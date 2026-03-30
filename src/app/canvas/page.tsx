@@ -951,28 +951,58 @@ function QueryNodeCard({
 
 // ── NodePicker ────────────────────────────────────────────────────────────
 
-type NewNodeType = "query" | "note" | "idea" | "list";
+type NewNodeType =
+  | "query"
+  | "insights" | "scenarios" | "decision" | "followups"
+  | "note" | "idea" | "list";
 
-const NODE_PICKER_OPTIONS: {
-  type: NewNodeType; icon: string; label: string; desc: string; bg: string; color: string;
-}[] = [
-  { type: "query", icon: "⌕", label: "Abfrage", desc: "KI-Analyse starten",               bg: "#E4FF97", color: "#0A0A0A" },
-  { type: "note",  icon: "✎",  label: "Notiz",   desc: "Freitext, Beobachtung",             bg: "#FFF9C4", color: "#5D4037" },
-  { type: "idea",  icon: "◇",  label: "Idee",    desc: "Hypothese oder Ansatz",             bg: "#FFF3E0", color: "#E65100" },
-  { type: "list",  icon: "≡",  label: "Liste",   desc: "Strukturierte Aufzählung",          bg: "#E8F5E9", color: "#1B5E20" },
+interface NodePickerOption {
+  type: NewNodeType;
+  icon: string;
+  label: string;
+  desc: string;
+  bg: string;
+  color: string;
+  section: "analyse" | "karte";
+}
+
+const NODE_PICKER_OPTIONS: NodePickerOption[] = [
+  // ── KI-Analyse ──────────────────────────────────────────────────────────
+  { type: "query",    icon: "⌕", label: "Abfrage",       desc: "Vollständige KI-Analyse starten",        bg: "#E4FF97", color: "#0A0A0A",  section: "analyse" },
+  { type: "insights", icon: "◉", label: "Erkenntnisse",  desc: "Kernaussagen & Muster extrahieren",       bg: "#C3F4D3", color: "#0F6038",  section: "analyse" },
+  { type: "scenarios",icon: "◈", label: "Szenarien",     desc: "Optimist. / wahrsch. / pessim. Zukunft",  bg: "#FDE2FF", color: "#7C1A9E",  section: "analyse" },
+  { type: "decision", icon: "◆", label: "Empfehlung",    desc: "Konkreten Handlungsrahmen ableiten",      bg: "#D4F4F4", color: "#0A6060",  section: "analyse" },
+  { type: "followups",icon: "◎", label: "Folgefragen",   desc: "Offene Fragen & nächste Schritte",        bg: "#FFF5BA", color: "#7A5C00",  section: "analyse" },
+  // ── Karten ──────────────────────────────────────────────────────────────
+  { type: "note",  icon: "✎", label: "Notiz",   desc: "Freitext, Beobachtung, Quelle",   bg: "#FFF9C4", color: "#5D4037", section: "karte" },
+  { type: "idea",  icon: "◇", label: "Idee",    desc: "Hypothese, Ansatz, These",        bg: "#FFF3E0", color: "#E65100", section: "karte" },
+  { type: "list",  icon: "≡", label: "Liste",   desc: "Strukturierte Aufzählung",        bg: "#E8F5E9", color: "#1B5E20", section: "karte" },
 ];
 
-function NodePicker({ onSelect, onClose }: { onSelect: (t: NewNodeType) => void; onClose: () => void }) {
+const SECTION_LABELS: Record<"analyse" | "karte", string> = {
+  analyse: "KI-Analyse",
+  karte:   "Karte",
+};
+
+function NodePicker({ onSelect, onClose, hasContext }: {
+  onSelect: (t: NewNodeType) => void;
+  onClose: () => void;
+  hasContext?: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const filtered = NODE_PICKER_OPTIONS.filter(o =>
-    o.label.toLowerCase().includes(search.toLowerCase()) ||
-    o.desc.toLowerCase().includes(search.toLowerCase())
-  );
+  const allOptions = NODE_PICKER_OPTIONS;
+  const filtered = search.trim()
+    ? allOptions.filter(o =>
+        o.label.toLowerCase().includes(search.toLowerCase()) ||
+        o.desc.toLowerCase().includes(search.toLowerCase())
+      )
+    : allOptions;
+
   useEffect(() => { setCursor(0); }, [search]);
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -982,45 +1012,86 @@ function NodePicker({ onSelect, onClose }: { onSelect: (t: NewNodeType) => void;
     if (e.key === "Escape") onClose();
   };
 
+  // Group by section (only when not filtering)
+  const sections = search.trim()
+    ? null
+    : (["analyse", "karte"] as const).map(sec => ({
+        key: sec,
+        label: SECTION_LABELS[sec],
+        items: filtered.filter(o => o.section === sec),
+      })).filter(s => s.items.length > 0);
+
+  // Flat index mapping for cursor (sections view)
+  const flatItems = sections ? sections.flatMap(s => s.items) : filtered;
+
+  const renderItem = (item: NodePickerOption, flatIdx: number) => (
+    <div key={item.type}
+      onClick={() => onSelect(item.type)}
+      onMouseEnter={() => setCursor(flatIdx)}
+      title={item.desc}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8,
+        cursor: "pointer", transition: "background 0.1s",
+        background: cursor === flatIdx ? "var(--color-page-bg)" : "transparent",
+      }}
+    >
+      <div style={{
+        width: 32, height: 32, borderRadius: 7, flexShrink: 0,
+        background: item.bg, border: "1px solid rgba(0,0,0,0.07)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 15, color: item.color, fontWeight: 700,
+      }}>
+        {item.icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)" }}>{item.label}</div>
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.desc}</div>
+      </div>
+      {item.section === "analyse" && (
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", color: item.color, background: item.bg, border: `1px solid ${item.color}33`, borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>KI</span>
+      )}
+    </div>
+  );
+
   return (
     <div onPointerDown={e => e.stopPropagation()}
-      style={{ width: 300, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.16)", overflow: "hidden" }}
+      style={{ width: 340, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", overflow: "hidden" }}
     >
-      {/* Search */}
-      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>⌕</span>
-        <input
-          ref={inputRef}
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Suchen…"
-          style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "var(--color-text-primary)", fontFamily: "inherit" }}
-        />
+      {/* Header */}
+      <div style={{ padding: "10px 14px 9px", borderBottom: "1px solid var(--color-border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>⌕</span>
+          <input
+            ref={inputRef}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder={hasContext ? "Iteration auswählen…" : "Typ auswählen…"}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "var(--color-text-primary)", fontFamily: "inherit" }}
+          />
+        </div>
+        {hasContext && (
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 5, paddingLeft: 21 }}>
+            KI-Typen verwenden den Kontext der Eltern-Karte als Ausgangspunkt
+          </div>
+        )}
       </div>
 
-      {/* Items */}
-      <div style={{ padding: "6px" }}>
-        {filtered.map((item, i) => (
-          <div key={item.type}
-            onClick={() => onSelect(item.type)}
-            onMouseEnter={() => setCursor(i)}
-            style={{
-              display: "flex", alignItems: "center", gap: 12, padding: "9px 10px", borderRadius: 8, cursor: "pointer",
-              background: cursor === i ? "var(--color-page-bg)" : "transparent", transition: "background 0.1s",
-            }}
-          >
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: item.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0, border: "1px solid rgba(0,0,0,0.06)" }}>
-              {item.icon}
+      {/* Items — sectioned or flat */}
+      <div style={{ padding: "6px 6px 4px", maxHeight: 380, overflowY: "auto" }}>
+        {sections ? (
+          sections.map(sec => (
+            <div key={sec.key}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", padding: "6px 10px 3px" }}>
+                {sec.label}
+              </div>
+              {sec.items.map(item => renderItem(item, flatItems.indexOf(item)))}
             </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)" }}>{item.label}</div>
-              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 1 }}>{item.desc}</div>
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <div style={{ padding: "16px 10px", textAlign: "center", fontSize: 12, color: "var(--color-text-muted)" }}>Keine Ergebnisse</div>
+          ))
+        ) : (
+          filtered.length > 0
+            ? filtered.map((item, i) => renderItem(item, i))
+            : <div style={{ padding: "16px 10px", textAlign: "center", fontSize: 12, color: "var(--color-text-muted)" }}>Keine Ergebnisse</div>
         )}
       </div>
 
@@ -1873,12 +1944,20 @@ export default function CanvasPage() {
     const ctx = iterateCtxRef.current;
     setIterateCtx(null);
 
-    if (type === "query") {
-      if (ctx) {
-        setCmdParentId(ctx.parentId); setCmdPrefill(ctx.prefill); setCmdVisible(true);
-      } else {
-        setCmdParentId(null); setCmdPrefill(""); setCmdVisible(true);
-      }
+    // ── KI-Analyse types: open CommandBox with focused prefill ──────────────
+    const ANALYSIS_PREFIXES: Partial<Record<NewNodeType, string>> = {
+      query:     "",
+      insights:  "Extrahiere die wichtigsten Erkenntnisse und Muster zu: ",
+      scenarios: "Entwickle optimistische, wahrscheinliche und pessimistische Szenarien für: ",
+      decision:  "Leite einen konkreten Handlungsrahmen und Empfehlungen ab für: ",
+      followups: "Welche offenen Fragen und nächsten Schritte ergeben sich aus: ",
+    };
+
+    if (type in ANALYSIS_PREFIXES) {
+      const prefix = ANALYSIS_PREFIXES[type] ?? "";
+      const prefill = ctx ? `${prefix}${ctx.prefill}` : "";
+      const parentId = ctx?.parentId ?? null;
+      setCmdParentId(parentId); setCmdPrefill(prefill); setCmdVisible(true);
       return;
     }
 
@@ -2417,7 +2496,7 @@ export default function CanvasPage() {
             {/* Backdrop */}
             <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onPointerDown={() => { setNodePickerVisible(false); setIterateCtx(null); }} />
             <div style={{ position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }}>
-              <NodePicker onSelect={handleNodeTypeSelect} onClose={() => { setNodePickerVisible(false); setIterateCtx(null); }} />
+              <NodePicker onSelect={handleNodeTypeSelect} onClose={() => { setNodePickerVisible(false); setIterateCtx(null); }} hasContext={!!iterateCtx} />
             </div>
           </>
         )}
