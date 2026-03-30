@@ -122,7 +122,24 @@ interface ListNode {
   parentId?: string;
 }
 
-type CanvasNode = QueryNode | DerivedNode | NoteNode | IdeaNode | ListNode;
+interface FileNode {
+  id: string;
+  nodeType: "file";
+  x: number;
+  y: number;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  fileUrl: string;
+  textContent?: string;
+  loading?: boolean;
+  createdAt: number;
+  customWidth?: number;
+  customHeight?: number;
+  parentId?: string;
+}
+
+type CanvasNode = QueryNode | DerivedNode | NoteNode | IdeaNode | ListNode | FileNode;
 
 interface Connection {
   from: string;
@@ -144,6 +161,7 @@ const QUERY_NODE_W       = 420;
 const QUERY_NODE_H       = 50;
 const DERIVED_W          = 256;
 const LIST_NODE_W        = 280;
+const FILE_NODE_W        = 300;
 const DERIVED_COL_GAP_X  = 72;
 const DERIVED_COL_GAP    = 16;
 const DERIVED_ROW_GAP    = 12;
@@ -510,6 +528,7 @@ function ConnectionsSVG({ nodes, connections }: { nodes: CanvasNode[]; connectio
           if (n.nodeType === "list") return LIST_NODE_W;
           if (n.nodeType === "note") return 280;
           if (n.nodeType === "idea") return 300;
+          if (n.nodeType === "file") return FILE_NODE_W;
           return DERIVED_W;
         };
         const fromW = from.customWidth ?? nodeDefaultW(from);
@@ -954,7 +973,7 @@ function QueryNodeCard({
 type NewNodeType =
   | "query"
   | "insights" | "scenarios" | "decision" | "followups"
-  | "note" | "idea" | "list";
+  | "note" | "idea" | "list" | "file";
 
 interface NodePickerOption {
   type: NewNodeType;
@@ -977,6 +996,7 @@ const NODE_PICKER_OPTIONS: NodePickerOption[] = [
   { type: "note",  icon: "✎", label: "Notiz",   desc: "Freitext, Beobachtung, Quelle",   bg: "#FFF9C4", color: "#5D4037", section: "karte" },
   { type: "idea",  icon: "◇", label: "Idee",    desc: "Hypothese, Ansatz, These",        bg: "#FFF3E0", color: "#E65100", section: "karte" },
   { type: "list",  icon: "≡", label: "Liste",   desc: "Strukturierte Aufzählung",        bg: "#E8F5E9", color: "#1B5E20", section: "karte" },
+  { type: "file",  icon: "📎", label: "Datei",   desc: "Dokument, Bild oder Text hochladen", bg: "#E8EDFF", color: "#3B5BDB", section: "karte" },
 ];
 
 const SECTION_LABELS: Record<"analyse" | "karte", string> = {
@@ -1110,7 +1130,7 @@ function NodePicker({ onSelect, onClose, hasContext }: {
 
 // ── NoteNodeCard ──────────────────────────────────────────────────────────
 
-function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onUpdate, onIterate, nodeW }: {
+function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onUpdate, onIterate, onPromote, nodeW }: {
   node: NoteNode; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
@@ -1118,6 +1138,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
   onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
   onUpdate: (id: string, content: string) => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPromote: (query: string) => void;
   nodeW: number;
 }) {
   const [editing, setEditing] = useState(!node.content);
@@ -1190,17 +1211,30 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         )}
       </div>
 
-      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "0 10px 7px", display: "flex", alignItems: "center", gap: 6 }}>
+      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "0 10px 7px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
           {formatNodeTime(node.createdAt)}
         </span>
         {node.content && (
           <button
             onClick={e => { e.stopPropagation(); onIterate(node.id, node.content); }}
+            title="Notiz weiterdenken"
             style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "rgba(0,0,0,0.3)", cursor: "pointer", lineHeight: 1.3, transition: "all 0.1s" }}
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.6)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
           >↺ rethink</button>
+        )}
+        {node.content && (
+          <>
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={e => { e.stopPropagation(); onPromote(node.content); }}
+              title="Notizinhalt als KI-Abfrage starten"
+              style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", cursor: "pointer", transition: "all 0.12s" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(249,168,37,0.2)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(249,168,37,0.1)"; }}
+            >Als Abfrage</button>
+          </>
         )}
       </div>
 
@@ -1553,6 +1587,181 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
   );
 }
 
+// ── FileNodeCard ──────────────────────────────────────────────────────────
+
+function fileIcon(fileType: string, fileName: string): string {
+  if (fileType.startsWith("image/")) return "🖼️";
+  if (fileType === "application/pdf") return "📄";
+  if (fileType.includes("spreadsheet") || fileName.endsWith(".csv") || fileName.endsWith(".xlsx")) return "📊";
+  if (fileType.includes("word") || fileName.endsWith(".docx")) return "📝";
+  if (fileType.includes("presentation") || fileName.endsWith(".pptx")) return "📑";
+  if (fileType.startsWith("video/")) return "🎬";
+  if (fileType.startsWith("audio/")) return "🎵";
+  if (fileType.includes("zip") || fileType.includes("archive")) return "🗜️";
+  if (fileType.startsWith("text/") || fileName.endsWith(".md") || fileName.endsWith(".txt")) return "📃";
+  if (fileType.includes("json") || fileName.endsWith(".json")) return "⚙️";
+  return "📎";
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function FileNodeCard({
+  node, selected, onSelect, onDragStart, onDelete, onResizeStart, onAnalyze, onIterate, nodeW,
+}: {
+  node: FileNode;
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onDragStart: (e: React.PointerEvent, id: string) => void;
+  onDelete: (id: string) => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onAnalyze: (query: string, parentId: string) => void;
+  onIterate: (nodeId: string, prefill: string) => void;
+  nodeW: number;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const nodeH = node.customHeight;
+  const isImage = node.fileType.startsWith("image/");
+  const icon = fileIcon(node.fileType, node.fileName);
+  const analyzeText = node.textContent
+    ? `Analysiere diesen Dateiinhalt ("${node.fileName}"):\n\n${node.textContent.slice(0, 3000)}`
+    : `Was kannst du über diese Datei sagen: ${node.fileName} (${node.fileType})`;
+
+  return (
+    <div
+      ref={cardRef}
+      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      style={{
+        position: "absolute", left: node.x, top: node.y, width: nodeW,
+        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
+        background: "#F0F4FF",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+        borderTop: "3px solid #4A6CF7",
+        borderRadius: 10,
+        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.08)" : "0 2px 8px rgba(0,0,0,0.06)",
+        userSelect: "none",
+        opacity: node.loading ? 0.65 : 1,
+      }}
+    >
+      {/* Header / drag handle */}
+      <div
+        onPointerDown={e => onDragStart(e, node.id)}
+        style={{ padding: "9px 10px 7px", cursor: "grab", borderBottom: "1px solid rgba(74,108,247,0.1)", display: "flex", alignItems: "center", gap: 8 }}
+      >
+        <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#0A0A0A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            title={node.fileName}
+          >{node.fileName}</div>
+          <div style={{ fontSize: 10, color: "rgba(0,0,0,0.4)", marginTop: 1 }}>
+            {formatFileSize(node.fileSize)}
+            {node.fileType ? ` · ${node.fileType.split("/")[1]?.toUpperCase() ?? node.fileType}` : ""}
+          </div>
+        </div>
+        <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", gap: 1, flexShrink: 0 }}>
+          <button
+            onClick={e => { e.stopPropagation(); onIterate(node.id, node.fileName); }}
+            title="Iteration starten"
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "rgba(0,0,0,0.3)", fontSize: 14, borderRadius: 4, lineHeight: 1, fontWeight: 300 }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#1A9E5A"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.3)"; }}
+          >+</button>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(node.id); }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "rgba(0,0,0,0.25)", fontSize: 11, borderRadius: 4 }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.25)"}
+            title="Karte löschen"
+          >✕</button>
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {node.loading && (
+        <div style={{ padding: "12px 14px", fontSize: 12, color: "rgba(74,108,247,0.8)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16, animation: "cur-blink 0.8s steps(1) infinite" }}>⋯</span>
+          Datei wird hochgeladen…
+        </div>
+      )}
+
+      {/* Image preview */}
+      {!node.loading && isImage && node.fileUrl && (
+        <div
+          onPointerDown={e => e.stopPropagation()}
+          style={{ padding: "8px 10px 4px", display: "flex", justifyContent: "center" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={node.fileUrl}
+            alt={node.fileName}
+            style={{ maxWidth: "100%", maxHeight: nodeH ? nodeH - 120 : 180, borderRadius: 6, objectFit: "contain", display: "block" }}
+          />
+        </div>
+      )}
+
+      {/* Text preview */}
+      {!node.loading && !isImage && node.textContent && (
+        <div
+          onPointerDown={e => e.stopPropagation()}
+          style={{ padding: "8px 10px 4px", maxHeight: 120, overflow: "hidden", position: "relative" }}
+        >
+          <pre style={{ fontSize: 10, lineHeight: 1.5, color: "rgba(0,0,0,0.55)", margin: 0, whiteSpace: "pre-wrap", fontFamily: "ui-monospace, monospace", overflowWrap: "break-word" }}>
+            {node.textContent.slice(0, 400)}
+          </pre>
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 24, background: "linear-gradient(transparent, #F0F4FF)" }} />
+        </div>
+      )}
+
+      {/* Footer */}
+      <div
+        onPointerDown={e => e.stopPropagation()}
+        style={{ padding: "6px 10px 8px", borderTop: "1px solid rgba(74,108,247,0.1)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
+      >
+        <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
+          {formatNodeTime(node.createdAt)}
+        </span>
+        {node.fileUrl && (
+          <a
+            href={node.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            title="Datei in neuem Tab öffnen"
+            style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none", lineHeight: 1.3 }}
+          >↗ Öffnen</a>
+        )}
+        {!node.loading && (node.textContent || isImage) && (
+          <button
+            onClick={e => { e.stopPropagation(); onAnalyze(analyzeText, node.id); }}
+            title="Dateiinhalt mit KI analysieren"
+            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7", cursor: "pointer", transition: "all 0.12s", marginLeft: "auto" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"; }}
+          >Analysieren</button>
+        )}
+      </div>
+
+      {/* Right resize handle */}
+      <div
+        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
+        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", zIndex: 10, background: "transparent", transition: "background 0.15s", borderRadius: "0 10px 10px 0" }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+      />
+      {/* Bottom resize handle */}
+      <div
+        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "v"); }}
+        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", zIndex: 10, background: "transparent", transition: "background 0.15s" }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+      />
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function CanvasPage() {
@@ -1603,6 +1812,11 @@ export default function CanvasPage() {
   const viewportRef  = useRef<HTMLDivElement>(null);
   const saveTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // ── File upload refs ──────────────────────────────────────────────────────
+  const fileInputRef     = useRef<HTMLInputElement>(null);
+  const fileUploadPosRef = useRef<{ x: number; y: number } | null>(null);
+  const fileUploadParentRef = useRef<string | null>(null);
 
   // ── Project API functions ─────────────────────────────────────────────────
 
@@ -1832,7 +2046,8 @@ export default function CanvasPage() {
       if (parent) {
         const parentW = parent.customWidth ?? (
           parent.nodeType === "query" ? QUERY_NODE_W :
-          parent.nodeType === "list"  ? LIST_NODE_W  : DERIVED_W
+          parent.nodeType === "list"  ? LIST_NODE_W  :
+          parent.nodeType === "file"  ? FILE_NODE_W  : DERIVED_W
         );
         const siblings = nodesRef.current.filter(n => n.parentId === parentId && n.nodeType === "query");
         return { x: parent.x + parentW + 80, y: parent.y + siblings.length * 28 };
@@ -1933,6 +2148,67 @@ export default function CanvasPage() {
     setNodes(prev => prev.map(n => n.id === id && n.nodeType === "list" ? { ...n, title, items } : n));
   }, []);
 
+  const handlePromoteNote = useCallback((query: string) => {
+    submitQuery(query);
+  }, [submitQuery]);
+
+  // ── File upload ────────────────────────────────────────────────────────────
+
+  const uploadFile = useCallback(async (file: File, pos: { x: number; y: number }, parentId?: string) => {
+    const id = uid();
+    const placeholderNode: FileNode = {
+      id, nodeType: "file", x: pos.x, y: pos.y,
+      fileName: file.name, fileSize: file.size, fileType: file.type || "application/octet-stream",
+      fileUrl: "", loading: true, createdAt: Date.now(), parentId,
+    };
+    setNodes(prev => [...prev, placeholderNode]);
+    if (parentId) setConnections(prev => [...prev, { from: parentId, to: id, derived: true }]);
+    setSelectedId(id);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/v1/canvas/upload", { method: "POST", body: formData });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setNodes(prev => prev.map(n =>
+        n.id === id && n.nodeType === "file"
+          ? { ...n, fileUrl: json.fileUrl, textContent: json.textContent, loading: false }
+          : n
+      ));
+    } catch {
+      setNodes(prev => prev.filter(n => n.id !== id));
+    }
+  }, []);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    const pos = fileUploadPosRef.current ?? getNextQueryPos();
+    const parentId = fileUploadParentRef.current ?? undefined;
+    fileUploadPosRef.current = null;
+    fileUploadParentRef.current = null;
+    uploadFile(file, pos, parentId);
+  }, [uploadFile, getNextQueryPos]);
+
+  const triggerFileUpload = useCallback((pos: { x: number; y: number }, parentId?: string) => {
+    fileUploadPosRef.current = pos;
+    fileUploadParentRef.current = parentId ?? null;
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleCanvasDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = (e.clientX - rect.left - panXRef.current) / zoomRef.current;
+    const y = (e.clientY - rect.top - panYRef.current) / zoomRef.current;
+    uploadFile(file, { x, y });
+  }, [uploadFile]);
+
   const handleIterateFromNode = useCallback((nodeId: string, prefill: string) => {
     setIterateCtx({ parentId: nodeId, prefill });
     setNodePickerVisible(true);
@@ -1970,6 +2246,8 @@ export default function CanvasPage() {
         ? ((parent as QueryNode).customWidth ?? QUERY_NODE_W)
         : parent.nodeType === "list"
         ? ((parent as ListNode).customWidth ?? LIST_NODE_W)
+        : parent.nodeType === "file"
+        ? ((parent as FileNode).customWidth ?? FILE_NODE_W)
         : ((parent as DerivedNode | NoteNode | IdeaNode).customWidth ?? DERIVED_W);
       return { x: parent.x + parentW + 64, y: parent.y + 80 };
     };
@@ -2004,9 +2282,13 @@ export default function CanvasPage() {
       };
       setNodes(prev => [...prev, node]);
       if (ctx?.parentId) setConnections(prev => [...prev, { from: ctx.parentId, to: id, derived: true }]);
+    } else if (type === "file") {
+      // Open file picker — upload will create the node
+      triggerFileUpload(pos, ctx?.parentId);
+      return; // node creation happens asynchronously in handleFileInputChange
     }
     setSelectedId(id);
-  }, [getNextQueryPos]);
+  }, [getNextQueryPos, triggerFileUpload]);
 
   const clearCanvas = useCallback(() => {
     if (!window.confirm(de ? "Canvas leeren?" : "Clear canvas?")) return;
@@ -2346,11 +2628,22 @@ export default function CanvasPage() {
         </div>
       </header>
 
+      {/* Hidden file input for NodePicker "Datei" upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="*/*"
+        style={{ display: "none" }}
+        onChange={handleFileInputChange}
+      />
+
       {/* ── Canvas viewport ──────────────────────────────────────── */}
       <div
         ref={viewportRef}
         onPointerDown={handleViewportPointerDown}
         onWheel={handleWheel}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+        onDrop={handleCanvasDrop}
         style={{
           flex: 1, position: "relative", overflow: "hidden",
           backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.09) 1px, transparent 1px)",
@@ -2394,6 +2687,7 @@ export default function CanvasPage() {
                   onResizeStart={handleResizeStart}
                   onUpdate={handleUpdateNote}
                   onIterate={handleIterateFromNode}
+                  onPromote={handlePromoteNote}
                   nodeW={nNode.customWidth ?? 280}
                 />
               );
@@ -2428,6 +2722,22 @@ export default function CanvasPage() {
                   onUpdate={handleUpdateList}
                   onIterate={handleIterateFromNode}
                   nodeW={lNode.customWidth ?? 280}
+                />
+              );
+            }
+            if (n.nodeType === "file") {
+              const fNode = n as FileNode;
+              return (
+                <FileNodeCard key={n.id}
+                  node={fNode}
+                  selected={selectedId === n.id}
+                  onSelect={setSelectedId}
+                  onDragStart={handleDragStart}
+                  onDelete={deleteNode}
+                  onResizeStart={handleResizeStart}
+                  onAnalyze={(query, parentId) => submitQuery(query, parentId)}
+                  onIterate={handleIterateFromNode}
+                  nodeW={fNode.customWidth ?? FILE_NODE_W}
                 />
               );
             }
