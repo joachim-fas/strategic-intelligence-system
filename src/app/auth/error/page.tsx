@@ -1,0 +1,76 @@
+/**
+ * Auth error page.
+ */
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+
+function ErrorContent() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+
+  const messages: Record<string, string> = {
+    Configuration: "Server configuration error. Contact the administrator.",
+    AccessDenied: "Zugang verweigert. Deine E-Mail ist nicht auf der Zulassungsliste.",
+    Verification: "Der Anmeldelink ist abgelaufen oder wurde bereits verwendet.",
+    Default: "Ein Authentifizierungsfehler ist aufgetreten.",
+  };
+
+  const message = messages[error ?? ""] ?? messages.Default;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
+      <div style={{ maxWidth: 420, width: "100%", padding: "40px 32px", textAlign: "center" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 32 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "#E4FF97", border: "1.5px solid rgba(0,0,0,0.12)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 10, fontWeight: 700, color: "#0A0A0A", letterSpacing: "0.05em",
+          }}>SIS</div>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Strategic Intelligence System</div>
+            <div style={{ fontSize: 11, color: "#9B9B9B" }}>Zugang nur für autorisierte Nutzer</div>
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #E8E8E8", borderRadius: 16, padding: "28px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12, background: "#FDEEE9", border: "1px solid #F4A090",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto 20px",
+          }}>⚠</div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", marginBottom: 10, marginTop: 0 }}>Authentifizierungsfehler</h1>
+          <p style={{ fontSize: 14, color: "#6B6B6B", lineHeight: 1.6, margin: "0 0 24px" }}>{message}</p>
+          <a
+            href="/auth/signin"
+            style={{
+              display: "inline-block", padding: "11px 24px", borderRadius: 10,
+              background: "#0A0A0A", color: "#FFFFFF", fontSize: 14, fontWeight: 600,
+              textDecoration: "none", transition: "background 0.15s",
+            }}
+            onMouseOver={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "#1A1A1A"; }}
+            onMouseOut={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "#0A0A0A"; }}
+          >
+            Erneut versuchen
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
+          <p style={{ color: "#9B9B9B", fontSize: 14 }}>Lädt…</p>
+        </div>
+      }
+    >
+      <ErrorContent />
+    </Suspense>
+  );
+}

@@ -1,0 +1,600 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════
+   GRAIN UI — DESIGN TOKENS
+   Primärfarbe:  #E4FF97  Neon Yellow / Lime
+   Pastell:      Rose · Peach · Mint · Orchid · Blue · Butter · Orange · Aqua
+   Signale:      Smaragd (↑) · Koralle (↓) · Slate (→)
+   SIS-Aktion:   Indigo #4F46E5 (CTA-Buttons bleiben Indigo — SIS-Identität)
+   Schriften:    Bricolage Grotesque · DM Sans · Lora · JetBrains Mono
+═══════════════════════════════════════════════════════ */
+
+/* ── Tailwind v4 Font-Tokens ── */
+@theme {
+  --font-family-display: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  --font-family-sans:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
+  --font-family-mono:    var(--font-mono, "JetBrains Mono"), monospace;
+  --font-family-serif:   var(--font-serif, "Lora"), Georgia, serif;
+  /* Grain UI font aliases */
+  --font-family-ui:      var(--font-sans, "DM Sans"), system-ui, sans-serif;
+  --font-family-body:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
+
+  /* Grain UI Color-Mapping → Tailwind --color-* */
+  --color-background:          #FFFFFF;
+  --color-foreground:          #0A0A0A;
+  --color-card:                #FFFFFF;
+  --color-card-foreground:     #0A0A0A;
+  --color-primary:             #E4FF97;
+  --color-primary-foreground:  #000000;
+  --color-secondary:           #F4F4F4;
+  --color-secondary-foreground:#0A0A0A;
+  --color-muted:               #F7F7F7;
+  --color-muted-foreground:    #6B6B6B;
+  --color-accent:              #E4FF97;
+  --color-accent-foreground:   #000000;
+  --color-destructive:         #E8402A;
+  --color-border:              #E8E8E8;
+  --color-input:               #E8E8E8;
+  --color-ring:                #0A0A0A;
+  --radius: 0.5rem;
+}
+
+:root {
+  /* ── Typography — Next.js font variables ── */
+  --font-ui:       var(--font-sans, "DM Sans"), system-ui, sans-serif;
+  --font-heading:  var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  --font-code:     var(--font-mono, "JetBrains Mono"), monospace;
+  --font-editorial:var(--font-serif, "Lora"), Georgia, serif;
+
+  /* ── Grain UI Core Neutrals ── */
+  --color-page-bg:       #FFFFFF;
+  --color-surface:       #FFFFFF;
+  --color-surface-2:     #F4F4F4;
+  --color-border:        #E8E8E8;
+  --color-border-strong: #CCCCCC;
+  --color-text-heading:  #000000;
+  --color-text-primary:  #0A0A0A;
+  --color-text-secondary:#3A3A3A;
+  --color-text-subtle:   #6B6B6B;
+  --color-text-muted:    #9B9B9B;
+
+  /* ── Grain UI Lime/Yellow — Akzent ── */
+  --color-lime:        #E4FF97;
+  --color-lime-hover:  #D4F080;
+  --color-lime-deep:   #C8F060;
+  --color-lime-light:  #F5FFE0;
+
+  /* ── SIS Brand — Grain: Schwarz + Lime ── */
+  --color-brand:        #0A0A0A;
+  --color-brand-hover:  #1A1A1A;
+  --color-brand-light:  #E4FF97;
+  --color-brand-mid:    #D4F080;
+  --color-brand-text:   #0A0A0A;
+
+  /* ── Grain UI 8 Pastell-Farben ── */
+  --pastel-rose:    #FFD6E0;   /* Rose Quartz   */
+  --pastel-peach:   #FFECD2;   /* Peach Cream   */
+  --pastel-mint:    #C3F4D3;   /* Mint Green    */
+  --pastel-orchid:  #FDE2FF;   /* Soft Orchid   */
+  --pastel-blue:    #D4E8FF;   /* Baby Blue     */
+  --pastel-butter:  #FFF5BA;   /* Butter Yellow */
+  --pastel-orange:  #FFE0CC;   /* Powder Orange */
+  --pastel-aqua:    #D6F5F5;   /* Aqua Mist     */
+
+  /* Pastell-Textfarben */
+  --pastel-rose-text:   #A0244A;
+  --pastel-peach-text:  #955A20;
+  --pastel-mint-text:   #0F6038;
+  --pastel-orchid-text: #7C1A9E;
+  --pastel-blue-text:   #1A4A8A;
+  --pastel-butter-text: #7A5C00;
+  --pastel-orange-text: #8A3A10;
+  --pastel-aqua-text:   #1A6A6A;
+
+  /* Pastell-Borders */
+  --pastel-rose-border:   #F4A0B8;
+  --pastel-peach-border:  #F0C090;
+  --pastel-mint-border:   #7DD4A8;
+  --pastel-orchid-border: #D4A0F0;
+  --pastel-blue-border:   #80B8F0;
+  --pastel-butter-border: #E0C840;
+  --pastel-orange-border: #F0A870;
+  --pastel-aqua-border:   #80D0D0;
+
+  /* ── Signal-Farben (Grain UI) ── */
+  --signal-positive:        #1A9E5A;
+  --signal-positive-light:  #E8F8EF;
+  --signal-positive-border: #7DD4A8;
+  --signal-positive-text:   #0F6038;
+
+  --signal-negative:        #E8402A;
+  --signal-negative-light:  #FDEEE9;
+  --signal-negative-border: #F4A090;
+  --signal-negative-text:   #A01A08;
+
+  --signal-neutral:         #6B7A9A;
+  --signal-neutral-light:   #F0F2F7;
+  --signal-neutral-border:  #B0BACC;
+  --signal-neutral-text:    #3A4560;
+
+  /* ── Semantische Aliase ── */
+  --color-success:       var(--signal-positive);
+  --color-success-light: var(--signal-positive-light);
+  --color-success-mid:   var(--signal-positive-border);
+  --color-warning:       #C8820A;
+  --color-warning-light: var(--pastel-butter);
+  --color-warning-mid:   var(--pastel-butter-border);
+  --color-danger:        var(--signal-negative);
+  --color-danger-light:  var(--signal-negative-light);
+  --color-danger-mid:    var(--signal-negative-border);
+  /* NOTE: --color-accent intentionally NOT set here — must not override @theme */
+  --color-highlight:     var(--pastel-orchid);  /* orchid für spezielle Akzente */
+
+  /* ── Ring-Status-Farben (Pastell-Mapping) ── */
+  --color-adopt:     var(--signal-positive);
+  --color-trial:     #2563EB;
+  --color-assess:    #C8820A;
+  --color-hold:      var(--signal-neutral);
+
+  /* ── Grain UI Border-Radius ── */
+  --radius-xs:   3px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
+  --radius-full: 9999px;
+
+  /* ── Grain UI Shadows (minimalist, kein heavy shadow) ── */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 3px 8px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 20px rgba(0,0,0,0.07), 0 3px 8px rgba(0,0,0,0.04);
+
+  /* ── Spacing ── */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+  --space-10: 40px; --space-12: 48px;
+
+  /* ── shadcn/ui compatibility ── */
+  --background:          #FFFFFF;
+  --foreground:          #0A0A0A;
+  --card:                #FFFFFF;
+  --card-foreground:     #0A0A0A;
+  --primary:             #E4FF97;
+  --primary-foreground:  #000000;
+  --secondary:           #F4F4F4;
+  --secondary-foreground:#0A0A0A;
+  --muted:               #F7F7F7;
+  --muted-foreground:    #6B6B6B;
+  --accent:              #E4FF97;
+  --accent-foreground:   #000000;
+  --destructive:         #E8402A;
+  --border:              #E8E8E8;
+  --input:               #E8E8E8;
+  --ring:                #0A0A0A;
+  --radius:              0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════════════════ */
+body {
+  background: var(--color-page-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--color-text-heading);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+═══════════════════════════════════════════════════════ */
+.text-display    { font-family: var(--font-heading); font-size: 32px; line-height: 1.1; font-weight: 800; letter-spacing: -0.04em; }
+.text-heading-1  { font-family: var(--font-heading); font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -0.03em; }
+.text-heading-2  { font-family: var(--font-heading); font-size: 18px; line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; }
+.text-heading-3  { font-size: 15px; line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
+.text-body-lg    { font-size: 16px; line-height: 1.65; font-weight: 400; }
+.text-body       { font-size: 15px; line-height: 1.65; font-weight: 400; }
+.text-body-sm    { font-size: 13px; line-height: 1.55; font-weight: 400; }
+.text-label      { font-size: 11px; line-height: 1.4; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.text-caption    { font-size: 12px; line-height: 1.4; font-weight: 400; color: var(--color-text-muted); }
+.text-mono       { font-family: var(--font-code); font-size: 13px; line-height: 1.5; }
+.text-numeric    { font-family: var(--font-code); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ═══════════════════════════════════════════════════════
+   GRAIN TEXTURE — subtle noise overlay (used by GrainCard/GrainStat)
+═══════════════════════════════════════════════════════ */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* glass utility */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARD — Grain UI style (kein Grey-Header, border-only)
+═══════════════════════════════════════════════════════ */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* Section label — font-mono per Grain UI spec */
+.section-label {
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BUTTONS — Grain UI: solid schwarz + lime-Accent
+═══════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  height: 36px;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+/* Primär: SIS Indigo (bleibt als CTA-Identität) */
+.btn-primary {
+  background: #0A0A0A;
+  color: white;
+  border-color: #0A0A0A;
+}
+.btn-primary:hover { background: #1A1A1A; border-color: #1A1A1A; }
+
+/* Sekundär: Lime-Yellow */
+.btn-lime {
+  background: var(--color-lime);
+  color: #000000;
+  border-color: var(--color-lime);
+  ring: 1px solid rgba(0,0,0,0.1);
+}
+.btn-lime:hover { background: var(--color-lime-hover); }
+
+/* Outline */
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  border-color: rgba(0,0,0,0.2);
+}
+.btn-secondary:hover { background: var(--color-surface-2); border-color: rgba(0,0,0,0.4); }
+
+/* Ghost */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-subtle);
+  border-color: transparent;
+  height: 32px;
+  padding: 0 10px;
+}
+.btn-ghost:hover { background: var(--color-surface-2); color: var(--color-text-primary); }
+
+/* ═══════════════════════════════════════════════════════
+   BADGES — Grain UI: rounded-full, pastell
+═══════════════════════════════════════════════════════ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+.badge-lime    { background: var(--color-lime); color: #000000; border-color: var(--color-lime-deep); }
+.badge-success { background: var(--signal-positive-light); color: var(--signal-positive-text); border-color: var(--signal-positive-border); }
+.badge-warning { background: var(--pastel-butter); color: var(--pastel-butter-text); border-color: var(--pastel-butter-border); }
+.badge-danger  { background: var(--signal-negative-light); color: var(--signal-negative-text); border-color: var(--signal-negative-border); }
+.badge-brand   { background: var(--color-lime); color: #0A0A0A; border-color: var(--color-lime-deep); }
+.badge-neutral { background: var(--signal-neutral-light); color: var(--signal-neutral-text); border-color: var(--signal-neutral-border); }
+
+/* Pastell-Badges (für Trend-Kategorien) */
+.badge-mint    { background: var(--pastel-mint);   color: var(--pastel-mint-text);   border-color: var(--pastel-mint-border); }
+.badge-blue    { background: var(--pastel-blue);   color: var(--pastel-blue-text);   border-color: var(--pastel-blue-border); }
+.badge-orchid  { background: var(--pastel-orchid); color: var(--pastel-orchid-text); border-color: var(--pastel-orchid-border); }
+.badge-peach   { background: var(--pastel-peach);  color: var(--pastel-peach-text);  border-color: var(--pastel-peach-border); }
+.badge-rose    { background: var(--pastel-rose);   color: var(--pastel-rose-text);   border-color: var(--pastel-rose-border); }
+.badge-aqua    { background: var(--pastel-aqua);   color: var(--pastel-aqua-text);   border-color: var(--pastel-aqua-border); }
+
+/* ── Ring-Status-Badges (Pastell) ── */
+.ring-adopt  { background: var(--pastel-mint);   color: var(--pastel-mint-text);   border: 1px solid var(--pastel-mint-border); }
+.ring-trial  { background: var(--pastel-blue);   color: var(--pastel-blue-text);   border: 1px solid var(--pastel-blue-border); }
+.ring-assess { background: var(--pastel-butter); color: var(--pastel-butter-text); border: 1px solid var(--pastel-butter-border); }
+.ring-hold   { background: var(--signal-neutral-light); color: var(--signal-neutral-text); border: 1px solid var(--signal-neutral-border); }
+
+/* ═══════════════════════════════════════════════════════
+   CHIPS — Grain UI: outline-style, farbig
+═══════════════════════════════════════════════════════ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.chip-brand   { background: var(--color-lime-light); color: #0A0A0A; border-color: var(--color-lime-deep); }
+.chip-brand:hover { background: var(--color-lime); border-color: var(--color-lime); box-shadow: var(--shadow-xs); }
+.chip-neutral { background: var(--color-surface-2); color: var(--color-text-secondary); border-color: var(--color-border); }
+.chip-neutral:hover { background: #EBEBEB; border-color: var(--color-border-strong); color: var(--color-text-primary); }
+
+/* ═══════════════════════════════════════════════════════
+   INFO-BLOCKS — Pastell-Hintergrund mit Akzent-Border
+═══════════════════════════════════════════════════════ */
+.info-block {
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid;
+  border-left-width: 3px;
+}
+
+.info-block-brand   { background: var(--color-lime-light); border-color: var(--color-lime-deep); border-left-color: #0A0A0A; }
+.info-block-warning { background: var(--pastel-butter);  border-color: var(--pastel-butter-border);  border-left-color: var(--color-warning); }
+.info-block-success { background: var(--pastel-mint);    border-color: var(--pastel-mint-border);    border-left-color: var(--color-success); }
+
+/* ═══════════════════════════════════════════════════════
+   INPUT
+═══════════════════════════════════════════════════════ */
+.input-base {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  font-size: 15px;
+  color: var(--color-text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  letter-spacing: -0.01em;
+}
+.input-base::placeholder { color: var(--color-text-muted); }
+.input-base:focus { border-color: #0A0A0A; box-shadow: 0 0 0 3px rgba(0,0,0,0.08); }
+
+/* Search Bar */
+.search-bar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 0 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.search-bar:focus-within {
+  border-color: #0A0A0A;
+  box-shadow: 0 0 0 3px rgba(228,255,151,0.6), var(--shadow-sm);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #A0A0A0; }
+
+/* ═══════════════════════════════════════════════════════
+   GRAIN UI FONT UTILITY CLASSES
+═══════════════════════════════════════════════════════ */
+.font-display { font-family: var(--font-heading, "Bricolage Grotesque"), system-ui, sans-serif; }
+.font-ui      { font-family: var(--font-ui, "DM Sans"), system-ui, sans-serif; }
+.font-body    { font-family: var(--font-editorial, "Lora"), Georgia, serif; }
+.font-mono    { font-family: var(--font-code, "JetBrains Mono"), monospace; }
+
+/* Display scale */
+.text-display-xl {
+  font-family: var(--font-heading); font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 1.0; letter-spacing: -0.04em; font-weight: 800;
+}
+.text-display-lg {
+  font-family: var(--font-heading); font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05; letter-spacing: -0.03em; font-weight: 700;
+}
+.text-display-md {
+  font-family: var(--font-heading); font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.1; letter-spacing: -0.025em; font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GLASS VARIANTS
+═══════════════════════════════════════════════════════ */
+.glass-strong {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.glass-dark {
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ═══════════════════════════════════════════════════════
+   BACKGROUND PATTERNS — Grain UI
+═══════════════════════════════════════════════════════ */
+.pattern-grid {
+  background-image:
+    linear-gradient(rgba(10, 10, 10, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10, 10, 10, 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.pattern-dots {
+  background-image: radial-gradient(rgba(10, 10, 10, 0.12) 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+.pattern-lines {
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 8px,
+    rgba(10, 10, 10, 0.05) 8px, rgba(10, 10, 10, 0.05) 9px
+  );
+}
+.pattern-cross {
+  background-image:
+    linear-gradient(rgba(10, 10, 10, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10, 10, 10, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BACKGROUND UTILITIES — Grain UI
+═══════════════════════════════════════════════════════ */
+.bg-grain-hero {
+  background-color: #E4FF97;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(10, 10, 10, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(10, 10, 10, 0.03) 0%, transparent 50%);
+}
+.bg-grain-gradient      { background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%); }
+.bg-grain-gradient-soft { background: linear-gradient(135deg, rgba(228,255,151,0.15) 0%, rgba(228,255,151,0.05) 100%); }
+.bg-atmospheric {
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(228,255,151,0.20) 0%, transparent 55%),
+    radial-gradient(ellipse at 70% 60%, rgba(10,10,10,0.06) 0%, transparent 50%),
+    #FFFFFF;
+}
+
+/* Text gradient */
+.text-gradient-fire {
+  background: linear-gradient(135deg, #0A0A0A 0%, #3A3A3A 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PASTELL UTILITY CLASSES
+═══════════════════════════════════════════════════════ */
+.bg-pastel-rose    { background-color: #FFD6E0; color: #000000; }
+.bg-pastel-peach   { background-color: #FFECD2; color: #000000; }
+.bg-pastel-mint    { background-color: #C3F4D3; color: #000000; }
+.bg-pastel-orchid  { background-color: #FDE2FF; color: #000000; }
+.bg-pastel-blue    { background-color: #D4E8FF; color: #000000; }
+.bg-pastel-butter  { background-color: #FFF5BA; color: #000000; }
+.bg-pastel-orange  { background-color: #FFE0CC; color: #000000; }
+.bg-pastel-aqua    { background-color: #D6F5F5; color: #000000; }
+
+/* ═══════════════════════════════════════════════════════
+   SIGNAL BADGE & DOT UTILITIES — Grain UI
+   Positiv (Smaragd) · Negativ (Koralle) · Neutral (Slate)
+═══════════════════════════════════════════════════════ */
+.signal-positive-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.6rem; border-radius: 9999px;
+  font-size: 0.75rem; font-weight: 600;
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  background-color: var(--signal-positive-light);
+  color: var(--signal-positive-text);
+  border: 1.5px solid var(--signal-positive-border);
+}
+.signal-negative-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.6rem; border-radius: 9999px;
+  font-size: 0.75rem; font-weight: 600;
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  background-color: var(--signal-negative-light);
+  color: var(--signal-negative-text);
+  border: 1.5px solid var(--signal-negative-border);
+}
+.signal-neutral-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.2rem 0.6rem; border-radius: 9999px;
+  font-size: 0.75rem; font-weight: 600;
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  background-color: var(--signal-neutral-light);
+  color: var(--signal-neutral-text);
+  border: 1.5px solid var(--signal-neutral-border);
+}
+.signal-positive-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--signal-positive); flex-shrink: 0; }
+.signal-negative-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--signal-negative); flex-shrink: 0; }
+.signal-neutral-dot  { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--signal-neutral);  flex-shrink: 0; }
+
+/* Delta & value utilities */
+.delta-up      { color: var(--signal-positive-text); font-family: var(--font-code); font-size: 0.8125rem; font-weight: 600; }
+.delta-down    { color: var(--signal-negative-text); font-family: var(--font-code); font-size: 0.8125rem; font-weight: 600; }
+.delta-neutral { color: var(--signal-neutral-text);  font-family: var(--font-code); font-size: 0.8125rem; font-weight: 600; }
+.value-positive { color: var(--signal-positive-text); font-family: var(--font-code); font-variant-numeric: tabular-nums; }
+.value-negative { color: var(--signal-negative-text); font-family: var(--font-code); font-variant-numeric: tabular-nums; }
+.value-neutral  { color: var(--signal-neutral-text);  font-family: var(--font-code); font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════════════════════
+   ANIMATIONEN — Grain UI
+═══════════════════════════════════════════════════════ */
+@keyframes breathe {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.8; }
+  50%       { transform: scale(1.05) translate(2%, 1%); opacity: 1; }
+}
+.animate-breathe { animation: breathe 8s ease-in-out infinite; }
+.delay-100 { animation-delay: 1s; }
+.delay-200 { animation-delay: 2s; }
+
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.cursor-blink { animation: cursor-blink 1s step-end infinite; }
