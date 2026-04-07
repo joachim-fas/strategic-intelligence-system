@@ -37,7 +37,13 @@ export default function SignalTicker() {
       .catch(() => {});
   }, []);
 
-  if (signals.length === 0) return null;
+  // Hide ticker when rendered inside an iframe (e.g. Canvas embedded in Werkstatt)
+  const [isIframe, setIsIframe] = useState(false);
+  useEffect(() => {
+    try { setIsIframe(window.self !== window.top); } catch { setIsIframe(true); }
+  }, []);
+
+  if (signals.length === 0 || isIframe) return null;
 
   return (
     <div style={{
