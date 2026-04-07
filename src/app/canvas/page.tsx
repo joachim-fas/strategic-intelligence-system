@@ -8,6 +8,7 @@ import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { TEMPLATES, FRAMEWORKS, type TemplateResult } from "@/lib/canvas-templates";
 import { BOARD_COLUMNS } from "@/lib/colors";
+import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
 
@@ -5318,42 +5319,15 @@ export default function CanvasPage() {
         <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setProjectDropdownOpen(false)} />
       )}
 
-      {/* ── Header (hidden when embedded in main page) ────────── */}
+      {/* ── Global Header (hidden when embedded) ────────── */}
+      {!embedded && hydrated && <AppHeader />}
+
+      {/* ── Canvas Toolbar (project management + tools) ────────── */}
       {!embedded && hydrated && (
-      <header style={{ height: 48, flexShrink: 0, zIndex: 200, display: "flex", alignItems: "center", padding: "0 20px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "rgba(255,255,255,0.88)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)" }}>
+      <div style={{ height: 42, flexShrink: 0, zIndex: 190, display: "flex", alignItems: "center", padding: "0 20px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface, rgba(255,255,255,0.92))" }}>
 
-        {/* Logo + back */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 24, height: 16 }} />
-          <a href="/" style={{ fontSize: 12, color: "var(--color-text-secondary)", textDecoration: "none", fontWeight: 500 }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"}
-          >← {de ? "Start" : "Home"}</a>
-          <a href="/projects" style={{ fontSize: 11, color: "var(--color-text-muted)", textDecoration: "none" }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"}
-          >{de ? "Projekte" : "Projects"}</a>
-        </div>
-        <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-heading)", letterSpacing: "-0.01em", flexShrink: 0 }}>Canvas</span>
-        <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-
-        {/* ── Global nav links ───────────────────────────────── */}
-        {([
-          { href: "/cockpit",  label: de ? "Cockpit"  : "Cockpit",   tip: de ? "Trend-Radar, Netzwerk & Trends" : "Trend radar, network & trends" },
-          { href: "/werkstatt", label: de ? "Werkstatt" : "Workshop", tip: de ? "Projekte & Denkarbeitsplatz" : "Projects & thinking workspace" },
-          { href: "/archiv",  label: de ? "Archiv"   : "Archive",  tip: de ? "Datenquellen & Methodik" : "Data sources & methodology" },
-        ] as { href: string; label: string; tip: string }[]).map(({ href, label, tip }) => (
-          <Tooltip key={href} content={tip} placement="bottom">
-            <a
-              href={href}
-              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-muted)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, transition: "color 0.12s, background 0.12s", whiteSpace: "nowrap" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >{label}</a>
-          </Tooltip>
-        ))}
+        {/* Canvas label */}
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", letterSpacing: "-0.01em", flexShrink: 0 }}>Canvas</span>
         <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
 
         {/* ── Project management ─────────────────────────────── */}
@@ -5581,7 +5555,7 @@ export default function CanvasPage() {
             </>
           )}
         </div>
-      </header>
+      </div>
       )}
 
       {/* Error banner */}

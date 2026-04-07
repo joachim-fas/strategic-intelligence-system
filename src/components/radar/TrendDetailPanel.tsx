@@ -9,6 +9,7 @@ import { autoClassify } from "@/lib/classify";
 import { getDrivers, getEffects, getInhibitors, calculateCascadeDepth, TrendEdge } from "@/lib/causal-graph";
 import { getRegulationsForTrend, getRegulatoryPressure } from "@/lib/regulations";
 import { getClusterForTrend } from "@/lib/trend-clusters";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 // ─── Grain pastel palette ──────────────────────────────────────────────
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
@@ -45,12 +46,12 @@ interface TrendDetailPanelProps {
 }
 
 // ─── ScoreBar ─────────────────────────────────────────────────────────
-function ScoreBar({ label, value, fillColor, trackColor }: {
-  label: string; value: number; fillColor: string; trackColor: string;
+function ScoreBar({ label, value, fillColor, trackColor, tooltip }: {
+  label: string; value: number; fillColor: string; trackColor: string; tooltip?: string;
 }) {
-  return (
+  const bar = (
     <div className="flex items-center gap-3">
-      <span className="text-xs text-[var(--volt-text-muted,#6B6B6B)] w-24">{label}</span>
+      <span className="text-xs text-[var(--volt-text-muted,#6B6B6B)] w-24 cursor-help">{label}</span>
       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: trackColor }}>
         <div
           className="h-full rounded-full transition-all duration-500"
@@ -60,6 +61,8 @@ function ScoreBar({ label, value, fillColor, trackColor }: {
       <span className="text-xs font-mono w-10 text-right text-[var(--volt-text,#3A3A3A)]">{(value * 100).toFixed(0)}%</span>
     </div>
   );
+  if (tooltip) return <Tooltip content={tooltip} placement="top">{bar}</Tooltip>;
+  return bar;
 }
 
 // ─── RegulatorySection ────────────────────────────────────────────────
@@ -351,22 +354,24 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
 
         {/* Badge row */}
         <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-          {/* Ring — with contextual help tooltip */}
-          <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
-            style={{ background: ringPastel.background, color: ringPastel.color }}
-            title={locale === "de"
-              ? trend.ring === "adopt" ? "Adopt: Sofort relevant, aktiv beobachten und einsetzen."
-                : trend.ring === "trial" ? "Trial: Vielversprechend, erste Pilotprojekte sinnvoll."
-                : trend.ring === "assess" ? "Assess: Beobachten, Relevanz für eigenen Kontext prüfen."
-                : "Hold: Langfristig relevant, aber noch nicht handlungsrelevant."
-              : trend.ring === "adopt" ? "Adopt: Immediately relevant, actively monitor and apply."
-                : trend.ring === "trial" ? "Trial: Promising, pilot projects recommended."
-                : trend.ring === "assess" ? "Assess: Monitor, evaluate relevance for own context."
-                : "Hold: Long-term relevant, not yet actionable."}
-          >
-            {getRingLabel(locale, trend.ring)}
-          </span>
+          {/* Ring — with Volt tooltip */}
+          <Tooltip content={locale === "de"
+            ? trend.ring === "adopt" ? "Adopt: Sofort relevant, aktiv beobachten und einsetzen."
+              : trend.ring === "trial" ? "Trial: Vielversprechend, erste Pilotprojekte sinnvoll."
+              : trend.ring === "assess" ? "Assess: Beobachten, Relevanz fuer eigenen Kontext pruefen."
+              : "Hold: Langfristig relevant, aber noch nicht handlungsrelevant."
+            : trend.ring === "adopt" ? "Adopt: Immediately relevant, actively monitor and apply."
+              : trend.ring === "trial" ? "Trial: Promising, pilot projects recommended."
+              : trend.ring === "assess" ? "Assess: Monitor, evaluate relevance for own context."
+              : "Hold: Long-term relevant, not yet actionable."
+          } placement="bottom">
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
+              style={{ background: ringPastel.background, color: ringPastel.color }}
+            >
+              {getRingLabel(locale, trend.ring)}
+            </span>
+          </Tooltip>
 
           {/* Category */}
           <span
@@ -390,15 +395,21 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             );
           })()}
 
-          {/* Velocity */}
+          {/* Velocity with tooltip */}
           {trend.velocity === "rising" && (
-            <span className="text-xs font-medium" style={{ color: "var(--pastel-mint-text, #0F6038)" }}>▲ {t(locale, "velocityRising")}</span>
+            <Tooltip content={locale === "de" ? "Steigend: Relevanz hat in den letzten 30 Tagen zugenommen" : "Rising: Relevance increased over the last 30 days"} placement="bottom">
+              <span className="text-xs font-medium cursor-help" style={{ color: "var(--pastel-mint-text, #0F6038)" }}>▲ {t(locale, "velocityRising")}</span>
+            </Tooltip>
           )}
           {trend.velocity === "falling" && (
-            <span className="text-xs font-medium" style={{ color: "var(--signal-negative, #C0341D)" }}>▼ {t(locale, "velocityFalling")}</span>
+            <Tooltip content={locale === "de" ? "Fallend: Relevanz hat in den letzten 30 Tagen abgenommen" : "Falling: Relevance decreased over the last 30 days"} placement="bottom">
+              <span className="text-xs font-medium cursor-help" style={{ color: "var(--signal-negative, #C0341D)" }}>▼ {t(locale, "velocityFalling")}</span>
+            </Tooltip>
           )}
           {trend.velocity === "stable" && (
-            <span className="text-xs text-[var(--volt-text-faint,#9B9B9B)]">— {t(locale, "stable")}</span>
+            <Tooltip content={locale === "de" ? "Stabil: Keine wesentliche Veraenderung in 30 Tagen" : "Stable: No significant change in 30 days"} placement="bottom">
+              <span className="text-xs cursor-help text-[var(--volt-text-faint,#9B9B9B)]">— {t(locale, "stable")}</span>
+            </Tooltip>
           )}
           {trend.userOverride && (
             <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "var(--pastel-butter, #FFF5BA)", color: "var(--pastel-butter-text, #7A5C00)" }}>
@@ -421,9 +432,12 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           {t(locale, "scores")}
         </h3>
         <div className="space-y-3">
-          <ScoreBar label={t(locale, "relevance")} value={trend.relevance} fillColor="#80B8F0" trackColor="#EBF3FF" />
-          <ScoreBar label={t(locale, "confidence")} value={trend.confidence} fillColor="#6FD99A" trackColor="#E8FAF0" />
-          <ScoreBar label={t(locale, "impact")} value={trend.impact} fillColor="#E0C840" trackColor="#FFFAE5" />
+          <ScoreBar label={t(locale, "relevance")} value={trend.relevance} fillColor="var(--pastel-sky-border, #80B8F0)" trackColor="var(--pastel-sky-light, #EBF3FF)"
+            tooltip={locale === "de" ? "Relevanz: Wie wichtig ist dieser Trend fuer strategische Entscheidungen (0-100%)" : "Relevance: How important is this trend for strategic decisions (0-100%)"} />
+          <ScoreBar label={t(locale, "confidence")} value={trend.confidence} fillColor="var(--pastel-mint-border, #6FD99A)" trackColor="var(--pastel-mint-light, #E8FAF0)"
+            tooltip={locale === "de" ? "Konfidenz: Wie sicher ist die Einschaetzung, basierend auf Quellenlage und Signalstaerke (0-100%)" : "Confidence: How certain is the assessment, based on source coverage and signal strength (0-100%)"} />
+          <ScoreBar label={t(locale, "impact")} value={trend.impact} fillColor="var(--pastel-butter-border, #E0C840)" trackColor="var(--pastel-butter-light, #FFFAE5)"
+            tooltip={locale === "de" ? "Impact: Potenzielle Auswirkung auf Wirtschaft, Gesellschaft oder Technologie (0-100%)" : "Impact: Potential effect on economy, society, or technology (0-100%)"} />
         </div>
         <div className="mt-4 flex items-center justify-between pt-3 border-t" style={{ borderColor: "var(--volt-border, #F0F0F0)" }}>
           <span className="text-xs text-[var(--volt-text-muted,#6B6B6B)]">{t(locale, "timeHorizon")}</span>
