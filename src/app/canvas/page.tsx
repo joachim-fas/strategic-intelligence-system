@@ -6077,7 +6077,14 @@ export default function CanvasPage() {
                             {(n as QueryNode).synthesis.slice(0,120)}
                           </p>
                         )}
-                        <div style={{ marginTop: 6, fontSize: 9, color: "var(--color-text-muted)" }}>{formatNodeTime(n.createdAt)}</div>
+                        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 9, color: "var(--color-text-muted)" }}>
+                          <span>{formatNodeTime(n.createdAt)}</span>
+                          {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
+                            <span style={{ color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color, fontWeight: 600 }}>
+                              {NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon} {NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.label}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -6109,6 +6116,9 @@ export default function CanvasPage() {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                       <span style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{n.nodeType}</span>
+                      {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
+                        <span style={{ fontSize: 8, color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color }}>{NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon}</span>
+                      )}
                       <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{formatNodeTime(n.createdAt)}</span>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-heading)", lineHeight: 1.4 }}>

@@ -502,14 +502,12 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
         </div>
       )}
 
-      {/* ── Regulatory Landscape ── */}
-      <RegulatorySection trendId={trend.id} locale={locale} />
-
-      {/* ── Live Signals ── */}
+      {/* ── Aktuelle Signale (prominent, before regulatory) ── */}
       <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider">
-            {locale === "de" ? "Live-Signale" : "Live Signals"}
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--signal-positive, #1A9E5A)" }}>
+            <span style={{ marginRight: 4 }}>●</span>
+            {locale === "de" ? "Aktuelle Signale" : "Active Signals"}
           </h3>
           {trend.signalCount > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)" }}>
@@ -599,6 +597,9 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           </div>
         )}
       </div>
+
+      {/* ── Regulatory Landscape ── */}
+      <RegulatorySection trendId={trend.id} locale={locale} />
 
       {/* ── Tags ── */}
       <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
