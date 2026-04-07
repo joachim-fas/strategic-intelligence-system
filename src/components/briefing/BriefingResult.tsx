@@ -188,33 +188,23 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             <SynthesisBlock text={briefing.synthesis} locale={locale} isHelp={isHelp} />
           )}
 
-          {/* 1b. Section preview chips */}
+          {/* 1b. Section preview chips — VoltBadge */}
           {!isHelp && (b.scenarios?.length > 0 || briefing.causalChain?.length > 0 || b.balancedScorecard || briefing.keyInsights?.length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {b.scenarios?.length > 0 && (
-                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
-                  ◈ {b.scenarios.length} {locale === "de" ? "Szenarien" : "Scenarios"}
-                </span>
+                <VoltBadge variant="muted" size="sm">◈ {b.scenarios.length} {locale === "de" ? "Szenarien" : "Scenarios"}</VoltBadge>
               )}
               {briefing.causalChain?.length > 0 && (
-                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
-                  ⬡ Kausalnetz
-                </span>
+                <VoltBadge variant="muted" size="sm">⬡ Kausalnetz</VoltBadge>
               )}
               {b.balancedScorecard?.perspectives?.length > 0 && (
-                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
-                  ◉ Scorecard
-                </span>
+                <VoltBadge variant="muted" size="sm">◉ Scorecard</VoltBadge>
               )}
               {briefing.keyInsights?.length > 0 && (
-                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
-                  → {briefing.keyInsights.length} {locale === "de" ? "Erkenntnisse" : "Insights"}
-                </span>
+                <VoltBadge variant="muted" size="sm">→ {briefing.keyInsights.length} {locale === "de" ? "Erkenntnisse" : "Insights"}</VoltBadge>
               )}
               {b.followUpQuestions?.length > 0 && (
-                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
-                  ↺ {b.followUpQuestions.length} {locale === "de" ? "Folgefragen" : "Follow-ups"}
-                </span>
+                <VoltBadge variant="muted" size="sm">↺ {b.followUpQuestions.length} {locale === "de" ? "Folgefragen" : "Follow-ups"}</VoltBadge>
               )}
             </div>
           )}

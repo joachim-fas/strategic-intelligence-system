@@ -7,7 +7,7 @@ import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_CLUSTERS, TREND_CLUSTER_MAP, getIntraClusterEdges } from "@/lib/trend-clusters";
-import { VoltBadge, VoltTabs, VoltTrendCard } from "@/components/volt";
+import { VoltBadge, VoltTabs, VoltTrendCard, VoltStat } from "@/components/volt";
 import dynamic from "next/dynamic";
 
 // ── Lazy-load heavy visualization components ────────────────────────────────
@@ -482,6 +482,13 @@ export default function WissenPage() {
         <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
           {lens === "radar" && (
             <div style={{ padding: "16px 24px" }}>
+              {/* KPI Stats row */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                <VoltStat label="Trends" value={String(trends.length)} variant="default" size="sm" />
+                <VoltStat label="Mega-Trends" value={String(megaCount)} variant="default" size="sm" />
+                <VoltStat label={de ? "Steigend" : "Rising"} value={String(risingCount)} change={risingCount > 10 ? +(risingCount / trends.length * 100).toFixed(0) : undefined} variant="positive" size="sm" />
+                <VoltStat label={de ? "Cluster" : "Clusters"} value={String(TREND_CLUSTERS.length)} variant="default" size="sm" />
+              </div>
               <RadarView
                 trends={trends}
                 onTrendClick={handleTrendClick}

@@ -112,19 +112,14 @@ export default function ArbeitenPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
               {projects.map(p => (
-                <a
-                  key={p.id}
-                  href={`/projects?id=${p.id}`}
-                  className="volt-card"
-                  style={{ padding: "16px 18px", textDecoration: "none", color: "inherit", transition: "all 150ms" }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-                >
-                  <div className="volt-body" style={{ fontWeight: 600, marginBottom: 4 }}>{p.name}</div>
-                  <div className="volt-body-sm" style={{ color: "var(--color-text-muted)", marginBottom: 8 }}>
-                    {p.query_count} {de ? "Analysen" : "analyses"} · {p.note_count} {de ? "Notizen" : "notes"}
-                  </div>
-                  <div className="volt-label">{timeAgo(p.updated_at, de)}</div>
+                <a key={p.id} href={`/projects?id=${p.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <VoltCard variant="elevated" className="cursor-pointer hover:-translate-y-0.5 transition-transform">
+                    <div className="font-display font-semibold text-sm mb-1">{p.name}</div>
+                    <div className="text-muted-foreground text-xs mb-2">
+                      {p.query_count} {de ? "Analysen" : "analyses"} · {p.note_count} {de ? "Notizen" : "notes"}
+                    </div>
+                    <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">{timeAgo(p.updated_at, de)}</div>
+                  </VoltCard>
                 </a>
               ))}
             </div>
