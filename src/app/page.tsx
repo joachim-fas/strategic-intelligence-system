@@ -227,24 +227,24 @@ export default function Home() {
     if (!q || isAnalyzing) return;
 
     // ── Special commands ──
-    if (q === "/radar" || q === "/r") { window.location.href = "/wissen"; return; }
-    if (q === "/graph" || q === "/g") { window.location.href = "/wissen"; return; }
+    if (q === "/radar" || q === "/r") { window.location.href = "/cockpit"; return; }
+    if (q === "/graph" || q === "/g") { window.location.href = "/cockpit?lens=network"; return; }
     if (q === "/close" || q === "/c") { setShowFullRadar(false); setShowGraph(false); setQuery(""); return; }
 
     // ── Query Shortcuts (Bloomberg Learning 1) ──
     if (q.startsWith("TREND:") || q.startsWith("trend:")) {
       const trendName = q.slice(6).trim();
-      window.location.href = `/wissen?q=${encodeURIComponent(trendName)}`;
+      window.location.href = `/cockpit?lens=trends&q=${encodeURIComponent(trendName)}`;
       return;
     }
     if (q.startsWith("SIGNAL:") || q.startsWith("signal:")) {
       const filter = q.slice(7).trim();
-      window.location.href = `/wissen?signal=${encodeURIComponent(filter)}`;
+      window.location.href = `/cockpit?lens=trends&q=${encodeURIComponent(filter)}`;
       return;
     }
     if (q.startsWith("SCENARIO:") || q.startsWith("scenario:")) {
       const topic = q.slice(9).trim();
-      window.location.href = `/szenarien?q=${encodeURIComponent(topic)}`;
+      window.location.href = `/werkstatt`;
       return;
     }
 
