@@ -1,15 +1,18 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
 
 /**
  * /briefing — Print-optimized intelligence briefing
  *
- * Renders the first demo briefing as a clean, printable page.
+ * Supports ?id=0, ?id=1, ?id=2 for different demo briefings.
  * Use Cmd+P to export as PDF.
  */
 export default function BriefingPage() {
-  const entry = DEMO_BRIEFINGS[0];
+  const params = useSearchParams();
+  const idx = parseInt(params.get("id") ?? "0", 10);
+  const entry = DEMO_BRIEFINGS[Math.min(idx, DEMO_BRIEFINGS.length - 1)];
   if (!entry) return <div>Kein Briefing verfügbar</div>;
 
   const b = entry.briefing as any;
@@ -187,7 +190,7 @@ export default function BriefingPage() {
         </div>
       </div>
 
-      {/* Print button */}
+      {/* Print + Navigation */}
       <div className="no-print" style={{ marginTop: 32, textAlign: "center" }}>
         <button
           onClick={() => window.print()}
@@ -195,10 +198,32 @@ export default function BriefingPage() {
             fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600,
             padding: "10px 24px", borderRadius: 10,
             background: "#0A0A0A", color: "#fff", border: "none", cursor: "pointer",
+            marginBottom: 24,
           }}
         >
           Als PDF exportieren (Cmd+P)
         </button>
+
+        {/* Other briefings */}
+        {DEMO_BRIEFINGS.length > 1 && (
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            {DEMO_BRIEFINGS.map((d, i) => (
+              <a
+                key={d.id}
+                href={`/briefing?id=${i}`}
+                style={{
+                  fontSize: 12, padding: "6px 14px", borderRadius: 8,
+                  border: i === idx ? "1.5px solid #0A0A0A" : "1px solid #E8E8E8",
+                  background: i === idx ? "#F7F7F7" : "transparent",
+                  color: i === idx ? "#0A0A0A" : "#999",
+                  textDecoration: "none", fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                {d.query}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
