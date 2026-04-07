@@ -18,9 +18,9 @@ export const NODE_COLORS: Record<string, { color: string; label: string; labelEn
   dimensions: { color: "#3B82F6", label: "Analyse",        labelEn: "Analysis" },
   causalgraph:{ color: "#3B82F6", label: "Kausal-Graph",   labelEn: "Causal Graph" },
   note:       { color: "#F5A623", label: "Notiz",          labelEn: "Note" },
-  idea:       { color: "#F5A623", label: "Idee",           labelEn: "Idea" },
-  list:       { color: "#F5A623", label: "Liste",          labelEn: "List" },
-  file:       { color: "#8B5CF6", label: "Datei",          labelEn: "File" },
+  idea:       { color: "#F97316", label: "Idee",           labelEn: "Idea" },
+  list:       { color: "#2E7D32", label: "Liste",          labelEn: "List" },
+  file:       { color: "#4A6CF7", label: "Datei",          labelEn: "File" },
 };
 
 // ── Szenario-Typ-Farben ─────────────────────────────────────────────────

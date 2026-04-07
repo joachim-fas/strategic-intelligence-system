@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { TEMPLATES, FRAMEWORKS, type TemplateResult } from "@/lib/canvas-templates";
-import { BOARD_COLUMNS } from "@/lib/colors";
+import { BOARD_COLUMNS, NODE_COLORS } from "@/lib/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
@@ -4080,11 +4080,10 @@ function DetailPanel({
 
 const MINIMAP_W = 160;
 const MINIMAP_H = 90;
-const NODE_MINIMAP_COLOR: Record<string, string> = {
-  query: "#1A9E5A", insight: "#6B7A00", scenario: "#1D4ED8", decision: "#1A9E5A",
-  followup: "#9CA3AF", note: "#F5A623", idea: "#F97316", list: "#2E7D32", file: "#4A6CF7",
-  dimensions: "#3b82f6", causalgraph: "#1A9E5A",
-};
+// Node colors from central colors.ts — used in minimap, timeline, orbit
+const NODE_MINIMAP_COLOR: Record<string, string> = Object.fromEntries(
+  Object.entries(NODE_COLORS).map(([k, v]) => [k, v.color])
+);
 
 function Minimap({ nodes, panX, panY, zoom, viewportW, viewportH, onNavigate, rightOffset }: {
   nodes: CanvasNode[];
