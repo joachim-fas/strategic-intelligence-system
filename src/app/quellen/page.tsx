@@ -98,17 +98,17 @@ const ALL_SOURCES: SourceEntry[] = [
 // ─── Status styling ──────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  integrated: { color: "#0F6038", bg: "#C3F4D3", label: "Integriert" },
-  new: { color: "#1A4A8A", bg: "#D4E8FF", label: "Neu (wird gebaut)" },
-  planned: { color: "#7A5C00", bg: "#FFF5BA", label: "Geplant" },
-  "download-only": { color: "#6B7280", bg: "#F3F4F6", label: "Nur Download" },
-  deactivated: { color: "#E8402A", bg: "#FDEEE9", label: "Deaktiviert" },
+  integrated: { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", label: "Integriert" },
+  new: { color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", label: "Neu (wird gebaut)" },
+  planned: { color: "var(--pastel-butter-text, #7A5C00)", bg: "var(--pastel-butter, #FFF5BA)", label: "Geplant" },
+  "download-only": { color: "var(--volt-text-muted, #6B7280)", bg: "var(--color-surface-2, #F3F4F6)", label: "Nur Download" },
+  deactivated: { color: "var(--signal-negative, #E8402A)", bg: "var(--pastel-rose, #FDEEE9)", label: "Deaktiviert" },
 };
 
 const PRIO_CFG: Record<string, { color: string; label: string }> = {
-  high: { color: "#E8402A", label: "🔴 Hoch" },
-  medium: { color: "#F5A623", label: "🟡 Mittel" },
-  low: { color: "#1A9E5A", label: "🟢 Niedrig" },
+  high: { color: "var(--signal-negative, #E8402A)", label: "🔴 Hoch" },
+  medium: { color: "var(--pastel-amber-text, #F5A623)", label: "🟡 Mittel" },
+  low: { color: "var(--signal-positive, #1A9E5A)", label: "🟢 Niedrig" },
 };
 
 const AUTH_LABELS: Record<string, string> = {

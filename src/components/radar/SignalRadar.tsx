@@ -39,16 +39,16 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const RING_CFG: Record<string, { color: string; bg: string; border: string }> = {
-  adopt:  { color: "#0F6038", bg: "#C3F4D3", border: "#7DD4A8" },
+  adopt:  { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", border: "#7DD4A8" },
   trial:  { color: "#1A4A8A", bg: "#D4E8FF", border: "#80B8F0" },
   assess: { color: "#7A5C00", bg: "#FFF5BA", border: "#E0C840" },
   hold:   { color: "#3A4560", bg: "#F0F2F7", border: "#D1D5DB" },
 };
 
 const VELOCITY_CFG = {
-  rising:  { symbol: "↑", color: "#1A9E5A", label: { de: "steigend", en: "rising" } },
+  rising:  { symbol: "↑", color: "var(--signal-positive, #1A9E5A)", label: { de: "steigend", en: "rising" } },
   stable:  { symbol: "→", color: "#9CA3AF", label: { de: "stabil", en: "stable" } },
-  falling: { symbol: "↓", color: "#E8402A", label: { de: "fallend", en: "falling" } },
+  falling: { symbol: "↓", color: "var(--signal-negative, #E8402A)", label: { de: "fallend", en: "falling" } },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
         backdropFilter: "blur(12px)", display: "flex", alignItems: "center", gap: 8,
         fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600,
       }}>
-        <span style={{ fontSize: 8, color: "#1A9E5A" }}>●</span>
+        <span style={{ fontSize: 8, color: "var(--signal-positive, #1A9E5A)" }}>●</span>
         SIGNAL-RADAR
         {data && <span style={{ fontWeight: 400, marginLeft: 4 }}>{data.meta.freshSignals} {de ? "Signale" : "signals"} · {data.trends.length} Trends</span>}
         <span style={{ marginLeft: "auto", fontSize: 13 }}>▲</span>
@@ -126,7 +126,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
     <div style={{ borderTop: "1.5px solid var(--color-border)", background: "rgba(250,250,250,0.97)" }}>
       {/* Header */}
       <div onClick={() => setCollapsed(true)} style={{ padding: "8px 24px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
-        <span style={{ fontSize: 8, color: "#1A9E5A" }}>●</span>
+        <span style={{ fontSize: 8, color: "var(--signal-positive, #1A9E5A)" }}>●</span>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--color-text-heading)" }}>SIGNAL-RADAR</span>
         {data && <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
           {data.meta.freshSignals} {de ? "Signale" : "signals"} · {data.trends.length} Trends · {data.sourceStatus.filter(s => s.status === "fresh").length} {de ? "aktive Quellen" : "active sources"}
@@ -136,7 +136,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
       </div>
 
       {loading ? (
-        <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "#999" }}>{de ? "Lade…" : "Loading…"}</div>
+        <div style={{ padding: 20, textAlign: "center", fontSize: 12, color: "var(--volt-text-faint, #999)" }}>{de ? "Lade…" : "Loading…"}</div>
       ) : data ? (
         <div style={{ maxHeight: 420, overflowY: "auto" }}>
 
@@ -154,7 +154,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
                     fontSize: 9, padding: "1px 7px", borderRadius: 10,
                     border: `1px solid ${active ? "var(--color-text-heading)" : "var(--color-border)"}`,
                     background: active ? "var(--color-text-heading)" : "transparent",
-                    color: active ? "#fff" : "var(--color-text-muted)", cursor: "pointer", fontWeight: active ? 600 : 400,
+                    color: active ? "var(--volt-surface, #fff)" : "var(--color-text-muted)", cursor: "pointer", fontWeight: active ? 600 : 400,
                   }}>{labels[cat] ?? cat}</button>;
                 })}
               </div>
@@ -194,7 +194,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
                         <span style={{ fontSize: 10, fontWeight: 600, color: vel.color, flexShrink: 0 }}>{vel.symbol}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: t.trendType === "megatrend" ? "#FFF5BA" : "#F3F4F6", color: t.trendType === "megatrend" ? "#7A5C00" : "#6B7280", border: `1px solid ${t.trendType === "megatrend" ? "#E0C840" : "#D1D5DB"}` }}>
+                        <span style={{ fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: t.trendType === "megatrend" ? "#FFF5BA" : "var(--color-surface-2, #F3F4F6)", color: t.trendType === "megatrend" ? "#7A5C00" : "var(--volt-text-muted, #6B7280)", border: `1px solid ${t.trendType === "megatrend" ? "#E0C840" : "#D1D5DB"}` }}>
                           {t.trendType === "megatrend" ? "MEGA" : "MAKRO"}
                         </span>
                         <span style={{ fontSize: 8, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: ring.bg, color: ring.color, border: `1px solid ${ring.border}` }}>{t.ring.toUpperCase()}</span>
@@ -214,8 +214,8 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {data.topSignals.map(s => {
-                const srcColor = SOURCE_COLORS[s.source] ?? "#666";
-                const ageBg = s.hoursAgo < 24 ? "#1A9E5A" : s.hoursAgo < 72 ? "#F5A623" : "#9CA3AF";
+                const srcColor = SOURCE_COLORS[s.source] ?? "var(--volt-text-muted, #666)";
+                const ageBg = s.hoursAgo < 24 ? "var(--signal-positive, #1A9E5A)" : s.hoursAgo < 72 ? "#F5A623" : "#9CA3AF";
                 return (
                   <a key={s.id}
                     href={s.url ?? undefined}
@@ -244,7 +244,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
               <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.06em", color: "var(--color-text-muted)", textTransform: "uppercase", marginRight: 4 }}>{de ? "Quellen" : "Sources"}</span>
               {data.sourceStatus.map(s => {
-                const dot = s.status === "fresh" ? "#1A9E5A" : s.status === "stale" ? "#F5A623" : "#D1D5DB";
+                const dot = s.status === "fresh" ? "var(--signal-positive, #1A9E5A)" : s.status === "stale" ? "#F5A623" : "#D1D5DB";
                 return (
                   <span key={s.source} title={`${s.signalCount} signals · last: ${s.lastSignalAt ?? "never"}`}
                     style={{ fontSize: 9, display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", borderRadius: 4, background: "rgba(0,0,0,0.02)" }}>
@@ -268,25 +268,25 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
             position: "fixed",
             left: Math.min(tooltipPos.x, typeof window !== "undefined" ? window.innerWidth - 290 : 500),
             bottom: typeof window !== "undefined" ? window.innerHeight - tooltipPos.y + 8 : 100,
-            zIndex: 50, width: 270, background: "#fff", border: `1px solid ${ring.border}`,
+            zIndex: 50, width: 270, background: "var(--volt-surface, #fff)", border: `1px solid ${ring.border}`,
             borderLeft: `3px solid ${ring.color}`, borderRadius: 10,
             boxShadow: "0 8px 24px rgba(0,0,0,0.14)", padding: "12px 14px", pointerEvents: "none",
           }}>
             {/* Name + Type */}
             <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{t.name}</span>
-              <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: t.trendType === "megatrend" ? "#FFF5BA" : "#F3F4F6", color: t.trendType === "megatrend" ? "#7A5C00" : "#6B7280", flexShrink: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--volt-text, #0F172A)", lineHeight: 1.3 }}>{t.name}</span>
+              <span style={{ fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: t.trendType === "megatrend" ? "#FFF5BA" : "var(--color-surface-2, #F3F4F6)", color: t.trendType === "megatrend" ? "#7A5C00" : "var(--volt-text-muted, #6B7280)", flexShrink: 0 }}>
                 {t.trendType === "megatrend" ? "MEGA" : "MAKRO"}
               </span>
             </div>
             {/* Description */}
-            {t.description && <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.5, marginBottom: 10 }}>{t.description}</div>}
+            {t.description && <div style={{ fontSize: 11, color: "var(--volt-text-muted, #475569)", lineHeight: 1.5, marginBottom: 10 }}>{t.description}</div>}
             {/* Metrics */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", marginBottom: 10 }}>
-              <div><div style={{ fontSize: 9, color: "#94A3B8", marginBottom: 2 }}>{de ? "Relevanz" : "Relevance"}</div><MetricBar value={t.relevance} color="#4F46E5" /></div>
-              <div><div style={{ fontSize: 9, color: "#94A3B8", marginBottom: 2 }}>Impact</div><MetricBar value={t.impact} color="#059669" /></div>
-              <div><div style={{ fontSize: 9, color: "#94A3B8", marginBottom: 2 }}>{de ? "Konfidenz" : "Confidence"}</div><MetricBar value={t.confidence} color="#D97706" /></div>
-              <div><div style={{ fontSize: 9, color: "#94A3B8", marginBottom: 2 }}>{de ? "Signale" : "Signals"}</div><div style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>{t.signalCount72h}</div></div>
+              <div><div style={{ fontSize: 9, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>{de ? "Relevanz" : "Relevance"}</div><MetricBar value={t.relevance} color="#4F46E5" /></div>
+              <div><div style={{ fontSize: 9, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>Impact</div><MetricBar value={t.impact} color="#059669" /></div>
+              <div><div style={{ fontSize: 9, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>{de ? "Konfidenz" : "Confidence"}</div><MetricBar value={t.confidence} color="#D97706" /></div>
+              <div><div style={{ fontSize: 9, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>{de ? "Signale" : "Signals"}</div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--volt-text, #1E293B)" }}>{t.signalCount72h}</div></div>
             </div>
             {/* Ring + Velocity + Sparkline */}
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>

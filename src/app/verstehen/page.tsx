@@ -120,12 +120,12 @@ const SOURCES: SourceRow[] = [
 ];
 
 const TYPE_COLOR: Record<string, string> = {
-  "Live-Signal": "#1A9E5A",
-  "Statistik": "#2563EB",
-  "Forschung": "#8B5CF6",
-  "Prediction": "#F59E0B",
-  "News": "#E8402A",
-  "Social": "#6366F1",
+  "Live-Signal": "var(--signal-positive, #1A9E5A)",
+  "Statistik": "var(--pastel-sky-text, #2563EB)",
+  "Forschung": "var(--pastel-orchid-text, #8B5CF6)",
+  "Prediction": "var(--pastel-amber-text, #F59E0B)",
+  "News": "var(--signal-negative, #E8402A)",
+  "Social": "var(--pastel-orchid, #6366F1)",
 };
 
 function SourcesTable({ de }: { de: boolean }) {
@@ -175,7 +175,7 @@ function SourcesTable({ de }: { de: boolean }) {
           </thead>
           <tbody>
             {filtered.map((s, i) => {
-              const tc = TYPE_COLOR[s.type] ?? "#666";
+              const tc = TYPE_COLOR[s.type] ?? "var(--volt-text-muted, #666)";
               return (
                 <tr key={i} style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,0,0,0.015)")}
@@ -189,13 +189,13 @@ function SourcesTable({ de }: { de: boolean }) {
                   <td className="volt-body-sm" style={{ padding: "8px 8px", color: "var(--color-text-secondary)", maxWidth: 400 }}>{s.description}</td>
                   <td style={{ padding: "8px 8px", textAlign: "center" }}>
                     {s.active
-                      ? <span className="volt-badge volt-badge-muted" style={{ background: "#C3F4D3", color: "var(--pastel-mint-text)" }}>Aktiv</span>
+                      ? <span className="volt-badge volt-badge-muted" style={{ background: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text)" }}>Aktiv</span>
                       : <span className="volt-badge volt-badge-muted">Inaktiv</span>
                     }
                   </td>
                   <td style={{ padding: "8px 8px", textAlign: "center" }}>
                     {s.needsKey
-                      ? <span className="volt-badge volt-badge-muted" title={s.keyName} style={{ background: "#FFF5BA", color: "var(--pastel-butter-text)" }}>Key</span>
+                      ? <span className="volt-badge volt-badge-muted" title={s.keyName} style={{ background: "var(--pastel-butter, #FFF5BA)", color: "var(--pastel-butter-text)" }}>Key</span>
                       : <span className="volt-label" style={{ color: "var(--signal-positive)" }}>Frei</span>
                     }
                   </td>
@@ -213,7 +213,7 @@ function SourcesTable({ de }: { de: boolean }) {
 
 const RING_ORDER = ["adopt", "trial", "assess", "hold"];
 const RING_COLOR: Record<string, string> = { adopt: "var(--color-adopt)", trial: "var(--color-trial)", assess: "var(--color-assess)", hold: "var(--color-hold)" };
-const RING_BG: Record<string, string> = { adopt: "#F0FDF6", trial: "#EFF6FF", assess: "#FFFBEB", hold: "#F9FAFB" };
+const RING_BG: Record<string, string> = { adopt: "var(--pastel-mint-light, #F0FDF6)", trial: "var(--pastel-sky-light, #EFF6FF)", assess: "var(--pastel-butter-light, #FFFBEB)", hold: "var(--color-surface, #F9FAFB)" };
 
 function TrendCard({ t, isSel, onSelect }: { t: TrendDot; isSel: boolean; onSelect: (t: TrendDot) => void }) {
   const dir = t.velocity === "rising" ? "up" as const : t.velocity === "falling" ? "down" as const : "stable" as const;
@@ -309,7 +309,7 @@ function TrendsGrid({ trends, selectedId, onSelect, de }: {
                     {items.length} Trends
                   </span>
                   {stats && stats.rising > 0 && (
-                    <span className="volt-badge volt-badge-muted" style={{ background: "#C3F4D3", color: "var(--pastel-mint-text)" }}>
+                    <span className="volt-badge volt-badge-muted" style={{ background: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text)" }}>
                       {stats.rising} ↑
                     </span>
                   )}
@@ -575,12 +575,12 @@ export default function WissenPage() {
                 }}
                 style={{
                   width: "100%", fontSize: 12, fontWeight: 600, padding: "10px 16px",
-                  borderRadius: 8, border: "1px solid #1A9E5A44",
-                  background: "#1A9E5A0C", color: "var(--signal-positive)", cursor: "pointer",
+                  borderRadius: 8, border: "1px solid color-mix(in srgb, var(--signal-positive, #1A9E5A) 26%, transparent)",
+                  background: "color-mix(in srgb, var(--signal-positive, #1A9E5A) 5%, transparent)", color: "var(--signal-positive)", cursor: "pointer",
                   transition: "all 0.12s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#1A9E5A1A"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "#1A9E5A0C"; }}
+                onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--signal-positive, #1A9E5A) 10%, transparent)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--signal-positive, #1A9E5A) 5%, transparent)"; }}
               >
                 ⊞ {de ? "Im Canvas analysieren" : "Analyze in Canvas"}
               </button>

@@ -112,11 +112,11 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
   filtered.forEach((s, i) => columns[i % colCount].push(s));
 
   return (
-    <div className="border-t border-[#E8E8E8] bg-[#FAFAFA]">
+    <div className="border-t border-[var(--volt-border,#E8E8E8)] bg-[var(--color-surface,#FAFAFA)]">
       {/* Header */}
       <div className="px-6 py-3 flex items-center gap-3">
         <button onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-1.5 text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors">
+          className="flex items-center gap-1.5 text-[var(--volt-text-muted,#6B6B6B)] hover:text-[var(--volt-text,#0A0A0A)] transition-colors">
           <span className={`transition-transform duration-200 text-[10px] ${collapsed ? "" : "rotate-90"}`}>▸</span>
           <span className="text-xs uppercase tracking-wider font-semibold">Intelligence Feed</span>
         </button>
@@ -124,36 +124,36 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
         {/* Filter pills */}
         <div className="flex items-center gap-1">
           <button onClick={() => setFilter(null)}
-            className={`px-2 py-0.5 rounded-full text-xs transition-colors ${!filter ? "bg-[#0A0A0A] text-white" : "text-[#9B9B9B] hover:text-[#6B6B6B] hover:bg-[#F0F0F0]"}`}>
+            className={`px-2 py-0.5 rounded-full text-xs transition-colors ${!filter ? "bg-[var(--volt-text,#0A0A0A)] text-[var(--volt-surface,#FFFFFF)]" : "text-[var(--volt-text-faint,#9B9B9B)] hover:text-[var(--volt-text-muted,#6B6B6B)] hover:bg-[var(--volt-border,#F0F0F0)]"}`}>
             {de ? "Alle" : "All"} {signals.length}
           </button>
           {spikes > 0 && (
             <button onClick={() => setFilter(filter === "spike" ? null : "spike")}
-              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "spike" ? "bg-[#FDEEE9] text-[#E8402A]" : "text-[#E8402A]/60 hover:bg-[#FDEEE9]"}`}>
+              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "spike" ? "bg-[var(--pastel-rose,#FDEEE9)] text-[var(--signal-negative,#E8402A)]" : "text-[var(--signal-negative,#E8402A)]/60 hover:bg-[var(--pastel-rose,#FDEEE9)]"}`}>
               ▲ {spikes}
             </button>
           )}
           {alerts > 0 && (
             <button onClick={() => setFilter(filter === "alert" ? null : "alert")}
-              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "alert" ? "bg-[#FFF5BA] text-[#7A5C00]" : "text-[#7A5C00]/60 hover:bg-[#FFF5BA]"}`}>
+              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "alert" ? "bg-[var(--pastel-butter,#FFF5BA)] text-[#7A5C00]" : "text-[#7A5C00]/60 hover:bg-[var(--pastel-butter,#FFF5BA)]"}`}>
               ● {alerts}
             </button>
           )}
           {mentions > 0 && (
             <button onClick={() => setFilter(filter === "mention" ? null : "mention")}
-              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "mention" ? "bg-[#D4E8FF] text-[#1A4A8A]" : "text-[#1A4A8A]/60 hover:bg-[#D4E8FF]"}`}>
+              className={`px-2 py-0.5 rounded-full text-xs transition-colors ${filter === "mention" ? "bg-[var(--pastel-sky,#D4E8FF)] text-[var(--pastel-sky-text,#1A4A8A)]" : "text-[var(--pastel-sky-text,#1A4A8A)]/60 hover:bg-[var(--pastel-sky,#D4E8FF)]"}`}>
               → {mentions}
             </button>
           )}
         </div>
 
-        <span className="ml-auto text-[#B0B0B0] text-[10px] hidden sm:block select-none">
+        <span className="ml-auto text-[var(--volt-text-faint,#B0B0B0)] text-[10px] hidden sm:block select-none">
           {de ? "Hover für Details · Klicken für Analyse" : "Hover for details · Click for analysis"}
         </span>
-        <span className="text-[#C8C8C8] text-xs">
+        <span className="text-[var(--volt-text-faint,#C8C8C8)] text-xs">
           {lastUpdate ? (de ? `aktualisiert ${timeAgo(lastUpdate, de)}` : `updated ${timeAgo(lastUpdate, de)}`) : ""}
         </span>
-        <button onClick={generateLocalFeed} className="text-[#C8C8C8] hover:text-[#0A0A0A] transition-colors text-sm" title="Refresh">↻</button>
+        <button onClick={generateLocalFeed} className="text-[var(--volt-text-faint,#C8C8C8)] hover:text-[var(--volt-text,#0A0A0A)] transition-colors text-sm" title="Refresh">↻</button>
       </div>
 
       {/* Multi-column feed */}
@@ -188,17 +188,17 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-[#1A1A1A] font-medium truncate">
+                          <span className="text-xs text-[var(--volt-text,#1A1A1A)] font-medium truncate">
                             {signal.trendName || signal.topic}
                           </span>
                           {signal.meta?.ring && (
                             <span className="text-[9px] px-1 py-0.5 rounded-full font-semibold shrink-0" style={{
-                              ...RING_PASTEL[signal.meta.ring as keyof typeof RING_PASTEL] || { color: "#6B7A9A", background: "#F0F2F7" },
+                              ...RING_PASTEL[signal.meta.ring as keyof typeof RING_PASTEL] || { color: "var(--volt-text-muted, #6B7A9A)", background: "var(--color-surface-2, #F0F2F7)" },
                             }}>{signal.meta.ring}</span>
                           )}
-                          {signal.meta?.velocity === "rising" && <span className="text-[10px] shrink-0" style={{ color: "#1A9E5A" }}>▲</span>}
+                          {signal.meta?.velocity === "rising" && <span className="text-[10px] shrink-0" style={{ color: "var(--signal-positive, #1A9E5A)" }}>▲</span>}
                         </div>
-                        <div className="text-[10px] truncate text-[#6B6B6B]">{signal.title}</div>
+                        <div className="text-[10px] truncate text-[var(--volt-text-muted,#6B6B6B)]">{signal.title}</div>
                       </div>
                       {/* Strength mini-bar */}
                       <div className="w-8 h-1.5 bg-white/60 rounded-full overflow-hidden shrink-0">
@@ -242,7 +242,7 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
               transform: "translateY(-100%)",
               zIndex: 50,
               width: 260,
-              background: "#fff",
+              background: "var(--volt-surface, #fff)",
               border: `1px solid ${cfg.border}`,
               borderLeft: `3px solid ${cfg.color}`,
               borderRadius: 10,
@@ -252,7 +252,7 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
             }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", lineHeight: 1.4 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text, #0F172A)", lineHeight: 1.4 }}>
                 {signal.trendName || signal.topic}
               </span>
               <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 20, background: cfg.bg, color: cfg.color, flexShrink: 0, whiteSpace: "nowrap" }}>
@@ -262,7 +262,7 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
 
             {/* Description — the one sentence that matters */}
             {fullTrend?.description && (
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.5, marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: "var(--volt-text-muted, #334155)", lineHeight: 1.5, marginBottom: 10 }}>
                 {fullTrend.description}
               </div>
             )}
@@ -281,8 +281,8 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
                 )}
                 {m.signalCount != null && (
                   <div>
-                    <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 2 }}>{de ? "Signale" : "Signals"}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}>{m.signalCount.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>{de ? "Signale" : "Signals"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--volt-text, #1E293B)" }}>{m.signalCount.toLocaleString()}</div>
                   </div>
                 )}
               </div>
@@ -292,14 +292,14 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {m?.ring && (
                 <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 600,
-                  background: RING_PASTEL[m.ring]?.background || "#F0F2F7",
-                  color: RING_PASTEL[m.ring]?.color || "#3A4560",
+                  background: RING_PASTEL[m.ring]?.background || "var(--color-surface-2, #F0F2F7)",
+                  color: RING_PASTEL[m.ring]?.color || "var(--volt-text-muted, #3A4560)",
                 }}>
                   {m.ring}
                 </span>
               )}
               {m?.velocity && (
-                <span style={{ fontSize: 11, color: m.velocity === "rising" ? "#059669" : m.velocity === "falling" ? "#DC2626" : "#94A3B8" }}>
+                <span style={{ fontSize: 11, color: m.velocity === "rising" ? "var(--signal-positive, #059669)" : m.velocity === "falling" ? "var(--signal-negative, #DC2626)" : "var(--volt-text-faint, #94A3B8)" }}>
                   {m.velocity === "rising" ? "↑ " : m.velocity === "falling" ? "↓ " : "→ "}
                   {de ? (m.velocity === "rising" ? "steigend" : m.velocity === "falling" ? "fallend" : "stabil") :
                          (m.velocity === "rising" ? "rising" : m.velocity === "falling" ? "falling" : "stable")}
@@ -308,7 +308,7 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
             </div>
 
             {signal.trendName && (
-              <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid #F1F5F9", fontSize: 11, color: "#94A3B8" }}>
+              <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--color-surface-2, #F1F5F9)", fontSize: 11, color: "var(--volt-text-faint, #94A3B8)" }}>
                 {de ? "Klicken für vollständige Analyse →" : "Click for full analysis →"}
               </div>
             )}
@@ -322,12 +322,12 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
 function MetricRow({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: "#94A3B8", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, color: "var(--volt-text-faint, #94A3B8)", marginBottom: 2 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div style={{ flex: 1, height: 3, borderRadius: 2, background: "#F1F5F9" }}>
+        <div style={{ flex: 1, height: 3, borderRadius: 2, background: "var(--color-surface-2, #F1F5F9)" }}>
           <div style={{ height: 3, borderRadius: 2, background: color, width: `${value * 100}%` }} />
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "#1E293B", flexShrink: 0 }}>{(value * 100).toFixed(0)}%</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--volt-text, #1E293B)", flexShrink: 0 }}>{(value * 100).toFixed(0)}%</span>
       </div>
     </div>
   );

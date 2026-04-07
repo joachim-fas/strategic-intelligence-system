@@ -20,7 +20,7 @@ export function SynthesisBlock({ text, locale, isHelp }: {
       <p className="text-body" style={{ color: "var(--color-text-secondary)", margin: 0 }}>{shown}</p>
       {hasMore && !isHelp && (
         <button onClick={() => setExpanded(e => !e)} style={{
-          marginTop: 6, fontSize: 12, color: "#9B9B9B", background: "none", border: "none",
+          marginTop: 6, fontSize: 12, color: "var(--volt-text-faint, #9B9B9B)", background: "none", border: "none",
           cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4,
         }}>
           {expanded

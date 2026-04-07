@@ -57,8 +57,8 @@ export default function MiniRadar({ trends, onTrendClick, width = 320, height = 
     });
 
     // Crosshairs
-    g.append("line").attr("x1", -maxR).attr("x2", maxR).attr("y1", 0).attr("y2", 0).attr("stroke", "#222").attr("stroke-width", 0.5);
-    g.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -maxR).attr("y2", maxR).attr("stroke", "#222").attr("stroke-width", 0.5);
+    g.append("line").attr("x1", -maxR).attr("x2", maxR).attr("y1", 0).attr("y2", 0).attr("stroke", "var(--volt-text-muted, #222)").attr("stroke-width", 0.5);
+    g.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -maxR).attr("y2", maxR).attr("stroke", "var(--volt-text-muted, #222)").attr("stroke-width", 0.5);
 
     // Place trends
     const jitter = (id: string) => {
@@ -104,7 +104,7 @@ export default function MiniRadar({ trends, onTrendClick, width = 320, height = 
       dot.append("text")
         .attr("y", size + 10)
         .attr("text-anchor", "middle")
-        .attr("fill", "#999")
+        .attr("fill", "var(--volt-text-faint, #999)")
         .attr("font-size", "7px")
         .text(trend.name.length > 20 ? trend.name.slice(0, 18) + "…" : trend.name);
 

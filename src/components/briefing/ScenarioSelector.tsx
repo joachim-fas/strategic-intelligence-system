@@ -19,13 +19,13 @@ const TYPE_CONFIG: Record<string, {
   color: string; bg: string; border: string;
   labelDe: string; labelEn: string;
 }> = {
-  optimistic:  { color: "#0F6038", bg: "#E8F8EF", border: "#7DD4A8", labelDe: "Optimistisch",  labelEn: "Optimistic"  },
-  baseline:    { color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", labelDe: "Basisfall",      labelEn: "Baseline"    },
-  pessimistic: { color: "#B91C1C", bg: "#FEF2F2", border: "#FCA5A5", labelDe: "Pessimistisch", labelEn: "Pessimistic" },
-  wildcard:    { color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", labelDe: "Wildcard",       labelEn: "Wildcard"    },
+  optimistic:  { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint-light, #E8F8EF)", border: "var(--pastel-mint-border, #7DD4A8)", labelDe: "Optimistisch",  labelEn: "Optimistic"  },
+  baseline:    { color: "var(--pastel-sky-text, #1D4ED8)", bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", labelDe: "Basisfall",      labelEn: "Baseline"    },
+  pessimistic: { color: "var(--signal-negative, #B91C1C)", bg: "var(--pastel-rose-light, #FEF2F2)", border: "var(--pastel-rose-border, #FCA5A5)", labelDe: "Pessimistisch", labelEn: "Pessimistic" },
+  wildcard:    { color: "var(--pastel-butter-text, #92400E)", bg: "var(--pastel-butter-light, #FFFBEB)", border: "var(--pastel-butter-border, #FDE68A)", labelDe: "Wildcard",       labelEn: "Wildcard"    },
 };
 
-const DEFAULT_TYPE = { color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", labelDe: "Szenario", labelEn: "Scenario" };
+const DEFAULT_TYPE = { color: "var(--pastel-sky-text, #1D4ED8)", bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", labelDe: "Szenario", labelEn: "Scenario" };
 
 function getTypeConfig(type?: string) {
   return TYPE_CONFIG[type ?? ""] ?? DEFAULT_TYPE;
@@ -137,8 +137,8 @@ function ScenarioCard({
             title={de ? "Im Szenario-Builder speichern" : "Save to scenario builder"}
             style={{
               fontSize: 11, padding: "2px 6px", borderRadius: 6,
-              border: saved ? "1px solid #1A9E5A" : "1px solid var(--color-border)",
-              background: saved ? "#C3F4D3" : "transparent",
+              border: saved ? "1px solid var(--signal-positive, #1A9E5A)" : "1px solid var(--color-border)",
+              background: saved ? "var(--pastel-mint, #C3F4D3)" : "transparent",
               color: saved ? "var(--pastel-mint-text)" : "var(--color-text-muted)",
               cursor: saved ? "default" : "pointer", flexShrink: 0, marginLeft: 4,
               transition: "all 0.15s",

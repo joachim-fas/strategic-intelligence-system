@@ -21,12 +21,12 @@ interface FilterBarProps {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: "#FAFAFA",
-  border: "1px solid #E8E8E8",
+  background: "var(--color-surface, #FAFAFA)",
+  border: "1px solid var(--volt-border, #E8E8E8)",
   borderRadius: 8,
   padding: "6px 12px",
   fontSize: 13,
-  color: "#1A1A1A",
+  color: "var(--volt-text, #1A1A1A)",
   outline: "none",
   cursor: "pointer",
 };
@@ -39,8 +39,8 @@ export default function FilterBar({ filters, onChange, categories, trendCount }:
     <div style={{
       display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10,
       padding: "10px 16px",
-      background: "#FFFFFF",
-      border: "1px solid #E8E8E8",
+      background: "var(--volt-surface, #FFFFFF)",
+      border: "1px solid var(--volt-border, #E8E8E8)",
       borderRadius: 12,
     }}>
       <input
@@ -53,8 +53,8 @@ export default function FilterBar({ filters, onChange, categories, trendCount }:
           width: 192,
           boxSizing: "border-box",
         }}
-        onFocus={(e) => { e.currentTarget.style.borderColor = "#1A1A1A"; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = "#E8E8E8"; }}
+        onFocus={(e) => { e.currentTarget.style.borderColor = "var(--volt-text, #1A1A1A)"; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
       />
 
       <select
@@ -102,16 +102,16 @@ export default function FilterBar({ filters, onChange, categories, trendCount }:
       </select>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 11, color: "#9B9B9B" }}>{t(locale, "minConfidence")}</span>
+        <span style={{ fontSize: 11, color: "var(--volt-text-faint, #9B9B9B)" }}>{t(locale, "minConfidence")}</span>
         <input
           type="range"
           min={0}
           max={100}
           value={filters.minConfidence * 100}
           onChange={(e) => update({ minConfidence: Number(e.target.value) / 100 })}
-          style={{ width: 80, accentColor: "#0A0A0A" }}
+          style={{ width: 80, accentColor: "var(--volt-text, #0A0A0A)" }}
         />
-        <span style={{ fontSize: 11, color: "#6B6B6B", width: 32 }}>{(filters.minConfidence * 100).toFixed(0)}%</span>
+        <span style={{ fontSize: 11, color: "var(--volt-text-muted, #6B6B6B)", width: 32 }}>{(filters.minConfidence * 100).toFixed(0)}%</span>
       </div>
 
       <button
@@ -126,16 +126,16 @@ export default function FilterBar({ filters, onChange, categories, trendCount }:
           })
         }
         style={{
-          marginLeft: "auto", fontSize: 12, color: "#9B9B9B",
+          marginLeft: "auto", fontSize: 12, color: "var(--volt-text-faint, #9B9B9B)",
           background: "none", border: "none", cursor: "pointer", padding: 0,
         }}
-        onMouseOver={(e) => { e.currentTarget.style.color = "#1A1A1A"; }}
-        onMouseOut={(e) => { e.currentTarget.style.color = "#9B9B9B"; }}
+        onMouseOver={(e) => { e.currentTarget.style.color = "var(--volt-text, #1A1A1A)"; }}
+        onMouseOut={(e) => { e.currentTarget.style.color = "var(--volt-text-faint, #9B9B9B)"; }}
       >
         {t(locale, "reset")}
       </button>
 
-      <span style={{ fontSize: 11, color: "#9B9B9B" }}>
+      <span style={{ fontSize: 11, color: "var(--volt-text-faint, #9B9B9B)" }}>
         {trendCount} {t(locale, "trends")}
       </span>
     </div>

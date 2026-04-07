@@ -35,10 +35,10 @@ interface WorkflowPanelProps {
 // ─── Status Icons ────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
-  done:    { icon: "✓", color: "#0F6038", bg: "#C3F4D3", label: "Erledigt" },
-  running: { icon: "⟳", color: "#1A4A8A", bg: "#D4E8FF", label: "Läuft..." },
-  pending: { icon: "○", color: "#6B7280", bg: "#F3F4F6", label: "Bereit" },
-  locked:  { icon: "🔒", color: "#9CA3AF", bg: "#F9FAFB", label: "Gesperrt" },
+  done:    { icon: "✓", color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", label: "Erledigt" },
+  running: { icon: "⟳", color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", label: "Läuft..." },
+  pending: { icon: "○", color: "var(--volt-text-muted, #6B7280)", bg: "var(--color-surface-2, #F3F4F6)", label: "Bereit" },
+  locked:  { icon: "🔒", color: "var(--volt-text-faint, #9CA3AF)", bg: "var(--color-surface, #F9FAFB)", label: "Gesperrt" },
 };
 
 // ─── WorkflowPanel ───────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
             <span>{Math.round(progress)}%</span>
           </div>
           <div style={{ height: 4, background: "rgba(0,0,0,0.06)", borderRadius: 2, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${progress}%`, background: "#1A9E5A", borderRadius: 2, transition: "width 0.3s" }} />
+            <div style={{ height: "100%", width: `${progress}%`, background: "var(--signal-positive, #1A9E5A)", borderRadius: 2, transition: "width 0.3s" }} />
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                 style={{
                   display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
                   borderRadius: 8, cursor: "pointer", transition: "background 0.1s",
-                  background: isActive ? "#E4FF9718" : "transparent",
+                  background: isActive ? "color-mix(in srgb, var(--volt-lime, #E4FF97) 9%, transparent)" : "transparent",
                   border: isActive ? "1px solid #E4FF9766" : "1px solid transparent",
                 }}
                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(0,0,0,0.02)"; }}
@@ -150,7 +150,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                   {/* Show previous context if available */}
                   {step.dependsOn.length > 0 && step.dependsOn.some(d => steps[d]?.synthesis) && (
                     <div style={{ marginBottom: 10, padding: "8px 10px", background: "rgba(37,99,235,0.04)", borderRadius: 6, border: "1px solid rgba(37,99,235,0.1)" }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "#2563EB", textTransform: "uppercase", marginBottom: 4 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "var(--pastel-sky-text, #2563EB)", textTransform: "uppercase", marginBottom: 4 }}>
                         Kontext aus vorherigen Schritten
                       </div>
                       <div style={{ fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.5, maxHeight: 100, overflowY: "auto" }}>
@@ -192,7 +192,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                   {step.status === "running" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 14, height: 14, border: "2px solid #2563EB", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                      <span style={{ fontSize: 12, color: "#2563EB", fontWeight: 500 }}>Analyse läuft...</span>
+                      <span style={{ fontSize: 12, color: "var(--pastel-sky-text, #2563EB)", fontWeight: 500 }}>Analyse läuft...</span>
                       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                     </div>
                   )}
@@ -229,7 +229,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
       {/* Footer — summary when all done */}
       {doneCount === steps.length && steps.length > 0 && (
         <div style={{ padding: "16px 20px", borderTop: "1px solid var(--color-border)", flexShrink: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A9E5A", marginBottom: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--signal-positive, #1A9E5A)", marginBottom: 4 }}>
             ✓ Alle {steps.length} Schritte abgeschlossen
           </div>
           <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>

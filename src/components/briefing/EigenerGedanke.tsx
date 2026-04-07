@@ -44,7 +44,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
         onClick={() => setOpen(true)}
         style={{
           display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-          border: "1px dashed #DEDEDE", borderRadius: 8, background: "transparent",
+          border: "1px dashed var(--volt-border, #DEDEDE)", borderRadius: 8, background: "transparent",
           cursor: "pointer", width: "100%", textAlign: "left", transition: "all 0.15s",
         }}
         onMouseEnter={e => {
@@ -52,7 +52,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
           (e.currentTarget as HTMLElement).style.background = "var(--volt-surface-raised, #FDFFF5)";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "#DEDEDE";
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--volt-border, #DEDEDE)";
           (e.currentTarget as HTMLElement).style.background = "transparent";
         }}
       >

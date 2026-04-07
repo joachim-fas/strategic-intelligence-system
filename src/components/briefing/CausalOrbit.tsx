@@ -92,7 +92,7 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
                     cx={x} cy={y}
                     r={nr + (isNodeHovered ? 3 : 0)}
                     fill={isNodeHovered ? "#E4FF97" : isChainHovered ? "var(--color-warning)" : data.count > 1 ? "var(--color-brand)" : "var(--color-border-strong)"}
-                    stroke={isNodeHovered ? "#0A0A0A" : "white"}
+                    stroke={isNodeHovered ? "var(--volt-text, #0A0A0A)" : "var(--volt-surface, white)"}
                     strokeWidth={1.5}
                   />
                   <text
@@ -101,7 +101,7 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
                     fill={isChainHovered || isNodeHovered ? "var(--color-text-primary)" : "var(--color-text-muted)"}
                     fontSize={isNodeHovered ? "8" : "7"}
                     fontWeight={isNodeHovered ? "600" : "400"}
-                    fontFamily="var(--font-sans)"
+                    fontFamily="var(--volt-font-ui, sans-serif)"
                   >
                     {name.length > 18 ? name.slice(0, 16) + "…" : name}
                   </text>
@@ -109,7 +109,7 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
                     <text
                       x={x} y={y - nr - 4}
                       textAnchor="middle"
-                      fill="#0A0A0A" fontSize="7" fontWeight="600" fontFamily="var(--font-sans)"
+                      fill="var(--volt-text, #0A0A0A)" fontSize="7" fontWeight="600" fontFamily="var(--volt-font-ui, sans-serif)"
                     >
                       → Analysieren
                     </text>

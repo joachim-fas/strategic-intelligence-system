@@ -85,18 +85,18 @@ function BriefingContent() {
           <div style={{ display: "grid", gridTemplateColumns: b.scenarios.length > 2 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
             {b.scenarios.map((s: any, i: number) => {
               const colors: Record<string, { bg: string; border: string; label: string }> = {
-                optimistic: { bg: "#F0FDF6", border: "#7DD4A8", label: "Optimistisch" },
-                baseline: { bg: "#EFF6FF", border: "#93C5FD", label: "Basisfall" },
-                pessimistic: { bg: "#FEF2F2", border: "#FCA5A5", label: "Pessimistisch" },
+                optimistic: { bg: "var(--pastel-mint-light, #F0FDF6)", border: "var(--pastel-mint-border, #7DD4A8)", label: "Optimistisch" },
+                baseline: { bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", label: "Basisfall" },
+                pessimistic: { bg: "var(--pastel-rose-light, #FEF2F2)", border: "var(--pastel-rose-border, #FCA5A5)", label: "Pessimistisch" },
               };
-              const c = colors[s.type] ?? { bg: "#F9FAFB", border: "#E5E7EB", label: s.type };
+              const c = colors[s.type] ?? { bg: "var(--color-surface, #F9FAFB)", border: "var(--volt-border, #E5E7EB)", label: s.type };
               return (
                 <div key={i} style={{
                   padding: "14px 16px", borderRadius: 10,
                   background: c.bg, border: `1px solid ${c.border}`,
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666" }}>
+                    <span style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--volt-text-muted, #666)" }}>
                       {c.label}
                     </span>
                     <span style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 18, fontWeight: 700 }}>
@@ -155,7 +155,7 @@ function BriefingContent() {
       {/* Decision Framework */}
       {b.decisionFramework && (
         <section style={{ marginBottom: 32, padding: "16px 20px", borderRadius: 10, background: "var(--pastel-butter-light, #FFF8F0)", border: "1px solid var(--pastel-butter-border, #F0D4A8)" }}>
-          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#955A20" }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "var(--pastel-butter-text, #955A20)" }}>
             Entscheidungshilfe
           </h2>
           <div style={{ fontSize: 14, lineHeight: 1.7 }}>
@@ -198,7 +198,7 @@ function BriefingContent() {
           style={{
             fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 14, fontWeight: 600,
             padding: "10px 24px", borderRadius: 10,
-            background: "var(--volt-text, #0A0A0A)", color: "#fff", border: "none", cursor: "pointer",
+            background: "var(--volt-text, #0A0A0A)", color: "var(--volt-surface, #fff)", border: "none", cursor: "pointer",
             marginBottom: 24,
           }}
         >
@@ -215,8 +215,8 @@ function BriefingContent() {
                 style={{
                   fontSize: 12, padding: "6px 14px", borderRadius: 8,
                   border: i === idx ? "1.5px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
-                  background: i === idx ? "#F7F7F7" : "transparent",
-                  color: i === idx ? "var(--volt-text, #0A0A0A)" : "#999",
+                  background: i === idx ? "var(--color-surface, #F7F7F7)" : "transparent",
+                  color: i === idx ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #999)",
                   textDecoration: "none", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}
               >

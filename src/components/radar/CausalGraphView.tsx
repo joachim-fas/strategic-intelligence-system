@@ -191,7 +191,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
       .attr("r", (d) => 8 + d.trend.impact * 15)
       .attr("fill", (d) => TIME_HORIZON_COLORS[d.trend.timeHorizon])
       .attr("fill-opacity", (d) => 0.25 + d.trend.confidence * 0.45)
-      .attr("stroke", (d) => d.id === focusedNode ? "#0A0A0A" : RING_COLORS[d.trend.ring])
+      .attr("stroke", (d) => d.id === focusedNode ? "var(--volt-text, #0A0A0A)" : RING_COLORS[d.trend.ring])
       .attr("stroke-width", (d) => d.id === focusedNode ? 2.5 : 1.5);
 
     // Glow for focused node
@@ -200,7 +200,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         .append("circle")
         .attr("r", (d) => 12 + d.trend.impact * 15)
         .attr("fill", "none")
-        .attr("stroke", "#0A0A0A")
+        .attr("stroke", "var(--volt-text, #0A0A0A)")
         .attr("stroke-opacity", 0.12)
         .attr("stroke-width", 2);
     }
@@ -209,7 +209,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
     node.append("text")
       .attr("dy", (d) => 12 + d.trend.impact * 15 + 4)
       .attr("text-anchor", "middle")
-      .attr("fill", (d) => d.id === focusedNode ? "#0A0A0A" : "#6B6B6B")
+      .attr("fill", (d) => d.id === focusedNode ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-muted, #6B6B6B)")
       .attr("font-size", (d) => d.id === focusedNode ? "10px" : "9px")
       .attr("font-weight", (d) => d.id === focusedNode ? "600" : "400")
       .text((d) => d.name.length > 28 ? d.name.slice(0, 26) + "..." : d.name);
@@ -290,12 +290,12 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
 
       {/* Edge tooltip */}
       {hoveredEdge && (
-        <div className="mb-2 px-3 py-1.5 bg-white border border-[#E8E8E8] rounded text-xs font-sans shadow-sm">
+        <div className="mb-2 px-3 py-1.5 rounded text-xs font-sans shadow-sm" style={{ background: "var(--volt-surface, white)", border: "1px solid var(--volt-border, #E8E8E8)" }}>
           <span style={{ color: EDGE_COLORS[hoveredEdge.type], fontWeight: 600 }}>{EDGE_LABELS[hoveredEdge.type]?.[locale]}</span>
           {hoveredEdge.description && (
-            <span className="text-[#6B6B6B] ml-2">{hoveredEdge.description}</span>
+            <span className="ml-2" style={{ color: "var(--volt-text-muted, #6B6B6B)" }}>{hoveredEdge.description}</span>
           )}
-          <span className="text-[#9B9B9B] ml-2">({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
+          <span className="ml-2" style={{ color: "var(--volt-text-faint, #9B9B9B)" }}>({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
         </div>
       )}
 
@@ -304,7 +304,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         width="100%"
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        className="bg-[#F8F8F6] rounded-xl border border-[#E8E8E8]"
+        style={{ background: "var(--color-surface, #F8F8F6)", border: "1px solid var(--volt-border, #E8E8E8)", borderRadius: 12 }}
       />
     </div>
   );

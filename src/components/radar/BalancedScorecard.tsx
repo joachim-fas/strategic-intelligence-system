@@ -31,10 +31,10 @@ interface BalancedScorecardProps {
 
 // Grain UI Pastell-Palette — Baby Blue · Mint · Butter · Orchid
 const PERSPECTIVE_COLORS = [
-  { color: "#1A4A8A", bg: "#D4E8FF" },  // Baby Blue
-  { color: "#0F6038", bg: "#C3F4D3" },  // Mint Green
-  { color: "#7A5C00", bg: "#FFF5BA" },  // Butter Yellow
-  { color: "#7C1A9E", bg: "#FDE2FF" },  // Soft Orchid
+  { color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)" },  // Baby Blue
+  { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)" },  // Mint Green
+  { color: "var(--pastel-butter-text, #7A5C00)", bg: "var(--pastel-butter, #FFF5BA)" },  // Butter Yellow
+  { color: "var(--pastel-orchid-text, #7C1A9E)", bg: "#FDE2FF" },  // Soft Orchid
 ];
 
 const TREND_ICONS: Record<BSCPerspective["trend"], string> = {
@@ -48,7 +48,7 @@ const TREND_COLORS: Record<BSCPerspective["trend"], string> = {
   rising:    "var(--signal-positive)",
   stable:    "var(--signal-neutral)",
   declining: "var(--signal-negative)",
-  uncertain: "#C8820A",
+  uncertain: "var(--pastel-amber-text, #C8820A)",
 };
 
 // Node positions on 700×380 canvas — corners with breathing room
@@ -127,7 +127,7 @@ function PerspectiveCard({
   const { color } = getPerspectiveColor(index);
   const score = computedScore(p, perspectives, whatIfMode ? deltas : {});
   const trendIcon = TREND_ICONS[p.trend] ?? "?";
-  const trendColor = TREND_COLORS[p.trend] ?? "#6B7280";
+  const trendColor = TREND_COLORS[p.trend] ?? "var(--volt-text-muted, #6B7280)";
   const deltaVal = deltas[p.id] ?? 0;
   const isExpanded = expanded === p.id;
 
@@ -302,8 +302,8 @@ function PerspectiveCard({
                 background:
                   ratings[p.id] === r
                     ? r === "up"
-                      ? "#ECFDF5"
-                      : "#FEF2F2"
+                      ? "var(--pastel-mint, #ECFDF5)"
+                      : "var(--pastel-rose, #FEF2F2)"
                     : "transparent",
                 color:
                   ratings[p.id] === r
@@ -402,10 +402,10 @@ function NodeView({
     >
       <defs>
         <marker id="arrow-pos" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L8,3 z" fill="#1A9E5A" fillOpacity="0.7" />
+          <path d="M0,0 L0,6 L8,3 z" fill="var(--signal-positive, #1A9E5A)" fillOpacity="0.7" />
         </marker>
         <marker id="arrow-neg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L8,3 z" fill="#E8402A" fillOpacity="0.7" />
+          <path d="M0,0 L0,6 L8,3 z" fill="var(--signal-negative, #E8402A)" fillOpacity="0.7" />
         </marker>
       </defs>
 
@@ -415,7 +415,7 @@ function NodeView({
 
       {/* Edges */}
       {edges.map((edge, i) => {
-        const strokeColor = edge.impact > 0 ? "#1A9E5A" : "#E8402A";
+        const strokeColor = edge.impact > 0 ? "var(--signal-positive, #1A9E5A)" : "var(--signal-negative, #E8402A)";
         const sw = 1.5 + Math.abs(edge.impact) * 2.5;
         // Offset endpoints to node border
         const dx = edge.toPos.x - edge.fromPos.x;
@@ -443,23 +443,23 @@ function NodeView({
       })}
 
       {/* Center hub: overall readiness */}
-      <circle cx={350} cy={190} r={36} fill="white" stroke="rgba(0,0,0,0.1)" strokeWidth={1.5} />
+      <circle cx={350} cy={190} r={36} fill="var(--volt-surface, #FFFFFF)" stroke="rgba(0,0,0,0.1)" strokeWidth={1.5} />
       <circle cx={350} cy={190} r={32} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={4} />
       <circle
         cx={350} cy={190} r={32}
         fill="none"
-        stroke={effectiveOverall > 0.6 ? "#1A9E5A" : effectiveOverall > 0.35 ? "#C8820A" : "#E8402A"}
+        stroke={effectiveOverall > 0.6 ? "var(--signal-positive, #1A9E5A)" : effectiveOverall > 0.35 ? "var(--pastel-amber-text, #C8820A)" : "var(--signal-negative, #E8402A)"}
         strokeWidth={4}
         strokeDasharray={`${effectiveOverall * 201} 201`}
         strokeLinecap="round"
         transform="rotate(-90 350 190)"
         style={{ transition: "stroke-dasharray 0.4s ease" }}
       />
-      <text x={350} y={184} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9CA3AF" fontFamily="inherit">
+      <text x={350} y={184} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="var(--volt-text-faint, #9CA3AF)" fontFamily="inherit">
         {centerLabel}
       </text>
       <text x={350} y={200} textAnchor="middle" dominantBaseline="middle" fontSize={20} fontWeight={800}
-        fill={effectiveOverall > 0.6 ? "#1A9E5A" : effectiveOverall > 0.35 ? "#C8820A" : "#E8402A"}
+        fill={effectiveOverall > 0.6 ? "var(--signal-positive, #1A9E5A)" : effectiveOverall > 0.35 ? "var(--pastel-amber-text, #C8820A)" : "var(--signal-negative, #E8402A)"}
         fontFamily="inherit"
       >
         {overallPct}%
@@ -472,7 +472,7 @@ function NodeView({
         const score = computedScore(p, perspectives, whatIfMode ? deltas : {});
         const pct = Math.round(score * 100);
         const trendIcon = TREND_ICONS[p.trend] ?? "?";
-        const trendColor = TREND_COLORS[p.trend] ?? "#6B7280";
+        const trendColor = TREND_COLORS[p.trend] ?? "var(--volt-text-muted, #6B7280)";
         // Label position: push outward from center
         const isLeft = pos.x < 350;
         const isTop = pos.y < 190;
@@ -530,12 +530,12 @@ function NodeView({
 
       {/* Legend */}
       <g transform="translate(20, 358)">
-        <line x1={0} y1={4} x2={18} y2={4} stroke="#1A9E5A" strokeWidth={2} />
-        <polygon points="16,1 16,7 22,4" fill="#1A9E5A" fillOpacity="0.7" />
-        <text x={26} y={8} fontSize={10} fill="#6B7280" fontFamily="inherit">verstärkt</text>
-        <line x1={90} y1={4} x2={108} y2={4} stroke="#E8402A" strokeWidth={2} strokeDasharray="5 3" />
-        <polygon points="106,1 106,7 112,4" fill="#E8402A" fillOpacity="0.7" />
-        <text x={116} y={8} fontSize={10} fill="#6B7280" fontFamily="inherit">hemmt</text>
+        <line x1={0} y1={4} x2={18} y2={4} stroke="var(--signal-positive, #1A9E5A)" strokeWidth={2} />
+        <polygon points="16,1 16,7 22,4" fill="var(--signal-positive, #1A9E5A)" fillOpacity="0.7" />
+        <text x={26} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">verstärkt</text>
+        <line x1={90} y1={4} x2={108} y2={4} stroke="var(--signal-negative, #E8402A)" strokeWidth={2} strokeDasharray="5 3" />
+        <polygon points="106,1 106,7 112,4" fill="var(--signal-negative, #E8402A)" fillOpacity="0.7" />
+        <text x={116} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">hemmt</text>
       </g>
     </svg>
   );
@@ -652,8 +652,8 @@ export default function BalancedScorecard({
       {data.criticalTension && (
         <div
           style={{
-            background: "#FFFBEB",
-            border: "1px solid #FDE68A",
+            background: "var(--pastel-butter, #FFFBEB)",
+            border: "1px solid var(--pastel-butter, #FDE68A)",
             borderRadius: "var(--radius-md)",
             padding: "8px 12px",
             marginBottom: 12,
@@ -662,8 +662,8 @@ export default function BalancedScorecard({
             alignItems: "flex-start",
           }}
         >
-          <span style={{ fontSize: 13, color: "#D97706", flexShrink: 0 }}>⚠</span>
-          <span style={{ fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
+          <span style={{ fontSize: 13, color: "var(--pastel-amber-text, #D97706)", flexShrink: 0 }}>⚠</span>
+          <span style={{ fontSize: 12, color: "var(--pastel-amber-text, #92400E)", lineHeight: 1.5 }}>
             {data.criticalTension}
           </span>
         </div>

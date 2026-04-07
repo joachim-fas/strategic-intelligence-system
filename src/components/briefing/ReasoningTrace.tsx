@@ -39,7 +39,7 @@ export function ReasoningTrace({ query, trendCount, locale }: {
     <div style={{
       fontFamily: "var(--font-mono)", fontSize: 12, lineHeight: 1.6,
       padding: "14px 16px", borderRadius: 8,
-      background: "#F7F7F5", border: "1px solid #EBEBEB",
+      background: "var(--color-surface, #F7F7F5)", border: "1px solid var(--volt-border, #EBEBEB)",
       display: "flex", flexDirection: "column", gap: 8,
     }}>
       {steps.map((s, i) => {

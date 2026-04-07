@@ -25,11 +25,11 @@ interface Scenario {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const TYPE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  optimistic: { bg: "#C3F4D3", color: "#0F6038", label: "Optimistisch" },
-  baseline: { bg: "#D4E8FF", color: "#1A4A8A", label: "Wahrscheinlich" },
-  pessimistic: { bg: "#FDEEE9", color: "#B91C1C", label: "Pessimistisch" },
-  wildcard: { bg: "#FFF5BA", color: "#7A5C00", label: "Wildcard" },
-  custom: { bg: "#F3F4F6", color: "#4B5563", label: "Eigenes" },
+  optimistic: { bg: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text, #0F6038)", label: "Optimistisch" },
+  baseline: { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)", label: "Wahrscheinlich" },
+  pessimistic: { bg: "var(--pastel-rose, #FDEEE9)", color: "var(--signal-negative, #B91C1C)", label: "Pessimistisch" },
+  wildcard: { bg: "var(--pastel-butter, #FFF5BA)", color: "var(--pastel-butter-text, #7A5C00)", label: "Wildcard" },
+  custom: { bg: "var(--color-surface-2, #F3F4F6)", color: "var(--volt-text-muted, #4B5563)", label: "Eigenes" },
 };
 
 const SOURCE_LABELS: Record<string, string> = {

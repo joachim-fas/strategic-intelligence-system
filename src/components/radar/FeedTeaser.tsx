@@ -31,9 +31,9 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const VEL = {
-  rising:  { sym: "↑", color: "#1A9E5A" },
-  stable:  { sym: "→", color: "#9CA3AF" },
-  falling: { sym: "↓", color: "#E8402A" },
+  rising:  { sym: "↑", color: "var(--signal-positive, #1A9E5A)" },
+  stable:  { sym: "→", color: "var(--volt-text-faint, #9CA3AF)" },
+  falling: { sym: "↓", color: "var(--signal-negative, #E8402A)" },
 };
 
 function ageLabel(h: number): string { return h < 1 ? "<1h" : h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`; }
@@ -130,7 +130,7 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
                   <span style={{ fontSize: 12, fontWeight: 700, color: vel.color, flexShrink: 0 }}>{vel.sym}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 7, fontWeight: 700, padding: "1px 4px", borderRadius: 3, background: t.trendType === "megatrend" ? "#FFF5BA" : "#F3F4F6", color: t.trendType === "megatrend" ? "var(--pastel-butter-text)" : "#9CA3AF" }}>
+                  <span style={{ fontSize: 7, fontWeight: 700, padding: "1px 4px", borderRadius: 3, background: t.trendType === "megatrend" ? "var(--pastel-butter, #FFF5BA)" : "var(--color-surface-2, #F3F4F6)", color: t.trendType === "megatrend" ? "var(--pastel-butter-text)" : "var(--volt-text-faint, #9CA3AF)" }}>
                     {t.trendType === "megatrend" ? "MEGA" : "MAKRO"}
                   </span>
                   <MiniSparkline data={t.sparkline} color={vel.color} />
@@ -150,8 +150,8 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
             {de ? "Frische Signale" : "Fresh Signals"}
           </span>
           {topSignals.map(s => {
-            const srcColor = SOURCE_COLORS[s.source] ?? "#666";
-            const ageBg = s.hoursAgo < 24 ? "var(--signal-positive)" : s.hoursAgo < 72 ? "#F5A623" : "#9CA3AF";
+            const srcColor = SOURCE_COLORS[s.source] ?? "var(--volt-text-muted, #666)";
+            const ageBg = s.hoursAgo < 24 ? "var(--signal-positive)" : s.hoursAgo < 72 ? "var(--pastel-amber-text, #F5A623)" : "var(--volt-text-faint, #9CA3AF)";
             return (
               <a key={s.id} href={s.url ?? "/wissen#signale"} target={s.url ? "_blank" : "_self"} rel="noopener noreferrer"
                 style={{
