@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useLocale } from "@/lib/locale-context";
 import { AppHeader } from "@/components/AppHeader";
+import { VoltButton, VoltBadge } from "@/components/volt";
 
 // ─── Complete source registry — ALL sources (integrated + planned) ──────────
 
@@ -216,9 +217,9 @@ export default function QuellenPage() {
             { key: "planned", label: `📋 Geplant (${plannedCount})` },
             { key: "download-only", label: `📥 Download (${downloadCount})` },
           ].map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={filter === f.key ? "volt-btn volt-btn-solid volt-btn-sm" : "volt-btn volt-btn-ghost volt-btn-sm"}
-            >{f.label}</button>
+            <VoltButton key={f.key} variant={filter === f.key ? "solid" : "ghost"} size="sm" onClick={() => setFilter(f.key)}>
+              {f.label}
+            </VoltButton>
           ))}
           <input className="volt-input" placeholder={de ? "Suchen…" : "Search…"} value={search} onChange={e => setSearch(e.target.value)}
             style={{ marginLeft: "auto", width: 200 }} />

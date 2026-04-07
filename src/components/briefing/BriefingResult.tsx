@@ -158,16 +158,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               </div>
               <div style={{ fontSize: 12, color: "#7F1D1D", lineHeight: 1.5 }}>{entry.error}</div>
             </div>
-            <button
-              onClick={() => onFollowUp?.(entry.query)}
-              style={{
-                flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "5px 12px",
-                borderRadius: "var(--radius-sm)", border: "1px solid #EF4444",
-                background: "white", color: "#DC2626", cursor: "pointer",
-              }}
-            >
+            <VoltButton variant="destructive" size="sm" onClick={() => onFollowUp?.(entry.query)}>
               {locale === "de" ? "Wiederholen" : "Retry"} ↺
-            </button>
+            </VoltButton>
           </div>
         </div>
       )}
@@ -422,11 +415,11 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               <div className="section-label" style={{ marginBottom: 8 }}>
                 {locale === "de" ? "Weiterführende Fragen" : "Follow-up Questions"}
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {b.followUpQuestions.map((q: string, i: number) => (
-                  <button key={i} onClick={() => onFollowUp?.(q)} className="chip chip-brand">
+                  <VoltButton key={i} variant="outline" size="sm" onClick={() => onFollowUp?.(q)}>
                     → {q}
-                  </button>
+                  </VoltButton>
                 ))}
               </div>
             </div>
