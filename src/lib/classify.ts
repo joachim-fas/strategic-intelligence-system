@@ -131,7 +131,7 @@ function inferAnalysisMethod(t: TrendDot): ("quantitative" | "qualitative" | "vi
   }
 
   // Visual if it's a chart-based trend
-  if (t.topSources.includes("google_trends") || t.topSources.includes("npm_pypi")) {
+  if ((t.topSources ?? []).includes("google_trends") || (t.topSources ?? []).includes("npm_pypi")) {
     methods.push("visual");
   }
 
