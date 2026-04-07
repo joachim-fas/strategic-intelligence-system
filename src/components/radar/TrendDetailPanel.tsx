@@ -311,9 +311,9 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
 
   // Category badge style
   const categoryStyle =
-    trend.category === "Mega-Trend" ? { bg: "#FDE2FF", color: "#7C1A9E" } :
-    trend.category === "Makro-Trend" ? { bg: "#D4E8FF", color: "#1A4A8A" } :
-    { bg: "#F0F2F7", color: "#3A4560" };
+    trend.category === "Mega-Trend" ? { bg: "var(--pastel-orchid-light, #FDE2FF)", color: "var(--pastel-orchid-text, #7C1A9E)" } :
+    trend.category === "Makro-Trend" ? { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)" } :
+    { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #3A4560)" };
 
   // Ring style
   const ringPastel = RING_PASTEL[trend.ring] ?? { color: "#3A4560", background: "#F0F2F7" };
@@ -596,9 +596,9 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             .filter((tag) => !resolveSource(tag))
             .map((tag) => {
               const style =
-                tag === "mega-trend"  ? { bg: "#FDE2FF", color: "#7C1A9E", border: "#D4A0F0" } :
-                tag === "makro-trend" ? { bg: "#D4E8FF", color: "#1A4A8A", border: "#80B8F0" } :
-                                        { bg: "#F0F2F7", color: "#6B6B6B", border: "#E0E0E0" };
+                tag === "mega-trend"  ? { bg: "var(--pastel-orchid-light, #FDE2FF)", color: "var(--pastel-orchid-text, #7C1A9E)", border: "var(--pastel-orchid-border, #D4A0F0)" } :
+                tag === "makro-trend" ? { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)", border: "var(--pastel-sky-border, #80B8F0)" } :
+                                        { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #6B6B6B)", border: "var(--volt-border, #E0E0E0)" };
               return (
                 <span
                   key={tag}
@@ -612,25 +612,81 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
         </div>
       </div>
 
-      {/* ── L3: Deep Dive Actions ── */}
+      {/* ── L3: Actions Bar ── */}
       <div className="px-6 py-5">
-        <a
-          href={`/?q=${encodeURIComponent(trend.name)}`}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            width: "100%", padding: "10px 16px",
-            borderRadius: 10,
-            background: "var(--volt-text, #0A0A0A)", color: "var(--volt-surface, #FFFFFF)",
-            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-            fontSize: 13, fontWeight: 600,
-            textDecoration: "none",
-            transition: "transform 150ms ease",
-          }}
-          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-          onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-        >
-          {locale === "de" ? "Frag mich zu diesem Trend" : "Ask me about this trend"} →
-        </a>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Primary: Ask about this trend */}
+          <a
+            href={`/?q=${encodeURIComponent(locale === "de" ? `Deep Dive: ${trend.name} — Treiber, Signale, Szenarien` : `Deep dive: ${trend.name} — drivers, signals, scenarios`)}`}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              width: "100%", padding: "10px 16px",
+              borderRadius: 10,
+              background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)",
+              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              fontSize: 13, fontWeight: 600,
+              textDecoration: "none",
+              transition: "transform 150ms ease",
+              border: "1px solid rgba(0,0,0,0.08)",
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+          >
+            {locale === "de" ? "Frage stellen" : "Ask question"} →
+          </a>
+
+          {/* Secondary row */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* Deep dive */}
+            <a
+              href={`/cockpit/${trend.id}`}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                padding: "8px 12px", borderRadius: 8,
+                border: "1px solid var(--volt-border, #E8E8E8)",
+                background: "var(--volt-surface, #FFFFFF)",
+                color: "var(--volt-text, #0A0A0A)",
+                fontSize: 12, fontWeight: 500, textDecoration: "none",
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                transition: "all 150ms ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
+            >
+              ↓ {locale === "de" ? "Vertiefen" : "Deep dive"}
+            </a>
+
+            {/* Save to project */}
+            <button
+              onClick={() => {
+                const projectId = typeof window !== "undefined" ? localStorage.getItem("sis-active-project") : null;
+                if (projectId) {
+                  fetch(`/api/v1/projects/${projectId}/queries`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: `Trend: ${trend.name}`, result: { synthesis: `${trend.name} — ${trend.category}, ${trend.ring}, Relevanz ${Math.round(trend.relevance * 100)}%` } }),
+                  });
+                } else {
+                  window.location.href = "/werkstatt";
+                }
+              }}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                padding: "8px 12px", borderRadius: 8,
+                border: "1px solid var(--volt-border, #E8E8E8)",
+                background: "var(--volt-surface, #FFFFFF)",
+                color: "var(--volt-text, #0A0A0A)",
+                fontSize: 12, fontWeight: 500, cursor: "pointer",
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                transition: "all 150ms ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
+            >
+              📁 {locale === "de" ? "Zum Projekt" : "To project"}
+            </button>
+          </div>
+        </div>
 
         {/* All authoritative sources with links */}
         {authoritativeSources.length > 0 && (
