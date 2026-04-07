@@ -453,13 +453,42 @@ export default function WissenPage() {
       {/* ── Page header + Lens switcher ─────────────────────────── */}
       <div style={{ borderBottom: "1px solid var(--color-border)", padding: "16px 24px 0" }}>
         <div className="volt-container" style={{ display: "flex", alignItems: "end", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h1 className="volt-display-md" style={{ color: "var(--color-text-heading)", margin: "0 0 4px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <h1 style={{
+              fontFamily: "var(--volt-font-display)", fontSize: 20, fontWeight: 700,
+              letterSpacing: "-0.02em", color: "var(--color-text-heading)", margin: 0,
+            }}>
               {de ? "Verstehen" : "Understand"}
             </h1>
-            <p className="volt-body-sm" style={{ color: "var(--color-text-muted)", margin: 0 }}>
-              {trends.length} Trends · {megaCount} Mega · {risingCount} ↑ {de ? "steigend" : "rising"} · <a href="/quellen" style={{ color: "var(--color-text-muted)", textDecoration: "underline", textUnderlineOffset: 2 }}>{de ? "Quellen →" : "Sources →"}</a>
-            </p>
+
+            {/* Stat badges */}
+            <div style={{ display: "flex", gap: 6 }}>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "4px 10px", borderRadius: 8,
+                background: "var(--volt-lime, #E4FF97)", color: "var(--volt-black, #0A0A0A)",
+                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 700,
+              }}>
+                {trends.length} <span style={{ fontWeight: 500, fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Trends</span>
+              </span>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "4px 10px", borderRadius: 8,
+                background: "var(--volt-surface, #F7F7F7)", color: "var(--volt-text-muted)",
+                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 600,
+                border: "1px solid var(--volt-border)",
+              }}>
+                {megaCount} <span style={{ fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Mega</span>
+              </span>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "4px 10px", borderRadius: 8,
+                background: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text, #0F6038)",
+                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 600,
+              }}>
+                {risingCount} ↑ <span style={{ fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{de ? "steigend" : "rising"}</span>
+              </span>
+            </div>
           </div>
 
           {/* Lens switcher */}
