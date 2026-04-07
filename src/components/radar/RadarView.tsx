@@ -167,7 +167,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
                           {trend.name}
                         </span>
                         {trend.velocity === "rising" && (
-                          <span style={{ color: "#16a34a", fontSize: 10, flexShrink: 0 }}>▲</span>
+                          <span style={{ color: "var(--signal-positive, #16a34a)", fontSize: 10, flexShrink: 0 }}>▲</span>
                         )}
                         <span
                           style={{

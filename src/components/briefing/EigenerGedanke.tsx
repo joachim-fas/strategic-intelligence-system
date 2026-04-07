@@ -49,14 +49,14 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
         }}
         onMouseEnter={e => {
           (e.currentTarget as HTMLElement).style.borderColor = "var(--volt-lime, #E4FF97)";
-          (e.currentTarget as HTMLElement).style.background = "#FDFFF5";
+          (e.currentTarget as HTMLElement).style.background = "var(--volt-surface-raised, #FDFFF5)";
         }}
         onMouseLeave={e => {
           (e.currentTarget as HTMLElement).style.borderColor = "#DEDEDE";
           (e.currentTarget as HTMLElement).style.background = "transparent";
         }}
       >
-        <span style={{ fontSize: 14, color: "#BDBDBD" }}>✏</span>
+        <span style={{ fontSize: 14, color: "var(--volt-text-faint, #BDBDBD)" }}>✏</span>
         <span style={{ fontSize: 12, color: "var(--volt-text-faint, #9B9B9B)" }}>
           {de ? "Eigenen Gedanken einbringen…" : "Add your own thought…"}
         </span>
@@ -65,12 +65,12 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
   }
 
   return (
-    <div style={{ border: "1px solid #E4FF97", borderRadius: 8, overflow: "hidden", background: "#FDFFF5" }}>
-      <div style={{ padding: "8px 12px", borderBottom: "1px solid #E4FF97", display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ border: "1px solid var(--volt-lime, #E4FF97)", borderRadius: 8, overflow: "hidden", background: "var(--volt-surface-raised, #FDFFF5)" }}>
+      <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--volt-lime, #E4FF97)", display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--volt-text, #0A0A0A)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           {de ? "Eigener Gedanke" : "Your thought"}
         </span>
-        <span style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 400 }}>
+        <span style={{ fontSize: 11, color: "var(--volt-text-muted, #6B6B6B)", fontWeight: 400 }}>
           {de ? "— wird kritisch gegen die Analyse geprüft" : "— critically tested against the analysis"}
         </span>
         <button
@@ -93,7 +93,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
           minHeight: 80, boxSizing: "border-box",
         }}
       />
-      <div style={{ padding: "8px 12px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid #E4FF97" }}>
+      <div style={{ padding: "8px 12px", display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--volt-lime, #E4FF97)" }}>
         <button
           onClick={() => { setOpen(false); setText(""); }}
           style={{ fontSize: 12, color: "var(--volt-text-faint, #9B9B9B)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}

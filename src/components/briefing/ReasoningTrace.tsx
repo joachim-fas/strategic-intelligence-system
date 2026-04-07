@@ -53,12 +53,12 @@ export function ReasoningTrace({ query, trendCount, locale }: {
             transition: "opacity 0.4s ease",
           }}>
             {isDone ? (
-              <span style={{ width: 14, height: 14, flexShrink: 0, color: "#1A9E5A", fontWeight: 700, fontSize: 12, lineHeight: "14px" }}>✓</span>
+              <span style={{ width: 14, height: 14, flexShrink: 0, color: "var(--signal-positive, #1A9E5A)", fontWeight: 700, fontSize: 12, lineHeight: "14px" }}>✓</span>
             ) : isActive ? (
               <span className="animate-spin" style={{
                 width: 10, height: 10, flexShrink: 0, margin: "0 2px",
                 borderRadius: "50%",
-                border: "1.5px solid #E4FF97",
+                border: "1.5px solid var(--volt-lime, #E4FF97)",
                 borderTopColor: "var(--volt-text, #0A0A0A)",
                 display: "inline-block",
               }} />

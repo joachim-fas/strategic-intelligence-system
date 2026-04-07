@@ -156,7 +156,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-negative-text)", marginBottom: 4 }}>
                 {locale === "de" ? "Analyse fehlgeschlagen" : "Analysis failed"}
               </div>
-              <div style={{ fontSize: 12, color: "#7F1D1D", lineHeight: 1.5 }}>{entry.error}</div>
+              <div style={{ fontSize: 12, color: "var(--signal-negative-text, #7F1D1D)", lineHeight: 1.5 }}>{entry.error}</div>
             </div>
             <VoltButton variant="destructive" size="sm" onClick={() => onFollowUp?.(entry.query)}>
               {locale === "de" ? "Wiederholen" : "Retry"} ↺
@@ -205,7 +205,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           {/* 1c. Transparency indicator — shows data sources used */}
           {!isHelp && !isLoading && (b.usedSignals?.length > 0 || b.references?.length > 0 || briefing.confidence > 0) && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(37,99,235,0.04)", borderRadius: 8, border: "1px solid rgba(37,99,235,0.1)" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "#2563EB", textTransform: "uppercase" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "var(--volt-neutral-text, #2563EB)", textTransform: "uppercase" }}>
                 {locale === "de" ? "Datengrundlage" : "Data Basis"}
               </span>
               {b.usedSignals?.length > 0 && (
@@ -277,7 +277,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                   <span style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
-                    background: isHelp ? "#F7F7F7" : "var(--volt-lime, #E4FF97)",
+                    background: isHelp ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
                     fontSize: 10, fontWeight: 700, color: "var(--volt-text, #0A0A0A)",
                   }}>{isHelp ? "·" : "→"}</span>
                   <span style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{insight}</span>
