@@ -87,11 +87,15 @@ export default function WerkstattPage() {
               </div>
             </div>
 
-            {/* Canvas embed */}
+            {/* Canvas embed — passes project ID via localStorage + URL */}
             <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--color-border)" }}>
               <iframe
-                src="/canvas?embedded=1"
+                key={activeProject.id}
+                src={`/canvas?embedded=1&project=${activeProject.id}`}
                 style={{ width: "100%", height: "calc(100vh - 160px)", border: "none" }}
+                onLoad={() => {
+                  try { localStorage.setItem("sis-active-canvas", activeProject.id); } catch {}
+                }}
               />
             </div>
           </div>

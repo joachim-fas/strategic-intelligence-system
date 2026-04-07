@@ -4442,9 +4442,10 @@ export default function CanvasPage() {
       } catch { /* ignore malformed transfer data */ }
     }
 
-    // Check if launched from Projects page → takes priority
+    // Check URL param first (e.g. from Werkstatt embed), then localStorage
+    const urlProjectId = (() => { try { return new URLSearchParams(window.location.search).get("project"); } catch { return null; } })();
     const fromProjects = (() => { try { const v = localStorage.getItem("sis-canvas-project"); localStorage.removeItem("sis-canvas-project"); return v; } catch { return null; } })();
-    const activeId = fromProjects ?? (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+    const activeId = urlProjectId ?? fromProjects ?? (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
 
     if (activeId) {
       fetch(`/api/v1/canvas/${activeId}`)
