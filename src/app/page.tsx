@@ -674,18 +674,41 @@ export default function Home() {
       {projectView === "standard" && (<>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
 
-        {/* Search input */}
+        {/* Hero + Search */}
         <div style={{
-          maxWidth: 880, margin: "0 auto", width: "100%",
-          padding: isFirstVisit && !showFullRadar ? "calc(40vh - 80px) 24px 0" : "20px 24px 0",
+          maxWidth: 700, margin: "0 auto", width: "100%",
+          padding: isFirstVisit && !showFullRadar ? "80px 24px 0" : "20px 24px 0",
         }}>
+          {/* Headline — only on first visit */}
+          {isFirstVisit && !showFullRadar && (
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <h1 style={{
+                fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+                fontSize: "clamp(1.25rem, 3vw, 1.75rem)",
+                fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2,
+                color: "var(--volt-text, #0A0A0A)", margin: "0 0 8px",
+              }}>
+                {locale === "de"
+                  ? "Welche strategische Frage beschäftigt dich?"
+                  : "What strategic question are you working on?"}
+              </h1>
+              <p style={{
+                fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase" as const,
+                color: "var(--volt-text-faint, #AAA)", margin: 0,
+              }}>
+                50 {locale === "de" ? "Quellen" : "Sources"} · 39 Trends · STEEP+V · EU-Fokus
+              </p>
+            </div>
+          )}
           <div
             style={{
               display: "flex", alignItems: "center",
               padding: "0 22px",
               height: 56,
               borderRadius: "var(--volt-radius-lg, 14px)",
-              border: "2px solid var(--volt-text, #0A0A0A)",
+              border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+              transition: "border-color 150ms ease",
               background: "var(--volt-surface-raised, #fff)",
               /* no shadow — Volt depth via border */
               position: "relative",
@@ -899,14 +922,14 @@ export default function Home() {
 
         {/* Framework grid — own wider container, outside 640px constraint */}
         {isFirstVisit && !showFullRadar && (
-          <div style={{ maxWidth: 880, margin: "0 auto", width: "100%", padding: "48px 24px 0" }}>
+          <div style={{ maxWidth: 700, margin: "0 auto", width: "100%", padding: "32px 24px 0" }}>
             <div style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
               fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
               color: "var(--volt-text-faint, #BBB)",
-              marginBottom: 12,
+              marginBottom: 12, textAlign: "center",
             }}>
-              {locale === "de" ? "Analyse-Frameworks" : "Analysis Frameworks"}
+              {locale === "de" ? "Oder starte mit einem Framework" : "Or start with a framework"}
             </div>
             <div className="sis-framework-grid">
               {([
