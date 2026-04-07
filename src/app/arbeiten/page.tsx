@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import { VoltButton, VoltCard } from "@/components/volt";
 
 interface Project {
   id: string;
@@ -93,9 +94,9 @@ export default function ArbeitenPage() {
             })}
           </div>
           {tab === "projekte" && (
-            <button onClick={createProject} className="volt-btn volt-btn-solid" style={{ fontSize: 12, padding: "6px 14px" }}>
+            <VoltButton variant="solid" size="sm" onClick={createProject}>
               + {de ? "Neues Projekt" : "New Project"}
-            </button>
+            </VoltButton>
           )}
         </div>
       </div>

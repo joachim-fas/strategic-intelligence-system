@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import { VoltButton } from "@/components/volt";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

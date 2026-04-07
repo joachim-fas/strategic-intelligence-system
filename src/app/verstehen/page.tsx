@@ -7,6 +7,7 @@ import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_CLUSTERS, TREND_CLUSTER_MAP, getIntraClusterEdges } from "@/lib/trend-clusters";
+import { VoltBadge } from "@/components/volt";
 import dynamic from "next/dynamic";
 
 // ── Lazy-load heavy visualization components ────────────────────────────────
@@ -461,33 +462,11 @@ export default function WissenPage() {
               {de ? "Verstehen" : "Understand"}
             </h1>
 
-            {/* Stat badges */}
+            {/* Stat badges — Volt components */}
             <div style={{ display: "flex", gap: 6 }}>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                padding: "4px 10px", borderRadius: 8,
-                background: "var(--volt-lime, #E4FF97)", color: "var(--volt-black, #0A0A0A)",
-                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 700,
-              }}>
-                {trends.length} <span style={{ fontWeight: 500, fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Trends</span>
-              </span>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                padding: "4px 10px", borderRadius: 8,
-                background: "var(--volt-surface, #F7F7F7)", color: "var(--volt-text-muted)",
-                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 600,
-                border: "1px solid var(--volt-border)",
-              }}>
-                {megaCount} <span style={{ fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>Mega</span>
-              </span>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                padding: "4px 10px", borderRadius: 8,
-                background: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text, #0F6038)",
-                fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 600,
-              }}>
-                {risingCount} ↑ <span style={{ fontSize: 9, letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{de ? "steigend" : "rising"}</span>
-              </span>
+              <VoltBadge variant="default">{trends.length} Trends</VoltBadge>
+              <VoltBadge variant="outline">{megaCount} Mega</VoltBadge>
+              <VoltBadge variant="positive">{risingCount} ↑ {de ? "steigend" : "rising"}</VoltBadge>
             </div>
           </div>
 
