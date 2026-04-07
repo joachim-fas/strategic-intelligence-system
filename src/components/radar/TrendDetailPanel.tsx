@@ -154,7 +154,7 @@ function CausalGraphSection({ trendId, locale }: { trendId: string; locale: Loca
     const label = targetId
       .replace(/^mega-/, "").replace(/^macro-/, "")
       .replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    const s = edgeStyle[edge.type] ?? { dot: "var(--volt-text-faint, #9B9B9B)", bg: "var(--color-surface-2, #F0F2F7)", text: "var(--volt-text-muted, #6B6B6B)" };
+    const s = edgeStyle[edge.type] ?? { dot: "#9B9B9B", bg: "#F0F2F7", text: "#6B6B6B" };
 
     return (
       <div className="flex items-center gap-2 text-xs py-1">
@@ -311,12 +311,12 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
 
   // Category badge style
   const categoryStyle =
-    trend.category === "Mega-Trend" ? { bg: "var(--pastel-orchid-light, #FDE2FF)", color: "var(--pastel-orchid-text, #7C1A9E)" } :
-    trend.category === "Makro-Trend" ? { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)" } :
-    { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #3A4560)" };
+    trend.category === "Mega-Trend" ? { bg: "#FDE2FF", color: "#7C1A9E" } :
+    trend.category === "Makro-Trend" ? { bg: "#D4E8FF", color: "#1A4A8A" } :
+    { bg: "#F0F2F7", color: "#3A4560" };
 
   // Ring style
-  const ringPastel = RING_PASTEL[trend.ring] ?? { color: "var(--volt-text-muted, #3A4560)", background: "var(--color-surface-2, #F0F2F7)" };
+  const ringPastel = RING_PASTEL[trend.ring] ?? { color: "#3A4560", background: "#F0F2F7" };
 
   return (
     <div
@@ -596,9 +596,9 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             .filter((tag) => !resolveSource(tag))
             .map((tag) => {
               const style =
-                tag === "mega-trend"  ? { bg: "var(--pastel-orchid-light, #FDE2FF)", color: "var(--pastel-orchid-text, #7C1A9E)", border: "var(--pastel-orchid-border, #D4A0F0)" } :
-                tag === "makro-trend" ? { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)", border: "var(--pastel-sky-border, #80B8F0)" } :
-                                        { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #6B6B6B)", border: "var(--volt-border, #E0E0E0)" };
+                tag === "mega-trend"  ? { bg: "#FDE2FF", color: "#7C1A9E", border: "#D4A0F0" } :
+                tag === "makro-trend" ? { bg: "#D4E8FF", color: "#1A4A8A", border: "#80B8F0" } :
+                                        { bg: "#F0F2F7", color: "#6B6B6B", border: "#E0E0E0" };
               return (
                 <span
                   key={tag}

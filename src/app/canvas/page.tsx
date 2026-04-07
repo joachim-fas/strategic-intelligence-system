@@ -5340,7 +5340,9 @@ export default function CanvasPage() {
 
         {/* ── Global nav links ───────────────────────────────── */}
         {([
-          { href: "/wissen",   label: de ? "Wissen"   : "Knowledge", tip: de ? "Trends, Signale & Quellen" : "Trends, signals & sources" },
+          { href: "/cockpit",  label: de ? "Cockpit"  : "Cockpit",   tip: de ? "Trend-Radar, Netzwerk & Trends" : "Trend radar, network & trends" },
+          { href: "/werkstatt", label: de ? "Werkstatt" : "Workshop", tip: de ? "Projekte & Denkarbeitsplatz" : "Projects & thinking workspace" },
+          { href: "/archiv",  label: de ? "Archiv"   : "Archive",  tip: de ? "Datenquellen & Methodik" : "Data sources & methodology" },
         ] as { href: string; label: string; tip: string }[]).map(({ href, label, tip }) => (
           <Tooltip key={href} content={tip} placement="bottom">
             <a

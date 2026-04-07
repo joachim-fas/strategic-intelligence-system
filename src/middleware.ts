@@ -23,7 +23,12 @@ export async function middleware(request: NextRequest) {
   // Public paths that do not require authentication
   const publicPaths = [
     "/",              // FRAGEN — main intelligence terminal
-    "/verstehen",     // VERSTEHEN — knowledge base (public read)
+    "/cockpit",       // COCKPIT — trend radar, network, trends (public read)
+    "/werkstatt",     // WERKSTATT — project workspace
+    "/archiv",        // ARCHIV — source registry, methodology
+    "/verstehen",     // Legacy redirect → /cockpit
+    "/arbeiten",      // Legacy redirect → /werkstatt
+    "/quellen",       // Legacy redirect → /archiv
     "/briefing",      // Print-optimized briefing (shareable)
     "/api/auth",      // NextAuth endpoints
     "/auth",          // Sign-in pages

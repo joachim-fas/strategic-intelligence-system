@@ -95,7 +95,7 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
         <span style={{ fontSize: 10, color: "var(--color-text-muted)", opacity: 0.6 }}>
           {data.meta.freshSignals} {de ? "Signale" : "signals"}
         </span>
-        <Link href="/wissen#signale" style={{
+        <Link href="/cockpit" style={{
           marginLeft: "auto", fontSize: 10, fontWeight: 600,
           color: "var(--color-text-muted)", textDecoration: "none",
           padding: "2px 8px", borderRadius: 10,
@@ -117,7 +117,7 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
           {hotTrends.map(t => {
             const vel = VEL[t.velocity];
             return (
-              <Link key={t.id} href="/wissen#signale" className="volt-card" style={{
+              <Link key={t.id} href="/cockpit" className="volt-card" style={{
                 flexShrink: 0, width: 160, padding: "8px 10px",
                 textDecoration: "none", color: "inherit",
                 transition: "border-color 0.12s, transform 0.12s",
@@ -153,7 +153,7 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
             const srcColor = SOURCE_COLORS[s.source] ?? "var(--volt-text-muted, #666)";
             const ageBg = s.hoursAgo < 24 ? "var(--signal-positive)" : s.hoursAgo < 72 ? "var(--pastel-amber-text, #F5A623)" : "var(--volt-text-faint, #9CA3AF)";
             return (
-              <a key={s.id} href={s.url ?? "/wissen#signale"} target={s.url ? "_blank" : "_self"} rel="noopener noreferrer"
+              <a key={s.id} href={s.url ?? "/cockpit"} target={s.url ? "_blank" : "_self"} rel="noopener noreferrer"
                 style={{
                   display: "flex", alignItems: "center", gap: 6, padding: "3px 6px",
                   borderRadius: 5, textDecoration: "none", color: "inherit",
@@ -169,7 +169,7 @@ export default function FeedTeaser({ locale }: { locale: "de" | "en" }) {
               </a>
             );
           })}
-          <Link href="/wissen#signale" style={{ fontSize: 10, color: "var(--color-text-muted)", textDecoration: "none", marginTop: 2, paddingLeft: 6 }}
+          <Link href="/cockpit" style={{ fontSize: 10, color: "var(--color-text-muted)", textDecoration: "none", marginTop: 2, paddingLeft: 6 }}
             onMouseEnter={e => (e.currentTarget.style.color = "var(--color-text-heading)")}
             onMouseLeave={e => (e.currentTarget.style.color = "var(--color-text-muted)")}
           >{de ? "Alle Signale →" : "All signals →"}</Link>

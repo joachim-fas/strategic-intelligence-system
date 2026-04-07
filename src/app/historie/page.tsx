@@ -1,2 +1,2 @@
 import { redirect } from "next/navigation";
-export default function HistoriePage() { redirect("/arbeiten"); }
+export default function HistoriePage() { redirect("/werkstatt"); }

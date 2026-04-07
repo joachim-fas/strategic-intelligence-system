@@ -5,16 +5,15 @@ import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/verstehen",  labelDe: "Verstehen",  labelEn: "Understand" },
-  { href: "/arbeiten",   labelDe: "Arbeiten",   labelEn: "Work"      },
+  { href: "/cockpit",    labelDe: "Cockpit",    labelEn: "Cockpit"   },
+  { href: "/werkstatt",  labelDe: "Werkstatt",  labelEn: "Workshop"  },
+  { href: "/archiv",     labelDe: "Archiv",     labelEn: "Archive"   },
 ];
 
 /**
- * Shared navigation header used by all satellite pages:
- * Trends, Sources, How-to, Projects.
- *
- * Canvas has its own workspace header.
- * The main "/" page has its own header with additional controls.
+ * Shared navigation header — used by ALL pages including Canvas.
+ * Three rooms: Cockpit (observe) | Werkstatt (build) | Archiv (verify)
+ * Logo click returns to Home (/).
  */
 export function AppHeader() {
   const { locale, toggleLocale } = useLocale();

@@ -1,2 +1,2 @@
 import { redirect } from "next/navigation";
-export default function FeedPage() { redirect("/wissen"); }
+export default function FeedPage() { redirect("/cockpit"); }

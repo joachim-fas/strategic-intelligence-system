@@ -543,8 +543,9 @@ export default function Home() {
           {/* Nav — Desktop only */}
           <nav className="sis-nav-desktop" style={{ display: "flex", alignItems: "center", gap: 2 }}>
             {[
-              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
-              { href: "/arbeiten", label: locale === "de" ? "Arbeiten" : "Work" },
+              { href: "/cockpit", label: locale === "de" ? "Cockpit" : "Cockpit" },
+              { href: "/werkstatt", label: locale === "de" ? "Werkstatt" : "Workshop" },
+              { href: "/archiv", label: locale === "de" ? "Archiv" : "Archive" },
             ].map(({ href, label }) => (
               <a key={href} href={href}
                 style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-subtle)", textDecoration: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", transition: "all 0.15s", whiteSpace: "nowrap" }}
@@ -624,8 +625,9 @@ export default function Home() {
             <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
             </>)}
             {[
-              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
-              { href: "/arbeiten", label: locale === "de" ? "Arbeiten" : "Work" },
+              { href: "/cockpit", label: locale === "de" ? "Cockpit" : "Cockpit" },
+              { href: "/werkstatt", label: locale === "de" ? "Werkstatt" : "Workshop" },
+              { href: "/archiv", label: locale === "de" ? "Archiv" : "Archive" },
             ].map(({ href, label }) => (
               <a key={href} href={href} onClick={() => setMobileMenuOpen(false)}
                 style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)", textDecoration: "none", padding: "11px 24px" }}
@@ -730,14 +732,15 @@ export default function Home() {
               position: "absolute", visibility: "hidden", whiteSpace: "pre",
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
             }} />
-            {/* Blinking block cursor — follows text, shown on focus or when typing */}
-            {(query || inputFocused) && (
+            {/* Blinking block cursor — visible on focus or when typing */}
+            {!isAnalyzing && (query || inputFocused) && (
               <span className="sis-blink-cursor" style={{
                 position: "absolute",
                 left: 22 + cursorLeft,
                 top: "50%", transform: "translateY(-50%)",
                 width: 10, height: 20,
                 background: "var(--volt-text, #0A0A0A)",
+                zIndex: 2,
               }} />
             )}
             <input
@@ -760,8 +763,8 @@ export default function Home() {
                 style={{
                   fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
                   borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                  background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-black, #0A0A0A)",
-                  color: isAnalyzing ? "var(--volt-text-muted)" : "var(--volt-white, #fff)",
+                  background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
+                  color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
                   border: "none", cursor: isAnalyzing ? "wait" : "pointer",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}
