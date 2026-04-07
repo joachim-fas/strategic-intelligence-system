@@ -773,6 +773,36 @@ export default function Home() {
             )}
           </div>
 
+          {/* Suggestion chips — only on first visit, when not typing */}
+          {isFirstVisit && !query && !isAnalyzing && (
+            <div style={{
+              display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap",
+              marginTop: 12, position: "relative", zIndex: 1,
+            }}>
+              {(locale === "de"
+                ? ["KI-Regulierung EU", "Energiewende 2030", "Zukunft der Arbeit", "Cybersecurity Trends", "Supply Chain Risiken"]
+                : ["AI Regulation EU", "Energy Transition 2030", "Future of Work", "Cybersecurity Trends", "Supply Chain Risks"]
+              ).map(suggestion => (
+                <button
+                  key={suggestion}
+                  onClick={() => { setQuery(suggestion); inputRef.current?.focus(); }}
+                  style={{
+                    fontFamily: "var(--volt-font-ui)", fontSize: 11, fontWeight: 500,
+                    padding: "5px 12px", borderRadius: 20,
+                    border: "1px solid var(--volt-border, #E8E8E8)",
+                    background: "var(--volt-surface-raised, #fff)",
+                    color: "var(--volt-text-muted, #6B6B6B)",
+                    cursor: "pointer", transition: "all 150ms ease",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text)"; e.currentTarget.style.color = "var(--volt-text)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; e.currentTarget.style.color = "var(--volt-text-muted)"; }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Framework Topic Modal */}
           {frameworkModal && (
             <>
