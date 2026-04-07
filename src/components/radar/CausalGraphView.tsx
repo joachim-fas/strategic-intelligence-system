@@ -263,25 +263,28 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
   return (
     <div ref={containerRef} className="px-6 py-4">
       {/* Legend + Stats */}
-      <div className="flex flex-wrap items-center gap-4 mb-3 text-[10px] text-[#666]">
-        <span className="font-semibold text-[#888]">{locale === "de" ? "Kausal-Graph" : "Causal Graph"}</span>
-        <span className="text-[#555]">{connectedNodes.size} Nodes / {activeEdges.length} Edges</span>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 12, fontFamily: "var(--volt-font-mono)", fontSize: 10 }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--volt-text-faint)" }}>
+          {connectedNodes.size} Nodes · {activeEdges.length} Edges
+        </span>
+        <span style={{ width: 1, height: 12, background: "var(--volt-border)" }} />
         {Object.entries(EDGE_COLORS).map(([type, color]) => (
-          <span key={type} className="flex items-center gap-1">
-            <span className="w-4 h-0.5 inline-block" style={{ background: color, opacity: 0.8 }} />
+          <span key={type} style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--volt-text-muted)" }}>
+            <span style={{ width: 16, height: 2, borderRadius: 1, background: color, display: "inline-block" }} />
             {EDGE_LABELS[type]?.[locale] || type}
           </span>
         ))}
         {focusedNode && (
-          <button
-            onClick={() => setFocusedNode(null)}
-            className="ml-auto text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors"
-          >
-            {locale === "de" ? "Filter zuruecksetzen" : "Reset filter"}
+          <button onClick={() => setFocusedNode(null)} style={{
+            marginLeft: "auto", fontSize: 10, color: "var(--volt-text-muted)",
+            background: "none", border: "1px solid var(--volt-border)", borderRadius: 6,
+            padding: "2px 8px", cursor: "pointer",
+          }}>
+            {locale === "de" ? "Filter zurücksetzen" : "Reset filter"} ✕
           </button>
         )}
-        <span className="ml-auto text-[#444]">
-          {locale === "de" ? "Klick = Fokus, Doppelklick = Details, Ziehen = Verschieben" : "Click = Focus, Double-click = Details, Drag = Move"}
+        <span style={{ marginLeft: "auto", color: "var(--volt-text-faint)", fontSize: 9 }}>
+          {locale === "de" ? "Klick = Fokus · Ziehen = Verschieben · Scroll = Zoom" : "Click = Focus · Drag = Move · Scroll = Zoom"}
         </span>
       </div>
 

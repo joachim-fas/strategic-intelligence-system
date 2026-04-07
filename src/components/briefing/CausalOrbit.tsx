@@ -33,8 +33,12 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <div className="section-label" style={{ marginBottom: 12 }}>
-        {de ? "Kausalnetz" : "Causal Network"}
+      <div style={{
+        fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 700,
+        letterSpacing: "0.10em", textTransform: "uppercase" as const,
+        color: "var(--volt-text-faint, #AAA)", marginBottom: 12,
+      }}>
+        {de ? "Kausalnetz" : "Causal Network"} · {parsedChains.length} {de ? "Ketten" : "chains"} · {allNodes.size} Nodes
       </div>
       <div style={{ display: "flex", gap: 16 }}>
         {/* SVG orbit */}
