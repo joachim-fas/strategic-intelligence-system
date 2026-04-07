@@ -66,8 +66,12 @@ export default function SignalTicker() {
           ● LIVE
         </span>
 
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", gap: 16 }}>
-          {signals.slice(0, expanded ? 8 : 3).map(s => {
+        <div style={{
+          flex: 1, overflow: "hidden", display: "flex", gap: 20,
+          maskImage: "linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%)",
+        }}>
+          {signals.slice(0, expanded ? 8 : 5).map(s => {
             const dot = SOURCE_DOT[s.source] ?? "#999";
             return (
               <a
