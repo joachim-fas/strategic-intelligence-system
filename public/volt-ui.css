@@ -1,641 +1,300 @@
-/*
- * ╔══════════════════════════════════════════════════════════════╗
- * ║  VOLT UI — Portable Design System                           ║
- * ║  Version 1.0 · Free Agents Design Concept                  ║
- * ║                                                              ║
- * ║  VERWENDUNG:                                                 ║
- * ║  <link rel="stylesheet" href="volt-ui.css">                 ║
- * ║  <link rel="preconnect" href="https://fonts.googleapis.com">║
- * ║  Dann die Google Fonts einbinden (siehe unten).             ║
- * ╚══════════════════════════════════════════════════════════════╝
+/**
+ * Volt UI – Design Tokens & Utility Classes
+ * ==========================================
+ * Importiere diese Datei einmalig in deinem Projekt:
+ *   import "./volt-ui.css";
  *
- * GOOGLE FONTS (in <head> einbinden):
- * @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+ * Voraussetzungen:
+ *   - Tailwind CSS v4
+ *   - Google Fonts: Space Grotesk, DM Sans, JetBrains Mono
+ *     (in index.html oder via @import)
+ *
+ * Hauptfarben:  #E4FF97 Neon Yellow + #000000 Black
+ * Schriften:    Space Grotesk · DM Sans · JetBrains Mono
  */
 
-/* ═══════════════════════════════════════════════════════════════
-   1. DESIGN TOKENS — CSS Custom Properties
-   ═══════════════════════════════════════════════════════════════ */
-
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS – Light Mode (Standard)
+═══════════════════════════════════════════════════════ */
 :root {
-  /* ── Typografie ── */
-  --volt-font-display: "Space Grotesk", system-ui, sans-serif;
-  --volt-font-ui:      "DM Sans", system-ui, sans-serif;
-  --volt-font-mono:    "JetBrains Mono", "Fira Code", monospace;
+  /* ── Schriften ── */
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-ui:      "DM Sans", system-ui, sans-serif;
+  --font-body:    "DM Sans", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "Fira Code", monospace;
+
+  /* ── Border Radius ── */
+  --radius: 0.5rem;
 
   /* ── Primärfarben ── */
-  --volt-lime:         #E4FF97;   /* Neon Lime — Hauptakzent */
-  --volt-lime-deep:    #C8F060;   /* Lime tiefer */
-  --volt-lime-darker:  #9DC800;   /* Lime dunkel */
-  --volt-black:        #0A0A0A;   /* Fast-Schwarz — Fundament */
-  --volt-white:        #FFFFFF;
+  --neon-yellow: #E4FF97;   /* Neon Yellow – Primär-Akzent */
+  --black:       #000000;   /* Black – Fundament */
 
-  /* ── Pastell-Palette (Projekt-Kodierung) ── */
-  --volt-rose:         #F9D0D0;   /* Rose Quartz   · Project Alpha */
-  --volt-orchid:       #E8D0F0;   /* Soft Orchid   · Project Beta */
-  --volt-mint:         #C8F0E0;   /* Mint Green    · Project Gamma */
-  --volt-butter:       #FFF0C0;   /* Butter Yellow · Project Delta */
-  --volt-sky:          #C8E8FF;   /* Baby Blue     · Project Epsilon */
-  --volt-peach:        #FFE0CC;   /* Peach Cream   · Erweiterung */
-  --volt-aqua:         #D6F5F5;   /* Aqua Mist     · Erweiterung */
+  /* Aliase */
+  --lime:        #E4FF97;
+  --lime-deep:   #C8F060;
+  --lime-darker: #9DC800;
+  --lime-fg:     #000000;   /* Text auf Lime-Hintergrund */
+  --ink:         #000000;
+  --ink-soft:    #1A1A1A;
+  --ink-muted:   #3A3A3A;
+
+  /* ── Pastell-Palette (8 Farben) ── */
+  --pastel-rose:    #FFD6E0;   /* Rose Quartz   */
+  --pastel-peach:   #FFECD2;   /* Peach Cream   */
+  --pastel-mint:    #C3F4D3;   /* Mint Green    */
+  --pastel-orchid:  #FDE2FF;   /* Soft Orchid   */
+  --pastel-blue:    #D4E8FF;   /* Baby Blue     */
+  --pastel-butter:  #FFF5BA;   /* Butter Yellow */
+  --pastel-orange:  #FFE0CC;   /* Powder Orange */
+  --pastel-aqua:    #D6F5F5;   /* Aqua Mist     */
 
   /* ── Signalfarben ── */
-  --volt-positive:        #1A9E5A;
-  --volt-positive-light:  #E8F8EF;
-  --volt-positive-border: #7DD4A8;
-  --volt-positive-text:   #0F6038;
+  --signal-positive:        #1A9E5A;
+  --signal-positive-light:  #E8F8EF;
+  --signal-positive-border: #7DD4A8;
+  --signal-positive-text:   #0F6038;
 
-  --volt-negative:        #E8402A;
-  --volt-negative-light:  #FDEEE9;
-  --volt-negative-border: #F4A090;
-  --volt-negative-text:   #A01A08;
+  --signal-negative:        #E8402A;
+  --signal-negative-light:  #FDEEE9;
+  --signal-negative-border: #F4A090;
+  --signal-negative-text:   #A01A08;
 
-  --volt-neutral:         #6B7A9A;
-  --volt-neutral-light:   #F0F2F7;
-  --volt-neutral-border:  #B0BACC;
-  --volt-neutral-text:    #3A4560;
+  --signal-neutral:         #6B7A9A;
+  --signal-neutral-light:   #F0F2F7;
+  --signal-neutral-border:  #B0BACC;
+  --signal-neutral-text:    #3A4560;
 
-  /* ── UI-Tokens (Light Mode) ── */
-  --volt-bg:             #FFFFFF;
-  --volt-surface:        #F7F7F7;
-  --volt-surface-raised: #FFFFFF;
-  --volt-border:         #E8E8E8;
-  --volt-border-strong:  #D0D0D0;
-  --volt-text:           #0A0A0A;
-  --volt-text-muted:     #6B6B6B;
-  --volt-text-faint:     #AAAAAA;
+  /* ── Kern-UI-Tokens (shadcn/Tailwind-kompatibel) ── */
+  --background:            #FFFFFF;
+  --foreground:            #000000;
+  --card:                  #FFFFFF;
+  --card-foreground:       #000000;
+  --popover:               #FFFFFF;
+  --popover-foreground:    #000000;
+  --primary:               #0A0A0A;
+  --primary-foreground:    #FFFFFF;
+  --secondary:             #F4F4F4;
+  --secondary-foreground:  #000000;
+  --muted:                 #F7F7F7;
+  --muted-foreground:      #6B6B6B;
+  --accent:                #E4FF97;
+  --accent-foreground:     #000000;
+  --destructive:           #E8402A;
+  --destructive-foreground:#FFFFFF;
+  --border:                #E8E8E8;
+  --input:                 #E8E8E8;
+  --ring:                  #000000;
 
-  /* ── Radius ── */
-  --volt-radius-sm:   6px;
-  --volt-radius-md:   10px;
-  --volt-radius-lg:   14px;
-  --volt-radius-xl:   20px;
-  --volt-radius-full: 9999px;
+  /* ── Chart-Farben (Pastell-Reihenfolge) ── */
+  --chart-1: #FFD6E0;
+  --chart-2: #FFECD2;
+  --chart-3: #C3F4D3;
+  --chart-4: #FDE2FF;
+  --chart-5: #D4E8FF;
+  --chart-6: #FFF5BA;
+  --chart-7: #FFE0CC;
+  --chart-8: #D6F5F5;
 
-  /* ── Schatten ── */
-  --volt-shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --volt-shadow-md:  0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --volt-shadow-lg:  0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.05);
-  --volt-shadow-lime: 0 4px 20px rgba(228,255,151,0.35);
+  /* ── Sidebar ── */
+  --sidebar:                    #FAFAFA;
+  --sidebar-foreground:         #000000;
+  --sidebar-primary:            #0A0A0A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent:             #F5F5F5;
+  --sidebar-accent-foreground:  #000000;
+  --sidebar-border:             #E8E8E8;
+  --sidebar-ring:               #0A0A0A;
 
-  /* ── Übergänge ── */
-  --volt-transition: 150ms ease;
-  --volt-transition-slow: 300ms ease;
+  /* ── Gradient ── */
+  --theme-gradient: linear-gradient(135deg, #E4FF97 0%, #C8F060 60%, #A8D840 100%);
 }
 
-/* ── Dark Mode ── */
-.volt-dark, [data-theme="dark"] {
-  --volt-bg:             #0A0A0A;
-  --volt-surface:        #141414;
-  --volt-surface-raised: #1A1A1A;
-  --volt-border:         #2A2A2A;
-  --volt-border-strong:  #3A3A3A;
-  --volt-text:           #F5F5F5;
-  --volt-text-muted:     #888888;
-  --volt-text-faint:     #555555;
+/* ═══════════════════════════════════════════════════════
+   DARK MODE
+═══════════════════════════════════════════════════════ */
+.dark {
+  --background:            #000000;
+  --foreground:            #F5F5F5;
+  --card:                  #111111;
+  --card-foreground:       #F5F5F5;
+  --popover:               #1A1A1A;
+  --popover-foreground:    #F5F5F5;
+  --primary:               #E4FF97;
+  --primary-foreground:    #000000;
+  --secondary:             #1A1A1A;
+  --secondary-foreground:  #F5F5F5;
+  --muted:                 #1A1A1A;
+  --muted-foreground:      #888888;
+  --accent:                #E4FF97;
+  --accent-foreground:     #000000;
+  --destructive:           #FF5540;
+  --destructive-foreground:#000000;
+  --border:                #2A2A2A;
+  --input:                 #2A2A2A;
+  --ring:                  #E4FF97;
 
-  --volt-positive:        #2ECC7A;
-  --volt-positive-light:  #0A2018;
-  --volt-positive-border: #1A6040;
-  --volt-positive-text:   #5EEAA0;
+  /* Signalfarben Dark */
+  --signal-positive:        #2ECC7A;
+  --signal-positive-light:  #0A2018;
+  --signal-positive-border: #1A6040;
+  --signal-positive-text:   #5EEAA0;
+  --signal-negative:        #FF6050;
+  --signal-negative-light:  #200A08;
+  --signal-negative-border: #802010;
+  --signal-negative-text:   #FF9080;
+  --signal-neutral:         #8899BB;
+  --signal-neutral-light:   #141820;
+  --signal-neutral-border:  #3A4560;
+  --signal-neutral-text:    #AABBDD;
 
-  --volt-negative:        #FF6050;
-  --volt-negative-light:  #200A08;
-  --volt-negative-border: #802010;
-  --volt-negative-text:   #FF9080;
+  /* Chart Dark */
+  --chart-1: #E4FF97;
+  --chart-2: #F5F5F5;
+  --chart-3: #2ECC7A;
+  --chart-4: #FF6050;
+  --chart-5: #8899BB;
+  --chart-6: #D4B8FF;
+  --chart-7: #FFD4A8;
+  --chart-8: #B8E0FF;
 
-  --volt-neutral:         #8899BB;
-  --volt-neutral-light:   #141820;
-  --volt-neutral-border:  #3A4560;
-  --volt-neutral-text:    #AABBDD;
+  /* Sidebar Dark */
+  --sidebar:                    #000000;
+  --sidebar-foreground:         #F5F5F5;
+  --sidebar-primary:            #E4FF97;
+  --sidebar-primary-foreground: #000000;
+  --sidebar-accent:             #1A1A1A;
+  --sidebar-accent-foreground:  #F5F5F5;
+  --sidebar-border:             #2A2A2A;
+  --sidebar-ring:               #E4FF97;
+  --theme-gradient: linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 50%, #3A3A3A 100%);
 }
 
+/* ═══════════════════════════════════════════════════════
+   TAILWIND v4 THEME MAPPING
+   (nur nötig wenn Tailwind v4 verwendet wird)
+═══════════════════════════════════════════════════════ */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 
-/* ═══════════════════════════════════════════════════════════════
-   2. RESET & BASE
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-root, .volt-root * {
-  box-sizing: border-box;
+  --color-background:                var(--background);
+  --color-foreground:                var(--foreground);
+  --color-card:                      var(--card);
+  --color-card-foreground:           var(--card-foreground);
+  --color-popover:                   var(--popover);
+  --color-popover-foreground:        var(--popover-foreground);
+  --color-primary:                   var(--primary);
+  --color-primary-foreground:        var(--primary-foreground);
+  --color-secondary:                 var(--secondary);
+  --color-secondary-foreground:      var(--secondary-foreground);
+  --color-muted:                     var(--muted);
+  --color-muted-foreground:          var(--muted-foreground);
+  --color-accent:                    var(--accent);
+  --color-accent-foreground:         var(--accent-foreground);
+  --color-destructive:               var(--destructive);
+  --color-destructive-foreground:    var(--destructive-foreground);
+  --color-border:                    var(--border);
+  --color-input:                     var(--input);
+  --color-ring:                      var(--ring);
+  --color-chart-1:                   var(--chart-1);
+  --color-chart-2:                   var(--chart-2);
+  --color-chart-3:                   var(--chart-3);
+  --color-chart-4:                   var(--chart-4);
+  --color-chart-5:                   var(--chart-5);
+  --color-chart-6:                   var(--chart-6);
+  --color-chart-7:                   var(--chart-7);
+  --color-chart-8:                   var(--chart-8);
+  --color-sidebar:                   var(--sidebar);
+  --color-sidebar-foreground:        var(--sidebar-foreground);
+  --color-sidebar-primary:           var(--sidebar-primary);
+  --color-sidebar-primary-foreground:var(--sidebar-primary-foreground);
+  --color-sidebar-accent:            var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:            var(--sidebar-border);
+  --color-sidebar-ring:              var(--sidebar-ring);
 }
 
-.volt-root {
-  font-family: var(--volt-font-ui);
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--volt-text);
-  background-color: var(--volt-bg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* ═══════════════════════════════════════════════════════
+   TYPOGRAFIE-KLASSEN
+═══════════════════════════════════════════════════════ */
+.font-display { font-family: var(--font-display); }
+.font-ui      { font-family: var(--font-ui); }
+.font-body    { font-family: var(--font-body); }
+.font-mono    { font-family: var(--font-mono); }
 
-/* Alternativ: globaler Reset ohne Wrapper-Klasse */
-body.volt-body {
-  font-family: var(--volt-font-ui);
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--volt-text);
-  background-color: var(--volt-bg);
-  -webkit-font-smoothing: antialiased;
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   3. TYPOGRAFIE
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-display-xl {
-  font-family: var(--volt-font-display);
+.text-display-xl {
+  font-family: var(--font-display);
   font-size: clamp(3rem, 8vw, 6rem);
-  font-weight: 800;
-  line-height: 1.0;
-  letter-spacing: -0.04em;
-  color: var(--volt-text);
-}
-
-.volt-display-lg {
-  font-family: var(--volt-font-display);
-  font-size: clamp(2rem, 5vw, 3.5rem);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.03em;
-  color: var(--volt-text);
 }
-
-.volt-display-md {
-  font-family: var(--volt-font-display);
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
+.text-display-lg {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.5rem);
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: -0.025em;
-  color: var(--volt-text);
-}
-
-.volt-heading {
-  font-family: var(--volt-font-display);
-  font-size: 1.25rem;
-  font-weight: 600;
-  line-height: 1.3;
   letter-spacing: -0.02em;
-  color: var(--volt-text);
 }
-
-.volt-body {
-  font-family: var(--volt-font-ui);
-  font-size: 0.9375rem;
-  font-weight: 400;
-  line-height: 1.6;
-  color: var(--volt-text);
+.text-display-md {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
 }
-
-.volt-body-sm {
-  font-family: var(--volt-font-ui);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--volt-text-muted);
+.text-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-
-.volt-label {
-  font-family: var(--volt-font-mono);
-  font-size: 0.6875rem;
+.text-numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--volt-text-faint);
+  color: var(--muted-foreground);
 }
 
-.volt-mono {
-  font-family: var(--volt-font-mono);
-  font-size: 0.875rem;
-  color: var(--volt-text);
+/* ═══════════════════════════════════════════════════════
+   GLASSMORPHISMUS
+═══════════════════════════════════════════════════════ */
+.glass {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.glass-dark {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dark .glass {
+  background: rgba(20, 20, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.volt-text-gradient {
-  background: linear-gradient(135deg, var(--volt-lime) 0%, var(--volt-lime-deep) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   4. BUTTONS
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border-radius: var(--volt-radius-md);
-  font-family: var(--volt-font-ui);
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  border: none;
-  text-decoration: none;
-  transition: all var(--volt-transition);
-  white-space: nowrap;
-  user-select: none;
-}
-
-.volt-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Solid (Primär) */
-.volt-btn-solid {
-  background-color: var(--volt-black);
-  color: var(--volt-white);
-}
-.volt-btn-solid:hover:not(:disabled) {
-  background-color: #1A1A1A;
-  transform: translateY(-1px);
-  box-shadow: var(--volt-shadow-md);
-}
-
-/* Lime (Akzent) */
-.volt-btn-lime {
-  background-color: var(--volt-lime);
-  color: var(--volt-black);
-}
-.volt-btn-lime:hover:not(:disabled) {
-  background-color: var(--volt-lime-deep);
-  transform: translateY(-1px);
-  box-shadow: var(--volt-shadow-lime);
-}
-
-/* Outline */
-.volt-btn-outline {
-  background-color: transparent;
-  color: var(--volt-text);
-  border: 1.5px solid var(--volt-border-strong);
-}
-.volt-btn-outline:hover:not(:disabled) {
-  border-color: var(--volt-black);
-  background-color: var(--volt-surface);
-}
-
-/* Ghost */
-.volt-btn-ghost {
-  background-color: transparent;
-  color: var(--volt-text-muted);
-  border: none;
-}
-.volt-btn-ghost:hover:not(:disabled) {
-  background-color: var(--volt-surface);
-  color: var(--volt-text);
-}
-
-/* Destructive */
-.volt-btn-danger {
-  background-color: var(--volt-negative);
-  color: var(--volt-white);
-}
-.volt-btn-danger:hover:not(:disabled) {
-  background-color: #C03020;
-  transform: translateY(-1px);
-}
-
-/* Größen */
-.volt-btn-sm {
-  padding: 0.375rem 0.875rem;
-  font-size: 0.8125rem;
-  border-radius: var(--volt-radius-sm);
-}
-.volt-btn-lg {
-  padding: 0.875rem 1.75rem;
-  font-size: 1rem;
-  border-radius: var(--volt-radius-lg);
-}
-.volt-btn-xl {
-  padding: 1.125rem 2.25rem;
-  font-size: 1.0625rem;
-  border-radius: var(--volt-radius-lg);
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   5. CARDS & SURFACES
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-card {
-  background-color: var(--volt-surface-raised);
-  border: 1px solid var(--volt-border);
-  border-radius: var(--volt-radius-lg);
-  padding: 1.5rem;
-  box-shadow: var(--volt-shadow-sm);
-}
-
-.volt-card-elevated {
-  background-color: var(--volt-surface-raised);
-  border: 1px solid var(--volt-border);
-  border-radius: var(--volt-radius-lg);
-  padding: 1.5rem;
-  box-shadow: var(--volt-shadow-md);
-}
-
-.volt-card-lime {
-  background-color: var(--volt-lime);
-  border: 1px solid var(--volt-lime-deep);
-  border-radius: var(--volt-radius-lg);
-  padding: 1.5rem;
-  color: var(--volt-black);
-}
-
-.volt-card-dark {
-  background-color: var(--volt-black);
-  border: 1px solid #2A2A2A;
-  border-radius: var(--volt-radius-lg);
-  padding: 1.5rem;
-  color: var(--volt-white);
-}
-
-.volt-card-header {
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--volt-border);
-}
-
-.volt-card-title {
-  font-family: var(--volt-font-display);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--volt-text);
-  margin: 0;
-}
-
-.volt-card-description {
-  font-size: 0.8125rem;
-  color: var(--volt-text-muted);
-  margin: 0.25rem 0 0;
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   6. BADGES & TAGS
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--volt-radius-full);
-  font-family: var(--volt-font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.volt-badge-default {
-  background-color: var(--volt-black);
-  color: var(--volt-white);
-}
-
-.volt-badge-lime {
-  background-color: var(--volt-lime);
-  color: var(--volt-black);
-}
-
-.volt-badge-muted {
-  background-color: var(--volt-surface);
-  color: var(--volt-text-muted);
-  border: 1px solid var(--volt-border);
-}
-
-.volt-badge-positive {
-  background-color: var(--volt-positive-light);
-  color: var(--volt-positive-text);
-  border: 1.5px solid var(--volt-positive-border);
-}
-
-.volt-badge-negative {
-  background-color: var(--volt-negative-light);
-  color: var(--volt-negative-text);
-  border: 1.5px solid var(--volt-negative-border);
-}
-
-.volt-badge-neutral {
-  background-color: var(--volt-neutral-light);
-  color: var(--volt-neutral-text);
-  border: 1.5px solid var(--volt-neutral-border);
-}
-
-/* Pastell-Badges (Projekt-Kodierung) */
-.volt-badge-rose    { background-color: var(--volt-rose);   color: var(--volt-black); }
-.volt-badge-orchid  { background-color: var(--volt-orchid); color: var(--volt-black); }
-.volt-badge-mint    { background-color: var(--volt-mint);   color: var(--volt-black); }
-.volt-badge-butter  { background-color: var(--volt-butter); color: var(--volt-black); }
-.volt-badge-sky     { background-color: var(--volt-sky);    color: var(--volt-black); }
-
-
-/* ═══════════════════════════════════════════════════════════════
-   7. FORM ELEMENTS
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-input {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  background-color: var(--volt-bg);
-  border: 1.5px solid var(--volt-border);
-  border-radius: var(--volt-radius-md);
-  font-family: var(--volt-font-ui);
-  font-size: 0.9375rem;
-  color: var(--volt-text);
-  outline: none;
-  transition: border-color var(--volt-transition), box-shadow var(--volt-transition);
-}
-
-.volt-input::placeholder {
-  color: var(--volt-text-faint);
-}
-
-.volt-input:focus {
-  border-color: var(--volt-black);
-  box-shadow: 0 0 0 3px rgba(10,10,10,0.08);
-}
-
-.volt-input:focus.volt-dark,
-.volt-dark .volt-input:focus {
-  border-color: var(--volt-lime);
-  box-shadow: 0 0 0 3px rgba(228,255,151,0.15);
-}
-
-.volt-label-text {
-  display: block;
-  font-family: var(--volt-font-mono);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--volt-text-muted);
-  margin-bottom: 0.375rem;
-}
-
-.volt-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-bottom: 1rem;
-}
-
-.volt-select {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  background-color: var(--volt-bg);
-  border: 1.5px solid var(--volt-border);
-  border-radius: var(--volt-radius-md);
-  font-family: var(--volt-font-ui);
-  font-size: 0.9375rem;
-  color: var(--volt-text);
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B6B6B' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.875rem center;
-  padding-right: 2.5rem;
-}
-
-.volt-select:focus {
-  border-color: var(--volt-black);
-  box-shadow: 0 0 0 3px rgba(10,10,10,0.08);
-}
-
-.volt-textarea {
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  background-color: var(--volt-bg);
-  border: 1.5px solid var(--volt-border);
-  border-radius: var(--volt-radius-md);
-  font-family: var(--volt-font-ui);
-  font-size: 0.9375rem;
-  color: var(--volt-text);
-  outline: none;
-  resize: vertical;
-  min-height: 100px;
-  transition: border-color var(--volt-transition);
-}
-
-.volt-textarea:focus {
-  border-color: var(--volt-black);
-  box-shadow: 0 0 0 3px rgba(10,10,10,0.08);
-}
-
-.volt-checkbox {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--volt-black);
-  cursor: pointer;
-}
-
-.volt-helper {
-  font-size: 0.75rem;
-  color: var(--volt-text-faint);
-  margin-top: 0.25rem;
-}
-
-.volt-error-text {
-  font-size: 0.75rem;
-  color: var(--volt-negative-text);
-  margin-top: 0.25rem;
-}
-
-.volt-input-error {
-  border-color: var(--volt-negative);
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   8. SIGNET — >_ Cursor-Symbol
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-signet {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--volt-font-mono);
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  user-select: none;
-  line-height: 1;
-}
-
-.volt-signet::before {
-  content: ">_";
-}
-
-.volt-signet-sm  { font-size: 0.875rem; }
-.volt-signet-md  { font-size: 1.5rem; }
-.volt-signet-lg  { font-size: 2.5rem; }
-.volt-signet-xl  { font-size: 4rem; }
-
-.volt-signet-lime { color: var(--volt-lime); }
-.volt-signet-dark { color: var(--volt-black); }
-.volt-signet-white { color: var(--volt-white); }
-
-
-/* ═══════════════════════════════════════════════════════════════
-   9. BACKGROUNDS & GRADIENTS
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-bg-lime {
-  background-color: var(--volt-lime);
-  color: var(--volt-black);
-}
-
-.volt-bg-dark {
-  background-color: var(--volt-black);
-  color: var(--volt-white);
-}
-
-.volt-bg-surface {
-  background-color: var(--volt-surface);
-  color: var(--volt-text);
-}
-
-/* Gradient: Lime → Schwarz */
-.volt-gradient-brand {
-  background: linear-gradient(135deg, var(--volt-lime) 0%, var(--volt-black) 100%);
-}
-
-/* Gradient: Atmospheric (dunkler Hintergrund mit Lime-Orbs) */
-.volt-gradient-atmospheric {
-  background:
-    radial-gradient(ellipse at 25% 35%, rgba(228,255,151,0.50) 0%, transparent 55%),
-    radial-gradient(ellipse at 75% 65%, rgba(228,255,151,0.20) 0%, transparent 50%),
-    var(--volt-black);
-  color: var(--volt-white);
-}
-
-/* Gradient: Hero (Lime-Basis mit subtilen Orbs) */
-.volt-gradient-hero {
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(10,10,10,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(10,10,10,0.05) 0%, transparent 50%),
-    var(--volt-lime);
-  color: var(--volt-black);
-}
-
-/* Gradient: Soft Lime */
-.volt-gradient-soft {
-  background: linear-gradient(135deg, var(--volt-lime) 0%, var(--volt-lime-deep) 100%);
-  color: var(--volt-black);
-}
-
-/* Gradient: Pastel Blend */
-.volt-gradient-pastel {
-  background: linear-gradient(135deg, var(--volt-rose) 0%, var(--volt-mint) 100%);
-  color: var(--volt-black);
-}
-
-/* Volt-Textur (als Overlay) */
+/* ═══════════════════════════════════════════════════════
+   NOISE-TEXTUR (subtiles Overlay)
+═══════════════════════════════════════════════════════ */
 .volt-texture {
   position: relative;
 }
@@ -644,298 +303,185 @@ body.volt-body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
   pointer-events: none;
-  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
 }
 
-
-/* ═══════════════════════════════════════════════════════════════
-   10. PATTERNS (SVG-Hintergrundmuster)
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-pattern-dots {
-  background-image: radial-gradient(circle, rgba(10,10,10,0.15) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-.volt-pattern-grid {
+/* ═══════════════════════════════════════════════════════
+   HINTERGRUND-PATTERNS
+═══════════════════════════════════════════════════════ */
+.pattern-grid {
   background-image:
-    linear-gradient(rgba(10,10,10,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(10,10,10,0.06) 1px, transparent 1px);
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 24px 24px;
 }
-
-.volt-pattern-diagonal {
+.pattern-dots {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.pattern-dots-fine {
+  background-image: radial-gradient(circle, var(--border) 0.5px, transparent 0.5px);
+  background-size: 12px 12px;
+}
+.pattern-dots-coarse {
+  background-image: radial-gradient(circle, var(--border) 1.5px, transparent 1.5px);
+  background-size: 32px 32px;
+}
+.pattern-lines {
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
-    transparent 10px,
-    rgba(10,10,10,0.05) 10px,
-    rgba(10,10,10,0.05) 11px
+    transparent 8px,
+    var(--border) 8px,
+    var(--border) 9px
   );
 }
-
-.volt-pattern-cross {
+.pattern-cross {
   background-image:
-    linear-gradient(rgba(10,10,10,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(10,10,10,0.06) 1px, transparent 1px),
-    linear-gradient(rgba(10,10,10,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(10,10,10,0.03) 1px, transparent 1px);
-  background-size: 48px 48px, 48px 48px, 12px 12px, 12px 12px;
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: center center;
 }
 
-/* Dark-Mode Varianten */
-.volt-dark .volt-pattern-dots {
-  background-image: radial-gradient(circle, rgba(228,255,151,0.12) 1px, transparent 1px);
-  background-size: 20px 20px;
+/* ═══════════════════════════════════════════════════════
+   SIGNAL-FARB-KLASSEN (Utility)
+═══════════════════════════════════════════════════════ */
+.text-positive  { color: var(--signal-positive-text); }
+.text-negative  { color: var(--signal-negative-text); }
+.text-neutral   { color: var(--signal-neutral-text); }
+
+.bg-positive    { background-color: var(--signal-positive-light); }
+.bg-negative    { background-color: var(--signal-negative-light); }
+.bg-neutral     { background-color: var(--signal-neutral-light); }
+
+.border-positive { border-color: var(--signal-positive-border); }
+.border-negative { border-color: var(--signal-negative-border); }
+.border-neutral  { border-color: var(--signal-neutral-border); }
+
+/* ═══════════════════════════════════════════════════════
+   VOLT-KARTEN-VARIANTEN (CSS-only, ohne React)
+═══════════════════════════════════════════════════════ */
+.volt-card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  padding: 1.5rem;
 }
-
-.volt-dark .volt-pattern-grid {
-  background-image:
-    linear-gradient(rgba(228,255,151,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(228,255,151,0.06) 1px, transparent 1px);
-  background-size: 24px 24px;
+.volt-card-elevated {
+  border-radius: var(--radius);
+  background-color: var(--card);
+  color: var(--card-foreground);
+  padding: 1.5rem;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 4px 16px rgba(0,0,0,0.08),
+    0 8px 32px rgba(0,0,0,0.04);
 }
-
-
-/* ═══════════════════════════════════════════════════════════════
-   11. DATA & SIGNAL UTILITIES
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-delta-up {
-  color: var(--volt-positive-text);
-  font-family: var(--volt-font-mono);
-  font-size: 0.8125rem;
-  font-weight: 600;
+.volt-card-lime {
+  border-radius: var(--radius);
+  background-color: var(--neon-yellow);
+  color: var(--black);
+  padding: 1.5rem;
 }
-
-.volt-delta-down {
-  color: var(--volt-negative-text);
-  font-family: var(--volt-font-mono);
-  font-size: 0.8125rem;
-  font-weight: 600;
+.volt-card-solid {
+  border-radius: var(--radius);
+  background-color: var(--black);
+  color: #F5F5F5;
+  padding: 1.5rem;
 }
-
-.volt-delta-neutral {
-  color: var(--volt-neutral-text);
-  font-family: var(--volt-font-mono);
-  font-size: 0.8125rem;
-  font-weight: 600;
+.volt-card-glass {
+  border-radius: var(--radius);
+  padding: 1.5rem;
 }
+.volt-card-glass { @extend .glass; }
 
-.volt-kpi {
-  font-family: var(--volt-font-mono);
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: var(--volt-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.volt-kpi-sm {
-  font-family: var(--volt-font-mono);
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--volt-text);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Tabelle */
-.volt-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--volt-font-ui);
-  font-size: 0.875rem;
-}
-
-.volt-table th {
-  font-family: var(--volt-font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--volt-text-faint);
-  text-align: left;
-  padding: 0.625rem 1rem;
-  border-bottom: 1px solid var(--volt-border);
-}
-
-.volt-table td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--volt-border);
-  color: var(--volt-text);
-  vertical-align: middle;
-}
-
-.volt-table tr:last-child td {
-  border-bottom: none;
-}
-
-.volt-table tr:hover td {
-  background-color: var(--volt-surface);
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   12. LAYOUT UTILITIES
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-
-.volt-section {
-  padding: 4rem 0;
-}
-
-.volt-section-label {
-  font-family: var(--volt-font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--volt-text-faint);
-  margin-bottom: 0.5rem;
-  display: block;
-}
-
-.volt-divider {
-  border: none;
-  border-top: 1px solid var(--volt-border);
-  margin: 1.5rem 0;
-}
-
-.volt-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.volt-row {
-  display: flex;
+/* ═══════════════════════════════════════════════════════
+   VOLT-BUTTON-VARIANTEN (CSS-only, ohne React)
+═══════════════════════════════════════════════════════ */
+.volt-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  border: none;
+  outline: none;
+  text-decoration: none;
+}
+.volt-btn:active { transform: scale(0.97); }
+.volt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.volt-btn-primary {
+  background-color: var(--neon-yellow);
+  color: var(--black);
+}
+.volt-btn-primary:hover { background-color: var(--lime-deep); }
+
+.volt-btn-solid {
+  background-color: var(--black);
+  color: #FFFFFF;
+}
+.volt-btn-solid:hover { background-color: var(--ink-soft); }
+
+.volt-btn-outline {
+  background-color: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.volt-btn-outline:hover { border-color: var(--foreground); }
+
+.volt-btn-ghost {
+  background-color: transparent;
+  color: var(--muted-foreground);
+}
+.volt-btn-ghost:hover {
+  background-color: var(--secondary);
+  color: var(--foreground);
 }
 
-.volt-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+.volt-btn-destructive {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
 }
 
-.volt-grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+/* Größen */
+.volt-btn-sm  { font-size: 0.75rem; padding: 0.375rem 0.75rem; }
+.volt-btn-lg  { font-size: 1rem;    padding: 0.75rem 1.5rem; }
+.volt-btn-xl  { font-size: 1.125rem; padding: 1rem 2rem; }
+.volt-btn-icon { padding: 0.5rem; width: 2.25rem; height: 2.25rem; }
+
+/* ═══════════════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════════════ */
+@keyframes volt-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.08); }
 }
-
-.volt-grid-4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+@keyframes volt-pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.5); opacity: 0.5; }
 }
-
-@media (max-width: 768px) {
-  .volt-grid-2,
-  .volt-grid-3,
-  .volt-grid-4 {
-    grid-template-columns: 1fr;
-  }
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   13. ANIMATIONS
-   ═══════════════════════════════════════════════════════════════ */
-
 @keyframes volt-fade-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes volt-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50%       { transform: scale(1.04); opacity: 1; }
+@keyframes volt-slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes volt-pulse-lime {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(228,255,151,0.4); }
-  50%       { box-shadow: 0 0 0 8px rgba(228,255,151,0); }
-}
-
-.volt-animate-in {
-  animation: volt-fade-in 0.3s ease forwards;
-}
-
-.volt-animate-breathe {
-  animation: volt-breathe 6s ease-in-out infinite;
-}
-
-.volt-animate-pulse {
-  animation: volt-pulse-lime 2s ease-in-out infinite;
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   14. GLASSMORPHISM
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-glass {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.20);
-  border-radius: var(--volt-radius-lg);
-}
-
-.volt-glass-dark {
-  background: rgba(10, 10, 10, 0.60);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--volt-radius-lg);
-}
-
-.volt-glass-lime {
-  background: rgba(228, 255, 151, 0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(228, 255, 151, 0.30);
-  border-radius: var(--volt-radius-lg);
-}
-
-
-/* ═══════════════════════════════════════════════════════════════
-   15. PASTEL COLOR UTILITIES
-   ═══════════════════════════════════════════════════════════════ */
-
-.volt-rose    { background-color: var(--volt-rose);   color: var(--volt-black); }
-.volt-orchid  { background-color: var(--volt-orchid); color: var(--volt-black); }
-.volt-mint    { background-color: var(--volt-mint);   color: var(--volt-black); }
-.volt-butter  { background-color: var(--volt-butter); color: var(--volt-black); }
-.volt-sky     { background-color: var(--volt-sky);    color: var(--volt-black); }
-.volt-peach   { background-color: var(--volt-peach);  color: var(--volt-black); }
-.volt-aqua    { background-color: var(--volt-aqua);   color: var(--volt-black); }
-
-/* ═══════════════════════════════════════════════════════════════
-   GLOW-EFFEKTE (ergänzt v1.1)
-   ═══════════════════════════════════════════════════════════════ */
-.volt-glow-lime {
-  box-shadow: 0 0 0 1px rgba(228,255,151,0.3), 0 0 12px rgba(228,255,151,0.4), 0 0 32px rgba(228,255,151,0.2);
-}
-.volt-glow-blue {
-  box-shadow: 0 0 0 1px rgba(96,165,250,0.3), 0 0 12px rgba(96,165,250,0.4), 0 0 32px rgba(96,165,250,0.2);
-}
-.volt-glow-red {
-  box-shadow: 0 0 0 1px rgba(248,113,113,0.3), 0 0 12px rgba(248,113,113,0.4), 0 0 32px rgba(248,113,113,0.2);
-}
-.volt-glow-violet {
-  box-shadow: 0 0 0 1px rgba(167,139,250,0.3), 0 0 12px rgba(167,139,250,0.4), 0 0 32px rgba(167,139,250,0.2);
-}
+.animate-breathe        { animation: volt-breathe 3s ease-in-out infinite; }
+.animate-volt-fade-in   { animation: volt-fade-in 0.4s ease-out both; }
+.animate-volt-slide-in  { animation: volt-slide-in-right 0.3s ease-out both; }

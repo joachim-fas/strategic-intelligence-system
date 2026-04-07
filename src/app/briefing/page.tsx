@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
 
@@ -9,7 +10,7 @@ import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
  * Supports ?id=0, ?id=1, ?id=2 for different demo briefings.
  * Use Cmd+P to export as PDF.
  */
-export default function BriefingPage() {
+function BriefingContent() {
   const params = useSearchParams();
   const idx = parseInt(params.get("id") ?? "0", 10);
   const entry = DEMO_BRIEFINGS[Math.min(idx, DEMO_BRIEFINGS.length - 1)];
@@ -226,5 +227,13 @@ export default function BriefingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BriefingPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>Lade Briefing...</div>}>
+      <BriefingContent />
+    </Suspense>
   );
 }
