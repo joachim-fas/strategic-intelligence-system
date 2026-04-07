@@ -22,15 +22,20 @@ export async function middleware(request: NextRequest) {
 
   // Public paths that do not require authentication
   const publicPaths = [
-    "/",             // Main CLI interface — always accessible
-    "/api/auth",     // NextAuth endpoints
-    "/auth",         // Sign-in pages
-    "/api/v1/cron",  // External cron (validated by CRON_SECRET in the route)
-    "/api/v1/query", // LLM query endpoint
-    "/api/v1/pipeline", // Pipeline endpoint (for live data)
-    "/api/v1/trends",   // Trends endpoint
-    "/_next",        // Static assets
+    "/",              // FRAGEN — main intelligence terminal
+    "/verstehen",     // VERSTEHEN — knowledge base (public read)
+    "/briefing",      // Print-optimized briefing (shareable)
+    "/api/auth",      // NextAuth endpoints
+    "/auth",          // Sign-in pages
+    "/api/v1/cron",   // External cron (validated by CRON_SECRET in the route)
+    "/api/v1/query",  // LLM query endpoint
+    "/api/v1/pipeline", // Pipeline endpoint
+    "/api/v1/trends", // Trends endpoint (public read)
+    "/api/v1/feed",   // Feed endpoint (public read)
+    "/_next",         // Static assets
     "/favicon.ico",
+    "/volt-ui.css",   // Design system CSS
+    "/icons",         // SVG icons
   ];
 
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
