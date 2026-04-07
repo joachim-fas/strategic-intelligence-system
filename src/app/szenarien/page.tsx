@@ -185,13 +185,14 @@ export default function SzenarienPage() {
             { key: "all", label: de ? "Alle" : "All" },
             ...Object.entries(TYPE_STYLES).map(([key, v]) => ({ key, label: v.label })),
           ].map((f) => (
-            <button
+            <VoltButton
               key={f.key}
+              variant={filter === f.key ? "solid" : "outline"}
+              size="sm"
               onClick={() => setFilter(f.key)}
-              className={filter === f.key ? "volt-btn volt-btn-solid volt-btn-sm" : "volt-btn volt-btn-outline volt-btn-sm"}
             >
               {f.label}
-            </button>
+            </VoltButton>
           ))}
         </div>
 
