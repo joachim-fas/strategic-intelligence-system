@@ -118,7 +118,7 @@ export default function TrendDetailPage() {
           </div>
 
           <a
-            href={`/?q=${encodeURIComponent(trend.name)}`}
+            href={`/?q=${encodeURIComponent(de ? `Deep Dive: ${trend.name} — Treiber, Signale, Szenarien` : `Deep dive: ${trend.name} — drivers, signals, scenarios`)}`}
             className="volt-card"
             style={{
               display: "block", padding: "14px 16px", marginBottom: 8,
