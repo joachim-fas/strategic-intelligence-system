@@ -23,8 +23,8 @@ function BriefingContent() {
   return (
     <div style={{
       maxWidth: 800, margin: "0 auto", padding: "48px 40px 80px",
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-      color: "#0A0A0A", lineHeight: 1.7, fontSize: 14,
+      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+      color: "var(--volt-text, #0A0A0A)", lineHeight: 1.7, fontSize: 14,
     }}>
       {/* Print styles */}
       <style>{`
@@ -36,7 +36,7 @@ function BriefingContent() {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, paddingBottom: 16, borderBottom: "2px solid #E4FF97" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, paddingBottom: 16, borderBottom: "2px solid var(--volt-lime, #E4FF97)" }}>
         <div>
           <div style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--volt-text-faint, #999)", marginBottom: 4 }}>
             Strategic Intelligence System
@@ -47,7 +47,7 @@ function BriefingContent() {
         </div>
         <div style={{
           padding: "6px 14px", borderRadius: 8,
-          background: "#E4FF97", color: "#0A0A0A",
+          background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)",
           fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 11, fontWeight: 700,
         }}>
           {conf}% Konfidenz
@@ -68,7 +68,7 @@ function BriefingContent() {
 
       {/* Synthesis */}
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#0A0A0A" }}>
+        <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--volt-text, #0A0A0A)" }}>
           Synthese
         </h2>
         <div style={{ fontSize: 15, lineHeight: 1.75 }}>
@@ -129,7 +129,7 @@ function BriefingContent() {
           </h2>
           {b.keyInsights.map((insight: string, i: number) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
-              <span style={{ width: 18, height: 18, borderRadius: 4, background: "#E4FF97", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
+              <span style={{ width: 18, height: 18, borderRadius: 4, background: "var(--volt-lime, #E4FF97)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                 {i + 1}
               </span>
               <span style={{ fontSize: 14, lineHeight: 1.6 }}>{insight}</span>
@@ -145,7 +145,7 @@ function BriefingContent() {
             Kausale Zusammenhänge
           </h2>
           {(b.causalAnalysis ?? b.causalChain)?.map((chain: string, i: number) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 6, paddingLeft: 12, borderLeft: "2px solid #E4FF97" }}>
+            <div key={i} style={{ fontSize: 13, marginBottom: 6, paddingLeft: 12, borderLeft: "2px solid var(--volt-lime, #E4FF97)" }}>
               {chain}
             </div>
           ))}
@@ -182,7 +182,7 @@ function BriefingContent() {
       )}
 
       {/* Footer */}
-      <div style={{ marginTop: 48, paddingTop: 16, borderTop: "1px solid #E8E8E8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ marginTop: 48, paddingTop: 16, borderTop: "1px solid var(--volt-border, #E8E8E8)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--volt-text-faint, #BBB)" }}>
           Strategic Intelligence System · {date} · Vertraulich
         </div>
@@ -198,7 +198,7 @@ function BriefingContent() {
           style={{
             fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 14, fontWeight: 600,
             padding: "10px 24px", borderRadius: 10,
-            background: "#0A0A0A", color: "#fff", border: "none", cursor: "pointer",
+            background: "var(--volt-text, #0A0A0A)", color: "#fff", border: "none", cursor: "pointer",
             marginBottom: 24,
           }}
         >
@@ -214,9 +214,9 @@ function BriefingContent() {
                 href={`/briefing?id=${i}`}
                 style={{
                   fontSize: 12, padding: "6px 14px", borderRadius: 8,
-                  border: i === idx ? "1.5px solid #0A0A0A" : "1px solid #E8E8E8",
+                  border: i === idx ? "1.5px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
                   background: i === idx ? "#F7F7F7" : "transparent",
-                  color: i === idx ? "#0A0A0A" : "#999",
+                  color: i === idx ? "var(--volt-text, #0A0A0A)" : "#999",
                   textDecoration: "none", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}
               >

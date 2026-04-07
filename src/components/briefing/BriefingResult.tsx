@@ -277,8 +277,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                   <span style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
-                    background: isHelp ? "#F7F7F7" : "#E4FF97",
-                    fontSize: 10, fontWeight: 700, color: "#0A0A0A",
+                    background: isHelp ? "#F7F7F7" : "var(--volt-lime, #E4FF97)",
+                    fontSize: 10, fontWeight: 700, color: "var(--volt-text, #0A0A0A)",
                   }}>{isHelp ? "·" : "→"}</span>
                   <span style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{insight}</span>
                 </div>

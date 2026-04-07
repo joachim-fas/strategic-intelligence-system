@@ -59,19 +59,19 @@ export function ReasoningTrace({ query, trendCount, locale }: {
                 width: 10, height: 10, flexShrink: 0, margin: "0 2px",
                 borderRadius: "50%",
                 border: "1.5px solid #E4FF97",
-                borderTopColor: "#0A0A0A",
+                borderTopColor: "var(--volt-text, #0A0A0A)",
                 display: "inline-block",
               }} />
             ) : (
-              <span style={{ width: 14, height: 14, flexShrink: 0, color: "#C8C8C8", textAlign: "center", fontSize: 10, lineHeight: "14px" }}>○</span>
+              <span style={{ width: 14, height: 14, flexShrink: 0, color: "var(--volt-text-faint, #C8C8C8)", textAlign: "center", fontSize: 10, lineHeight: "14px" }}>○</span>
             )}
             <span style={{
-              color: isDone ? "#9B9B9B" : isActive ? "#0A0A0A" : "#C8C8C8",
+              color: isDone ? "var(--volt-text-faint, #9B9B9B)" : isActive ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #C8C8C8)",
               fontWeight: isActive ? 500 : 400,
               transition: "color 0.3s ease",
             }}>
               {s.label}
-              {isActive && <span className="cursor-blink" style={{ color: "#0A0A0A", marginLeft: 1 }}>▮</span>}
+              {isActive && <span className="cursor-blink" style={{ color: "var(--volt-text, #0A0A0A)", marginLeft: 1 }}>▮</span>}
             </span>
           </div>
         );
