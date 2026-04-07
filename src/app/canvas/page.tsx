@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { TEMPLATES, FRAMEWORKS, type TemplateResult } from "@/lib/canvas-templates";
+import { BOARD_COLUMNS } from "@/lib/colors";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
 
@@ -6068,21 +6069,13 @@ export default function CanvasPage() {
         {/* Board mode */}
         {viewMode === "board" && (
           <div style={{ display: "flex", gap: 0, height: "100%", overflowX: "auto" }}>
-            {[
-              { key: "query",     label: de ? "Fragen" : "Queries",           color: "#1A9E5A", types: ["query"] },
-              { key: "insights",  label: de ? "Erkenntnisse" : "Insights",   color: "#6B7A00", types: ["insight"] },
-              { key: "scenarios", label: de ? "Szenarien" : "Scenarios",     color: "#1D4ED8", types: ["scenario"] },
-              { key: "decisions", label: de ? "Entscheidungen" : "Decisions",color: "#1A9E5A", types: ["decision"] },
-              { key: "followups", label: de ? "Folgefragen" : "Follow-ups",  color: "#6B7280", types: ["followup"] },
-              { key: "analysis",  label: de ? "Analyse" : "Analysis",        color: "#3b82f6", types: ["dimensions","causalgraph"] },
-              { key: "notes",     label: de ? "Notizen" : "Notes",           color: "#F5A623", types: ["note","idea","list","file"] },
-            ].map(col => {
+            {BOARD_COLUMNS.map(col => {
               const colNodes = nodes.filter(n => col.types.includes(n.nodeType));
               return (
                 <div key={col.key} style={{ minWidth: 280, flex: 1, borderRight: "1px solid var(--color-border)", display: "flex", flexDirection: "column" }}>
                   <div style={{ padding: "12px 16px 10px", borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ width: 6, height: 6, borderRadius: "50%", background: col.color, flexShrink: 0 }} />
-                    <span className="section-label" style={{ color: col.color, marginBottom: 0 }}>{col.label}</span>
+                    <span className="section-label" style={{ color: col.color, marginBottom: 0 }}>{de ? col.labelDe : col.labelEn}</span>
                     <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", fontWeight: 600, color: "var(--color-text-muted)", background: "var(--color-page-bg)", padding: "1px 6px", borderRadius: 10, border: "1px solid var(--color-border)" }}>{colNodes.length}</span>
                   </div>
                   <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
