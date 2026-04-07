@@ -23,17 +23,17 @@ interface IntelligenceFeedProps {
 }
 
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
-  adopt:  { color: "#0F6038", background: "#C3F4D3" }, // pastel-mint
-  trial:  { color: "#1A4A8A", background: "#D4E8FF" }, // pastel-blue
-  assess: { color: "#7A5C00", background: "#FFF5BA" }, // pastel-butter
-  hold:   { color: "#3A4560", background: "#F0F2F7" }, // signal-neutral-light
+  adopt:  { color: "var(--pastel-mint-text, #0F6038)", background: "var(--pastel-mint, #C3F4D3)" },
+  trial:  { color: "var(--pastel-sky-text, #1A4A8A)", background: "var(--pastel-sky, #D4E8FF)" },
+  assess: { color: "var(--pastel-butter-text, #7A5C00)", background: "var(--pastel-butter, #FFF5BA)" },
+  hold:   { color: "var(--volt-text-muted, #3A4560)", background: "var(--color-surface-2, #F0F2F7)" },
 };
 
 const TYPE_CFG = {
-  spike:      { color: "#E8402A", bg: "#FDEEE9", border: "#F4A090", icon: "▲" }, // Grain Koralle (signal-negative)
-  alert:      { color: "#7A5C00", bg: "#FFF5BA", border: "#E0C840", icon: "●" }, // Grain Butter (pastel-butter)
-  prediction: { color: "#7C1A9E", bg: "#FDE2FF", border: "#D4A0F0", icon: "◆" }, // Grain Orchid (pastel-orchid)
-  mention:    { color: "#1A4A8A", bg: "#D4E8FF", border: "#80B8F0", icon: "→" }, // Grain Blue (pastel-blue)
+  spike:      { color: "var(--signal-negative, #E8402A)", bg: "var(--pastel-rose, #FDEEE9)", border: "var(--pastel-rose-border, #F4A090)", icon: "▲" },
+  alert:      { color: "var(--pastel-butter-text, #7A5C00)", bg: "var(--pastel-butter, #FFF5BA)", border: "var(--pastel-butter-border, #E0C840)", icon: "●" },
+  prediction: { color: "var(--pastel-orchid-text, #7C1A9E)", bg: "var(--pastel-orchid, #FDE2FF)", border: "var(--pastel-orchid-border, #D4A0F0)", icon: "◆" },
+  mention:    { color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", border: "var(--pastel-sky-border, #80B8F0)", icon: "→" },
 };
 
 export default function IntelligenceFeed({ trends, locale, onTrendClick }: IntelligenceFeedProps) {

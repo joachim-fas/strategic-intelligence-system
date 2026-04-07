@@ -307,19 +307,71 @@ export default function ArchivPage() {
 
         {/* ── Additional Archiv sections ── */}
         <div style={{ marginTop: 40 }}>
-          <CollapsibleSection title={de ? "Methodik" : "Methodology"}>
-            <div className="volt-body-sm" style={{ color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-              {de
-                ? "Wie werden Trends klassifiziert, Konfidenz berechnet und Szenarien generiert?"
-                : "How are trends classified, confidence calculated, and scenarios generated?"}
+          <CollapsibleSection title={de ? "Methodik — Wie SIS arbeitet" : "Methodology — How SIS works"}>
+            <div className="volt-body-sm" style={{ color: "var(--color-text-secondary)", lineHeight: 1.8 }}>
+              <div style={{ display: "grid", gap: 20 }}>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Trend-Klassifikation" : "Trend Classification"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "Jeder Trend wird in 4 Reifegrade eingestuft: Adopt (sofort relevant), Trial (Pilotprojekte empfohlen), Assess (beobachten) und Hold (langfristig relevant). Die Einstufung basiert auf Signal-Staerke, Quellen-Abdeckung und historischer Entwicklung. Zusaetzlich wird jeder Trend nach STEEP+V kategorisiert (Social, Technological, Economic, Environmental, Political, Values)."
+                    : "Each trend is classified into 4 maturity levels: Adopt (immediately relevant), Trial (pilots recommended), Assess (monitor), and Hold (long-term relevant). Classification is based on signal strength, source coverage, and historical development. Additionally, each trend is categorized by STEEP+V (Social, Technological, Economic, Environmental, Political, Values)."
+                  }</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Konfidenz-Berechnung" : "Confidence Calculation"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "Konfidenz (0-100%) misst wie sicher die Einschaetzung ist. Hohe Konfidenz entsteht durch: breite Quellen-Abdeckung (viele verschiedene Quellen bestaetigen den Trend), aktuelle Signale (frische Daten der letzten 72h), starke Signal-Uebereinstimmung (Quellen widersprechen sich nicht). Niedrige Konfidenz bedeutet: wenige Quellen, veraltete Daten oder widersprüchliche Signale."
+                    : "Confidence (0-100%) measures how certain the assessment is. High confidence comes from: broad source coverage (many different sources confirm the trend), recent signals (fresh data from the last 72h), strong signal agreement (sources don't contradict). Low confidence means: few sources, outdated data, or contradictory signals."
+                  }</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Kausalanalyse" : "Causal Analysis"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "SIS modelliert Beziehungen zwischen Trends als gerichteten Graphen mit 4 Edge-Typen: drives (treibt), amplifies (verstaerkt), dampens (daempft), correlates (korreliert). Jede Beziehung hat eine Staerke (0-100%). Die Kausalketten werden bei jeder Analyse beruecksichtigt — ein Trend der viele andere treibt hat hoehere systemische Relevanz."
+                    : "SIS models relationships between trends as a directed graph with 4 edge types: drives, amplifies, dampens, correlates. Each relationship has a strength (0-100%). Causal chains are considered in every analysis — a trend that drives many others has higher systemic relevance."
+                  }</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Szenario-Generierung" : "Scenario Generation"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "Jede Analyse generiert genau 3 Szenarien: Optimistisch (bestes realistisches Ergebnis), Basisfall (wahrscheinlichstes Ergebnis) und Pessimistisch (schlimmstes realistisches Ergebnis). Jedes Szenario hat eine Wahrscheinlichkeit (die Summe kann ueber 100% liegen, da Szenarien nicht exklusiv sind), Schluesssel-Treiber und einen Zeithorizont."
+                    : "Each analysis generates exactly 3 scenarios: Optimistic (best realistic outcome), Baseline (most likely outcome), and Pessimistic (worst realistic outcome). Each scenario has a probability (the sum can exceed 100% as scenarios aren't mutually exclusive), key drivers, and a time horizon."
+                  }</p>
+                </div>
+              </div>
             </div>
           </CollapsibleSection>
 
           <CollapsibleSection title={de ? "Datenqualitaet" : "Data Quality"}>
-            <div className="volt-body-sm" style={{ color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-              {de
-                ? "Erreichbarkeit, letzte Aktualisierungen, Signal-Counts pro Quelle"
-                : "Reachability, last updates, signal counts per source"}
+            <div className="volt-body-sm" style={{ color: "var(--color-text-secondary)", lineHeight: 1.8 }}>
+              <div style={{ display: "grid", gap: 16 }}>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Aktualisierungszyklus" : "Update Cycle"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "Die Pipeline laeuft alle 4 Stunden automatisch (via Cron). Dabei werden alle aktiven Connectors abgefragt, neue Signale extrahiert und Trend-Scores aktualisiert. Der letzte erfolgreiche Lauf ist in der Kopfzeile des Cockpits sichtbar."
+                    : "The pipeline runs every 4 hours automatically (via cron). All active connectors are queried, new signals extracted, and trend scores updated. The last successful run is visible in the Cockpit header."
+                  }</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-text)", marginBottom: 6 }}>
+                    {de ? "Quellen-Status" : "Source Status"}
+                  </h4>
+                  <p style={{ margin: 0 }}>{de
+                    ? "Jede Quelle hat einen Status: Integriert (aktiv, liefert Signale), Neu (wird gebaut), Geplant (noch nicht implementiert), Deaktiviert (temporaer ausgeschaltet). Die Filter oben zeigen den aktuellen Status aller 64 Datenquellen."
+                    : "Each source has a status: Integrated (active, delivering signals), New (being built), Planned (not yet implemented), Deactivated (temporarily disabled). The filters above show the current status of all 64 data sources."
+                  }</p>
+                </div>
+              </div>
             </div>
           </CollapsibleSection>
         </div>
