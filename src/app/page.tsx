@@ -63,13 +63,13 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   useEffect(() => {
     const stored = (() => { try { return localStorage.getItem("sis-theme"); } catch { return null; } })();
-    if (stored === "dark") { setDarkMode(true); document.documentElement.classList.add("volt-dark"); }
+    if (stored === "dark") { setDarkMode(true); document.documentElement.classList.add("dark", "volt-dark"); }
   }, []);
   const toggleDark = () => {
     const next = !darkMode;
     setDarkMode(next);
-    if (next) { document.documentElement.classList.add("volt-dark"); localStorage.setItem("sis-theme", "dark"); }
-    else { document.documentElement.classList.remove("volt-dark"); localStorage.setItem("sis-theme", "light"); }
+    if (next) { document.documentElement.classList.add("dark", "volt-dark"); localStorage.setItem("sis-theme", "dark"); }
+    else { document.documentElement.classList.remove("dark", "volt-dark"); localStorage.setItem("sis-theme", "light"); }
   };
   const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");

@@ -25,7 +25,7 @@ export function AppHeader() {
     const stored = localStorage.getItem("sis-theme");
     if (stored === "dark") {
       setDarkMode(true);
-      document.documentElement.classList.add("volt-dark");
+      document.documentElement.classList.add("dark", "volt-dark");
     }
   }, []);
 
@@ -33,10 +33,10 @@ export function AppHeader() {
     const next = !darkMode;
     setDarkMode(next);
     if (next) {
-      document.documentElement.classList.add("volt-dark");
+      document.documentElement.classList.add("dark", "volt-dark");
       localStorage.setItem("sis-theme", "dark");
     } else {
-      document.documentElement.classList.remove("volt-dark");
+      document.documentElement.classList.remove("dark", "volt-dark");
       localStorage.setItem("sis-theme", "light");
     }
   };
