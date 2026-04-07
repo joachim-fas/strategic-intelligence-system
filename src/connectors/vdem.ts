@@ -21,7 +21,7 @@ export const vdemConnector: SourceConnector = {
         "https://v-dem.net/data_analysis/VariableGraph/",
         {
           headers: { Accept: "text/html,application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

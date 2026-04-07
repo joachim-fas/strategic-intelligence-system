@@ -31,7 +31,7 @@ export const fredConnector: SourceConnector = {
     for (const series of SERIES) {
       try {
         const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&api_key=${apiKey}&limit=5&sort_order=desc&file_type=json`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
         if (!res.ok) continue;
 
         const data = await res.json();

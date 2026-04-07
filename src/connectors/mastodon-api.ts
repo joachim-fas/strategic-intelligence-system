@@ -39,7 +39,7 @@ export const mastodonApiConnector: SourceConnector = {
         "https://mastodon.social/api/v1/timelines/public?limit=20",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

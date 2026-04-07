@@ -21,7 +21,7 @@ export const dockerHubConnector: SourceConnector = {
         "https://hub.docker.com/v2/repositories/library/?page_size=20&ordering=-pull_count",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

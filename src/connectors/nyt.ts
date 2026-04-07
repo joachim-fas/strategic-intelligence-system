@@ -33,7 +33,7 @@ export const nytConnector: SourceConnector = {
         `https://api.nytimes.com/svc/search/v2/articlesearch.json?q=technology&sort=newest&api-key=${key}`,
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

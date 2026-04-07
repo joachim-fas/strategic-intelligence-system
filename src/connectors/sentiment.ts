@@ -80,7 +80,7 @@ async function fetchYouTubeTrending(): Promise<RawSignal[]> {
 
     for (const feedUrl of feeds) {
       try {
-        const res = await fetch(feedUrl, { signal: AbortSignal.timeout(8000) });
+        const res = await fetch(feedUrl, { signal: AbortSignal.timeout(20000) });
         if (!res.ok) continue;
         const text = await res.text();
 
@@ -129,7 +129,7 @@ async function fetchMastodonTrending(): Promise<RawSignal[]> {
       try {
         // Trending tags
         const res = await fetch(`${instance}/api/v1/trends/tags?limit=20`, {
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) continue;
 
@@ -176,7 +176,7 @@ async function fetchNewsSentiment(): Promise<RawSignal[]> {
     try {
       const res = await fetch(feed.url, {
         headers: { "User-Agent": "SIS/1.0" },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(20000),
       });
       if (!res.ok) continue;
 

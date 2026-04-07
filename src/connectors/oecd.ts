@@ -50,7 +50,7 @@ export const oecdConnector: SourceConnector = {
       try {
         const res = await fetch(ind.url, {
           headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)", Accept: "application/json" },
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) continue;
 

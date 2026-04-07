@@ -21,7 +21,7 @@ export const semanticScholarConnector: SourceConnector = {
         "https://api.semanticscholar.org/graph/v1/paper/search?query=AI&limit=20&fields=title,url,year,citationCount",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

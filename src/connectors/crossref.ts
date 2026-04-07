@@ -24,7 +24,7 @@ export const crossrefConnector: SourceConnector = {
             Accept: "application/json",
             "User-Agent": "SIS-TrendRadar/1.0 (mailto:info@example.com)",
           },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

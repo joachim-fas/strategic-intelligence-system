@@ -40,11 +40,11 @@ export const openalexConnector: SourceConnector = {
         const [currentRes, prevRes] = await Promise.all([
           fetch(`https://api.openalex.org/works?filter=publication_year:${currentYear},concept.id:${conceptId}&per_page=1`, {
             headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(20000),
           }),
           fetch(`https://api.openalex.org/works?filter=publication_year:${currentYear - 1},concept.id:${conceptId}&per_page=1`, {
             headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)" },
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(20000),
           }),
         ]);
 

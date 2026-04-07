@@ -25,7 +25,7 @@ export const openExchangeConnector: SourceConnector = {
         `https://openexchangerates.org/api/latest.json?app_id=${key}`,
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

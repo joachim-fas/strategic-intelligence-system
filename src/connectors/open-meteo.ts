@@ -21,7 +21,7 @@ export const openMeteoConnector: SourceConnector = {
         "https://api.open-meteo.com/v1/forecast?latitude=48.2&longitude=16.37&daily=temperature_2m_max,temperature_2m_min&past_days=7&timezone=Europe/Vienna",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

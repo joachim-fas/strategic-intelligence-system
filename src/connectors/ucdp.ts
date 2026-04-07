@@ -25,7 +25,7 @@ export const ucdpConnector: SourceConnector = {
     try {
       const res = await fetch(
         "https://ucdpapi.pcr.uu.se/api/gedevents/24.1?pagesize=20&page=0",
-        { signal: AbortSignal.timeout(10000) }
+        { signal: AbortSignal.timeout(20000) }
       );
 
       if (!res.ok) return signals;

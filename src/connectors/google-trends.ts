@@ -58,7 +58,7 @@ export const googleTrendsConnector: SourceConnector = {
       // Google Trends Daily Trending Searches (RSS)
       const res = await fetch(
         "https://trends.google.com/trending/rss?geo=US",
-        { headers: { "User-Agent": "SIS/1.0" }, signal: AbortSignal.timeout(10000) }
+        { headers: { "User-Agent": "SIS/1.0" }, signal: AbortSignal.timeout(20000) }
       );
 
       if (res.ok) {

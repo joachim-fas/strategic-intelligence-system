@@ -34,7 +34,7 @@ export const manifoldConnector: SourceConnector = {
       try {
         const res = await fetch(
           `https://api.manifold.markets/v0/search-markets?term=${encodeURIComponent(query)}&limit=5&sort=liquidity`,
-          { signal: AbortSignal.timeout(8000) }
+          { signal: AbortSignal.timeout(20000) }
         );
 
         if (!res.ok) continue;

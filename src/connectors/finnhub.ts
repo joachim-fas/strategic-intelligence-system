@@ -32,7 +32,7 @@ export const finnhubConnector: SourceConnector = {
       // Fetch general market news
       const newsRes = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${key}`, {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!newsRes.ok) return signals;
@@ -44,7 +44,7 @@ export const finnhubConnector: SourceConnector = {
       try {
         const sentRes = await fetch(`https://finnhub.io/api/v1/news-sentiment?symbol=SPY&token=${key}`, {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         });
         if (sentRes.ok) {
           const sentData = await sentRes.json();

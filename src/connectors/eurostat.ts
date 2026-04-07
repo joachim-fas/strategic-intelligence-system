@@ -31,7 +31,7 @@ export const eurostatConnector: SourceConnector = {
       try {
         // Fetch latest 2 years of data for trend detection
         const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/${ds.code}?format=JSON&lang=EN&lastTimePeriod=2`;
-        const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+        const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(20000) });
         if (!res.ok) continue;
 
         const data = await res.json();

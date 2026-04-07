@@ -21,7 +21,7 @@ export const blueskyConnector: SourceConnector = {
         "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=AI&limit=20",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

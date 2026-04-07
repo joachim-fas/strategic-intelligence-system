@@ -21,7 +21,7 @@ export const unDataConnector: SourceConnector = {
         "http://data.un.org/ws/rest/data/DF_UNData_DESA/SP_POP_TOTL..?startPeriod=2023&format=sdmx-json",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

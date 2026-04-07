@@ -33,7 +33,7 @@ export const nasaEonetConnector: SourceConnector = {
     try {
       const res = await fetch("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=50", {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) return signals;

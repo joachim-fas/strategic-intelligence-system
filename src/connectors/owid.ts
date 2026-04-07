@@ -38,7 +38,7 @@ export const owidConnector: SourceConnector = {
         const url = `https://ourworldindata.org/grapher/${ind.slug}.csv?time=latest`;
         const res = await fetch(url, {
           headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)" },
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) continue;
 

@@ -25,7 +25,7 @@ export const patentsviewConnector: SourceConnector = {
         `https://search.patentsview.org/api/v1/patent/?q=${q}&f=${f}&s=${s}&per_page=20`,
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

@@ -23,7 +23,7 @@ export const blsConnector: SourceConnector = {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ seriesid: ["LNS14000000"] }),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

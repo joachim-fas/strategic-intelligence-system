@@ -1,7 +1,8 @@
 # SIS Signal Sources
 
 Complete list of data sources integrated into the SIS live-signal layer.
-Signals are fetched every 6 hours and stored in `live_signals` for RAG context.
+Signals are fetched every 4 hours and stored in `live_signals` for RAG context.
+**50 connectors** across 12 categories. Last updated: April 2026.
 
 ## Overview
 
@@ -329,6 +330,55 @@ Signals are fetched every 6 hours and stored in `live_signals` for RAG context.
 
 ---
 
+## Batch 2: News, Geopolitics & Health (added 02.04.2026)
+
+| Connector | Source | Free | Auth | Reliability |
+|-----------|--------|------|------|-------------|
+| `guardian` | The Guardian Open Platform | Yes | Free API key | High |
+| `nyt` | New York Times Article Search | Yes | Free API key | High |
+| `newsdata` | NewsData.io Global News | Yes | Free API key | Medium |
+| `media_cloud` | Media Cloud (MIT) | Yes | None | Medium |
+| `acled` | Armed Conflict Location & Event Data | Yes | Registration | High |
+| `ucdp` | Uppsala Conflict Data Program | Yes | None | High |
+| `vdem` | V-Dem Democracy Index | Yes | None | High |
+| `who_gho` | WHO Global Health Observatory | Yes | None | High |
+| `ilo` | ILO International Labour Org | Yes | None | High |
+| `un_data` | UN Statistical Division | Yes | None | Medium |
+| `un_sdg` | UN Sustainable Development Goals | Yes | None | High |
+| `imf` | IMF DataMapper | Yes | None | High |
+| `finnhub` | Finnhub Stock Market News | Yes | Free API key | High |
+| `open_exchange` | Open Exchange Rates (FX) | Yes | Free API key | High |
+| `bls` | US Bureau of Labor Statistics | Yes | None | High |
+| `open_meteo` | Open-Meteo Weather & Climate | Yes | None | High |
+| `metaculus` | Metaculus Forecasting Platform | Yes | None | High |
+| `kalshi` | Kalshi Regulated Prediction Market | Yes | None | High |
+
+## Batch 3: Social, Tech & Innovation (added 02.04.2026)
+
+| Connector | Source | Free | Auth | Reliability |
+|-----------|--------|------|------|-------------|
+| `bluesky` | Bluesky / AT Protocol | Yes | None | Medium |
+| `mastodon_api` | Mastodon Fediverse | Yes | None | Medium |
+| `docker_hub` | Docker Hub Image Stats | Yes | None | High |
+| `patentsview` | USPTO PatentsView | Yes | None | High |
+| `crossref` | CrossRef DOI Metadata | Yes | None (polite) | High |
+| `semantic_scholar` | Semantic Scholar (AI2) | Yes | None | High |
+
+### Auth Keys Required
+
+| Connector | Env Variable | How to get |
+|-----------|-------------|------------|
+| `guardian` | `GUARDIAN_API_KEY` | https://open-platform.theguardian.com/ |
+| `nyt` | `NYT_API_KEY` | https://developer.nytimes.com/ |
+| `newsdata` | `NEWSDATA_API_KEY` | https://newsdata.io/ |
+| `finnhub` | `FINNHUB_API_KEY` | https://finnhub.io/ |
+| `open_exchange` | `OPEN_EXCHANGE_KEY` | https://openexchangerates.org/ |
+| `fred` | `FRED_API_KEY` | https://fred.stlouisfed.org/docs/api/api_key.html |
+| `news` | `NEWS_API_KEY` | https://newsapi.org/ |
+| `acled` | `ACLED_EMAIL` + `ACLED_KEY` | https://acleddata.com/ |
+
+---
+
 ## Adding New Connectors
 
 1. Create `src/connectors/{name}.ts` implementing `SourceConnector` from `./types`
@@ -345,6 +395,6 @@ Signals are fetched every 6 hours and stored in `live_signals` for RAG context.
 - **Meaningful `rawStrength`:** Should reflect actual signal magnitude (e.g., rate of change, volume, score), not a fixed baseline
 - **Accurate `sourceUrl`:** Must point to the actual data page, not just the provider homepage
 - **Valid `topic`:** Must match one of the SIS trend categories (e.g., "Economic Trends", "Future of Work", "Energy Transition & Decarbonization")
-- **Timeouts:** Max 15 seconds per individual request; use `AbortSignal.timeout()`
+- **Timeouts:** Max 20 seconds per individual request; use `AbortSignal.timeout()`
 - **User-Agent:** Include `SIS/1.0 (mailto:sis@strategic-intelligence.app)` header on all requests to APIs that benefit from identification
 - **API keys via env vars only:** Never hardcode credentials; document required env vars in connector JSDoc

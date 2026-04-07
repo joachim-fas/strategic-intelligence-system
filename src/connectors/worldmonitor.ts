@@ -237,7 +237,7 @@ export const worldmonitorConnector: SourceConnector = {
         const url = `${API_BASE}/${fetcher.domain}/v1/${fetcher.rpc}`;
         const res = await fetch(url, {
           headers: WM_HEADERS,
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         });
 
         if (!res.ok) continue;

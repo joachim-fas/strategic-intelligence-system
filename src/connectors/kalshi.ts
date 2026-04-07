@@ -31,7 +31,7 @@ export const kalshiConnector: SourceConnector = {
         "https://trading-api.kalshi.com/trade-api/v2/markets?limit=20&status=open",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

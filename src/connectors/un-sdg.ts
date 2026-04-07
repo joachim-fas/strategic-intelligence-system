@@ -41,7 +41,7 @@ export const unSdgConnector: SourceConnector = {
         "https://unstats.un.org/sdgs/UNSDGAPIV5/v1/sdg/Goal/List",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

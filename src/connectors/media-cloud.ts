@@ -21,7 +21,7 @@ export const mediaCloudConnector: SourceConnector = {
         "https://search.mediacloud.org/api/v4/search/overview?q=artificial+intelligence",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 
@@ -52,7 +52,7 @@ export const mediaCloudConnector: SourceConnector = {
         "https://search.mediacloud.org/api/v4/search/overview?q=climate+change",
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

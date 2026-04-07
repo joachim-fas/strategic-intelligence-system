@@ -33,7 +33,7 @@ export const acledConnector: SourceConnector = {
 
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) return signals;

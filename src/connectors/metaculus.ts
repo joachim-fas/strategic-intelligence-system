@@ -63,7 +63,7 @@ export const metaculusConnector: SourceConnector = {
     try {
       const res = await fetch("https://www.metaculus.com/api2/questions/?status=open&order_by=-activity&limit=20", {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) return signals;

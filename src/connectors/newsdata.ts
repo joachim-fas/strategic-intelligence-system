@@ -33,7 +33,7 @@ export const newsdataConnector: SourceConnector = {
         `https://newsdata.io/api/1/latest?apikey=${key}&language=en,de&category=technology,politics`,
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

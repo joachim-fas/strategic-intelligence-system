@@ -31,7 +31,7 @@ export const destatisConnector: SourceConnector = {
         const url = `${GENESIS_BASE}/data/tablefile?name=${table.code}&area=all&compress=false&transpose=false&startyear=2023&format=ffcsv&language=en&username=GUEST&password=GUEST`;
         const res = await fetch(url, {
           headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)" },
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(20000),
         });
 
         if (!res.ok) continue;

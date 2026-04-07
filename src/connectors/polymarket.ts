@@ -66,7 +66,7 @@ export const polymarketConnector: SourceConnector = {
       // Fetch active events
       const res = await fetch(`${POLYMARKET_API}/events?closed=false&limit=100&order=volume`, {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (!res.ok) return signals;
@@ -131,7 +131,7 @@ export async function getPredictionsForTrend(trendName: string): Promise<{
     const searchQuery = trendName.toLowerCase().split(" ").slice(0, 3).join(" ");
     const res = await fetch(
       `${POLYMARKET_API}/events?closed=false&limit=20&title=${encodeURIComponent(searchQuery)}`,
-      { signal: AbortSignal.timeout(10000) }
+      { signal: AbortSignal.timeout(20000) }
     );
 
     if (!res.ok) return [];
