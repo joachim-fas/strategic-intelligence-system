@@ -38,17 +38,17 @@ function BriefingContent() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, paddingBottom: 16, borderBottom: "2px solid #E4FF97" }}>
         <div>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "#999", marginBottom: 4 }}>
+          <div style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--volt-text-faint, #999)", marginBottom: 4 }}>
             Strategic Intelligence System
           </div>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 10, color: "#BBB" }}>
+          <div style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 10, color: "var(--volt-text-faint, #BBB)" }}>
             Intelligence Briefing · {date}
           </div>
         </div>
         <div style={{
           padding: "6px 14px", borderRadius: 8,
           background: "#E4FF97", color: "#0A0A0A",
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700,
+          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 11, fontWeight: 700,
         }}>
           {conf}% Konfidenz
         </div>
@@ -56,19 +56,19 @@ function BriefingContent() {
 
       {/* Title */}
       <h1 style={{
-        fontFamily: "'Space Grotesk', sans-serif",
+        fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
         fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em",
         margin: "0 0 8px", lineHeight: 1.15,
       }}>
         {entry.query}
       </h1>
-      <p style={{ fontSize: 12, color: "#999", margin: "0 0 32px", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>
+      <p style={{ fontSize: 12, color: "var(--volt-text-faint, #999)", margin: "0 0 32px", fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", letterSpacing: "0.04em" }}>
         STEEP+V · EU-Fokus · 50 Echtzeit-Quellen · 39 Trends
       </p>
 
       {/* Synthesis */}
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#0A0A0A" }}>
+        <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "#0A0A0A" }}>
           Synthese
         </h2>
         <div style={{ fontSize: 15, lineHeight: 1.75 }}>
@@ -79,7 +79,7 @@ function BriefingContent() {
       {/* Scenarios */}
       {b.scenarios?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
             Szenarien
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: b.scenarios.length > 2 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
@@ -96,21 +96,21 @@ function BriefingContent() {
                   background: c.bg, border: `1px solid ${c.border}`,
                 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666" }}>
+                    <span style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#666" }}>
                       {c.label}
                     </span>
-                    <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700 }}>
+                    <span style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 18, fontWeight: 700 }}>
                       {Math.round(s.probability * 100)}%
                     </span>
                   </div>
-                  <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                  <div style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
                     {s.name}
                   </div>
-                  <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: "var(--volt-text-muted, #555)", lineHeight: 1.5 }}>
                     {s.description?.slice(0, 200)}{s.description?.length > 200 ? "..." : ""}
                   </div>
                   {s.timeframe && (
-                    <div style={{ marginTop: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#999" }}>
+                    <div style={{ marginTop: 8, fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 10, color: "var(--volt-text-faint, #999)" }}>
                       {s.timeframe}
                     </div>
                   )}
@@ -124,7 +124,7 @@ function BriefingContent() {
       {/* Key Insights */}
       {b.keyInsights?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
             Erkenntnisse
           </h2>
           {b.keyInsights.map((insight: string, i: number) => (
@@ -141,7 +141,7 @@ function BriefingContent() {
       {/* Causal chains */}
       {(b.causalChain?.length > 0 || b.causalAnalysis?.length > 0) && (
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
             Kausale Zusammenhänge
           </h2>
           {(b.causalAnalysis ?? b.causalChain)?.map((chain: string, i: number) => (
@@ -155,7 +155,7 @@ function BriefingContent() {
       {/* Decision Framework */}
       {b.decisionFramework && (
         <section style={{ marginBottom: 32, padding: "16px 20px", borderRadius: 10, background: "#FFF8F0", border: "1px solid #F0D4A8" }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#955A20" }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#955A20" }}>
             Entscheidungshilfe
           </h2>
           <div style={{ fontSize: 14, lineHeight: 1.7 }}>
@@ -167,7 +167,7 @@ function BriefingContent() {
       {/* References */}
       {b.references?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+          <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
             Quellen
           </h2>
           {b.references.map((ref: any, i: number) => (
@@ -175,7 +175,7 @@ function BriefingContent() {
               <a href={ref.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1A4A8A", textDecoration: "none" }}>
                 {ref.title} ↗
               </a>
-              {ref.relevance && <span style={{ color: "#999", marginLeft: 8 }}>— {ref.relevance}</span>}
+              {ref.relevance && <span style={{ color: "var(--volt-text-faint, #999)", marginLeft: 8 }}>— {ref.relevance}</span>}
             </div>
           ))}
         </section>
@@ -183,10 +183,10 @@ function BriefingContent() {
 
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 16, borderTop: "1px solid #E8E8E8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "#BBB" }}>
+        <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--volt-text-faint, #BBB)" }}>
           Strategic Intelligence System · {date} · Vertraulich
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#BBB" }}>
+        <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, color: "var(--volt-text-faint, #BBB)" }}>
           {conf}% Konfidenz · STEEP+V · EU-Fokus
         </div>
       </div>
@@ -196,7 +196,7 @@ function BriefingContent() {
         <button
           onClick={() => window.print()}
           style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600,
+            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 14, fontWeight: 600,
             padding: "10px 24px", borderRadius: 10,
             background: "#0A0A0A", color: "#fff", border: "none", cursor: "pointer",
             marginBottom: 24,
@@ -217,7 +217,7 @@ function BriefingContent() {
                   border: i === idx ? "1.5px solid #0A0A0A" : "1px solid #E8E8E8",
                   background: i === idx ? "#F7F7F7" : "transparent",
                   color: i === idx ? "#0A0A0A" : "#999",
-                  textDecoration: "none", fontFamily: "'DM Sans', sans-serif",
+                  textDecoration: "none", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}
               >
                 {d.query}

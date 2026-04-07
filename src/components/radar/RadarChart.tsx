@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as d3 from "d3";
 import {
   TrendDot,
@@ -478,9 +478,9 @@ export default function RadarChart({
               { label: t(locale, "confidence"), val: tooltip.trend.confidence, color: "#22c55e" },
               { label: t(locale, "impact"), val: tooltip.trend.impact, color: "#f59e0b" },
             ].map(({ label, val, color }) => (
-              <>
-                <span key={label + "l"} style={{ color: "var(--color-text-muted)" }}>{label}</span>
-                <div key={label + "v"} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <React.Fragment key={label}>
+                <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <div style={{ flex: 1, height: 4, background: "var(--color-border)", borderRadius: 2 }}>
                     <div style={{ height: 4, borderRadius: 2, background: color, width: `${val * 100}%` }} />
                   </div>
@@ -488,7 +488,7 @@ export default function RadarChart({
                     {(val * 100).toFixed(0)}%
                   </span>
                 </div>
-              </>
+              </React.Fragment>
             ))}
             <span style={{ color: "var(--color-text-muted)" }}>{t(locale, "timeHorizon")}</span>
             <span style={{
