@@ -154,7 +154,7 @@ function BriefingContent() {
 
       {/* Decision Framework */}
       {b.decisionFramework && (
-        <section style={{ marginBottom: 32, padding: "16px 20px", borderRadius: 10, background: "#FFF8F0", border: "1px solid #F0D4A8" }}>
+        <section style={{ marginBottom: 32, padding: "16px 20px", borderRadius: 10, background: "var(--pastel-butter-light, #FFF8F0)", border: "1px solid var(--pastel-butter-border, #F0D4A8)" }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#955A20" }}>
             Entscheidungshilfe
           </h2>
@@ -172,7 +172,7 @@ function BriefingContent() {
           </h2>
           {b.references.map((ref: any, i: number) => (
             <div key={i} style={{ fontSize: 12, marginBottom: 4 }}>
-              <a href={ref.url} target="_blank" rel="noopener noreferrer" style={{ color: "#1A4A8A", textDecoration: "none" }}>
+              <a href={ref.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--pastel-sky-text, #1A4A8A)", textDecoration: "none" }}>
                 {ref.title} ↗
               </a>
               {ref.relevance && <span style={{ color: "var(--volt-text-faint, #999)", marginLeft: 8 }}>— {ref.relevance}</span>}
