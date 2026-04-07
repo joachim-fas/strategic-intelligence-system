@@ -468,15 +468,15 @@ export default function RadarChart({
               {tooltip.trend.name}
             </span>
             {tooltip.trend.velocity === "rising" && (
-              <span style={{ color: "#16a34a", fontSize: 10, fontWeight: 600 }}>▲</span>
+              <span style={{ color: "var(--signal-positive, #16a34a)", fontSize: 10, fontWeight: 600 }}>▲</span>
             )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 8px", fontSize: 10 }}>
             {[
-              { label: t(locale, "relevance"), val: tooltip.trend.relevance, color: "#3b82f6" },
-              { label: t(locale, "confidence"), val: tooltip.trend.confidence, color: "#22c55e" },
-              { label: t(locale, "impact"), val: tooltip.trend.impact, color: "#f59e0b" },
+              { label: t(locale, "relevance"), val: tooltip.trend.relevance, color: "var(--pastel-sky-text, #3b82f6)" },
+              { label: t(locale, "confidence"), val: tooltip.trend.confidence, color: "var(--signal-positive, #22c55e)" },
+              { label: t(locale, "impact"), val: tooltip.trend.impact, color: "var(--pastel-amber-text, #f59e0b)" },
             ].map(({ label, val, color }) => (
               <React.Fragment key={label}>
                 <span style={{ color: "var(--color-text-muted)" }}>{label}</span>

@@ -38,7 +38,7 @@ const VEL = {
 
 function ageLabel(h: number): string { return h < 1 ? "<1h" : h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`; }
 
-function MiniSparkline({ data, color = "#3B82F6" }: { data: number[]; color?: string }) {
+function MiniSparkline({ data, color = "var(--pastel-sky-text, #3B82F6)" }: { data: number[]; color?: string }) {
   const max = Math.max(...data, 1);
   return (
     <svg width={40} height={12} viewBox="0 0 40 12" style={{ display: "block", flexShrink: 0 }}>

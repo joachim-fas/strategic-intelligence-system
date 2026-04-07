@@ -13,10 +13,10 @@ import { Tooltip } from "@/components/ui/Tooltip";
 
 // ─── Grain pastel palette ──────────────────────────────────────────────
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
-  adopt:  { color: "#0F6038", background: "#C3F4D3" },
-  trial:  { color: "#1A4A8A", background: "#D4E8FF" },
-  assess: { color: "#7A5C00", background: "#FFF5BA" },
-  hold:   { color: "#3A4560", background: "#F0F2F7" },
+  adopt:  { color: "var(--pastel-mint-text, #0F6038)", background: "var(--pastel-mint, #C3F4D3)" },
+  trial:  { color: "var(--pastel-sky-text, #1A4A8A)", background: "var(--pastel-sky, #D4E8FF)" },
+  assess: { color: "var(--pastel-butter-text, #7A5C00)", background: "var(--pastel-butter, #FFF5BA)" },
+  hold:   { color: "var(--volt-text-muted, #3A4560)", background: "var(--color-surface-2, #F0F2F7)" },
 };
 
 const SOURCE_CONTEXT: Record<string, { label: string; description: string }> = {
@@ -72,9 +72,9 @@ function RegulatorySection({ trendId, locale }: { trendId: string; locale: Local
   if (regulations.length === 0) return null;
 
   const effectStyle = {
-    accelerates: { bg: "#C3F4D3", color: "#0F6038" },
-    constrains:  { bg: "#FDEEE9", color: "#C0341D" },
-    reshapes:    { bg: "#FFF5BA", color: "#7A5C00" },
+    accelerates: { bg: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text, #0F6038)" },
+    constrains:  { bg: "var(--pastel-rose, #FDEEE9)", color: "var(--signal-negative, #C0341D)" },
+    reshapes:    { bg: "var(--pastel-butter, #FFF5BA)", color: "var(--pastel-butter-text, #7A5C00)" },
   };
   const effectLabels = {
     accelerates: { de: "beschleunigt", en: "accelerates" },
@@ -140,10 +140,10 @@ function CausalGraphSection({ trendId, locale }: { trendId: string; locale: Loca
   if (drivers.length === 0 && effects.length === 0 && inhibitors.length === 0) return null;
 
   const edgeStyle: Record<string, { dot: string; bg: string; text: string }> = {
-    drives:     { dot: "#0F6038", bg: "#C3F4D3", text: "#0F6038" },
-    amplifies:  { dot: "#1A4A8A", bg: "#D4E8FF", text: "#1A4A8A" },
-    dampens:    { dot: "#C0341D", bg: "#FDEEE9", text: "#C0341D" },
-    correlates: { dot: "#7A5C00", bg: "#FFF5BA", text: "#7A5C00" },
+    drives:     { dot: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", text: "var(--pastel-mint-text, #0F6038)" },
+    amplifies:  { dot: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", text: "var(--pastel-sky-text, #1A4A8A)" },
+    dampens:    { dot: "var(--signal-negative, #C0341D)", bg: "var(--pastel-rose, #FDEEE9)", text: "var(--signal-negative, #C0341D)" },
+    correlates: { dot: "var(--pastel-butter-text, #7A5C00)", bg: "var(--pastel-butter, #FFF5BA)", text: "var(--pastel-butter-text, #7A5C00)" },
   };
   const edgeLabels: Record<string, Record<string, string>> = {
     drives:     { de: "treibt",        en: "drives" },
@@ -157,7 +157,7 @@ function CausalGraphSection({ trendId, locale }: { trendId: string; locale: Loca
     const label = targetId
       .replace(/^mega-/, "").replace(/^macro-/, "")
       .replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    const s = edgeStyle[edge.type] ?? { dot: "#9B9B9B", bg: "#F0F2F7", text: "#6B6B6B" };
+    const s = edgeStyle[edge.type] ?? { dot: "var(--volt-text-faint, #9B9B9B)", bg: "var(--color-surface-2, #F0F2F7)", text: "var(--volt-text-muted, #6B6B6B)" };
 
     return (
       <div className="flex items-center gap-2 text-xs py-1">
@@ -319,7 +319,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
     { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #3A4560)" };
 
   // Ring style
-  const ringPastel = RING_PASTEL[trend.ring] ?? { color: "#3A4560", background: "#F0F2F7" };
+  const ringPastel = RING_PASTEL[trend.ring] ?? { color: "var(--volt-text-muted, #3A4560)", background: "var(--color-surface-2, #F0F2F7)" };
 
   return (
     <div

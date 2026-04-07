@@ -271,13 +271,13 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
             {m && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px", marginBottom: 10 }}>
                 {m.relevance != null && (
-                  <MetricRow label={de ? "Relevanz" : "Relevance"} value={m.relevance} color="#4F46E5" />
+                  <MetricRow label={de ? "Relevanz" : "Relevance"} value={m.relevance} color="var(--pastel-sky-text, #4F46E5)" />
                 )}
                 {m.impact != null && (
-                  <MetricRow label={de ? "Impact" : "Impact"} value={m.impact} color="#059669" />
+                  <MetricRow label={de ? "Impact" : "Impact"} value={m.impact} color="var(--signal-positive, #059669)" />
                 )}
                 {m.confidence != null && (
-                  <MetricRow label={de ? "Vertrauen" : "Confidence"} value={m.confidence} color="#D97706" />
+                  <MetricRow label={de ? "Vertrauen" : "Confidence"} value={m.confidence} color="var(--pastel-amber-text, #D97706)" />
                 )}
                 {m.signalCount != null && (
                   <div>

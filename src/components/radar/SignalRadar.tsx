@@ -40,14 +40,14 @@ const SOURCE_COLORS: Record<string, string> = {
 
 const RING_CFG: Record<string, { color: string; bg: string; border: string }> = {
   adopt:  { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", border: "#7DD4A8" },
-  trial:  { color: "#1A4A8A", bg: "#D4E8FF", border: "#80B8F0" },
-  assess: { color: "#7A5C00", bg: "#FFF5BA", border: "#E0C840" },
-  hold:   { color: "#3A4560", bg: "#F0F2F7", border: "#D1D5DB" },
+  trial:  { color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", border: "var(--pastel-sky-border, #80B8F0)" },
+  assess: { color: "var(--pastel-butter-text, #7A5C00)", bg: "var(--pastel-butter, #FFF5BA)", border: "var(--pastel-butter-border, #E0C840)" },
+  hold:   { color: "var(--volt-text-muted, #3A4560)", bg: "var(--color-surface-2, #F0F2F7)", border: "var(--volt-border, #D1D5DB)" },
 };
 
 const VELOCITY_CFG = {
   rising:  { symbol: "↑", color: "var(--signal-positive, #1A9E5A)", label: { de: "steigend", en: "rising" } },
-  stable:  { symbol: "→", color: "#9CA3AF", label: { de: "stabil", en: "stable" } },
+  stable:  { symbol: "→", color: "var(--volt-text-faint, #9CA3AF)", label: { de: "stabil", en: "stable" } },
   falling: { symbol: "↓", color: "var(--signal-negative, #E8402A)", label: { de: "fallend", en: "falling" } },
 };
 
@@ -56,7 +56,7 @@ const VELOCITY_CFG = {
 function ageLabel(h: number): string { return h < 1 ? "<1h" : h < 24 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`; }
 function strengthDots(s: number): string { const f = Math.min(3, Math.ceil(s * 3)); return "●".repeat(f) + "○".repeat(3 - f); }
 
-function MiniSparkline({ data, width = 48, height = 14, color = "#3B82F6" }: { data: number[]; width?: number; height?: number; color?: string }) {
+function MiniSparkline({ data, width = 48, height = 14, color = "var(--pastel-sky-text, #3B82F6)" }: { data: number[]; width?: number; height?: number; color?: string }) {
   const max = Math.max(...data, 1);
   const bw = (width - 2) / data.length;
   return (
