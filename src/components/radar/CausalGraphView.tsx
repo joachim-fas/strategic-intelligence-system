@@ -31,15 +31,15 @@ interface GraphLink {
 
 const EDGE_COLORS: Record<string, string> = {
   drives: "#1A9E5A",
-  enables: "#1A4A8A",
-  inhibits: "#E8402A",
+  amplifies: "#1A4A8A",
+  dampens: "#E8402A",
   correlates: "#C8820A",
 };
 
 const EDGE_LABELS: Record<string, Record<string, string>> = {
   drives: { de: "treibt", en: "drives" },
-  enables: { de: "ermoeglicht", en: "enables" },
-  inhibits: { de: "hemmt", en: "inhibits" },
+  amplifies: { de: "verstaerkt", en: "amplifies" },
+  dampens: { de: "daempft", en: "dampens" },
   correlates: { de: "korreliert", en: "correlates" },
 };
 
@@ -149,7 +149,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
       .attr("stroke-opacity", (d) => isConnected(d) ? d.edge.strength * 0.7 : 0.05)
       .attr("stroke-width", (d) => isConnected(d) ? 1.5 + d.edge.strength * 2.5 : 0.5)
       .attr("marker-end", (d) => `url(#arrow-${d.edge.type}-${isConnected(d) ? "full" : "dim"})`)
-      .style("stroke-dasharray", (d) => d.edge.type === "inhibits" ? "5,3" : "none")
+      .style("stroke-dasharray", (d) => d.edge.type === "dampens" ? "5,3" : "none")
       .style("cursor", "pointer")
       .on("mouseenter", (_event, d) => setHoveredEdge(d.edge))
       .on("mouseleave", () => setHoveredEdge(null));

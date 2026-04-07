@@ -35,7 +35,7 @@ export const worldbankConnector: SourceConnector = {
       try {
         const res = await fetch(
           `https://api.worldbank.org/v2/country/WLD/indicator/${id}?format=json&per_page=5&date=2019:2024`,
-          { signal: AbortSignal.timeout(8000) }
+          { signal: AbortSignal.timeout(20000) }
         );
 
         if (!res.ok) continue;
@@ -75,7 +75,7 @@ export const worldbankConnector: SourceConnector = {
       const currentYear = new Date().getFullYear();
       const res = await fetch(
         `https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH?periods=${currentYear},${currentYear + 1}`,
-        { signal: AbortSignal.timeout(10000) }
+        { signal: AbortSignal.timeout(20000) }
       );
 
       if (res.ok) {

@@ -27,16 +27,18 @@ export interface HistoryEntry {
   showRadar?: boolean;
   isLoading?: boolean; // explicit flag — never rely on synthesis string comparison
   error?: string;      // set when LLM call failed, shown with retry option
+  parentQuery?: string; // if this is a follow-up, the original query text
 }
 
 // ── BriefingResult ────────────────────────────────────────────────────────────
-export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp }: {
+export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp, onOpenInCanvas }: {
   entry: HistoryEntry;
   locale: Locale;
   trendCount: number;
   onTrendClick: (trend: TrendDot) => void;
   activeProjectId?: string | null;
   onFollowUp?: (query: string) => void;
+  onOpenInCanvas?: (entry: HistoryEntry) => void;
 }) {
   const { briefing } = entry;
   const isHelp = entry.query === "/help";
@@ -44,13 +46,13 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   const b = briefing as any; // Extended fields from LLM
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showSignals, setShowSignals] = useState(false);
+  const [showSignals, setShowSignals] = useState(true); // default OPEN for transparency
 
   const saveToProject = async () => {
     if (!activeProjectId || saving || saved) return;
     setSaving(true);
     try {
-      await fetch(`/api/v1/projects/${activeProjectId}/queries`, {
+      const res = await fetch(`/api/v1/projects/${activeProjectId}/queries`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,21 +74,33 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           locale,
         }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSaved(true);
     } catch { /* ignore */ }
     setSaving(false);
   };
 
   return (
-    <article className="card" style={{ borderLeft: "3px solid #E4FF97" }}>
+    <article className="card volt-texture" style={{ borderLeft: entry.parentQuery ? "3px solid var(--volt-sky, #7AB8F5)" : "3px solid var(--volt-lime, #E4FF97)" }}>
+
+      {/* Thread indicator */}
+      {entry.parentQuery && (
+        <div style={{ padding: "6px 14px 0", display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--volt-orchid, #D98AE8)", fontFamily: "var(--volt-font-mono)" }}>
+          <span style={{ fontSize: 12 }}>↳</span>
+          <span style={{ fontWeight: 500 }}>{locale === "de" ? "Folgefrage zu" : "Follow-up to"}: </span>
+          <span style={{ color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }}>
+            {entry.parentQuery}
+          </span>
+        </div>
+      )}
 
       {/* ── Card header ────────────────────────────────────────── */}
       <div className="card-header">
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "var(--color-text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", color: "var(--volt-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {entry.query}
         </span>
         {isLoading && (
-          <span style={{ fontSize: 12, color: "#6B6B6B", flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: "var(--volt-text-muted)", flexShrink: 0 }}>
             {locale === "de" ? "Analysiere…" : "Analyzing…"}
           </span>
         )}
@@ -103,14 +117,30 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
           <BriefingExport entry={entry} locale={locale} />
         )}
+        {!isLoading && !isHelp && briefing.synthesis && onOpenInCanvas && (
+          <button
+            onClick={() => onOpenInCanvas(entry)}
+            style={{
+              fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
+              border: "1px solid #1A9E5A44", background: "#1A9E5A08",
+              color: "var(--signal-positive)", cursor: "pointer", transition: "all 0.12s",
+              display: "inline-flex", alignItems: "center", gap: 3,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A18"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A08"; }}
+          >⊞ Canvas</button>
+        )}
         {briefing.confidence > 0 && !isLoading && (
           <Badge
             variant="outline"
+            title={locale === "de"
+              ? `Konfidenz ${(briefing.confidence * 100).toFixed(0)}% — basiert auf ${b.usedSignals?.length ?? 0} Live-Signalen und ${b.references?.length ?? 0} Quellen. Hohe Werte = breite, aktuelle Datenbasis.`
+              : `Confidence ${(briefing.confidence * 100).toFixed(0)}% — based on ${b.usedSignals?.length ?? 0} live signals and ${b.references?.length ?? 0} sources. High values = broad, current data basis.`}
             className={cn(
-              "text-[11px]",
-              briefing.confidence > 0.7 ? "bg-[#C3F4D3] text-[#0F6038] border-[#7DD4A8]" :
-              briefing.confidence > 0.4 ? "bg-[#FFF5BA] text-[#7A5C00] border-[#E0C840]" :
-              "bg-[#FDEEE9] text-[#E8402A] border-[#F4A090]"
+              "text-[11px] cursor-help",
+              briefing.confidence > 0.7 ? "bg-[var(--pastel-mint)] text-[var(--pastel-mint-text)] border-[var(--pastel-mint-border)]" :
+              briefing.confidence > 0.4 ? "bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]" :
+              "bg-[var(--signal-negative-light)] text-[var(--signal-negative-text)] border-[var(--signal-negative-border)]"
             )}
           >
             {(briefing.confidence * 100).toFixed(0)}%
@@ -126,11 +156,11 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         <div className="card-body">
           <div style={{
             display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
-            background: "#FFF5F5", border: "1px solid #FCA5A5", borderRadius: "var(--radius-md)",
+            background: "var(--volt-negative-light)", border: "1px solid var(--volt-negative-border)", borderRadius: "var(--volt-radius-md)",
           }}>
             <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>⚠</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#B91C1C", marginBottom: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-negative-text)", marginBottom: 4 }}>
                 {locale === "de" ? "Analyse fehlgeschlagen" : "Analysis failed"}
               </div>
               <div style={{ fontSize: 12, color: "#7F1D1D", lineHeight: 1.5 }}>{entry.error}</div>
@@ -169,30 +199,57 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           {!isHelp && (b.scenarios?.length > 0 || briefing.causalChain?.length > 0 || b.balancedScorecard || briefing.keyInsights?.length > 0) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {b.scenarios?.length > 0 && (
-                <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "#F0F0F0", color: "#5A5A5A", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
                   ◈ {b.scenarios.length} {locale === "de" ? "Szenarien" : "Scenarios"}
                 </span>
               )}
               {briefing.causalChain?.length > 0 && (
-                <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "#F0F0F0", color: "#5A5A5A", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
                   ⬡ Kausalnetz
                 </span>
               )}
               {b.balancedScorecard?.perspectives?.length > 0 && (
-                <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "#F0F0F0", color: "#5A5A5A", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
                   ◉ Scorecard
                 </span>
               )}
               {briefing.keyInsights?.length > 0 && (
-                <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "#F0F0F0", color: "#5A5A5A", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
                   → {briefing.keyInsights.length} {locale === "de" ? "Erkenntnisse" : "Insights"}
                 </span>
               )}
               {b.followUpQuestions?.length > 0 && (
-                <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "#F0F0F0", color: "#5A5A5A", fontWeight: 500 }}>
+                <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, padding: "3px 8px", borderRadius: 9999, background: "var(--volt-surface)", color: "var(--volt-text-muted)", fontWeight: 500 }}>
                   ↺ {b.followUpQuestions.length} {locale === "de" ? "Folgefragen" : "Follow-ups"}
                 </span>
               )}
+            </div>
+          )}
+
+          {/* 1c. Transparency indicator — shows data sources used */}
+          {!isHelp && !isLoading && (b.usedSignals?.length > 0 || b.references?.length > 0 || briefing.confidence > 0) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(37,99,235,0.04)", borderRadius: 8, border: "1px solid rgba(37,99,235,0.1)" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "#2563EB", textTransform: "uppercase" }}>
+                {locale === "de" ? "Datengrundlage" : "Data Basis"}
+              </span>
+              {b.usedSignals?.length > 0 && (
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                  {b.usedSignals.length} {locale === "de" ? "Live-Signale" : "live signals"}
+                </span>
+              )}
+              {b.references?.length > 0 && (
+                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                  {b.references.length} {locale === "de" ? "Quellen" : "sources"}
+                </span>
+              )}
+              {briefing.confidence > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: briefing.confidence > 0.7 ? "var(--signal-positive)" : briefing.confidence > 0.4 ? "#F5A623" : "var(--signal-negative)" }}>
+                  {Math.round(briefing.confidence * 100)}% {locale === "de" ? "Konfidenz" : "confidence"}
+                </span>
+              )}
+              <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+                STEEP+V · EU-Fokus
+              </span>
             </div>
           )}
 
@@ -334,7 +391,14 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
 
-          {/* 10b. References — always visible when present */}
+          {/* 10b. References — always visible; fallback if none */}
+          {(!b.references || b.references.length === 0) && !isHelp && briefing.synthesis && (
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic", padding: "4px 0" }}>
+              {locale === "de"
+                ? "Keine externen Quellen zitiert — Antwort basiert auf strukturellem Trend-Wissen und Live-Signalen."
+                : "No external sources cited — response is based on structural trend knowledge and live signals."}
+            </div>
+          )}
           {b.references?.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>

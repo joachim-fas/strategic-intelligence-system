@@ -223,6 +223,38 @@ const statements = [
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+
+  // ─── Query Versions (versioned query results) ────────────────────────────
+  `CREATE TABLE IF NOT EXISTS query_versions (
+    id TEXT PRIMARY KEY,
+    canvas_node_id TEXT NOT NULL,
+    radar_id TEXT REFERENCES radars(id) ON DELETE CASCADE,
+    query_text TEXT NOT NULL,
+    locale TEXT NOT NULL DEFAULT 'de',
+    version_number INTEGER NOT NULL DEFAULT 1,
+    result_json TEXT NOT NULL,
+    confidence REAL,
+    matched_trend_count INTEGER,
+    signal_count INTEGER,
+    executed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    notes TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS qv_canvas_node ON query_versions(canvas_node_id, version_number DESC)`,
+  `CREATE INDEX IF NOT EXISTS qv_radar ON query_versions(radar_id, executed_at DESC)`,
+
+  // ─── Scenario Alerts (staleness detection) ───────────────────────────────
+  `CREATE TABLE IF NOT EXISTS scenario_alerts (
+    id TEXT PRIMARY KEY,
+    canvas_node_id TEXT NOT NULL,
+    radar_id TEXT REFERENCES radars(id) ON DELETE CASCADE,
+    query_text TEXT NOT NULL,
+    trigger_signal_id TEXT,
+    reason TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'medium',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    dismissed_at TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS sa_canvas_node ON scenario_alerts(canvas_node_id, dismissed_at)`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);

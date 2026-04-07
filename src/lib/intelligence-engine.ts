@@ -121,13 +121,14 @@ export async function queryIntelligenceAsync(
   allTrends: TrendDot[],
   locale: Locale,
   contextProfile?: { role: string; industry: string; region: string },
-  onSynthesisChunk?: (chunk: string) => void
+  onSynthesisChunk?: (chunk: string) => void,
+  previousContext?: { query: string; synthesis: string },
 ): Promise<IntelligenceBriefing | null> {
   try {
     const res = await fetch("/api/v1/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, locale, contextProfile }),
+      body: JSON.stringify({ query, locale, contextProfile, previousContext }),
     });
 
     if (!res.ok || !res.body) return null;

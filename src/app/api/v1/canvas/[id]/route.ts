@@ -48,7 +48,7 @@ export async function PATCH(req: Request, { params }: Params) {
     values.push(body.name);
   }
 
-  if (sets.length > 1) {
+  if (sets.length > 0) {
     values.push(id);
     d.prepare(`UPDATE radars SET ${sets.join(", ")} WHERE id = ?`).run(...values);
   }

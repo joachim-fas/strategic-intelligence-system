@@ -1,0 +1,73 @@
+import { SourceConnector, RawSignal } from "./types";
+
+/**
+ * New York Times Connector — Article Search API
+ *
+ * Technology and trending articles from the NYT.
+ * Requires a free API key from https://developer.nytimes.com/
+ *
+ * Env: NYT_API_KEY
+ */
+
+const SECTION_TOPICS: Record<string, string> = {
+  Technology: "Artificial Intelligence & Automation",
+  Science: "Artificial Intelligence & Automation",
+  Business: "Economic Trends",
+  World: "Geopolitical Fragmentation",
+  Climate: "Climate Change & Sustainability",
+  Health: "Health & Wellbeing",
+  Politics: "Geopolitical Fragmentation",
+};
+
+export const nytConnector: SourceConnector = {
+  name: "nyt",
+  displayName: "New York Times (Articles)",
+
+  async fetchSignals(): Promise<RawSignal[]> {
+    const signals: RawSignal[] = [];
+    const key = process.env.NYT_API_KEY;
+    if (!key) return signals;
+
+    try {
+      const res = await fetch(
+        `https://api.nytimes.com/svc/search/v2/articlesearch.json?q=technology&sort=newest&api-key=${key}`,
+        {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+
+      if (!res.ok) return signals;
+
+      const data = await res.json();
+      const docs = data.response?.docs || [];
+
+      for (const doc of docs.slice(0, 20)) {
+        const headline = doc.headline?.main || "Unknown";
+        const section = doc.section_name || "World";
+        const topic = SECTION_TOPICS[section] || "Geopolitical Fragmentation";
+
+        signals.push({
+          sourceType: "nyt",
+          sourceUrl: doc.web_url || "https://www.nytimes.com/",
+          sourceTitle: `NYT: ${headline.slice(0, 150)}`,
+          signalType: "mention",
+          topic,
+          rawStrength: 0.7,
+          rawData: {
+            headline,
+            section,
+            abstract: doc.abstract,
+            publishedAt: doc.pub_date,
+            byline: doc.byline?.original,
+          },
+          detectedAt: new Date(),
+        });
+      }
+    } catch {
+      // API unavailable
+    }
+
+    return signals;
+  },
+};

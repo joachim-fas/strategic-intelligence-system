@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { TrendDot, DEFAULT_QUADRANTS, Ring } from "@/types";
-import { dummyTrends, dummyConfig } from "./dummy-data";
+import { megaTrends } from "./mega-trends";
 
 export interface RadarInstance {
   id: string;
@@ -20,10 +20,10 @@ export interface RadarInstance {
 
 const DEFAULT_RADAR: RadarInstance = {
   id: "default",
-  name: "Tech Trends 2026",
-  description: "Vollständige Technologie-Landschaft",
+  name: "Strategic Intelligence Radar 2026",
+  description: "Mega- und Makro-Trends aus autoritativen Quellen: PwC, EY, Roland Berger, Zukunftsinstitut, EU ESPAS",
   quadrants: DEFAULT_QUADRANTS,
-  trends: dummyTrends,
+  trends: megaTrends,
   scope: {},
   createdAt: new Date().toISOString(),
 };
@@ -94,7 +94,7 @@ export function useRadarStore() {
         const preset = PRESET_RADARS.find((p) => p.id === presetId);
         if (!preset) return;
 
-        const allTrends = radars.find((r) => r.id === "default")?.trends || dummyTrends;
+        const allTrends = radars.find((r) => r.id === "default")?.trends || megaTrends;
         const filteredTrends = filterTrendsForScope(allTrends, preset.scope);
 
         const newRadar: RadarInstance = {

@@ -75,9 +75,9 @@ export function storeSignals(
 
 export function pruneOldSignals(maxAgeHours = 48): void {
   const d = db();
-  d.prepare(`
-    DELETE FROM live_signals WHERE fetched_at < datetime('now', '-${maxAgeHours} hours')
-  `).run();
+  d.prepare(
+    `DELETE FROM live_signals WHERE fetched_at < datetime('now', ? || ' hours')`
+  ).run(`-${Math.floor(maxAgeHours)}`);
   d.close();
 }
 
@@ -137,17 +137,16 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     return rows;
   }
 
-  // Score each signal: +1 for each keyword found in title or topic
-  // SQLite doesn't have FTS here, so we use a CASE-based scoring approach
-  const scoreClauses = keywords.map(
-    (kw) => `
-    (CASE WHEN lower(title) LIKE '%${kw.replace(/'/g, "''")}%' THEN 2 ELSE 0 END) +
-    (CASE WHEN lower(topic) LIKE '%${kw.replace(/'/g, "''")}%' THEN 2 ELSE 0 END) +
-    (CASE WHEN lower(content) LIKE '%${kw.replace(/'/g, "''")}%' THEN 1 ELSE 0 END)
-    `
+  // Score each signal using parameterized LIKE queries (no string interpolation).
+  // Each keyword generates three CASE clauses (title, topic, content).
+  const caseParts = keywords.map(() =>
+    `(CASE WHEN lower(title)   LIKE ? THEN 2 ELSE 0 END +
+      CASE WHEN lower(topic)   LIKE ? THEN 2 ELSE 0 END +
+      CASE WHEN lower(content) LIKE ? THEN 1 ELSE 0 END)`
   );
-
-  const scoreExpr = scoreClauses.join(" + ");
+  const scoreExpr = caseParts.join(" + ");
+  // Bind each keyword as a `%keyword%` pattern for title, topic, and content
+  const likeParams = keywords.flatMap(kw => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
 
   const rows = d.prepare(`
     SELECT *,
@@ -156,7 +155,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     WHERE fetched_at > datetime('now', '-72 hours')
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
-  `).all(limit) as (LiveSignal & { relevance_score: number })[];
+  `).all([...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
 
   d.close();
 

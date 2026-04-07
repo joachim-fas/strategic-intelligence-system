@@ -11,6 +11,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // MVP mode: skip auth entirely for localhost development
+  // To enable auth, remove this early return and uncomment the logic below
+  const host = request.headers.get("host") ?? "";
+  if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
+    return NextResponse.next();
+  }
+
   const { pathname } = request.nextUrl;
 
   // Public paths that do not require authentication

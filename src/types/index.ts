@@ -12,7 +12,43 @@ export type SourceType =
   | "stackoverflow"
   | "npm_pypi"
   | "producthunt"
-  | "wikipedia";
+  | "wikipedia"
+  | "eurostat"
+  | "destatis"
+  | "fred"
+  | "oecd"
+  | "worldbank"
+  | "openalex"
+  | "owid"
+  | "polymarket"
+  | "manifold"
+  | "nasa_eonet"
+  | "worldmonitor"
+  | "sentiment"
+  | "guardian"
+  | "acled"
+  | "finnhub"
+  | "metaculus"
+  | "who_gho"
+  | "ilo"
+  | "ucdp"
+  | "crossref"
+  | "semantic_scholar"
+  | "un_data"
+  | "un_sdg"
+  | "imf"
+  | "nyt"
+  | "newsdata"
+  | "open_meteo"
+  | "bls"
+  | "open_exchange"
+  | "media_cloud"
+  | "bluesky"
+  | "mastodon_api"
+  | "docker_hub"
+  | "vdem"
+  | "patentsview"
+  | "kalshi";
 
 // ─── Klassifizierung nach Dauer und Reichweite ──────────────────
 export type TrendDuration = "hype" | "trend" | "megatrend";
@@ -87,17 +123,29 @@ export const RING_LABELS: Record<Ring, string> = {
 };
 
 export const RING_COLORS: Record<Ring, string> = {
-  adopt: "#22c55e",
-  trial: "#3b82f6",
-  assess: "#f59e0b",
-  hold: "#6b7280",
+  adopt: "#6DDBA0",  // Volt Mint
+  trial: "#7AB8F5",  // Volt Sky
+  assess: "#F5C87A", // Volt Amber
+  hold: "#9CA3AF",   // Neutral
 };
 
 export const TIME_HORIZON_COLORS: Record<TimeHorizon, string> = {
-  short: "#ef4444",
-  mid: "#3b82f6",
-  long: "#8b5cf6",
+  short: "#F4A0B5",  // Volt Rose
+  mid: "#7AB8F5",    // Volt Sky
+  long: "#D98AE8",   // Volt Orchid
 };
+
+/** Volt Pastell-Palette fuer Datenpunkte (8 Farben) */
+export const VOLT_PASTELS = [
+  "#F4A0B5", // Rose
+  "#7AB8F5", // Sky
+  "#6DDBA0", // Mint
+  "#F5C87A", // Amber
+  "#D98AE8", // Orchid
+  "#F0956A", // Peach
+  "#5ECECE", // Aqua
+  "#E8C840", // Yellow
+] as const;
 
 export const DURATION_CONFIG: Record<TrendDuration, { label: { de: string; en: string }; color: string; icon: string }> = {
   hype: { label: { de: "Hype / Mode", en: "Hype / Fad" }, color: "#f97316", icon: "⚡" },

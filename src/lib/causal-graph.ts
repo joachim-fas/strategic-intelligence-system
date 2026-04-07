@@ -1,7 +1,8 @@
 /**
  * Causal Graph: Trends as a connected system
  *
- * Each trend can DRIVE, ENABLE, or INHIBIT other trends.
+ * Each trend can DRIVE, AMPLIFY, or DAMPEN other trends.
+ * (Master Spec Section 2.3: drives / amplifies / dampens)
  * This creates a directed graph that shows:
  * - Why a trend is moving (its drivers)
  * - What a trend will affect (its consequences)
@@ -9,7 +10,7 @@
  * - Systemic risks (when multiple connected trends shift)
  */
 
-export type EdgeType = "drives" | "enables" | "inhibits" | "correlates";
+export type EdgeType = "drives" | "amplifies" | "dampens" | "correlates";
 
 export interface TrendEdge {
   from: string; // trend ID
@@ -73,14 +74,14 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-ai-transformation",
     to: "macro-generative-ai",
-    type: "enables",
+    type: "amplifies",
     strength: 0.98,
     description: "AI research directly produces generative AI capabilities",
   },
   {
     from: "mega-ai-transformation",
     to: "macro-ai-agents",
-    type: "enables",
+    type: "amplifies",
     strength: 0.95,
     description: "AI advances enable autonomous agent systems",
   },
@@ -102,7 +103,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-ai-transformation",
     to: "macro-human-machine",
-    type: "enables",
+    type: "amplifies",
     strength: 0.9,
     description: "AI capabilities enable new human-machine collaboration models",
   },
@@ -111,7 +112,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-geopolitical-fracturing",
     to: "mega-connectivity",
-    type: "inhibits",
+    type: "dampens",
     strength: 0.7,
     description: "Fragmentation leads to internet splinternet, tech decoupling",
   },
@@ -179,21 +180,21 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-technological-disruption",
     to: "mega-connectivity",
-    type: "enables",
+    type: "amplifies",
     strength: 0.9,
     description: "New technologies expand connectivity possibilities",
   },
   {
     from: "mega-connectivity",
     to: "mega-ai-transformation",
-    type: "enables",
+    type: "amplifies",
     strength: 0.8,
     description: "Connected data fuels AI training and deployment",
   },
   {
     from: "mega-connectivity",
     to: "macro-edge-iot",
-    type: "enables",
+    type: "amplifies",
     strength: 0.9,
     description: "Connectivity infrastructure enables IoT/Edge deployment",
   },
@@ -209,7 +210,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "macro-cybersecurity",
     to: "macro-data-economy",
-    type: "enables",
+    type: "amplifies",
     strength: 0.7,
     description: "Security enables trusted data exchange",
     bidirectional: true,
@@ -219,21 +220,21 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-health-biotech",
     to: "macro-digital-health",
-    type: "enables",
+    type: "amplifies",
     strength: 0.9,
     description: "Health R&D produces digital health solutions",
   },
   {
     from: "mega-health-biotech",
     to: "macro-genomics",
-    type: "enables",
+    type: "amplifies",
     strength: 0.85,
     description: "Biotech advances enable personalized medicine",
   },
   {
     from: "mega-health-biotech",
     to: "macro-engineered-evolution",
-    type: "enables",
+    type: "amplifies",
     strength: 0.7,
     description: "Biotech creates human enhancement possibilities",
   },
@@ -242,14 +243,14 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-energy-transition",
     to: "macro-green-energy",
-    type: "enables",
+    type: "amplifies",
     strength: 0.95,
     description: "Transition policies drive renewable energy adoption",
   },
   {
     from: "mega-energy-transition",
     to: "macro-autonomous-mobility",
-    type: "enables",
+    type: "amplifies",
     strength: 0.8,
     description: "Electrification enables autonomous vehicle adoption",
   },
@@ -265,7 +266,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-future-of-work",
     to: "macro-remote-hybrid",
-    type: "enables",
+    type: "amplifies",
     strength: 0.9,
     description: "Work transformation includes location flexibility",
   },
@@ -279,7 +280,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-future-of-work",
     to: "macro-attention-economy",
-    type: "enables",
+    type: "amplifies",
     strength: 0.6,
     description: "New work models enable creator economy growth",
   },
@@ -288,7 +289,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "macro-platform-economy",
     to: "macro-seamless-commerce",
-    type: "enables",
+    type: "amplifies",
     strength: 0.85,
     description: "Platform infrastructure enables omnichannel commerce",
   },
@@ -311,7 +312,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "mega-urbanization",
     to: "macro-smart-surroundings",
-    type: "enables",
+    type: "amplifies",
     strength: 0.8,
     description: "Urban density enables ambient intelligence deployment",
   },
@@ -327,7 +328,7 @@ export const TREND_EDGES: TrendEdge[] = [
   {
     from: "macro-spatial-computing",
     to: "macro-seamless-commerce",
-    type: "enables",
+    type: "amplifies",
     strength: 0.6,
     description: "XR enables new shopping and interaction experiences",
   },
@@ -354,7 +355,7 @@ export function getEdgesForTrend(trendId: string): TrendEdge[] {
  */
 export function getDrivers(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.to === trendId && (e.type === "drives" || e.type === "enables")
+    (e) => e.to === trendId && (e.type === "drives" || e.type === "amplifies")
   );
 }
 
@@ -363,18 +364,20 @@ export function getDrivers(trendId: string): TrendEdge[] {
  */
 export function getEffects(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.from === trendId && (e.type === "drives" || e.type === "enables")
+    (e) => e.from === trendId && (e.type === "drives" || e.type === "amplifies")
   );
 }
 
 /**
- * Get trends that INHIBIT a specific trend
+ * Get trends that DAMPEN a specific trend (Master Spec: "dampens")
  */
 export function getInhibitors(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.to === trendId && e.type === "inhibits"
+    (e) => e.to === trendId && e.type === "dampens"
   );
 }
+/** Alias for spec compliance */
+export const getDampeners = getInhibitors;
 
 /**
  * Calculate systemic impact: how many trends are affected
@@ -389,7 +392,7 @@ export function calculateCascadeDepth(trendId: string, maxDepth = 3): string[] {
     if (current.depth >= maxDepth) continue;
 
     const effects = TREND_EDGES.filter(
-      (e) => e.from === current.id && e.type !== "inhibits"
+      (e) => e.from === current.id && e.type !== "dampens"
     );
 
     for (const edge of effects) {

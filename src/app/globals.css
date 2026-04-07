@@ -6,15 +6,15 @@
    Pastell:      Rose · Peach · Mint · Orchid · Blue · Butter · Orange · Aqua
    Signale:      Smaragd (↑) · Koralle (↓) · Slate (→)
    SIS-Aktion:   Indigo #4F46E5 (CTA-Buttons bleiben Indigo — SIS-Identität)
-   Schriften:    Bricolage Grotesque · DM Sans · Lora · JetBrains Mono
+   Schriften:    Space Grotesk · DM Sans · JetBrains Mono
 ═══════════════════════════════════════════════════════ */
 
 /* ── Tailwind v4 Font-Tokens ── */
 @theme {
-  --font-family-display: var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  --font-family-display: var(--font-display, "Space Grotesk"), system-ui, sans-serif;
   --font-family-sans:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
   --font-family-mono:    var(--font-mono, "JetBrains Mono"), monospace;
-  --font-family-serif:   var(--font-serif, "Lora"), Georgia, serif;
+  --font-family-serif:   var(--font-sans, "DM Sans"), system-ui, sans-serif;
   /* Grain UI font aliases */
   --font-family-ui:      var(--font-sans, "DM Sans"), system-ui, sans-serif;
   --font-family-body:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
@@ -42,33 +42,35 @@
 :root {
   /* ── Typography — Next.js font variables ── */
   --font-ui:       var(--font-sans, "DM Sans"), system-ui, sans-serif;
-  --font-heading:  var(--font-display, "Bricolage Grotesque"), system-ui, sans-serif;
+  --font-heading:  var(--font-display, "Space Grotesk"), system-ui, sans-serif;
   --font-code:     var(--font-mono, "JetBrains Mono"), monospace;
-  --font-editorial:var(--font-serif, "Lora"), Georgia, serif;
+  --font-editorial:var(--font-sans, "DM Sans"), system-ui, sans-serif;
 
-  /* ── Grain UI Core Neutrals ── */
-  --color-page-bg:       #FFFFFF;
-  --color-surface:       #FFFFFF;
-  --color-surface-2:     #F4F4F4;
-  --color-border:        #E8E8E8;
-  --color-border-strong: #CCCCCC;
-  --color-text-heading:  #000000;
-  --color-text-primary:  #0A0A0A;
-  --color-text-secondary:#3A3A3A;
-  --color-text-subtle:   #6B6B6B;
-  --color-text-muted:    #9B9B9B;
+  /* ── Legacy → Volt Token Mapping ──
+     All --color-* vars point to --volt-* from volt-ui.css.
+     This ensures dark mode works automatically. */
+  --color-page-bg:       var(--volt-bg, #FFFFFF);
+  --color-surface:       var(--volt-surface, #F7F7F7);
+  --color-surface-2:     var(--volt-surface, #F7F7F7);
+  --color-border:        var(--volt-border, #E8E8E8);
+  --color-border-strong: var(--volt-border-strong, #D0D0D0);
+  --color-text-heading:  var(--volt-text, #0A0A0A);
+  --color-text-primary:  var(--volt-text, #0A0A0A);
+  --color-text-secondary:var(--volt-text-muted, #6B6B6B);
+  --color-text-subtle:   var(--volt-text-muted, #6B6B6B);
+  --color-text-muted:    var(--volt-text-faint, #AAAAAA);
 
-  /* ── Grain UI Lime/Yellow — Akzent ── */
-  --color-lime:        #E4FF97;
-  --color-lime-hover:  #D4F080;
-  --color-lime-deep:   #C8F060;
+  /* ── Lime — mapped to Volt ── */
+  --color-lime:        var(--volt-lime, #E4FF97);
+  --color-lime-hover:  var(--volt-lime-deep, #C8F060);
+  --color-lime-deep:   var(--volt-lime-deep, #C8F060);
   --color-lime-light:  #F5FFE0;
 
-  /* ── SIS Brand — Grain: Schwarz + Lime ── */
-  --color-brand:        #0A0A0A;
+  /* ── Brand — mapped to Volt ── */
+  --color-brand:        var(--volt-black, #0A0A0A);
   --color-brand-hover:  #1A1A1A;
-  --color-brand-light:  #E4FF97;
-  --color-brand-mid:    #D4F080;
+  --color-brand-light:  var(--volt-lime, #E4FF97);
+  --color-brand-mid:    var(--volt-lime-deep, #C8F060);
   --color-brand-text:   #0A0A0A;
 
   /* ── Grain UI 8 Pastell-Farben ── */
@@ -136,7 +138,7 @@
   --color-assess:    #C8820A;
   --color-hold:      var(--signal-neutral);
 
-  /* ── Grain UI Border-Radius ── */
+  /* ── Border-Radius (Grain + Volt aliases) ── */
   --radius-xs:   3px;
   --radius-sm:   6px;
   --radius-md:   8px;
@@ -144,6 +146,16 @@
   --radius-xl:   16px;
   --radius-2xl:  20px;
   --radius-full: 9999px;
+  --volt-radius-sm:   var(--radius-sm);
+  --volt-radius-md:   var(--radius-md);
+  --volt-radius-lg:   var(--radius-lg);
+  --volt-radius-xl:   var(--radius-xl);
+  --volt-radius-full: var(--radius-full);
+
+  /* ── Font Aliases (Volt ↔ Grain) ── */
+  --volt-font-mono: var(--font-code);
+  --volt-font-ui:   var(--font-ui);
+  --volt-font-display: var(--font-heading);
 
   /* ── Grain UI Shadows (minimalist, kein heavy shadow) ── */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
@@ -177,10 +189,33 @@
 }
 
 /* ═══════════════════════════════════════════════════════
+   DARK MODE — volt-ui.css handles --volt-* overrides.
+   We only need to override shadcn/Tailwind tokens here.
+═══════════════════════════════════════════════════════ */
+.volt-dark {
+  --background:          var(--volt-bg);
+  --foreground:          var(--volt-text);
+  --card:                var(--volt-surface);
+  --card-foreground:     var(--volt-text);
+  --muted:               var(--volt-surface);
+  --muted-foreground:    var(--volt-text-muted);
+  --border:              var(--volt-border);
+  --input:               var(--volt-border);
+  --ring:                var(--volt-lime);
+  --signal-positive-light: #0A2018;
+  --signal-negative-light: #200A08;
+  --signal-neutral-light:  #141820;
+}
+
+/* ═══════════════════════════════════════════════════════
    BASE
 ═══════════════════════════════════════════════════════ */
 body {
-  background: var(--color-page-bg);
+  background-color: var(--color-page-bg);
+  background-image:
+    linear-gradient(rgba(10,10,10,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(10,10,10,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: var(--color-text-primary);
   font-family: var(--font-ui);
   font-size: 15px;
@@ -188,6 +223,14 @@ body {
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode: lime-tinted grid */
+.volt-dark body {
+  background-image:
+    linear-gradient(rgba(228,255,151,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(228,255,151,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -235,23 +278,24 @@ h1, h2, h3, h4, h5, h6 {
 /* ═══════════════════════════════════════════════════════
    CARD — Grain UI style (kein Grey-Header, border-only)
 ═══════════════════════════════════════════════════════ */
+/* .card inherits from volt-card spec */
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-2xl);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--volt-surface-raised, #fff);
+  border: 1px solid var(--volt-border, #E8E8E8);
+  border-radius: var(--volt-radius-lg, 14px);
+  transition: border-color 150ms ease;
 }
 
 .card-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--volt-border, #E8E8E8);
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .card-body {
-  padding: 20px;
+  padding: 24px;
 }
 
 /* Section label — font-mono per Grain UI spec */
@@ -443,9 +487,9 @@ h1, h2, h3, h4, h5, h6 {
 /* ═══════════════════════════════════════════════════════
    GRAIN UI FONT UTILITY CLASSES
 ═══════════════════════════════════════════════════════ */
-.font-display { font-family: var(--font-heading, "Bricolage Grotesque"), system-ui, sans-serif; }
+.font-display { font-family: var(--font-heading, "Space Grotesk"), system-ui, sans-serif; }
 .font-ui      { font-family: var(--font-ui, "DM Sans"), system-ui, sans-serif; }
-.font-body    { font-family: var(--font-editorial, "Lora"), Georgia, serif; }
+.font-body    { font-family: var(--font-ui, "DM Sans"), system-ui, sans-serif; }
 .font-mono    { font-family: var(--font-code, "JetBrains Mono"), monospace; }
 
 /* Display scale */
@@ -486,8 +530,8 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 32px 32px;
 }
 .pattern-dots {
-  background-image: radial-gradient(rgba(10, 10, 10, 0.12) 1.5px, transparent 1.5px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 0.75px, transparent 0.75px);
+  background-size: 24px 24px;
 }
 .pattern-lines {
   background-image: repeating-linear-gradient(
@@ -598,3 +642,380 @@ h1, h2, h3, h4, h5, h6 {
   50%       { opacity: 0; }
 }
 .cursor-blink { animation: cursor-blink 1s step-end infinite; }
+
+/* ═══════════════════════════════════════════════════════
+   CANVAS NODE ANIMATIONS — VoltUI
+═══════════════════════════════════════════════════════ */
+@keyframes ncRunPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(228,255,151,0.33), 0 4px 20px rgba(0,0,0,0.08); }
+  50%       { box-shadow: 0 0 0 4px rgba(228,255,151,0.66), 0 4px 28px rgba(228,255,151,0.18); }
+}
+@keyframes ncSuccessGlow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(26,158,90,0.33); }
+  50%       { box-shadow: 0 0 0 4px rgba(26,158,90,0.55), 0 4px 24px rgba(26,158,90,0.18); }
+}
+@keyframes ncErrorGlow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(232,64,42,0.33); }
+  50%       { box-shadow: 0 0 0 4px rgba(232,64,42,0.55); }
+}
+@keyframes ncEdgeDash {
+  from { stroke-dashoffset: 20; }
+  to   { stroke-dashoffset: 0; }
+}
+.nc-run     { animation: ncRunPulse 1.6s ease-in-out infinite; }
+.nc-success { animation: ncSuccessGlow 2s ease-in-out infinite; }
+.nc-error   { animation: ncErrorGlow 1.2s ease-in-out infinite; }
+.nc-edge-anim path { animation: ncEdgeDash 1s linear infinite; }
+
+/* Derived card hover elevation — adds lift without overriding selected boxShadow */
+.nc-derived:hover { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.09)); }
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE — Mobile Breakpoints
+═══════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .sis-nav-desktop { display: none !important; }
+  .sis-nav-mobile  { display: flex !important; }
+  .sis-title-long  { display: none !important; }
+  .sis-sidebar     { position: fixed !important; left: 0; top: 0; bottom: 0;
+                     z-index: 50; box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+                     transition: transform 0.25s ease; }
+  .sis-sidebar.closed { transform: translateX(-100%) !important; }
+  .sis-sidebar-btn { display: flex !important; }
+}
+@media (min-width: 768px) {
+  .sis-nav-mobile  { display: none !important; }
+  .sis-sidebar-btn { display: none !important; }
+  .sis-title-short { display: none !important; }
+  .sis-sidebar     { transform: none !important; position: static !important; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   DARK MODE — VoltUI .dark class tokens
+═══════════════════════════════════════════════════════ */
+.dark {
+  --color-page-bg:       #000000;
+  --color-surface:       #111111;
+  --color-surface-2:     #1A1A1A;
+  --color-border:        #2A2A2A;
+  --color-border-strong: #3A3A3A;
+  --color-text-heading:  #F5F5F5;
+  --color-text-primary:  #EEEEEE;
+  --color-text-secondary:#CCCCCC;
+  --color-text-subtle:   #999999;
+  --color-text-muted:    #666666;
+
+  --color-brand:         #E4FF97;
+  --color-brand-hover:   #D4F080;
+  --color-brand-light:   rgba(228,255,151,0.15);
+  --color-brand-mid:     rgba(228,255,151,0.30);
+  --color-brand-text:    #000000;
+
+  --signal-positive:        #2ECC7A;
+  --signal-positive-light:  rgba(46,204,122,0.12);
+  --signal-positive-border: rgba(46,204,122,0.35);
+  --signal-positive-text:   #7EEAB0;
+
+  --signal-negative:        #FF6050;
+  --signal-negative-light:  rgba(255,96,80,0.12);
+  --signal-negative-border: rgba(255,96,80,0.35);
+  --signal-negative-text:   #FF9F95;
+
+  --signal-neutral:         #8899BB;
+  --signal-neutral-light:   rgba(136,153,187,0.12);
+  --signal-neutral-border:  rgba(136,153,187,0.35);
+  --signal-neutral-text:    #AAB8CC;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 3px 8px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 20px rgba(0,0,0,0.5), 0 3px 8px rgba(0,0,0,0.3);
+
+  /* shadcn/ui dark compat */
+  --background:          #000000;
+  --foreground:          #F5F5F5;
+  --card:                #111111;
+  --card-foreground:     #F5F5F5;
+  --primary:             #E4FF97;
+  --primary-foreground:  #000000;
+  --secondary:           #1A1A1A;
+  --secondary-foreground:#F5F5F5;
+  --muted:               #1A1A1A;
+  --muted-foreground:    #888888;
+  --accent:              #E4FF97;
+  --accent-foreground:   #000000;
+  --destructive:         #FF5540;
+  --border:              #2A2A2A;
+  --input:               #2A2A2A;
+  --ring:                #E4FF97;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CHART COLOR TOKENS — VoltUI
+═══════════════════════════════════════════════════════ */
+:root {
+  --chart-1: var(--pastel-mint);
+  --chart-2: var(--pastel-blue);
+  --chart-3: var(--pastel-orchid);
+  --chart-4: var(--pastel-peach);
+  --chart-5: var(--pastel-rose);
+  --chart-6: var(--pastel-butter);
+  --chart-7: var(--pastel-orange);
+  --chart-8: var(--pastel-aqua);
+}
+.dark {
+  --chart-1: #E4FF97;
+  --chart-2: #F5F5F5;
+  --chart-3: #2ECC7A;
+  --chart-4: #FF6050;
+  --chart-5: #8899BB;
+  --chart-6: #D4B8FF;
+  --chart-7: #FFD4A8;
+  --chart-8: #B8E0FF;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TERMINAL / >_ IDENTITY — VoltUI command-prompt aesthetic
+═══════════════════════════════════════════════════════ */
+
+/* Prompt prefix — monospace ">_" symbol */
+.term-prompt {
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* Active prompt — focused/active state */
+.term-prompt-active {
+  color: var(--color-text-primary);
+}
+
+/* Terminal line — full command row */
+.term-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+}
+
+/* Query chip — "> query text" inline display */
+.term-query {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-code, "JetBrains Mono"), monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 3px 10px;
+}
+.term-query::before {
+  content: ">";
+  font-weight: 700;
+  color: var(--color-lime);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SIS HOMEPAGE — Atmospheric Hero
+═══════════════════════════════════════════════════════ */
+
+/* Floating orb animation */
+@keyframes sis-float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(-18px) scale(1.03); }
+}
+@keyframes sis-float-reverse {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(14px) scale(0.98); }
+}
+
+/* Shimmer sweep for buttons */
+@keyframes sis-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* DOS-style blinking cursor */
+.sis-blink-cursor {
+  animation: sis-blink 1s steps(1, end) infinite;
+}
+@keyframes sis-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Hero background with lime radial orbs */
+.sis-hero-bg {
+  position: relative;
+  overflow: hidden;
+}
+.sis-hero-bg::before {
+  content: "";
+  position: absolute;
+  top: -120px;
+  right: -80px;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(228,255,151,0.28) 0%, rgba(228,255,151,0.08) 45%, transparent 70%);
+  pointer-events: none;
+  animation: sis-float 9s ease-in-out infinite;
+}
+.sis-hero-bg::after {
+  content: "";
+  position: absolute;
+  bottom: -60px;
+  left: -100px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(228,255,151,0.18) 0%, rgba(228,255,151,0.05) 50%, transparent 70%);
+  pointer-events: none;
+  animation: sis-float-reverse 11s ease-in-out infinite;
+}
+
+/* Stat-card: Lime */
+.sis-stat-lime {
+  background: var(--volt-lime, #E4FF97);
+  border: 1.5px solid var(--volt-lime-deep, #C8F060);
+  border-radius: var(--volt-radius-lg, 14px);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+/* Stat-card: Black */
+.sis-stat-black {
+  background: var(--volt-black, #0A0A0A);
+  border: 1.5px solid #2A2A2A;
+  border-radius: var(--volt-radius-lg, 14px);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+/* Stat-card: Surface */
+.sis-stat-surface {
+  background: var(--volt-surface-raised, #fff);
+  border: 1.5px solid var(--volt-border, #E8E8E8);
+  border-radius: var(--volt-radius-lg, 14px);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.sis-stat-number {
+  font-family: var(--volt-font-display, "Space Grotesk"), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.sis-stat-label {
+  font-family: var(--volt-font-mono, "JetBrains Mono"), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Glass framework card */
+.sis-framework-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--volt-radius-lg, 14px);
+  border: 1px solid rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: all 180ms ease;
+  text-align: left;
+}
+.sis-framework-card:hover {
+  border-color: var(--volt-black, #0A0A0A);
+  background: rgba(255,255,255,0.92);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* Shimmer submit button */
+.sis-shimmer-btn {
+  position: relative;
+  overflow: hidden;
+  background: var(--volt-black, #0A0A0A);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-family: var(--volt-font-ui, "DM Sans"), sans-serif;
+  font-weight: 600;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.sis-shimmer-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(228,255,151,0.35) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: sis-shimmer 2.4s linear infinite;
+  pointer-events: none;
+}
+.sis-shimmer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+}
+
+/* ── Responsive: Framework Grid ── */
+.sis-framework-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .sis-framework-grid {
+    grid-template-columns: repeat(1, 1fr);
+    gap: 10px;
+  }
+}
+@media (min-width: 601px) and (max-width: 840px) {
+  .sis-framework-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Dark mode adjustments */
+.volt-dark .sis-hero-bg::before {
+  background: radial-gradient(circle, rgba(228,255,151,0.15) 0%, rgba(228,255,151,0.04) 45%, transparent 70%);
+}
+.volt-dark .sis-hero-bg::after {
+  background: radial-gradient(circle, rgba(228,255,151,0.10) 0%, rgba(228,255,151,0.02) 50%, transparent 70%);
+}
+.volt-dark .sis-framework-card {
+  background: rgba(26,26,26,0.80);
+  border-color: rgba(255,255,255,0.08);
+}
+.volt-dark .sis-framework-card:hover {
+  background: rgba(36,36,36,0.95);
+  border-color: rgba(228,255,151,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(228,255,151,0.15);
+}
+.volt-dark .sis-stat-surface {
+  background: var(--volt-surface, #141414);
+  border-color: var(--volt-border, #2A2A2A);
+}

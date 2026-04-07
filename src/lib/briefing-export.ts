@@ -48,9 +48,10 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
   }
 
   // Causal chains
-  if (b.causalChain?.length > 0) {
+  const causalChains = b.causalAnalysis ?? b.causalChain;
+  if (causalChains?.length > 0) {
     lines.push(`## ${de ? "Kausalketten" : "Causal Chains"}`);
-    for (const chain of b.causalChain) {
+    for (const chain of causalChains) {
       lines.push(`- ${chain}`);
     }
     lines.push("");
@@ -143,7 +144,9 @@ export function sessionToMarkdown(history: HistoryEntry[], locale: Locale): stri
   const de = locale === "de";
   const now = new Date().toLocaleString(de ? "de-DE" : "en-US");
   const completed = history.filter(
-    (e) => e.briefing.synthesis !== "Analysiere..." && e.briefing.synthesis !== "Analyzing..."
+    (e) => !e.isLoading
+      && e.briefing.synthesis !== "Analysiere..." && e.briefing.synthesis !== "Analyzing..."
+      && e.briefing.synthesis !== ""
   );
 
   const header = [
@@ -166,13 +169,14 @@ export function sessionToMarkdown(history: HistoryEntry[], locale: Locale): stri
 // ── Download helpers ──────────────────────────────────────────────────────────
 function downloadText(content: string, filename: string, mime = "text/markdown") {
   const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function slugify(text: string): string {
@@ -214,7 +218,8 @@ const MAX_STORED = 30;
 export function saveHistoryToStorage(history: HistoryEntry[]) {
   try {
     const completed = history.filter(
-      (e) => e.briefing.synthesis !== "Analysiere..." && e.briefing.synthesis !== "Analyzing..."
+      (e) => !e.isLoading
+        && e.briefing.synthesis !== "Analysiere..." && e.briefing.synthesis !== "Analyzing..."
         && e.briefing.synthesis !== ""
     );
     const toStore = completed.slice(0, MAX_STORED);
@@ -229,8 +234,8 @@ export function loadHistoryFromStorage(): HistoryEntry[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Restore Date objects
-    return parsed.map((e: any) => ({ ...e, timestamp: new Date(e.timestamp) }));
+    // Restore Date objects; force isLoading=false since no request survives a reload
+    return parsed.map((e: any) => ({ ...e, timestamp: new Date(e.timestamp), isLoading: false }));
   } catch {
     return [];
   }

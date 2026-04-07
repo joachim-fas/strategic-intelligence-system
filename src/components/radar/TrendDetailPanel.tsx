@@ -8,6 +8,7 @@ import { getTrendSources, resolveSource, getTotalSourceCount, TrendSourceRef } f
 import { autoClassify } from "@/lib/classify";
 import { getDrivers, getEffects, getInhibitors, calculateCascadeDepth, TrendEdge } from "@/lib/causal-graph";
 import { getRegulationsForTrend, getRegulatoryPressure } from "@/lib/regulations";
+import { getClusterForTrend } from "@/lib/trend-clusters";
 
 // ─── Grain pastel palette ──────────────────────────────────────────────
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
@@ -137,14 +138,14 @@ function CausalGraphSection({ trendId, locale }: { trendId: string; locale: Loca
 
   const edgeStyle: Record<string, { dot: string; bg: string; text: string }> = {
     drives:     { dot: "#0F6038", bg: "#C3F4D3", text: "#0F6038" },
-    enables:    { dot: "#1A4A8A", bg: "#D4E8FF", text: "#1A4A8A" },
-    inhibits:   { dot: "#C0341D", bg: "#FDEEE9", text: "#C0341D" },
+    amplifies:  { dot: "#1A4A8A", bg: "#D4E8FF", text: "#1A4A8A" },
+    dampens:    { dot: "#C0341D", bg: "#FDEEE9", text: "#C0341D" },
     correlates: { dot: "#7A5C00", bg: "#FFF5BA", text: "#7A5C00" },
   };
   const edgeLabels: Record<string, Record<string, string>> = {
     drives:     { de: "treibt",        en: "drives" },
-    enables:    { de: "ermöglicht",    en: "enables" },
-    inhibits:   { de: "hemmt",         en: "inhibits" },
+    amplifies:  { de: "verstärkt",     en: "amplifies" },
+    dampens:    { de: "dämpft",        en: "dampens" },
     correlates: { de: "korreliert mit",en: "correlates with" },
   };
 
@@ -306,7 +307,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
   const authoritativeSources = getTrendSources(trend.tags);
   const isMegaMacro = trend.category === "Mega-Trend" || trend.category === "Makro-Trend";
   const classification = trend.classification || autoClassify(trend);
-  const liveSources = trend.topSources.filter((s) => !resolveSource(s));
+  const liveSources = (trend.topSources ?? []).filter((s) => !resolveSource(s));
 
   // Category badge style
   const categoryStyle =
@@ -350,10 +351,19 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
 
         {/* Badge row */}
         <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-          {/* Ring */}
+          {/* Ring — with contextual help tooltip */}
           <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+            className="px-2 py-0.5 rounded-full text-xs font-semibold cursor-help"
             style={{ background: ringPastel.background, color: ringPastel.color }}
+            title={locale === "de"
+              ? trend.ring === "adopt" ? "Adopt: Sofort relevant, aktiv beobachten und einsetzen."
+                : trend.ring === "trial" ? "Trial: Vielversprechend, erste Pilotprojekte sinnvoll."
+                : trend.ring === "assess" ? "Assess: Beobachten, Relevanz für eigenen Kontext prüfen."
+                : "Hold: Langfristig relevant, aber noch nicht handlungsrelevant."
+              : trend.ring === "adopt" ? "Adopt: Immediately relevant, actively monitor and apply."
+                : trend.ring === "trial" ? "Trial: Promising, pilot projects recommended."
+                : trend.ring === "assess" ? "Assess: Monitor, evaluate relevance for own context."
+                : "Hold: Long-term relevant, not yet actionable."}
           >
             {getRingLabel(locale, trend.ring)}
           </span>
@@ -365,6 +375,20 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           >
             {trend.category}
           </span>
+
+          {/* Cluster */}
+          {(() => {
+            const cluster = getClusterForTrend(trend.id);
+            if (!cluster) return null;
+            return (
+              <span
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: cluster.color + "18", color: cluster.color }}
+              >
+                {cluster.icon} {locale === "de" ? cluster.nameDe : cluster.name}
+              </span>
+            );
+          })()}
 
           {/* Velocity */}
           {trend.velocity === "rising" && (
@@ -563,7 +587,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
       </div>
 
       {/* ── Tags ── */}
-      <div className="px-6 py-5">
+      <div className="px-6 py-5 border-b" style={{ borderColor: "#E8E8E8" }}>
         <h3 className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider mb-3">
           {t(locale, "tags")}
         </h3>
@@ -586,6 +610,52 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
               );
             })}
         </div>
+      </div>
+
+      {/* ── L3: Deep Dive Actions ── */}
+      <div className="px-6 py-5">
+        <a
+          href={`/?q=${encodeURIComponent(trend.name)}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", padding: "10px 16px",
+            borderRadius: 10,
+            background: "#0A0A0A", color: "#FFFFFF",
+            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+            fontSize: 13, fontWeight: 600,
+            textDecoration: "none",
+            transition: "transform 150ms ease",
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+        >
+          {locale === "de" ? "Frag mich zu diesem Trend" : "Ask me about this trend"} →
+        </a>
+
+        {/* All authoritative sources with links */}
+        {authoritativeSources.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h4 className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider mb-2">
+              {locale === "de" ? "Alle Quellen" : "All Sources"} ({authoritativeSources.length})
+            </h4>
+            <div className="space-y-1">
+              {authoritativeSources.map((src) => (
+                <a
+                  key={src.shortName}
+                  href={src.url ?? "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs py-1 hover:underline"
+                  style={{ color: src.url ? "#1A4A8A" : "#9B9B9B", textDecoration: "none" }}
+                >
+                  <span style={{ width: 4, height: 4, borderRadius: "50%", background: src.url ? "#1A4A8A" : "#D0D0D0", flexShrink: 0 }} />
+                  {src.shortName}
+                  {src.url && <span style={{ fontSize: 9, color: "#C0C0C0" }}>↗</span>}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

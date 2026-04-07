@@ -3,6 +3,12 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { GraphLightbox } from "@/components/ui/GraphLightbox";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { TEMPLATES, FRAMEWORKS, type TemplateResult } from "@/lib/canvas-templates";
+import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
+import { OrbitGraphView } from "./OrbitGraphView";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,8 +35,40 @@ interface Reference {
   relevance?: string;
 }
 
+interface MatchedTrend {
+  id: string;
+  name: string;
+  category: string;
+  tags: string[];
+  relevance: number;
+  confidence: number;
+  impact: number;
+  velocity: string;
+  ring: string;
+  signalCount: number;
+}
+
+interface MatchedEdge {
+  from: string;
+  to: string;
+  type: "drives" | "amplifies" | "dampens" | "correlates" | string;
+  strength: number;
+  description?: string;
+}
+
+interface DimensionEntry {
+  label: string;
+  key: "technology" | "society" | "market_economic" | "political_environment";
+  trends: MatchedTrend[];
+  avgConfidence: number;
+  direction: "up" | "down" | "neutral";
+  color: string;
+}
+
 interface QueryResult {
   synthesis?: string;
+  reasoningChains?: string[];
+  matchedTrendIds?: string[];
   keyInsights?: string[];
   scenarios?: Scenario[];
   decisionFramework?: string;
@@ -38,9 +76,50 @@ interface QueryResult {
   followUpQuestions?: string[];
   confidence?: number;
   interpretation?: string;
+  newsContext?: string;
   regulatoryContext?: string[];
-  causalChain?: string[];
+  causalAnalysis?: string[];
   usedSignals?: UsedSignal[];
+  matchedTrends?: MatchedTrend[];
+  matchedEdges?: MatchedEdge[];
+}
+
+// ── Node Status ────────────────────────────────────────────────────────────
+
+type NodeStatus = "open" | "active" | "decided" | "pinned";
+const NODE_STATUS_META: Record<NodeStatus, { icon: string; color: string; label: string }> = {
+  open:    { icon: "⬜", color: "var(--color-text-muted)", label: "Offen" },
+  active:  { icon: "🔵", color: "#2563EB", label: "Aktiv" },
+  decided: { icon: "✅", color: "#1A9E5A", label: "Entschieden" },
+  pinned:  { icon: "⭐", color: "#F5A623", label: "Gepinnt" },
+};
+
+// ── Layer types ────────────────────────────────────────────────────────────
+
+type CanvasLayer = "analyse" | "karte" | "datei";
+const NODE_LAYER: Record<string, CanvasLayer> = {
+  query: "analyse", insight: "analyse", scenario: "analyse", decision: "analyse", followup: "analyse",
+  dimensions: "analyse", causalgraph: "analyse",
+  note: "karte", idea: "karte", list: "karte", file: "datei",
+};
+const LAYER_LABELS: Record<CanvasLayer, { de: string; color: string }> = {
+  analyse: { de: "Analyse", color: "#1A9E5A" },
+  karte:   { de: "Karten",  color: "#F97316" },
+  datei:   { de: "Dateien", color: "#4A6CF7" },
+};
+
+// ── View Mode ──────────────────────────────────────────────────────────────
+
+type ViewMode = "canvas" | "board" | "timeline" | "orbit";
+
+// ── Canvas Group ───────────────────────────────────────────────────────────
+
+interface CanvasGroup {
+  id: string;
+  nodeIds: string[];
+  label: string;
+  color: string;
+  bounds: { x: number; y: number; w: number; h: number };
 }
 
 // ── Node types ─────────────────────────────────────────────────────────────
@@ -61,9 +140,12 @@ interface QueryNode {
   createdAt: number;
   customWidth?: number;
   customHeight?: number;
+  streamingPhase?: number; // 0=loading 1=synthesis 2=reasoning 3=scenarios 4=insights 5=done
+  nodeStatus?: NodeStatus;
+  tags?: string[];
 }
 
-type DerivedType = "insight" | "scenario" | "decision" | "followup";
+type DerivedType = "insight" | "scenario" | "decision" | "followup" | "dimensions" | "causalgraph";
 
 interface DerivedNode {
   id: string;
@@ -80,6 +162,13 @@ interface DerivedNode {
   createdAt: number;
   customWidth?: number;
   customHeight?: number;
+  nodeStatus?: NodeStatus;
+  // Enriched fields (all optional — backwards-compatible)
+  keyDrivers?: string[];                       // für Szenario-Karten
+  dimensionData?: DimensionEntry[];            // für Dimensions-Karten
+  causalEdges?: MatchedEdge[];                 // für Kausalnetz-Karten
+  causalTrendNames?: Record<string, string>;   // id→name lookup
+  tags?: string[];
 }
 
 // ── Additional node types ─────────────────────────────────────────────────
@@ -94,6 +183,8 @@ interface NoteNode {
   customWidth?: number;
   customHeight?: number;
   parentId?: string;
+  nodeStatus?: NodeStatus;
+  tags?: string[];
 }
 
 interface IdeaNode {
@@ -107,6 +198,8 @@ interface IdeaNode {
   customWidth?: number;
   customHeight?: number;
   parentId?: string;
+  nodeStatus?: NodeStatus;
+  tags?: string[];
 }
 
 interface ListNode {
@@ -120,6 +213,8 @@ interface ListNode {
   customWidth?: number;
   customHeight?: number;
   parentId?: string;
+  nodeStatus?: NodeStatus;
+  tags?: string[];
 }
 
 interface FileNode {
@@ -137,15 +232,21 @@ interface FileNode {
   customWidth?: number;
   customHeight?: number;
   parentId?: string;
+  nodeStatus?: NodeStatus;
+  tags?: string[];
 }
 
 type CanvasNode = QueryNode | DerivedNode | NoteNode | IdeaNode | ListNode | FileNode;
+
+type ConnectionType = "derived" | "builds-on" | "contradicts" | "validates" | "refreshed";
 
 interface Connection {
   from: string;
   to: string;
   derived?: boolean;
   refreshed?: boolean; // temporal chain: re-run of same query
+  connectionType?: ConnectionType;
+  note?: string;       // optional edge annotation
 }
 
 interface CanvasProject {
@@ -158,13 +259,16 @@ interface CanvasProject {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const QUERY_NODE_W       = 420;
-const QUERY_NODE_H       = 50;
-const DERIVED_W          = 256;
+const QUERY_NODE_H       = QUERY_NODE_W;  // square base
+const DERIVED_W          = 300;
 const LIST_NODE_W        = 280;
 const FILE_NODE_W        = 300;
-const DERIVED_COL_GAP_X  = 72;
-const DERIVED_COL_GAP    = 16;
-const DERIVED_ROW_GAP    = 12;
+const FILE_NODE_H        = 300; // default height matches width for square-ish file cards
+const DERIVED_COL_GAP_X  = 64;
+const DERIVED_COL_GAP    = 28;
+const DERIVED_ROW_GAP    = 36;
+const DIMENSIONS_CARD_H  = 192;
+const CAUSAL_GRAPH_CARD_H = 222;
 
 // ── Time helpers ──────────────────────────────────────────────────────────
 
@@ -187,6 +291,8 @@ function nodeAge(ms: number): "fresh" | "aging" | "stale" {
 function estimateCardHeight(
   type: DerivedType, content: string, label?: string, hasSources = false
 ): number {
+  if (type === "dimensions") return DIMENSIONS_CARD_H;
+  if (type === "causalgraph") return CAUSAL_GRAPH_CARD_H;
   const CHARS_PER_LINE = 29;
   const LINE_H   = 20;
   const MAX_LINES = 4;
@@ -204,6 +310,10 @@ function estimateCardHeight(
   if (type === "scenario") {
     return HEADER + PAD + 42 + labelLines * LINE_H + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
   }
+  if (type === "decision") {
+    // Decision cards contain multi-step frameworks — add ~20% extra height vs insight
+    return Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
+  }
   return HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
 }
 
@@ -212,10 +322,10 @@ const STORAGE_KEY = "sis-canvas-v2";
 // ── Scenario colours ──────────────────────────────────────────────────────
 
 const SCEN: Record<string, { color: string; bg: string; border: string; label: string; labelEn: string }> = {
-  optimistic:  { color: "#0F6038", bg: "#E8F8EF", border: "#7DD4A8", label: "Optimistisch", labelEn: "Optimistic" },
-  baseline:    { color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", label: "Basisfall",    labelEn: "Baseline"   },
-  pessimistic: { color: "#B91C1C", bg: "#FEF2F2", border: "#FCA5A5", label: "Pessimistisch",labelEn: "Pessimistic" },
-  wildcard:    { color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", label: "Wildcard",      labelEn: "Wildcard"   },
+  optimistic:  { color: "var(--pastel-mint-text)",   bg: "var(--signal-positive-light)", border: "var(--signal-positive-border)", label: "Optimistisch", labelEn: "Optimistic" },
+  baseline:    { color: "var(--pastel-blue-text)",   bg: "var(--pastel-blue)",            border: "var(--pastel-blue-border)",     label: "Basisfall",    labelEn: "Baseline"   },
+  pessimistic: { color: "var(--signal-negative-text)", bg: "var(--signal-negative-light)", border: "var(--signal-negative-border)", label: "Pessimistisch",labelEn: "Pessimistic" },
+  wildcard:    { color: "var(--pastel-butter-text)", bg: "var(--pastel-butter)",           border: "var(--pastel-butter-border)",   label: "Wildcard",     labelEn: "Wildcard"   },
 };
 
 // ── Persistence (localStorage) ────────────────────────────────────────────
@@ -256,12 +366,36 @@ function extractSynthesisDelta(acc: string, sent: number): string {
     if (ch === "\\") {
       if (i + 1 >= rest.length) break;
       const nx = rest[i + 1];
-      result += nx === "n" ? "\n" : nx === "t" ? "\t" : nx;
-      i += 2;
+      if (nx === "u") {
+        if (i + 5 >= rest.length) break;
+        const hex = rest.slice(i + 2, i + 6);
+        result += String.fromCharCode(parseInt(hex, 16));
+        i += 6;
+      } else {
+        result += nx === "n" ? "\n"
+               : nx === "t" ? "\t"
+               : nx === "r" ? "\r"
+               : nx === "b" ? "\b"
+               : nx === "f" ? "\f"
+               : nx === '"' ? '"'
+               : nx === "\\" ? "\\"
+               : nx === "/" ? "/"
+               : nx;
+        i += 2;
+      }
     } else if (ch === '"') break;
     else { result += ch; i++; }
   }
   return result.length > sent ? result.slice(sent) : "";
+}
+
+function detectStreamingPhase(acc: string): number {
+  if (acc.includes('"confidence"')) return 5;
+  if (acc.includes('"keyInsights"')) return 4;
+  if (acc.includes('"scenarios"')) return 3;
+  if (acc.includes('"reasoningChains"')) return 2;
+  if (acc.includes('"synthesis"')) return 1;
+  return 0;
 }
 
 async function streamQuery(
@@ -269,6 +403,7 @@ async function streamQuery(
   onChunk: (c: string) => void,
   onComplete: (r: QueryResult) => void,
   onError: (m: string) => void,
+  onPhase?: (phase: number) => void,
 ) {
   try {
     const res = await fetch("/api/v1/query", {
@@ -281,6 +416,7 @@ async function streamQuery(
     const dec = new TextDecoder();
     let buf = "", acc = "", sent = 0;
     let final: QueryResult | null = null;
+    let lastPhase = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -296,6 +432,10 @@ async function streamQuery(
             acc += evt.text;
             const delta = extractSynthesisDelta(acc, sent);
             if (delta) { sent += delta.length; onChunk(delta); }
+            if (onPhase) {
+              const phase = detectStreamingPhase(acc);
+              if (phase !== lastPhase) { lastPhase = phase; onPhase(phase); }
+            }
           } else if (evt.type === "complete" && evt.result) {
             final = evt.result;
           } else if (evt.type === "error") { onError(evt.error || "Fehler"); return; }
@@ -309,10 +449,51 @@ async function streamQuery(
 
 // ── Layout: derived card cluster ──────────────────────────────────────────
 //
-//   [MAIN NODE]──► Col A: ERKENNTNISSE (stacked)   │  Col B: SZENARIEN (stacked)
-//                          EMPFEHLUNG               │
-//                  ────────────────────────────────────────
+//   [MAIN NODE]──► Col A: ERKENNTNISSE (stacked)   │  Col B: SZENARIEN (stacked)  │  Col C: DIMENSIONEN / KAUSALNETZ
+//                          EMPFEHLUNG               │                               │
+//                  ─────────────────────────────────────────────────────────────────────────
 //                  FOLGEFRAGEN  (horizontal row, full width)
+
+// ── buildDimensionData — groups matchedTrends by 4 strategic dimensions ──
+
+const DIMENSION_CONFIG: Array<{
+  key: DimensionEntry["key"];
+  label: string;
+  color: string;
+  match: string[];
+}> = [
+  { key: "technology",           label: "Technologie & Innovation", color: "#3b82f6", match: ["technology", "ai", "digital", "tech", "innovation"] },
+  { key: "society",              label: "Gesellschaft & Arbeit",    color: "#f59e0b", match: ["society", "work", "demographics", "education", "health", "labor"] },
+  { key: "market_economic",      label: "Wirtschaft & Märkte",      color: "#22c55e", match: ["market", "economic", "business", "finance", "trade", "energy"] },
+  { key: "political_environment",label: "Geopolitik & Regulierung", color: "#6366f1", match: ["political", "environment", "regulation", "geopolitics", "governance", "climate"] },
+];
+
+function buildDimensionData(matchedTrends: MatchedTrend[]): DimensionEntry[] {
+  // Assign each trend to exactly one dimension (first match wins, priority order
+  // defined by DIMENSION_CONFIG: technology → society → market_economic → political_environment).
+  const buckets = new Map<DimensionEntry["key"], MatchedTrend[]>(
+    DIMENSION_CONFIG.map(cfg => [cfg.key, []])
+  );
+  for (const trend of matchedTrends) {
+    const haystack = [trend.category, ...trend.tags].map(s => s.toLowerCase());
+    const matched = DIMENSION_CONFIG.find(cfg =>
+      cfg.match.some(m => haystack.some(h => h.includes(m)))
+    );
+    if (matched) buckets.get(matched.key)!.push(trend);
+  }
+  return DIMENSION_CONFIG.map(cfg => {
+    const trends = buckets.get(cfg.key)!;
+    const avgConfidence = trends.length > 0
+      ? trends.reduce((s, t) => s + t.confidence, 0) / trends.length
+      : 0;
+    const rising = trends.filter(t => t.velocity === "rising").length;
+    const falling = trends.filter(t => t.velocity === "falling").length;
+    const direction: DimensionEntry["direction"] = rising > falling ? "up" : falling > rising ? "down" : "neutral";
+    return { label: cfg.label, key: cfg.key, trends, avgConfidence, direction, color: cfg.color };
+  });
+}
+
+const uid = () => Math.random().toString(36).slice(2, 10);
 
 function computeDerivedNodes(parentId: string, px: number, py: number, result: QueryResult): DerivedNode[] {
   const derived: DerivedNode[] = [];
@@ -322,6 +503,7 @@ function computeDerivedNodes(parentId: string, px: number, py: number, result: Q
 
   const colA_X = px + QUERY_NODE_W + DERIVED_COL_GAP_X;
   const colB_X = colA_X + DERIVED_W + DERIVED_COL_GAP;
+  const colC_X = colB_X + DERIVED_W + DERIVED_COL_GAP;
 
   let colA_Y = py;
   let colB_Y = py;
@@ -367,12 +549,45 @@ function computeDerivedNodes(parentId: string, px: number, py: number, result: Q
       label: s.name,
       colorKey: s.type ?? "baseline",
       probability: s.probability,
+      keyDrivers: s.keyDrivers ?? [],
       queryText: `Analysiere dieses Szenario tiefer: ${s.name} — ${s.description.slice(0, 100)}`,
       sources: topSources,
       createdAt: now,
     });
     colB_Y += h + DERIVED_ROW_GAP;
   });
+
+  // ── Col C: Dimensions + Causal Graph ──────────────────────────────────────
+  let colC_Y = py;
+  const matchedTrends = result.matchedTrends ?? [];
+  const matchedEdges  = result.matchedEdges  ?? [];
+
+  if (matchedTrends.length >= 3) {
+    const dimData = buildDimensionData(matchedTrends);
+    derived.push({
+      id: uid(), nodeType: "dimensions",
+      x: colC_X, y: colC_Y,
+      parentId, content: "Trend-Dimensionen", label: "DIMENSIONEN",
+      queryText: "Vertiefen: Dimensionsanalyse — welche Bereiche sind am stärksten betroffen?",
+      dimensionData: dimData,
+      createdAt: now,
+    });
+    colC_Y += DIMENSIONS_CARD_H + DERIVED_ROW_GAP;
+  }
+
+  if (matchedEdges.length >= 2) {
+    const trendNameMap: Record<string, string> = {};
+    matchedTrends.forEach(t => { trendNameMap[t.id] = t.name; });
+    derived.push({
+      id: uid(), nodeType: "causalgraph",
+      x: colC_X, y: colC_Y,
+      parentId, content: "Kausalnetz", label: "KAUSALNETZ",
+      queryText: "Vertiefen: Kausalnetz — welche Treiber sind am wirkungsmächtigsten?",
+      causalEdges: matchedEdges,
+      causalTrendNames: trendNameMap,
+      createdAt: now,
+    });
+  }
 
   // ── Row below both columns: Follow-up questions ──────────────────────────
   const rowY = Math.max(colA_Y, colB_Y) + 20;
@@ -389,19 +604,569 @@ function computeDerivedNodes(parentId: string, px: number, py: number, result: Q
   return derived;
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+// ── Test Dataset ──────────────────────────────────────────────────────────
+//
+// Aufruf: Einfach "test" in die Command-Line eingeben.
+// Erzeugt einen vollständigen Beispiel-Datensatz mit allen Kartentypen,
+// zwei verbundenen Abfrage-Bäumen und annotierten Karten die erklären
+// was jeder Kartentyp ist und warum er existiert.
+//
+function buildTestDataset(): { nodes: CanvasNode[]; conns: Connection[] } {
+  const now = Date.now();
+
+  // Feste IDs damit der Datensatz reproduzierbar bleibt
+  const Q1 = "test-q1", Q2 = "test-q2";
+  const I1 = "test-i1", I2 = "test-i2";
+  const DEC1 = "test-dec1";
+  const FQ1 = "test-fq1";
+  const S_OPT = "test-s-opt", S_BASE = "test-s-base", S_PESS = "test-s-pess", S_WILD = "test-s-wild";
+  const I3 = "test-i3", DEC2 = "test-dec2", S2 = "test-s2", FQ2 = "test-fq2";
+  const NOTE1 = "test-note1", IDEA1 = "test-idea1", LIST1 = "test-list1";
+
+  // Layout: Q1 oben-links, Q2 darunter (gleiche X-Spalte, vertieft)
+  // Derived-Karten rechts davon in zwei Spalten (wie computeDerivedNodes)
+  const Q1X = 80,  Q1Y = 80;
+  const Q2X = 80,  Q2Y = 700;
+  const CAX = Q1X + QUERY_NODE_W + DERIVED_COL_GAP_X; // = 572
+  const CBX = CAX + DERIVED_W + DERIVED_COL_GAP;       // = 844
+
+  const nodes: CanvasNode[] = [
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ABFRAGE 1 — Haupt-Query
+    // Erklärt: Was ist eine Abfrage-Karte? Wie sieht eine fertige Analyse aus?
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: Q1, nodeType: "query",
+      x: Q1X, y: Q1Y,
+      query: "KI-Automatisierung: Wie verändert sich die Arbeitswelt bis 2030?",
+      locale: "de", status: "done", collapsed: false,
+      synthesis:
+        "ABFRAGE-KARTE — Status: ✓ Abgeschlossen. " +
+        "Diese Karte ist der Startpunkt einer vollständigen KI-Analyse. " +
+        "Der grüne Balken oben zeigt: Analyse fertig. " +
+        "Klicken → Detail-Panel öffnet sich rechts. " +
+        "'+' Button → Iteration / Folgefrage starten. " +
+        "Die Kinder-Karten rechts (Erkenntnisse, Szenarien, Empfehlung, Folgefragen) " +
+        "wurden automatisch aus dem Analyse-Ergebnis generiert.",
+      result: {
+        synthesis:
+          "KI wird bis 2030 ca. 30–40% aller Routinetätigkeiten automatisieren. " +
+          "Gleichzeitig entstehen neue Berufsfelder rund um KI-Koordination, Ethikprüfung und Mensch-Maschine-Kollaboration. " +
+          "Der Nettoeffekt hängt entscheidend von der Geschwindigkeit der Umschulungssysteme ab.",
+        confidence: 0.82,
+        keyInsights: [
+          "30–40% aller Bürotätigkeiten bis 2030 automatisierbar",
+          "Neue Berufe: KI-Trainer, Ethik-Prüfer, Human-AI-Koordinatoren",
+          "Umschulungsgeschwindigkeit ist der kritische Engpass",
+        ],
+      },
+      createdAt: now - 3_600_000,
+    },
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ERKENNTNIS-KARTEN (linke Spalte / ColA) — generiert aus Q1
+    // Erklärt: Was ist eine Erkenntnis? Wo erscheint sie? Wie nutzt man sie?
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: I1, nodeType: "insight",
+      x: CAX, y: Q1Y,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      content:
+        "ERKENNTNIS-KARTE — Extrahiert eine Kernaussage aus der Analyse. " +
+        "Erscheint immer in der linken Spalte direkt rechts neben der Abfrage. " +
+        "→ 30–40% aller Bürotätigkeiten (Buchhaltung, Datenerfassung, einfache Texterstellung) " +
+        "sind bis 2030 durch LLMs + Robotik ersetzbar. " +
+        "Betroffen: mittlere Qualifikationsstufen ohne Spezialisierung.",
+      createdAt: now - 3_590_000,
+    } as DerivedNode,
+
+    {
+      id: I2, nodeType: "insight",
+      x: CAX, y: Q1Y + 100,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      content:
+        "ERKENNTNIS-KARTE (zweite) — Eine Abfrage erzeugt typisch 2–4 Erkenntnisse, " +
+        "die vertikal gestapelt erscheinen. " +
+        "→ Gleichzeitig entstehen 12–18M neue Jobs bis 2030 in KI-nahen Bereichen. " +
+        "Netto-Jobeffekt in DE: -800K bis +300K je nach Szenario (McKinsey 2024).",
+      createdAt: now - 3_589_000,
+    } as DerivedNode,
+
+    // ══════════════════════════════════════════════════════════════════════
+    // EMPFEHLUNG (linke Spalte, unter Erkenntnissen) — generiert aus Q1
+    // Erklärt: Wozu dient eine Empfehlungs-Karte?
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: DEC1, nodeType: "decision",
+      x: CAX, y: Q1Y + 212,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      content:
+        "EMPFEHLUNG-KARTE — Leitet konkrete Handlungsschritte aus der Analyse ab. " +
+        "Erscheint nach den Erkenntnissen in der linken Spalte. " +
+        "→ Sofortmaßnahmen: (1) Weiterbildungsbudget um 40% erhöhen, " +
+        "(2) Interne KI-Champions in allen Abteilungen benennen, " +
+        "(3) Pilotprojekt für KI-Assistenz in Sachbearbeitung starten. Zeithorizont: 12 Monate.",
+      createdAt: now - 3_588_000,
+    } as DerivedNode,
+
+    // ══════════════════════════════════════════════════════════════════════
+    // FOLGEFRAGE (linke Spalte, unterste) — generiert aus Q1
+    // Erklärt: Wie funktioniert die Folgefrage → neue Abfrage?
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: FQ1, nodeType: "followup",
+      x: CAX, y: Q1Y + 324,
+      parentId: Q1, queryText: "Welche Berufe und Branchen verschwinden bis 2030?",
+      content:
+        "FOLGEFRAGE-KARTE — KI schlägt die nächste logische Vertiefung vor. " +
+        "'+' klicken → neue Abfrage mit diesem Text vorausfüllen. " +
+        "→ Welche Berufe und Branchen verschwinden bis 2030? " +
+        "(Diese Frage wurde bereits vertieft — siehe Abfrage 2 unten!)",
+      createdAt: now - 3_587_000,
+    } as DerivedNode,
+
+    // ══════════════════════════════════════════════════════════════════════
+    // SZENARIEN (rechte Spalte / ColB) — generiert aus Q1
+    // Erklärt: Vier Szenario-Typen mit Farben und Wahrscheinlichkeiten
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: S_OPT, nodeType: "scenario", colorKey: "optimistic",
+      x: CBX, y: Q1Y,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      probability: 0.25,
+      label: "Soft Landing",
+      content:
+        "OPTIMISTISCH-SZENARIO (25%) — Grün, beste realistische Entwicklung. " +
+        "→ Weiterbildungssysteme skalieren rechtzeitig. Neue Jobs entstehen schneller als alte wegfallen. " +
+        "Reallöhne steigen durch Produktivitätsgewinne. Europa führt bei KI-Ethikstandards.",
+      createdAt: now - 3_586_000,
+    } as DerivedNode,
+
+    {
+      id: S_BASE, nodeType: "scenario", colorKey: "baseline",
+      x: CBX, y: Q1Y + 100,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      probability: 0.45,
+      label: "Graduelle Transformation",
+      content:
+        "BASISFALL-SZENARIO (45%) — Blau, wahrscheinlichstes Outcome. " +
+        "→ Langsame, ungleichmäßige Anpassung über 8–12 Jahre. " +
+        "Fachkräftemangel in KI-Berufen parallel zu Überangebot in Routinetätigkeiten. " +
+        "Staat muss aktiv mit Umschulungsprogrammen moderieren.",
+      createdAt: now - 3_585_000,
+    } as DerivedNode,
+
+    {
+      id: S_PESS, nodeType: "scenario", colorKey: "pessimistic",
+      x: CBX, y: Q1Y + 212,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      probability: 0.22,
+      label: "Strukturkrise",
+      content:
+        "PESSIMISTISCH-SZENARIO (22%) — Rot, ungünstigste realistische Entwicklung. " +
+        "→ Automatisierungsgeschwindigkeit überholt Anpassungsfähigkeit. " +
+        "Strukturelle Arbeitslosigkeit bei 45–60-Jährigen ohne MINT-Hintergrund. " +
+        "Soziale Spannungen steigen, politischer Backlash gegen KI.",
+      createdAt: now - 3_584_000,
+    } as DerivedNode,
+
+    {
+      id: S_WILD, nodeType: "scenario", colorKey: "wildcard",
+      x: CBX, y: Q1Y + 324,
+      parentId: Q1, queryText: "KI und Arbeitswelt",
+      probability: 0.08,
+      label: "EU-Regulierungsschock",
+      content:
+        "WILDCARD-SZENARIO (8%) — Gelb, unwahrscheinlich aber wirkungsmächtig. " +
+        "→ EU verabschiedet nach KI-Skandal strikte Verbote für KI in Entscheidungsprozessen. " +
+        "Temporäre Job-Stabilisierung, aber massiver Wettbewerbsnachteil gegenüber USA und Asien.",
+      createdAt: now - 3_583_000,
+    } as DerivedNode,
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ABFRAGE 2 — Kind-Abfrage (Vertiefung von Q1)
+    // Erklärt: Wie sieht eine verknüpfte Folge-Abfrage aus?
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: Q2, nodeType: "query",
+      x: Q2X, y: Q2Y,
+      parentId: Q1,
+      query: "Welche Berufe und Branchen verschwinden konkret bis 2030?",
+      locale: "de", status: "done", collapsed: false,
+      synthesis:
+        "ABFRAGE-KARTE (Kind-Abfrage) — Diese Analyse wurde durch die Folgefrage aus Abfrage 1 angestoßen. " +
+        "Die gestrichelte Verbindungslinie zeigt die Eltern-Kind-Beziehung. " +
+        "Vertiefungen ermöglichen mehrschichtige Analyse (bis zu 5+ Ebenen möglich). " +
+        "'+' klicken → weitere Vertiefung starten.",
+      result: {
+        synthesis:
+          "Besonders gefährdet: Sachbearbeitung (70% Automatisierungsgrad), Transport/Logistik (autonome Fahrzeuge), " +
+          "Kassierer & Lagerarbeiter (Robotik), Einstiegs-Juristentätigkeiten und Diagnoseassistenz. " +
+          "Weniger gefährdet: Sozialberufe, Handwerk, kreative Tätigkeiten.",
+        confidence: 0.79,
+      },
+      createdAt: now - 1_800_000,
+    },
+
+    // Q2 Derived nodes
+    {
+      id: I3, nodeType: "insight",
+      x: CAX, y: Q2Y,
+      parentId: Q2, queryText: "Berufe und KI 2030",
+      content:
+        "ERKENNTNIS zu Kind-Abfrage — Jede Abfrage hat eigene Kinder-Karten. " +
+        "Erkenntnisse beider Abfragen erscheinen in denselben Spalten, aber bei unterschiedlicher Y-Position. " +
+        "→ Top-3 gefährdete Berufsgruppen: Sachbearbeitung (-45%), Logistik (-38%), Finanzdienstleistungen (-31%). " +
+        "Wachstum: Pflege (+22%), Handwerk (+14%), KI-Ops (+67%).",
+      createdAt: now - 1_790_000,
+    } as DerivedNode,
+
+    {
+      id: DEC2, nodeType: "decision",
+      x: CAX, y: Q2Y + 100,
+      parentId: Q2, queryText: "Berufe und KI 2030",
+      content:
+        "EMPFEHLUNG zu Kind-Abfrage — Jede Analyseebene erzeugt eigene Handlungsempfehlungen. " +
+        "Konkreter und spezifischer als die Empfehlung der Eltern-Abfrage. " +
+        "→ Sofortprogramm für Sachbearbeiter: 18-monatige Umschulung zu 'KI-Koordinatoren'. " +
+        "Priorisierung: 45+ Jahrgang. Fördervolumen: €50M/Jahr.",
+      createdAt: now - 1_788_000,
+    } as DerivedNode,
+
+    {
+      id: S2, nodeType: "scenario", colorKey: "baseline",
+      x: CBX, y: Q2Y,
+      parentId: Q2, queryText: "Berufe und KI 2030",
+      probability: 0.55,
+      label: "Sektoraler Umbau",
+      content:
+        "SZENARIO zu Kind-Abfrage — Auch Vertiefungsabfragen generieren Szenarien in der rechten Spalte. " +
+        "→ Sektorialer Jobverlust wird durch Wachstum in Pflege, Handwerk und KI-nahen Berufen ausgeglichen — " +
+        "aber mit 5–10 Jahren Verzögerung und signifikanter regionaler Ungleichverteilung.",
+      createdAt: now - 1_789_000,
+    } as DerivedNode,
+
+    {
+      id: FQ2, nodeType: "followup",
+      x: CBX, y: Q2Y + 100,
+      parentId: Q2, queryText: "Wie kann die Politik KI-Arbeitslosigkeit abfedern?",
+      content:
+        "FOLGEFRAGE zu Kind-Abfrage — Öffnet eine weitere Analyseebene (Ebene 3). " +
+        "'+' klicken um diese Frage als neue Abfrage zu starten. " +
+        "→ Wie kann die Politik konkret KI-bedingte Arbeitslosigkeit abfedern? " +
+        "(Hier könntest du den Test-Canvas weiter vertiefen!)",
+      createdAt: now - 1_787_000,
+    } as DerivedNode,
+
+    // ══════════════════════════════════════════════════════════════════════
+    // MANUELLE KARTEN — Note, Idea, List
+    // Erklärt: Selbst erstellte Karten ohne KI-Analyse
+    // ══════════════════════════════════════════════════════════════════════
+    {
+      id: NOTE1, nodeType: "note",
+      x: 80, y: 1060,
+      content:
+        "NOTIZ-KARTE — Selbst erstellt, kein KI-Output. " +
+        "Ideal für eigene Beobachtungen, Quellen und Kontext-Infos. " +
+        "Erstellen: '+' auf einer Karte → Notiz wählen. Oder: Leeres Canvas → '+Hinzufügen'. " +
+        "Bearbeiten: Karte anklicken → Detail-Panel → Text direkt bearbeiten. " +
+        "Löschen: Karte anklicken (Rahmen erscheint) → Backspace → Enter.",
+      customWidth: 340, customHeight: 110,
+      createdAt: now - 900_000,
+    },
+
+    {
+      id: IDEA1, nodeType: "idea",
+      x: 470, y: 1060,
+      title: "Weiterbildungsplattform für KI-Betroffene",
+      content:
+        "IDEE-KARTE — Für eigene Hypothesen und Konzepte. " +
+        "Hat einen Titel (Kurzform, sichtbar beim Zoom-Out) und eine Beschreibung. " +
+        "'+' klicken → Idee als Basis für KI-Analyse verwenden. " +
+        "→ Staatliche Plattform die KI-gefährdete Berufsgruppen mit Umschulungsangeboten vernetzt. " +
+        "Geschätztes Potenzial: 800K Betroffene bis 2027.",
+      customWidth: 300, customHeight: 130,
+      createdAt: now - 890_000,
+    },
+
+    {
+      id: LIST1, nodeType: "list",
+      x: 820, y: 1060,
+      title: "Alle Canvas-Kartentypen",
+      items: [
+        "⌕ Abfrage — KI-Vollanalyse (blauer Rand = aktiv)",
+        "◉ Erkenntnis — Kernaussage (linke Spalte, Grün)",
+        "◆ Empfehlung — Handlungsrahmen (linke Spalte, Mint)",
+        "◈ Szenario — Opt. / Basis / Pess. / Wildcard (rechts)",
+        "◎ Folgefrage — Nächste Ebene (gestrichelt, rechts)",
+        "✎ Notiz — Eigener Freitext (Butter-Gelb)",
+        "◇ Idee — Hypothese oder These (Peach-Orange)",
+        "≡ Liste — Strukturierte Aufzählung (Mint-Grün)",
+        "📎 Datei — Dokument hochladen & analysieren (Blau)",
+      ],
+      customWidth: 320, customHeight: 210,
+      createdAt: now - 880_000,
+    },
+  ];
+
+  const conns: Connection[] = [
+    // Q1 → alle abgeleiteten Karten
+    { from: Q1, to: I1,    derived: true },
+    { from: Q1, to: I2,    derived: true },
+    { from: Q1, to: DEC1,  derived: true },
+    { from: Q1, to: FQ1,   derived: true },
+    { from: Q1, to: S_OPT, derived: true },
+    { from: Q1, to: S_BASE,derived: true },
+    { from: Q1, to: S_PESS,derived: true },
+    { from: Q1, to: S_WILD,derived: true },
+    // Q1 → Q2 (Vertiefungskette)
+    { from: Q1, to: Q2,    derived: false },
+    // Q2 → abgeleitete Karten
+    { from: Q2, to: I3,    derived: true },
+    { from: Q2, to: DEC2,  derived: true },
+    { from: Q2, to: S2,    derived: true },
+    { from: Q2, to: FQ2,   derived: true },
+    // Manuelle Karten mit Q2 verknüpft
+    { from: Q2, to: NOTE1, derived: true },
+    { from: Q2, to: IDEA1, derived: true },
+  ];
+
+  return { nodes, conns };
+}
+
+// ── Demo Project (Onboarding) ──────────────────────────────────────────────
+
+function buildDemoProject(): { nodes: CanvasNode[]; conns: Connection[] } {
+  const now = Date.now();
+  // IDs
+  const W = "demo-welcome", B = "demo-bedienung", T = "demo-tipps";
+  const Q = "demo-query";
+  const I1 = "demo-insight-1", I2 = "demo-insight-2";
+  const SC1 = "demo-sc-opt", SC2 = "demo-sc-base", SC3 = "demo-sc-pess";
+  const DEC = "demo-decision", FQ = "demo-followup";
+  const DIM = "demo-dimensions", CG = "demo-causalgraph";
+
+  // Layout constants
+  const NX = 60;     // Notes column X
+  const QX = 480;    // Query column X
+  const DX = 1020;   // Derived column X
+  const D2X = 1350;  // Second derived column (scenarios)
+  const D3X = 1020;  // Third column (analysis cards)
+
+  // Demo signals for sparkline
+  const demoSignals: UsedSignal[] = [
+    { source: "hackernews", title: "GPT-5 training costs exceed $1B — scaling laws plateau", date: new Date(now - 6 * 3600000).toISOString(), strength: 0.9 },
+    { source: "arxiv", title: "EU AI Act compliance costs for SMEs: first empirical study", date: new Date(now - 18 * 3600000).toISOString(), strength: 0.7 },
+    { source: "news", title: "Volkswagen nutzt KI-Copiloten in der Produktion — 2000 Stellen umgeschichtet", date: new Date(now - 30 * 3600000).toISOString(), strength: 0.8 },
+    { source: "reddit", title: "r/cscareerquestions: Junior dev jobs disappearing in EU?", date: new Date(now - 48 * 3600000).toISOString(), strength: 0.5 },
+    { source: "github", title: "Trending: open-source AI governance toolkit for EU compliance", date: new Date(now - 60 * 3600000).toISOString(), strength: 0.6 },
+  ];
+
+  // Demo causal edges for CausalGraph + Orbit
+  const causalEdges: MatchedEdge[] = [
+    { from: "mega-ai", to: "mega-future-of-work", type: "drives", strength: 0.95, description: "KI-Automatisierung verändert Jobprofile und Qualifikationsanforderungen" },
+    { from: "mega-ai", to: "mega-digital-transformation", type: "amplifies", strength: 0.88, description: "KI beschleunigt digitale Transformation in allen Sektoren" },
+    { from: "mega-geopolitics", to: "mega-ai", type: "dampens", strength: 0.65, description: "Tech-Exportkontrollen bremsen KI-Fortschritt" },
+    { from: "mega-future-of-work", to: "mega-demographics", type: "correlates", strength: 0.55, description: "Arbeitsmarktveränderungen verstärken demografische Trends" },
+    { from: "mega-digital-transformation", to: "mega-cybersecurity", type: "drives", strength: 0.78, description: "Mehr Digitalisierung erhöht Angriffsfläche" },
+    { from: "mega-regulation", to: "mega-ai", type: "dampens", strength: 0.72, description: "EU AI Act verlangsamt Innovation, erhöht aber Vertrauen" },
+  ];
+  const causalTrendNames: Record<string, string> = {
+    "mega-ai": "Künstliche Intelligenz",
+    "mega-future-of-work": "Zukunft der Arbeit",
+    "mega-digital-transformation": "Digitale Transformation",
+    "mega-geopolitics": "Geopolitik & Konflikte",
+    "mega-demographics": "Demografie & Alterung",
+    "mega-cybersecurity": "Cybersicherheit",
+    "mega-regulation": "Regulierung & Governance",
+  };
+
+  // Demo dimension data
+  const dimData: DimensionEntry[] = [
+    { label: "Technologie & Innovation", key: "technology", trends: [], avgConfidence: 0.82, direction: "up", color: "#3b82f6" },
+    { label: "Gesellschaft & Arbeit", key: "society", trends: [], avgConfidence: 0.61, direction: "down", color: "#f59e0b" },
+    { label: "Wirtschaft & Märkte", key: "market_economic", trends: [], avgConfidence: 0.54, direction: "neutral", color: "#22c55e" },
+    { label: "Geopolitik & Regulierung", key: "political_environment", trends: [], avgConfidence: 0.73, direction: "up", color: "#6366f1" },
+  ];
+
+  const nodes: CanvasNode[] = [
+    // ── Erklärungs-Notizen (links) ──
+    {
+      id: W, nodeType: "note", x: NX, y: 60, createdAt: now,
+      customWidth: 320, customHeight: 260,
+      content:
+        "WILLKOMMEN IM SIS CANVAS\n\n" +
+        "Das Strategic Intelligence System analysiert Trends, Signale und Zusammenhänge — und verwandelt sie in strategische Erkenntnisse.\n\n" +
+        "DIESER CANVAS ZEIGT DIR, WIE ALLES FUNKTIONIERT:\n\n" +
+        "→ Klicke auf eine Karte um Details zu sehen\n" +
+        "→ Ziehe am rechten Punkt um Verbindungen zu erstellen\n" +
+        "→ Nutze die Toolbar oben für Views, Export und mehr\n" +
+        "→ Tippe in die Command-Line unten um Analysen zu starten",
+      tags: ["onboarding", "start"],
+    } as NoteNode,
+    {
+      id: B, nodeType: "note", x: NX, y: 360, createdAt: now,
+      customWidth: 320, customHeight: 280,
+      content:
+        "CANVAS-BEDIENUNG\n\n" +
+        "KARTEN BEWEGEN: Header anfassen und ziehen\n" +
+        "VERBINDEN: Am rechten Port ziehen → zu einer anderen Karte\n" +
+        "ZOOM: Mausrad oder Toolbar (⊙ = Reset)\n" +
+        "VIEWS: ⊞ Canvas | ☰ Board | ⏱ Timeline | ⬡ Orbit\n" +
+        "LÖSCHEN: Karte auswählen → Delete → Enter\n" +
+        "TAGS: Karte anklicken → unten Tags eingeben → Enter\n" +
+        "EXPORT: ⬇ .md oder ⬇ .json in der Toolbar\n" +
+        "VOLLBILD: ⤢ Icon auf Grafiken klicken → Lightbox",
+      tags: ["onboarding"],
+    } as NoteNode,
+    {
+      id: T, nodeType: "note", x: NX, y: 680, createdAt: now,
+      customWidth: 320, customHeight: 240,
+      content:
+        "FUNKTIONEN ENTDECKEN\n\n" +
+        "⬡ ORBIT: Alle Trends als Kausal-Netzwerk\n" +
+        "📄 BRIEFING: Strategisches Memo generieren\n" +
+        "🔍 TOOLTIPS: Maus über jeden Button halten\n" +
+        "PROJEKTE: Dropdown oben → Neues Projekt\n" +
+        "VERBINDUNGEN: Grün = bestätigt, Rot = Widerspruch\n" +
+        "SPARKLINE: Mini-Zeitreihe der Signale auf Query-Karten",
+      tags: ["onboarding"],
+    } as NoteNode,
+
+    // ── Beispiel-Query (Mitte) ──
+    {
+      id: Q, nodeType: "query", x: QX, y: 80, createdAt: now,
+      query: "Wie verändert KI die Arbeitswelt in Europa bis 2030?",
+      locale: "de",
+      status: "done",
+      synthesis:
+        "Künstliche Intelligenz transformiert die europäische Arbeitswelt tiefgreifend: Bis 2030 werden laut McKinsey 30% aller Arbeitsstunden in der EU automatisierbar sein. " +
+        "Der Effekt ist asymmetrisch — administrative und analytische Berufe sind stärker betroffen als handwerkliche. " +
+        "Gleichzeitig entstehen neue Berufsfelder in KI-Governance, Prompt Engineering und Human-AI-Collaboration. " +
+        "Die EU AI Act setzt einen globalen Regulierungsstandard, der sowohl Innovation bremst als auch Vertrauen schafft.",
+      result: {
+        synthesis: "KI transformiert die EU-Arbeitswelt: 30% Automatisierungspotenzial bis 2030, asymmetrisch nach Qualifikation.",
+        keyInsights: [
+          "30% der EU-Arbeitsstunden automatisierbar — Augmentation vor Substitution",
+          "EU AI Act schafft Dreiklassen-Markt für KI-Anwendungen",
+        ],
+        scenarios: [
+          { type: "optimistic", name: "KI-Augmentations-Boom", description: "Co-Pilot-Modelle steigern Produktivität um 40%+", probability: 0.25, keyDrivers: ["Weiterbildungsinvestition", "AI Act Klarheit"] },
+          { type: "baseline", name: "Duale Arbeitswelt 2030", description: "Hochqualifizierte KI-Wissensarbeiter neben wachsendem Care-Sektor", probability: 0.45, keyDrivers: ["AI Act Regulierung", "Fachkräftemangel", "Remote-Work"] },
+          { type: "pessimistic", name: "Verdrängungskrise", description: "Schnelle Automatisierung ohne ausreichende Umschulung", probability: 0.22, keyDrivers: ["Kostendruck", "Mangelnde Regulierung"] },
+        ],
+        decisionFramework: "1. KI-Kompetenzoffensive starten. 2. Human-AI-Collaboration pilotieren. 3. EU AI Act Compliance sicherstellen. 4. Change-Management aufsetzen.",
+        followUpQuestions: ["Welche Branchen profitieren am stärksten?", "Wie wirkt sich der AI Act auf Startups aus?", "Welche Umschulungsprogramme funktionieren?"],
+        confidence: 0.72,
+        usedSignals: demoSignals,
+        matchedTrends: [],
+        matchedEdges: causalEdges,
+        reasoningChains: ["KI-Automatisierung → Jobverlagerung → Qualifikationslücke → Weiterbildungsbedarf"],
+        causalChain: ["Hohe Automatisierbarkeit → Produktivitätsgewinne → Arbeitskräfteverschiebung → Sozialpolitischer Anpassungsbedarf"],
+        regulatoryContext: ["EU AI Act (2026)", "DSGVO-Erweiterung für KI-Entscheidungen"],
+        newsContext: "Aktuelle Signale zeigen beschleunigte KI-Adoption in der EU bei gleichzeitig steigenden Compliance-Anforderungen.",
+      } as unknown as QueryResult,
+      collapsed: false,
+      customWidth: 440,
+    } as QueryNode,
+
+    // ── Insights (rechts oben) ──
+    { id: I1, nodeType: "insight", x: DX, y: 80, parentId: Q, createdAt: now, content: "30% der EU-Arbeitsstunden sind bis 2030 automatisierbar — aber Augmentation dominiert vor Substitution. KI-Co-Piloten steigern Produktivität um 40% (BCG 2025).", queryText: "Automatisierungspotenzial", sources: demoSignals.slice(0, 2), tags: ["ki-arbeit"] } as DerivedNode,
+    { id: I2, nodeType: "insight", x: DX, y: 260, parentId: Q, createdAt: now, content: "Der EU AI Act schafft einen Dreiklassen-Markt: Hochrisiko-KI mit Zertifizierung, General-Purpose AI mit Transparenz, Low-Risk ohne Auflagen.", queryText: "EU AI Act Impact", sources: demoSignals.slice(1, 3), tags: ["regulierung"] } as DerivedNode,
+
+    // ── Szenarien (rechts Mitte) ──
+    { id: SC1, nodeType: "scenario", x: D2X, y: 80, parentId: Q, createdAt: now, label: "KI-Augmentations-Boom", content: "Co-Pilot-Modelle dominieren. Produktivitätssprung von 40%+. Neue Berufsfelder überwiegen Jobverluste.", queryText: "Optimistisches KI-Szenario", colorKey: "optimistic", probability: 0.25, keyDrivers: ["Weiterbildung", "AI Act Klarheit"], tags: ["szenario"] } as DerivedNode,
+    { id: SC2, nodeType: "scenario", x: D2X, y: 300, parentId: Q, createdAt: now, label: "Duale Arbeitswelt 2030", content: "Hochqualifizierte KI-Wissensarbeiter koexistieren mit wachsendem Care-Sektor. Die Mitte schrumpft.", queryText: "Basis-Szenario", colorKey: "baseline", probability: 0.45, keyDrivers: ["AI Act", "Fachkräftemangel", "Remote-Work"], tags: ["szenario"] } as DerivedNode,
+    { id: SC3, nodeType: "scenario", x: D2X, y: 520, parentId: Q, createdAt: now, label: "Verdrängungskrise", content: "Schnelle Automatisierung ohne Umschulung führt zu struktureller Arbeitslosigkeit in Büroberufen.", queryText: "Pessimistisches KI-Szenario", colorKey: "pessimistic", probability: 0.22, keyDrivers: ["Kostendruck", "Regulierungslücke"], tags: ["szenario", "risiko"] } as DerivedNode,
+
+    // ── Decision + FollowUp ──
+    { id: DEC, nodeType: "decision", x: DX, y: 440, parentId: Q, createdAt: now, content: "1. KI-Kompetenzoffensive starten (Budget ×2). 2. Human-AI-Collaboration in 2-3 Prozessen pilotieren. 3. EU AI Act Audit durchführen. 4. Change-Management für betroffene Abteilungen.", queryText: "KI-Transformations-Maßnahmen", tags: ["massnahme", "ki-arbeit"] } as DerivedNode,
+    { id: FQ, nodeType: "followup", x: DX, y: 630, parentId: Q, createdAt: now, content: "Welche europäischen Branchen profitieren am stärksten von KI-Augmentation — und welche verlieren am meisten?", queryText: "Branchen-Analyse" } as DerivedNode,
+
+    // ── Dimensions Card ──
+    { id: DIM, nodeType: "dimensions", x: D3X, y: 800, parentId: Q, createdAt: now, content: "Strategische Dimensionen", queryText: "Dimensionen", dimensionData: dimData } as DerivedNode,
+
+    // ── CausalGraph Card ──
+    { id: CG, nodeType: "causalgraph", x: D2X, y: 740, parentId: Q, createdAt: now, content: "Kausalnetz", queryText: "Kausalanalyse", causalEdges, causalTrendNames } as DerivedNode,
+  ];
+
+  const conns: Connection[] = [
+    { from: W, to: Q, connectionType: "builds-on" },
+    { from: Q, to: I1, derived: true, connectionType: "derived" },
+    { from: Q, to: I2, derived: true, connectionType: "derived" },
+    { from: Q, to: SC1, derived: true, connectionType: "derived" },
+    { from: Q, to: SC2, derived: true, connectionType: "derived" },
+    { from: Q, to: SC3, derived: true, connectionType: "derived" },
+    { from: Q, to: DEC, derived: true, connectionType: "derived" },
+    { from: Q, to: FQ, derived: true, connectionType: "derived" },
+    { from: Q, to: DIM, derived: true, connectionType: "derived" },
+    { from: Q, to: CG, derived: true, connectionType: "derived" },
+    { from: I1, to: DEC, connectionType: "validates" },
+    { from: SC3, to: DEC, connectionType: "contradicts" },
+  ];
+
+  return { nodes, conns };
+}
 
 // ── ConfidenceBadge ───────────────────────────────────────────────────────
 
 function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
   const pct = Math.round(value * 100);
-  const s = value > 0.7 ? { bg: "#E8F8EF", color: "#0F6038", border: "#7DD4A8" }
-    : value > 0.4       ? { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" }
-    :                     { bg: "#FEF2F2", color: "#B91C1C", border: "#FCA5A5" };
+  const cls = value > 0.7 ? "signal-positive-badge" : value > 0.4 ? "signal-neutral-badge" : "signal-negative-badge";
   return (
-    <span style={{ display: "inline-block", background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 600 }}>
+    <span className={cls} style={{ fontSize: 10 }}>
       {pct}% {de ? "Konfidenz" : "confidence"}
     </span>
+  );
+}
+
+// ── ConfidenceGauge (mini half-circle SVG) ────────────────────────────────
+
+function ConfidenceGauge({ value, size = 44 }: { value: number; size?: number }) {
+  const r = size * 0.38;
+  const cx = size / 2;
+  const cy = size * 0.58;
+  const circumHalf = Math.PI * r;
+  const offset = circumHalf * (1 - Math.max(0, Math.min(1, value)));
+  const color = value > 0.7 ? "#1A9E5A" : value > 0.4 ? "#F5A623" : "#E8402A";
+  return (
+    <svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.65}`}>
+      <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={3} strokeLinecap="round" />
+      <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+        fill="none" stroke={color} strokeWidth={3} strokeLinecap="round"
+        strokeDasharray={`${circumHalf}`} strokeDashoffset={offset}
+        style={{ transition: "stroke-dashoffset 0.4s ease" }} />
+      <text x={cx} y={cy - 2} textAnchor="middle" fontSize={size * 0.2} fontWeight={700}
+        fill={color}>{Math.round(value * 100)}%</text>
+    </svg>
+  );
+}
+
+// ── SignalSparkline (mini timeline from signal dates) ──────────────────────
+
+function SignalSparkline({ signals, width = 80, height = 20 }: { signals: UsedSignal[]; width?: number; height?: number }) {
+  const dated = signals.filter(s => s.date).map(s => new Date(s.date!).getTime()).sort();
+  if (dated.length < 2) return null;
+  const min = dated[0];
+  const max = dated[dated.length - 1];
+  const range = max - min || 1;
+  // Bin into 8 buckets
+  const bins = new Array(8).fill(0);
+  dated.forEach(d => { const idx = Math.min(7, Math.floor(((d - min) / range) * 8)); bins[idx]++; });
+  const maxBin = Math.max(...bins, 1);
+  const barW = (width - 2) / 8;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      {bins.map((v, i) => {
+        const h = (v / maxBin) * (height - 2);
+        return (
+          <rect key={i} x={1 + i * barW} y={height - 1 - h} width={barW - 1} height={h}
+            rx={1} fill="#2563EB" fillOpacity={0.15 + (v / maxBin) * 0.55} />
+        );
+      })}
+    </svg>
   );
 }
 
@@ -417,33 +1182,281 @@ function SourceChips({ sources, de }: { sources: UsedSignal[]; de: boolean }) {
       <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 2 }}>
         {de ? "Basis" : "Via"}
       </span>
-      {sources.map((s, i) => (
-        s.url ? (
-          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            title={`${s.title}${s.date ? ` · ${s.date}` : ""}`}
-            style={{
-              fontSize: 9, padding: "1px 7px", borderRadius: 20,
-              background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)",
-              color: "var(--color-text-muted)", fontWeight: 500,
-              textDecoration: "none", whiteSpace: "nowrap",
-              display: "inline-block", transition: "all 0.1s",
-            }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(0,0,0,0.08)"; el.style.color = "var(--color-text-secondary)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(0,0,0,0.04)"; el.style.color = "var(--color-text-muted)"; }}
-          >{s.source}</a>
+      {sources.map((s, i) => {
+        const tipContent = (
+          <div style={{ maxWidth: 220 }}>
+            <div style={{ fontWeight: 600, marginBottom: 3, fontSize: 11 }}>{s.source}</div>
+            <div style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.4 }}>{s.title}</div>
+            {s.date && <div style={{ fontSize: 10, opacity: 0.55, marginTop: 4 }}>{s.date}</div>}
+          </div>
+        );
+        return s.url ? (
+          <Tooltip key={i} content={tipContent} placement="top" delay={200}>
+            <a href={s.url} target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={{
+                fontSize: 9, padding: "1px 7px", borderRadius: 20,
+                background: "var(--color-page-bg)", border: "1px solid var(--color-border)",
+                color: "var(--color-text-muted)", fontWeight: 500,
+                fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                textDecoration: "none", whiteSpace: "nowrap",
+                display: "inline-block", transition: "all 0.12s",
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "var(--color-border-strong)"; el.style.color = "var(--color-text-secondary)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "var(--color-border)"; el.style.color = "var(--color-text-muted)"; }}
+            >{s.source}</a>
+          </Tooltip>
         ) : (
-          <span key={i}
-            title={`${s.title}${s.date ? ` · ${s.date}` : ""}`}
-            style={{
-              fontSize: 9, padding: "1px 7px", borderRadius: 20,
-              background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)",
-              color: "var(--color-text-muted)", fontWeight: 500, whiteSpace: "nowrap",
-              display: "inline-block",
-            }}
-          >{s.source}</span>
-        )
-      ))}
+          <Tooltip key={i} content={tipContent} placement="top" delay={200}>
+            <span
+              style={{
+                fontSize: 9, padding: "1px 7px", borderRadius: 20,
+                background: "var(--color-page-bg)", border: "1px solid var(--color-border)",
+                color: "var(--color-text-muted)", fontWeight: 500, whiteSpace: "nowrap",
+                fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                display: "inline-block",
+              }}
+            >{s.source}</span>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── DimensionsNodeCard ────────────────────────────────────────────────────
+
+function DimensionsNodeCard({
+  node, selected, onSelect, onDragStart, onDelete: _onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed,
+}: {
+  node: DerivedNode; selected: boolean;
+  onSelect: (id: string) => void;
+  onDragStart: (e: React.PointerEvent, id: string) => void;
+  onDelete: (id: string) => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
+  onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
+  nodeW: number;
+  dimmed?: boolean;
+}) {
+  const cardH = node.customHeight ?? DIMENSIONS_CARD_H;
+  const dimData = node.dimensionData ?? [];
+  const accentColor = "#3b82f6";
+
+  return (
+    <div
+      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: cardH, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
+    >
+      {/* Left input port */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
+      {/* Right output port */}
+      <div
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Dimensionen vertiefen"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${accentColor}`, boxShadow: `0 0 8px ${accentColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${accentColor}99, 0 0 0 3px ${accentColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${accentColor}66`; }}
+      />
+      {/* Card body */}
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        {/* Header */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid rgba(0,0,0,0.08)" }}
+        >
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", color: accentColor, background: `${accentColor}18`, border: `1px solid ${accentColor}40`, borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>DIMENSIONEN</span>
+          <span style={{ fontSize: 10, color: "var(--color-text-muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dimData.filter(d => d.trends.length > 0).length} aktiv</span>
+        </div>
+        {/* Mini radar + dimension dots */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "4px 8px", gap: 8 }}>
+          <div style={{ flexShrink: 0 }}>
+            <DimensionRadar dimData={dimData} size={cardH - 52} mini />
+          </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+            {dimData.map(dim => {
+              const inactive = dim.trends.length === 0;
+              const arrow = dim.direction === "up" ? "↑" : dim.direction === "down" ? "↓" : "→";
+              return (
+                <div key={dim.key} style={{ display: "flex", alignItems: "center", gap: 4, opacity: inactive ? 0.35 : 1 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: dim.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 8.5, color: "var(--color-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dim.label.split(" & ")[0]}</span>
+                  <span style={{ fontSize: 9, color: dim.color, fontWeight: 700 }}>{arrow} {Math.round(dim.avgConfidence * 100)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* Resize handle */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, cardH, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CausalGraphNodeCard ───────────────────────────────────────────────────
+
+function CausalGraphNodeCard({
+  node, selected, onSelect, onDragStart, onDelete: _onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed,
+}: {
+  node: DerivedNode; selected: boolean;
+  onSelect: (id: string) => void;
+  onDragStart: (e: React.PointerEvent, id: string) => void;
+  onDelete: (id: string) => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
+  onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
+  nodeW: number;
+  dimmed?: boolean;
+}) {
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const cardH = node.customHeight ?? CAUSAL_GRAPH_CARD_H;
+  const edges = node.causalEdges ?? [];
+  const nameMap = node.causalTrendNames ?? {};
+  const accentColor = "#1A9E5A";
+
+  // Build unique trend node list (max 8)
+  const trendIds = Array.from(new Set(edges.flatMap(e => [e.from, e.to]))).slice(0, 8);
+
+  const GRAPH_W = nodeW - 24;
+  const GRAPH_H = cardH - 72;
+  const cx = GRAPH_W / 2;
+  const cy = GRAPH_H / 2;
+  const radius = Math.min(cx, cy) - 22;
+
+  const trendPositions = trendIds.map((id, i) => {
+    const angle = (i / trendIds.length) * 2 * Math.PI - Math.PI / 2;
+    return { id, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  });
+  const posMap = new Map(trendPositions.map(p => [p.id, p]));
+
+  const edgeTypeColor: Record<string, string> = {
+    drives: "#1A9E5A", amplifies: "#2563EB", dampens: "#E8402A", correlates: "#9CA3AF",
+  };
+  const visibleEdges = edges.filter(e => trendIds.includes(e.from) && trendIds.includes(e.to));
+
+  const connectedTo = hoveredNodeId ? new Set(
+    visibleEdges
+      .filter(e => e.from === hoveredNodeId || e.to === hoveredNodeId)
+      .flatMap(e => [e.from, e.to])
+  ) : null;
+
+  const truncate = (s: string, n = 10) => s.length > n ? s.slice(0, n) + "…" : s;
+  const getName = (id: string) => nameMap[id] || id.replace(/mega-|macro-|micro-/, "").replace(/-/g, " ");
+
+  return (
+    <div
+      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: cardH, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
+    >
+      {/* Left input port */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
+      {/* Right output port */}
+      <div
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Kausaltreiber vertiefen"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${accentColor}`, boxShadow: `0 0 8px ${accentColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${accentColor}99, 0 0 0 3px ${accentColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${accentColor}66`; }}
+      />
+      {/* Card body */}
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        {/* Header */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid rgba(0,0,0,0.08)" }}
+        >
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", color: accentColor, background: `${accentColor}18`, border: `1px solid ${accentColor}40`, borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>KAUSALNETZ</span>
+          <span style={{ fontSize: 10, color: "var(--color-text-muted)", flex: 1 }}>{trendIds.length} Trends · {visibleEdges.length} Kanten</span>
+        </div>
+        {/* SVG graph */}
+        <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+          <svg width={GRAPH_W} height={GRAPH_H} style={{ display: "block", margin: "0 auto" }}>
+            {/* Edges */}
+            {visibleEdges.map((e, i) => {
+              const from = posMap.get(e.from);
+              const to = posMap.get(e.to);
+              if (!from || !to) return null;
+              const isHighlighted = connectedTo ? (connectedTo.has(e.from) && connectedTo.has(e.to)) : true;
+              const color = edgeTypeColor[e.type] ?? "#9CA3AF";
+              return (
+                <line key={i}
+                  x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                  stroke={color}
+                  strokeWidth={isHighlighted ? 1.5 : 0.5}
+                  strokeOpacity={isHighlighted ? 0.7 : 0.15}
+                  strokeDasharray={e.type === "correlates" ? "3 3" : undefined}
+                />
+              );
+            })}
+            {/* Trend nodes */}
+            {trendPositions.map(({ id, x, y }) => {
+              const isHovered = hoveredNodeId === id;
+              const isConnected = connectedTo ? connectedTo.has(id) : false;
+              const dimmed2 = connectedTo ? !isConnected : false;
+              return (
+                <g key={id}
+                  onMouseEnter={() => setHoveredNodeId(id)}
+                  onMouseLeave={() => setHoveredNodeId(null)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <circle cx={x} cy={y} r={isHovered ? 7 : 5}
+                    fill={isHovered ? accentColor : "var(--color-surface)"}
+                    stroke={accentColor}
+                    strokeWidth={isHovered ? 2 : 1.5}
+                    opacity={dimmed2 ? 0.2 : 1}
+                  />
+                  <text x={x} y={y + 14} textAnchor="middle" fontSize={7}
+                    fill={dimmed2 ? "rgba(0,0,0,0.2)" : "var(--color-text-muted)"}
+                    fontFamily="inherit"
+                  >{truncate(getName(id))}</text>
+                </g>
+              );
+            })}
+          </svg>
+          {/* Edge type legend */}
+          <div style={{ position: "absolute", bottom: 4, left: 10, display: "flex", gap: 8 }}>
+            {Object.entries(edgeTypeColor).map(([type, color]) => (
+              <div key={type} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 7, color: "var(--color-text-muted)" }}>{type}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Resize handle */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, cardH, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }
@@ -480,7 +1493,7 @@ function CommandLine({
           ↳ {de ? "Folge-Analyse:" : "Follow-up on:"} <em>{contextLabel}</em>
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--color-surface)", border: "2px solid #0A0A0A", borderRadius: 12, padding: "8px 10px 8px 14px", boxShadow: "0 8px 40px rgba(0,0,0,0.12)", width: 520, maxWidth: "90vw" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "2px solid #0A0A0A", borderRadius: 14, padding: "8px 10px 8px 14px", boxShadow: "0 12px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)", width: 520, maxWidth: "90vw" }}>
         <span style={{ fontSize: 15, color: "var(--color-text-muted)", flexShrink: 0 }}>⌕</span>
         <input
           ref={inputRef}
@@ -503,19 +1516,28 @@ function CommandLine({
 
 // ── ConnectionsSVG ────────────────────────────────────────────────────────
 
-function ConnectionsSVG({ nodes, connections }: { nodes: CanvasNode[]; connections: Connection[] }) {
+function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }: { nodes: CanvasNode[]; connections: Connection[]; pipelineChain?: Set<string>; selectedId?: string | null }) {
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
   return (
     <svg style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
       <defs>
-        <marker id="arr-q" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="rgba(0,0,0,0.22)" />
+        <marker id="arr-q" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.50)" />
         </marker>
-        <marker id="arr-d" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
-          <path d="M0,0 L0,4 L4,2 z" fill="rgba(0,0,0,0.12)" />
+        <marker id="arr-d" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+          <path d="M0,0 L0,5 L5,2.5 z" fill="rgba(0,0,0,0.35)" />
         </marker>
         <marker id="arr-r" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#F5A62388" />
+          <path d="M0,0 L0,5 L5,2.5 z" fill="#F5A623AA" />
+        </marker>
+        <marker id="arr-builds" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+          <path d="M0,0 L0,5 L5,2.5 z" fill="#1A9E5A" />
+        </marker>
+        <marker id="arr-contradicts" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+          <path d="M0,0 L0,5 L5,2.5 z" fill="#E8402A" />
+        </marker>
+        <marker id="arr-validates" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+          <path d="M0,0 L0,5 L5,2.5 z" fill="#2563EB" />
         </marker>
       </defs>
       {connections.map(c => {
@@ -533,35 +1555,47 @@ function ConnectionsSVG({ nodes, connections }: { nodes: CanvasNode[]; connectio
         };
         const fromW = from.customWidth ?? nodeDefaultW(from);
 
+
+        const nodeDefaultH = (n: CanvasNode) => {
+          if (n.nodeType === "query") return QUERY_NODE_H;
+          if (n.nodeType === "dimensions") return DIMENSIONS_CARD_H;
+          if (n.nodeType === "causalgraph") return CAUSAL_GRAPH_CARD_H;
+          if (n.nodeType === "list") return 200;
+          if (n.nodeType === "note") return 160;
+          if (n.nodeType === "idea") return 300;
+          if (n.nodeType === "file") return FILE_NODE_H;
+          return DERIVED_W;
+        };
         const x1 = from.x + fromW;
-        const y1 = from.y + (from.nodeType === "query" ? QUERY_NODE_H : 24);
+        const y1 = from.y + (from.customHeight ?? nodeDefaultH(from)) / 2;
         const x2 = to.x;
-        const y2 = to.y + (to.nodeType === "query" ? QUERY_NODE_H : 24);
+        const y2 = to.y + (to.customHeight ?? nodeDefaultH(to)) / 2;
         const cp = Math.min(Math.abs(x2 - x1) * 0.45, 120);
 
-        if (c.refreshed) {
-          return (
-            <path key={`${c.from}-${c.to}`}
-              d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
-              fill="none" stroke="#F5A62355" strokeWidth={1.5} strokeDasharray="4 4"
-              markerEnd="url(#arr-r)"
-            />
-          );
-        }
-        if (c.derived) {
-          return (
-            <path key={`${c.from}-${c.to}`}
-              d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
-              fill="none" stroke="rgba(0,0,0,0.1)" strokeWidth={1} strokeDasharray="3 3"
-              markerEnd="url(#arr-d)"
-            />
-          );
-        }
+        const inChain = !selId || !pipelineChain || pipelineChain.has(c.from) || pipelineChain.has(c.to);
+        const edgeOpacity = inChain ? 1 : 0.1;
+
+        // Connection type styling
+        const ct = c.connectionType;
+        const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
+          "derived":     { stroke: "rgba(0,0,0,0.16)", dash: "4 3", width: 1, marker: "url(#arr-d)" },
+          "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
+          "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
+          "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
+          "validates":    { stroke: "#2563EB",          dash: "",    width: 1.5, marker: "url(#arr-validates)" },
+        };
+
+        const style = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived
+          : c.refreshed ? CONN_STYLES.refreshed
+          : c.derived   ? CONN_STYLES.derived
+          : { stroke: "rgba(0,0,0,0.40)", dash: "", width: 1.5, marker: "url(#arr-q)" };
+
         return (
           <path key={`${c.from}-${c.to}`}
             d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
-            fill="none" stroke="rgba(0,0,0,0.18)" strokeWidth={1.5} strokeDasharray="5 3"
-            markerEnd="url(#arr-q)"
+            fill="none" stroke={style.stroke} strokeWidth={style.width} strokeLinecap="round"
+            strokeDasharray={style.dash || "none"}
+            markerEnd={style.marker} opacity={edgeOpacity}
           />
         );
       })}
@@ -569,195 +1603,179 @@ function ConnectionsSVG({ nodes, connections }: { nodes: CanvasNode[]; connectio
   );
 }
 
-// ── DerivedNodeCard ───────────────────────────────────────────────────────
+// ── DerivedNodeCard (compact) ─────────────────────────────────────────────
 
 function DerivedNodeCard({
-  node, de, selected, onSelect, onDragStart, onExplore, onDelete, onResizeStart, onIterate, nodeW,
+  node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
+  onExplore: _onExplore, // kept for API compatibility, actions live in DetailPanel
 }: {
-  node: DerivedNode;
-  de: boolean;
-  selected: boolean;
+  node: DerivedNode; de: boolean; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onExplore: (id: string, queryText: string) => void;
   onDelete: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
 }) {
   const type = node.nodeType;
-  const age = nodeAge(node.createdAt);
-
-  const cfg = useMemo(() => {
-    if (type === "insight")  return { accent: "#E4FF97", accentText: "#0A0A0A", bg: "var(--color-surface)", badge: de ? "ERKENNTNIS" : "INSIGHT",    btnLabel: de ? "Analysieren" : "Analyze",   direct: true };
-    if (type === "decision") return { accent: "#7DD4A8", accentText: "#0A3A20", bg: "#F4FBF7",              badge: de ? "EMPFEHLUNG"  : "DECISION",   btnLabel: de ? "Umsetzen"   : "Implement", direct: true };
-    if (type === "followup") return { accent: "rgba(0,0,0,0.08)", accentText: "var(--color-text-muted)", bg: "var(--color-surface)", badge: de ? "FOLGEFRAGE" : "FOLLOW-UP", btnLabel: de ? "Vertiefen" : "Explore", direct: false };
-    const scen = SCEN[node.colorKey ?? "baseline"] ?? SCEN.baseline;
-    return { accent: scen.color, accentText: scen.color, bg: scen.bg, badge: de ? scen.label.toUpperCase() : scen.labelEn.toUpperCase(), btnLabel: de ? "Analysieren" : "Analyze", direct: true };
-  }, [type, node.colorKey, de]);
-
   const isScenario = type === "scenario";
   const isFollowup = type === "followup";
-  const scenCfg    = isScenario && node.colorKey ? SCEN[node.colorKey] ?? SCEN.baseline : null;
+  const scenCfg = isScenario && node.colorKey ? SCEN[node.colorKey] ?? SCEN.baseline : null;
 
-  const staleStyle = age === "stale"
-    ? { boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.3)" }
-    : age === "aging"
-    ? { boxShadow: "inset 0 0 0 1px rgba(245,166,35,0.15)" }
-    : {};
+  const cfg = useMemo(() => {
+    if (type === "insight")  return { accent: "#6B7A00", accentText: "#6B7A00", bg: "var(--color-lime-light)", badge: de ? "ERKENNTNIS" : "INSIGHT", badgeTip: de ? "Erkenntnis: Wichtige Schlussfolgerung aus der Analyse" : "Insight: Key finding derived from the analysis" };
+    if (type === "decision") return { accent: "#1A9E5A", accentText: "#1A9E5A", bg: "var(--signal-positive-light)", badge: de ? "EMPFEHLUNG" : "DECISION", badgeTip: de ? "Empfehlung: Konkrete Handlungsoption mit Entscheidungsrahmen" : "Decision: Concrete action option with decision framework" };
+    if (type === "followup") return { accent: "rgba(0,0,0,0.10)", accentText: "var(--color-text-muted)", bg: "var(--color-surface)", badge: de ? "FOLGEFRAGE" : "FOLLOW-UP", badgeTip: de ? "Folgefrage: Weiterführende Analyse auf Basis dieser Ergebnisse" : "Follow-up: Further analysis building on these results" };
+    const scen = SCEN[node.colorKey ?? "baseline"] ?? SCEN.baseline;
+    const scenTips: Record<string, string> = {
+      optimistic: de ? "Optimistisches Szenario: Beste realistische Entwicklung" : "Optimistic scenario: Best realistic outcome",
+      baseline:   de ? "Basisszenario: Wahrscheinlichstes Outcome" : "Baseline scenario: Most likely outcome",
+      pessimistic: de ? "Pessimistisches Szenario: Ungünstigste realistische Entwicklung" : "Pessimistic scenario: Worst realistic outcome",
+      wildcard:   de ? "Wildcard-Szenario: Unwahrscheinlich, aber wirkungsmächtig" : "Wildcard scenario: Unlikely but high-impact possibility",
+    };
+    return { accent: scen.color, accentText: scen.color, bg: scen.bg, badge: de ? scen.label.toUpperCase() : scen.labelEn.toUpperCase(), badgeTip: scenTips[node.colorKey ?? "baseline"] ?? "" };
+  }, [type, node.colorKey, de]);
 
-  const nodeH = node.customHeight;
+  const accentColorForStatus = node.nodeStatus && node.nodeStatus !== "open" ? NODE_STATUS_META[node.nodeStatus].color : null;
+
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
+      <div
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+        style={{
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 24, overflow: "hidden",
+          background: isScenario ? (scenCfg?.bg ?? "var(--color-surface)") : cfg.bg,
+          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          borderRadius: 6,
+          boxShadow: `inset 3px 0 0 ${isScenario ? (scenCfg?.color ?? "#1D4ED8") : isFollowup ? "var(--color-border)" : cfg.accent}`,
+          userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 4, padding: "0 6px",
+          opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
+        }}
+      >
+        <Tooltip content={cfg.badgeTip} placement="top" delay={400}>
+          <span style={{ fontSize: 7, fontWeight: 800, color: isScenario ? (scenCfg?.color ?? "#1D4ED8") : cfg.accentText, flexShrink: 0, textTransform: "uppercase", cursor: "help" }}>{cfg.badge}</span>
+        </Tooltip>
+        <span style={{ fontSize: 9, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.label || node.content}</span>
+        {accentColorForStatus && <span style={{ width: 5, height: 5, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} />}
+      </div>
+    );
+  }
+
+  const typeColorHex = isScenario
+    ? (node.colorKey === "optimistic" ? "#1A9E5A" : node.colorKey === "pessimistic" ? "#E8402A" : node.colorKey === "wildcard" ? "#D4A017" : "#3B82F6")
+    : type === "insight" ? "#6B7A00" : type === "decision" ? "#1A9E5A" : "#6B7280";
+  const cardH = node.customHeight ?? DERIVED_W;
 
   return (
+    // Wrapper: positioning + ports (overflow:visible)
     <div
       onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
-      style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: isScenario ? (scenCfg?.bg ?? "var(--color-surface)") : cfg.bg,
-        border: `1.5px solid ${selected ? "#0A0A0A" : age === "stale" ? "rgba(245,166,35,0.35)" : "rgba(0,0,0,0.1)"}`,
-        borderLeft: `3px solid ${isScenario ? (scenCfg?.color ?? "#1D4ED8") : type === "followup" ? "var(--color-border)" : cfg.accent}`,
-        borderRadius: 10,
-        boxShadow: selected
-          ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.1)"
-          : `0 2px 8px rgba(0,0,0,0.06)${staleStyle.boxShadow ? `, ${staleStyle.boxShadow.replace("inset ", "inset ")}` : ""}`,
-        overflow: nodeH ? "hidden" : "visible",
-        userSelect: "none",
-        transition: "box-shadow 0.15s, border-color 0.15s",
-        ...(isFollowup ? { borderStyle: "dashed" } : {}),
-      }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: cardH, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
     >
-      {/* Drag handle + header */}
+      {/* Left input port */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
+      {/* Right output port */}
       <div
-        onPointerDown={e => onDragStart(e, node.id)}
-        style={{ padding: "9px 10px 5px", cursor: "grab", display: "flex", alignItems: "flex-start", gap: 7 }}
-      >
-        <span style={{
-          flexShrink: 0, fontSize: 8, fontWeight: 800, letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: isScenario ? (scenCfg?.color ?? "#1D4ED8") : isFollowup ? "var(--color-text-muted)" : cfg.accentText,
-          background: isScenario ? "rgba(255,255,255,0.7)" : isFollowup ? "transparent" : cfg.accent,
-          border: isScenario ? `1px solid ${scenCfg?.border ?? "#93C5FD"}` : isFollowup ? "none" : "1px solid rgba(0,0,0,0.08)",
-          borderRadius: 4, padding: "2px 6px", marginTop: 2,
-        }}>{cfg.badge}</span>
-
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Weiterführende Analyse"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${typeColorHex}`, boxShadow: `0 0 8px ${typeColorHex}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${typeColorHex}99, 0 0 0 3px ${typeColorHex}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${typeColorHex}66`; }}
+      />
+      {/* Card body */}
+      <div className="nc-derived" style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : isFollowup ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected
+          ? `${!isFollowup ? `inset 3px 0 0 ${typeColorHex}, ` : ""}0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)`
+          : `${!isFollowup ? `inset 3px 0 0 ${typeColorHex}, ` : ""}0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        {/* Probability bar (scenario only) */}
         {isScenario && node.probability != null && (
-          <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: 18, fontWeight: 800, color: scenCfg?.color ?? "#1D4ED8", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-            {Math.round(node.probability * 100)}%
-          </span>
-        )}
-
-        {age !== "fresh" && (
-          <span style={{ flexShrink: 0, fontSize: 8, padding: "2px 5px", borderRadius: 4, background: age === "stale" ? "rgba(245,166,35,0.15)" : "rgba(245,166,35,0.08)", color: "#92400E", border: "1px solid rgba(245,166,35,0.2)", marginTop: 2, marginLeft: isScenario ? 0 : "auto" }}>
-            {age === "stale" ? (de ? "Veraltet" : "Stale") : (de ? "Altert" : "Aging")}
-          </span>
-        )}
-
-        <div onPointerDown={e => e.stopPropagation()} style={{ marginLeft: (age !== "fresh" && !isScenario) ? 0 : "auto", display: "flex", gap: 1, flexShrink: 0 }}>
-          {/* + iteration → NodePicker */}
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, node.queryText); }}
-            title={de ? "Iteration starten" : "Start iteration"}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "var(--color-text-muted)", fontSize: 13, borderRadius: 4, opacity: 0.5, lineHeight: 1, fontWeight: 300 }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "1"; el.style.color = "#1A9E5A"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "0.5"; el.style.color = "var(--color-text-muted)"; }}
-          >+</button>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "var(--color-text-muted)", fontSize: 11, borderRadius: 4, opacity: 0.5 }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.color = "#E8402A"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.5"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
-          >✕</button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: "0 10px 4px" }}>
-        {isScenario && node.label && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: scenCfg?.color ?? "#1D4ED8", marginBottom: 4, lineHeight: 1.3 }}>
-            {node.label}
+          <div style={{ height: 3, background: `${typeColorHex}28`, flexShrink: 0 }}>
+            <div style={{ height: "100%", width: `${node.probability * 100}%`, background: typeColorHex, transition: "width 0.3s" }} />
           </div>
         )}
-        {isScenario && node.probability != null && (
-          <div style={{ height: 3, borderRadius: 2, background: "rgba(0,0,0,0.08)", marginBottom: 6, overflow: "hidden" }}>
-            <div style={{ height: 3, width: `${node.probability * 100}%`, borderRadius: 2, background: scenCfg?.color ?? "#1D4ED8" }} />
-          </div>
-        )}
-        <p style={{
-          fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
-          lineHeight: 1.55,
-          color: isScenario ? (scenCfg?.color ?? "var(--color-text-secondary)") : "var(--color-text-secondary)",
-          margin: 0,
-        }}>
-          {isFollowup ? `→ ${node.content}` : node.content}
-        </p>
-      </div>
-
-      {/* Sources */}
-      {node.sources && node.sources.length > 0 && (
-        <div onPointerDown={e => e.stopPropagation()} style={{ padding: "3px 10px 5px" }}>
-          <SourceChips sources={node.sources} de={de} />
+        {/* Header */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 36, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${typeColorHex}0C`, borderBottom: `1px solid ${typeColorHex}22`, borderTopLeftRadius: isScenario ? 0 : 11, borderTopRightRadius: 11 }}
+        >
+          <span style={{
+            flexShrink: 0, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+            fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+            color: typeColorHex,
+          }}>{cfg.badge}</span>
+          {isScenario && node.probability != null && (
+            <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>
+              {Math.round(node.probability * 100)}%
+            </span>
+          )}
+          <div style={{ flex: 1 }} />
+          {accentColorForStatus && <span style={{ width: 5, height: 5, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
         </div>
-      )}
-
-      {/* Timestamp + rethink */}
-      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "0 10px 4px", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 9, color: "var(--color-text-muted)", opacity: 0.65, fontVariantNumeric: "tabular-nums" }}>
-          {formatNodeTime(node.createdAt)}
-        </span>
-        <button
-          onClick={e => { e.stopPropagation(); onExplore(node.id, node.queryText); }}
-          title={de ? "Neu durchdenken" : "Rethink"}
-          style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", opacity: 0.65, lineHeight: 1.3, transition: "all 0.1s" }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "1"; el.style.borderColor = "rgba(0,0,0,0.25)"; el.style.color = "var(--color-text-secondary)"; }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "0.65"; el.style.borderColor = "rgba(0,0,0,0.1)"; el.style.color = "var(--color-text-muted)"; }}
-        >↺ rethink</button>
+        {/* Content */}
+        <div style={{ padding: "10px 12px 0", flex: 1, overflow: "hidden", position: "relative" }}>
+          {isScenario && node.label && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, marginBottom: 5, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+              {node.label}
+            </div>
+          )}
+          <p style={{
+            fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
+            color: "var(--color-text-secondary)",
+            margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
+          }}>
+            {isFollowup ? `→ ${node.content}` : node.content}
+          </p>
+          {/* Driver pills (scenario only, max 2) */}
+          {isScenario && node.keyDrivers && node.keyDrivers.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 7 }}>
+              {node.keyDrivers.slice(0, 2).map((d, i) => (
+                <span key={i} style={{
+                  fontSize: 9, padding: "2px 7px", borderRadius: 20,
+                  background: `${typeColorHex}12`, border: `1px solid ${typeColorHex}35`,
+                  color: typeColorHex, fontWeight: 600,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110,
+                }}>{d}</span>
+              ))}
+            </div>
+          )}
+          {/* Fade gradient */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 32, background: "linear-gradient(to bottom, transparent, var(--color-surface))", pointerEvents: "none" }} />
+        </div>
+        {/* Resize handle */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? DERIVED_W, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
       </div>
-
-      {/* Footer: Explore button */}
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        style={{ padding: "6px 10px 8px", borderTop: "1px solid rgba(0,0,0,0.06)" }}
-      >
-        <button
-          onClick={e => { e.stopPropagation(); onExplore(node.id, node.queryText); }}
-          title={de ? `${cfg.btnLabel}: Neue KI-Analyse auf Basis dieses Inhalts` : `${cfg.btnLabel}: Run new AI analysis based on this content`}
-          style={{
-            fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 16,
-            border: `1px solid ${isScenario ? (scenCfg?.border ?? "#93C5FD") : "rgba(0,0,0,0.1)"}`,
-            background: isScenario ? "rgba(255,255,255,0.7)" : isFollowup ? "transparent" : "#E4FF97",
-            color: isScenario ? (scenCfg?.color ?? "#1D4ED8") : isFollowup ? "var(--color-text-secondary)" : "#0A0A0A",
-            cursor: "pointer",
-          }}
-        >{cfg.btnLabel}</button>
-      </div>
-
-      {/* Resize handle – right edge (width) */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? 200, "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", borderRadius: "0 10px 10px 0", background: "transparent", transition: "background 0.15s", zIndex: 10 }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.1)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
-      {/* Resize handle – bottom edge (height) */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (e.currentTarget.parentElement?.offsetHeight ?? 200), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", background: "transparent", transition: "background 0.15s", zIndex: 10 }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
     </div>
   );
 }
 
-// ── QueryNodeCard ─────────────────────────────────────────────────────────
+// ── QueryNodeCard (compact) ───────────────────────────────────────────────
 
 function QueryNodeCard({
-  node, de, selected, onSelect, onDragStart, onFollowUp, onFollowUpQ, onDelete, onToggleCollapse, onRefresh, onResizeStart, onIterate, nodeW,
+  node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom, causalFingerprint,
+  // unused in compact view (handled by DetailPanel) — kept for API compatibility:
+  onFollowUp: _onFollowUp, onFollowUpQ: _onFollowUpQ, onToggleCollapse: _onToggleCollapse, onRefresh: _onRefresh,
 }: {
-  node: QueryNode;
-  de: boolean;
-  selected: boolean;
+  node: QueryNode; de: boolean; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onFollowUp: (id: string, prefill?: string) => void;
@@ -765,205 +1783,153 @@ function QueryNodeCard({
   onDelete: (id: string) => void;
   onToggleCollapse: (id: string) => void;
   onRefresh: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
+  causalFingerprint?: string[];
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
   const isLoading = node.status === "loading" || node.status === "streaming";
-  const r = node.result;
   const age = nodeAge(node.createdAt);
-
-  const copy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!node.synthesis) return;
-    await navigator.clipboard.writeText(node.synthesis);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
-  };
-
   const staleAccent = age === "stale" ? "#F5A623" : age === "aging" ? "rgba(245,166,35,0.5)" : null;
+  const accentColorForStatus = node.nodeStatus && node.nodeStatus !== "open" ? NODE_STATUS_META[node.nodeStatus].color : null;
 
-  const nodeH = node.customHeight;
-
-  return (
-    <div
-      ref={cardRef}
-      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
-      style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : staleAccent ?? "var(--color-border)"}`,
-        borderRadius: 12,
-        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 8px 32px rgba(0,0,0,0.1)" : "0 2px 12px rgba(0,0,0,0.07)",
-        overflow: nodeH ? "hidden" : "visible",
-        userSelect: "none",
-        transition: "box-shadow 0.15s, border-color 0.15s",
-      }}
-    >
-      {/* Staleness bar */}
-      {age === "stale" && (
-        <div style={{ height: 2, background: "linear-gradient(90deg, #F5A623, #FDE68A)", opacity: 0.7 }} />
-      )}
-
-      {/* Header / drag handle */}
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
       <div
-        onPointerDown={e => onDragStart(e, node.id)}
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
         style={{
-          padding: "10px 12px 8px", cursor: "grab",
-          background: isLoading ? "linear-gradient(90deg, #E4FF9740 0%, #E4FF9715 100%)" : "var(--color-page-bg)",
-          borderBottom: "1px solid var(--color-border)",
-          display: "flex", alignItems: "flex-start", gap: 8,
-          minHeight: QUERY_NODE_H,
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 28, overflow: "hidden", background: "var(--color-surface)",
+          border: `1px solid ${selected ? "#0A0A0A" : staleAccent ?? "var(--color-border)"}`,
+          borderRadius: 8, userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6, padding: "0 8px",
+          opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
         }}
       >
-        <span style={{
-          width: 7, height: 7, borderRadius: "50%", flexShrink: 0, marginTop: 4,
-          background: node.status === "done" ? "#1A9E5A" : node.status === "error" ? "#E8402A" : "#F5A623",
-          boxShadow: node.status === "streaming" ? "0 0 6px #F5A62388" : "none",
-        }} />
-        <p style={{ flex: 1, margin: 0, fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {node.query}
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
-          {/* Button row */}
-          <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", gap: 1, alignItems: "center" }}>
-            {/* + iteration → NodePicker */}
-            <button
-              onClick={e => { e.stopPropagation(); onIterate(node.id, node.query); }}
-              title={de ? "Iteration starten" : "Start iteration"}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", fontSize: 14, borderRadius: 4, opacity: 0.5, lineHeight: 1, fontWeight: 300 }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "1"; el.style.color = "#1A9E5A"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "0.5"; el.style.color = "var(--color-text-muted)"; }}
-            >+</button>
-            <button
-              onClick={e => { e.stopPropagation(); onToggleCollapse(node.id); }}
-              title={node.collapsed ? (de ? "Karte aufklappen" : "Expand card") : (de ? "Karte einklappen" : "Collapse card")}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", fontSize: 12, borderRadius: 4 }}
-            >
-              {node.collapsed ? "▾" : "▴"}
-            </button>
-            <button
-              onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-              title={de ? "Karte löschen" : "Delete card"}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", fontSize: 12, borderRadius: 4 }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"}
-            >✕</button>
-          </div>
-          {/* Timestamp + rethink */}
-          <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 9, color: age === "stale" ? "#F5A623" : "var(--color-text-muted)", opacity: 0.8, fontVariantNumeric: "tabular-nums" }}>
-              {formatNodeTime(node.createdAt)}
-            </span>
-            {node.status === "done" && (
-              <button
-                onClick={e => { e.stopPropagation(); onRefresh(node.id); }}
-                title={de ? "Neu analysieren mit aktuellen Daten" : "Re-analyse with current data"}
-                style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.3)" : "rgba(0,0,0,0.1)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)", cursor: "pointer", opacity: 0.75, lineHeight: 1.3, transition: "all 0.1s" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "1"; el.style.borderColor = "rgba(0,0,0,0.25)"; el.style.color = "var(--color-text-secondary)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.opacity = "0.75"; el.style.borderColor = age === "stale" ? "rgba(245,166,35,0.3)" : "rgba(0,0,0,0.1)"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
-              >↺ rethink</button>
-            )}
-          </div>
-        </div>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: node.status === "done" ? "#1A9E5A" : node.status === "error" ? "#E8402A" : "#F5A623" }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.query}</span>
+        {accentColorForStatus && <span style={{ width: 5, height: 5, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} />}
       </div>
+    );
+  }
 
-      {/* Body */}
-      {!node.collapsed && (
-        <div style={{ padding: "12px 14px 4px" }}>
-          {(node.synthesis || isLoading) && (
-            <p style={{ fontSize: 13, lineHeight: 1.72, color: "var(--color-text-primary)", margin: "0 0 10px" }}>
-              {node.synthesis}
-              {node.status === "streaming" && (
-                <span style={{ display: "inline-block", width: 2, height: "0.9em", background: "#0A0A0A", marginLeft: 2, animation: "cur-blink 0.8s steps(1) infinite", verticalAlign: "text-bottom" }} />
-              )}
-              {node.status === "loading" && <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>{de ? "Analysiere…" : "Analyzing…"}</span>}
-            </p>
-          )}
-          {node.status === "error" && <p style={{ fontSize: 13, color: "#E8402A", margin: "0 0 8px" }}>{node.errorMsg || "Fehler"}</p>}
+  const queryTypeColor = "#E4FF97";
+  const statusCls = !selected && (node.status === "streaming" || node.status === "loading") ? "nc-run"
+    : !selected && node.status === "done" ? "nc-success"
+    : !selected && node.status === "error" ? "nc-error"
+    : "";
+  const cardH = node.customHeight ?? QUERY_NODE_W;
 
-          {r?.confidence != null && r.confidence > 0 && (
-            <div style={{ marginBottom: 10 }}><ConfidenceBadge value={r.confidence} de={de} /></div>
-          )}
-
-          {/* Used signals (data basis) */}
-          {r?.usedSignals && r.usedSignals.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <SourceChips sources={r.usedSignals.slice(0, 5)} de={de} />
-            </div>
-          )}
-
-          {r?.references && r.references.length > 0 && (
-            <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {r.references.slice(0, 4).map((ref, i) => (
-                <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => e.stopPropagation()}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--color-brand)", textDecoration: "none", padding: "2px 8px", borderRadius: 20, border: "1px solid var(--color-border)", background: "var(--color-surface)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
-                >↗ {ref.title}</a>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 4, padding: "7px 12px 9px", borderTop: "1px solid var(--color-border)", background: "var(--color-surface)", flexWrap: "wrap" }}>
-        <button
-          onClick={e => { e.stopPropagation(); onFollowUp(node.id); }}
-          title={de ? "Folgefrage auf Basis dieser Analyse starten" : "Start a follow-up query based on this analysis"}
-          style={{ fontSize: 11, fontWeight: 600, padding: "4px 11px", borderRadius: 20, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A", cursor: "pointer" }}
+  return (
+    // Wrapper: positioning + ports
+    <div
+      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: cardH, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
+    >
+      {/* Left input port */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
+      {/* Right output port */}
+      <div
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Folgefrage / Vertiefung"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #E4FF97", boxShadow: "0 0 8px rgba(228,255,151,0.6)", zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 14px rgba(228,255,151,0.9), 0 0 0 3px rgba(228,255,151,0.3)"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 8px rgba(228,255,151,0.6)"; }}
+      />
+      {/* Card body */}
+      <div
+        className={statusCls}
+        style={{
+          position: "relative", width: "100%", height: "100%",
+          display: "flex", flexDirection: "column",
+          background: "var(--color-surface)",
+          border: `1.5px solid ${selected ? "#0A0A0A" : staleAccent ?? "rgba(0,0,0,0.09)"}`,
+          borderRadius: 12, overflow: "hidden",
+          ...(selected ? { boxShadow: "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" } :
+            (!isLoading && node.status !== "done" && node.status !== "error") ? { boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)" } : {}),
+          transition: "box-shadow 0.15s, border-color 0.15s",
+        }}
+      >
+        {/* Header */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{
+            height: 44, padding: "0 14px", cursor: "grab", flexShrink: 0,
+            background: isLoading ? "linear-gradient(90deg, rgba(228,255,151,0.10) 0%, rgba(0,0,0,0.04) 100%)" : "rgba(0,0,0,0.04)",
+            borderBottom: "1px solid rgba(0,0,0,0.12)",
+            borderTopLeftRadius: 11, borderTopRightRadius: 11,
+            display: "flex", alignItems: "center", gap: 7,
+          }}
         >
-          {de ? "Weiterdenken" : "Follow up"}
-        </button>
-        {node.status === "done" && age !== "fresh" && (
-          <button onClick={e => { e.stopPropagation(); onRefresh(node.id); }}
-            title={de ? "Dieselbe Frage neu stellen — Ergebnis könnte sich geändert haben" : "Re-run this query — results may have changed"}
-            style={{ fontSize: 11, fontWeight: 600, padding: "4px 11px", borderRadius: 20, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
-          >⟳ {de ? "Aktualisieren" : "Refresh"}</button>
-        )}
-        {node.synthesis && (
-          <button
-            onClick={copy}
-            title={de ? "Synthese kopieren" : "Copy synthesis"}
-            style={{ fontSize: 11, padding: "4px 9px", borderRadius: 20, border: "1px solid var(--color-border)", background: "transparent", color: copied ? "#0F6038" : "var(--color-text-muted)", cursor: "pointer" }}
-          >
-            {copied ? "✓" : "⎘"}
-          </button>
-        )}
-        {r?.followUpQuestions && r.followUpQuestions.length > 0 && (
-          <div style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
-            {r.followUpQuestions.slice(0, 2).map((q, i) => (
-              <button key={i} onClick={e => { e.stopPropagation(); onFollowUpQ(node.id, q); }} title={de ? `Folgefrage: ${q}` : `Follow-up: ${q}`}
-                style={{ fontSize: 10, padding: "3px 8px", borderRadius: 20, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
-              >{q}</button>
-            ))}
-          </div>
-        )}
+          <span style={{
+            flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+            fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+            color: "#0A0A0A", background: queryTypeColor, border: "1px solid rgba(0,0,0,0.12)",
+            borderRadius: 5, padding: "2px 7px",
+          }}>QUERY</span>
+          <p style={{ flex: 1, margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "var(--font-display, 'Space Grotesk'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.02em", display: "-webkit-box", WebkitLineClamp: cardZoom !== undefined && cardZoom < 0.7 ? 1 : 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {node.query}
+          </p>
+          {accentColorForStatus && <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
+        </div>
+        {/* Content */}
+        <div style={{ padding: "12px 14px 0", flex: 1, overflow: "hidden", position: "relative" }}>
+          {node.synthesis && (cardZoom === undefined || cardZoom >= 0.7) && (
+            <>
+              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
+                {node.synthesis}
+              </p>
+              {/* Causal fingerprint pills */}
+              {causalFingerprint && causalFingerprint.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 8 }}>
+                  <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 600, letterSpacing: "0.06em", marginRight: 2, alignSelf: "center" }}>⬡</span>
+                  {causalFingerprint.map((t, i) => (
+                    <span key={i} style={{ fontSize: 8, padding: "1px 6px", borderRadius: 10, background: "#1A9E5A10", border: "1px solid #1A9E5A30", color: "#1A9E5A", fontWeight: 500, whiteSpace: "nowrap" }}>
+                      {t.length > 18 ? t.slice(0, 18) + "…" : t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {/* Signal sparkline — timeline of used signals */}
+              {node.result?.usedSignals && node.result.usedSignals.length >= 2 && (cardZoom === undefined || cardZoom >= 0.6) && (
+                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 7, color: "var(--color-text-muted)", fontWeight: 600, letterSpacing: "0.06em" }}>SIGNALE</span>
+                  <SignalSparkline signals={node.result.usedSignals} width={80} height={16} />
+                </div>
+              )}
+              {/* Fade gradient at bottom to signal more content */}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48, background: "linear-gradient(to bottom, transparent, var(--color-surface))", pointerEvents: "none" }} />
+            </>
+          )}
+          {isLoading && !node.synthesis && (() => {
+            const phases = de
+              ? ["Signale lesen…", "Synthese…", "Kausalketten…", "Szenarien…", "Erkenntnisse…", "Abschliessen…"]
+              : ["Reading signals…", "Synthesis…", "Causal chains…", "Scenarios…", "Insights…", "Finishing…"];
+            const phase = node.streamingPhase ?? 0;
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#F5A623", fontWeight: 500 }}>{phases[phase]}</span>
+                <div style={{ flex: 1, height: 2, background: "var(--color-border)", borderRadius: 1, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(phase / 5) * 100}%`, background: "#F5A623", borderRadius: 1, transition: "width 0.4s ease" }} />
+                </div>
+              </div>
+            );
+          })()}
+          {node.status === "error" && <span style={{ fontSize: 11, color: "#E8402A" }}>⚠ {node.errorMsg?.slice(0, 60) ?? "Fehler"}</span>}
+        </div>
+        {/* Resize handle */}
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? QUERY_NODE_W, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
       </div>
-
-      {/* Resize handle – right edge (width) */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", borderRadius: "0 12px 12px 0", background: "transparent", transition: "background 0.15s", zIndex: 10 }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
-      {/* Resize handle – bottom edge (height) */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", background: "transparent", transition: "background 0.15s", zIndex: 10 }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
     </div>
   );
 }
@@ -987,16 +1953,16 @@ interface NodePickerOption {
 
 const NODE_PICKER_OPTIONS: NodePickerOption[] = [
   // ── KI-Analyse ──────────────────────────────────────────────────────────
-  { type: "query",    icon: "⌕", label: "Abfrage",       desc: "Vollständige KI-Analyse starten",        bg: "#E4FF97", color: "#0A0A0A",  section: "analyse" },
-  { type: "insights", icon: "◉", label: "Erkenntnisse",  desc: "Kernaussagen & Muster extrahieren",       bg: "#C3F4D3", color: "#0F6038",  section: "analyse" },
-  { type: "scenarios",icon: "◈", label: "Szenarien",     desc: "Optimist. / wahrsch. / pessim. Zukunft",  bg: "#FDE2FF", color: "#7C1A9E",  section: "analyse" },
-  { type: "decision", icon: "◆", label: "Empfehlung",    desc: "Konkreten Handlungsrahmen ableiten",      bg: "#D4F4F4", color: "#0A6060",  section: "analyse" },
-  { type: "followups",icon: "◎", label: "Folgefragen",   desc: "Offene Fragen & nächste Schritte",        bg: "#FFF5BA", color: "#7A5C00",  section: "analyse" },
+  { type: "query",    icon: "⌕", label: "Abfrage",       desc: "Vollständige KI-Analyse starten",        bg: "var(--color-lime)",       color: "var(--color-text-heading)",  section: "analyse" },
+  { type: "insights", icon: "◉", label: "Erkenntnisse",  desc: "Kernaussagen & Muster extrahieren",       bg: "var(--pastel-mint)",       color: "var(--pastel-mint-text)",   section: "analyse" },
+  { type: "scenarios",icon: "◈", label: "Szenarien",     desc: "Optimist. / wahrsch. / pessim. Zukunft",  bg: "var(--pastel-orchid)",     color: "var(--pastel-orchid-text)", section: "analyse" },
+  { type: "decision", icon: "◆", label: "Empfehlung",    desc: "Konkreten Handlungsrahmen ableiten",      bg: "var(--pastel-aqua)",       color: "var(--pastel-aqua-text)",   section: "analyse" },
+  { type: "followups",icon: "◎", label: "Folgefragen",   desc: "Offene Fragen & nächste Schritte",        bg: "var(--pastel-butter)",     color: "var(--pastel-butter-text)", section: "analyse" },
   // ── Karten ──────────────────────────────────────────────────────────────
-  { type: "note",  icon: "✎", label: "Notiz",   desc: "Freitext, Beobachtung, Quelle",   bg: "#FFF9C4", color: "#5D4037", section: "karte" },
-  { type: "idea",  icon: "◇", label: "Idee",    desc: "Hypothese, Ansatz, These",        bg: "#FFF3E0", color: "#E65100", section: "karte" },
-  { type: "list",  icon: "≡", label: "Liste",   desc: "Strukturierte Aufzählung",        bg: "#E8F5E9", color: "#1B5E20", section: "karte" },
-  { type: "file",  icon: "📎", label: "Datei",   desc: "Dokument, Bild oder Text hochladen", bg: "#E8EDFF", color: "#3B5BDB", section: "karte" },
+  { type: "note",  icon: "✎", label: "Notiz",   desc: "Freitext, Beobachtung, Quelle",       bg: "var(--pastel-butter)",  color: "var(--pastel-butter-text)",  section: "karte" },
+  { type: "idea",  icon: "◇", label: "Idee",    desc: "Hypothese, Ansatz, These",            bg: "var(--pastel-peach)",   color: "var(--pastel-peach-text)",   section: "karte" },
+  { type: "list",  icon: "≡", label: "Liste",   desc: "Strukturierte Aufzählung",            bg: "var(--pastel-mint)",    color: "var(--pastel-mint-text)",    section: "karte" },
+  { type: "file",  icon: "📎", label: "Datei",   desc: "Dokument, Bild oder Text hochladen", bg: "var(--pastel-blue)",    color: "var(--pastel-blue-text)",    section: "karte" },
 ];
 
 const SECTION_LABELS: Record<"analyse" | "karte", string> = {
@@ -1075,7 +2041,7 @@ function NodePicker({ onSelect, onClose, hasContext }: {
 
   return (
     <div onPointerDown={e => e.stopPropagation()}
-      style={{ width: 340, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", overflow: "hidden" }}
+      style={{ width: 340, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)", overflow: "hidden" }}
     >
       {/* Header */}
       <div style={{ padding: "10px 14px 9px", borderBottom: "1px solid var(--color-border)" }}>
@@ -1102,7 +2068,7 @@ function NodePicker({ onSelect, onClose, hasContext }: {
         {sections ? (
           sections.map(sec => (
             <div key={sec.key}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", padding: "6px 10px 3px" }}>
+              <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", padding: "6px 10px 3px", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>
                 {sec.label}
               </div>
               {sec.items.map(item => renderItem(item, flatItems.indexOf(item)))}
@@ -1128,461 +2094,263 @@ function NodePicker({ onSelect, onClose, hasContext }: {
   );
 }
 
-// ── NoteNodeCard ──────────────────────────────────────────────────────────
+// ── NoteNodeCard (compact) ────────────────────────────────────────────────
 
-function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onUpdate, onIterate, onPromote, nodeW }: {
+function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
+  onUpdate: _onUpdate, onPromote: _onPromote, // editing lives in DetailPanel
+}: {
   node: NoteNode; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onDelete: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onUpdate: (id: string, content: string) => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   onPromote: (query: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
 }) {
-  const [editing, setEditing] = useState(!node.content);
-  const [draft, setDraft] = useState(node.content);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { if (editing) taRef.current?.focus(); }, [editing]);
-  useEffect(() => { setDraft(node.content); }, [node.content]);
-
-  const commit = () => { setEditing(false); onUpdate(node.id, draft); };
-
-  const cardRef = useRef<HTMLDivElement>(null);
-  const nodeH = node.customHeight;
-
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
+      <div
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+        style={{
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 24, overflow: "hidden", background: "var(--pastel-butter)",
+          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          borderLeft: "3px solid #F9A825", borderRadius: 6,
+          userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
+          opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
+        }}
+      >
+        <span style={{ fontSize: 9, fontWeight: 700, color: "#F9A825", flexShrink: 0 }}>✎</span>
+        <span style={{ fontSize: 9, color: "#3E2723", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.content.slice(0, 60) || "Notiz"}</span>
+      </div>
+    );
+  }
+  const noteColor = "#F9A825";
   return (
     <div
-      ref={cardRef}
       onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
-      style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: "#FFFDE7",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-        borderTop: "3px solid #F9A825",
-        borderRadius: 10,
-        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.08)" : "0 2px 8px rgba(0,0,0,0.06)",
-        userSelect: "none",
-      }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: node.customHeight ?? 280, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
     >
-      {/* Header / drag handle */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
       <div
-        onPointerDown={e => onDragStart(e, node.id)}
-        style={{ cursor: "grab", padding: "5px 10px 4px", display: "flex", alignItems: "center", justifyContent: "space-between" }}
-      >
-        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#F9A825" }}>NOTIZ</span>
-        <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, node.content); }}
-            title="Iteration starten"
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "rgba(0,0,0,0.3)", fontSize: 14, borderRadius: 4, lineHeight: 1, fontWeight: 300 }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#1A9E5A"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; }}
-          >+</button>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "rgba(0,0,0,0.25)", fontSize: 11, borderRadius: 4 }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.25)"}
-          >✕</button>
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Als Analysekontext verwenden"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${noteColor}`, boxShadow: `0 0 8px ${noteColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${noteColor}99, 0 0 0 3px ${noteColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${noteColor}66`; }}
+      />
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 44, padding: "0 14px", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", gap: 6, background: "rgba(0,0,0,0.04)", borderBottom: "1px solid rgba(0,0,0,0.12)", borderTopLeftRadius: 11, borderTopRightRadius: 11 }}
+        >
+          <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: noteColor, background: `${noteColor}18`, border: `1px solid ${noteColor}40`, borderRadius: 5, padding: "2px 7px", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>NOTIZ</span>
         </div>
-      </div>
-
-      {/* Editable content */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); if (!editing) { setEditing(true); } }}
-        style={{ padding: "4px 10px 8px", minHeight: 80 }}
-      >
-        {editing ? (
-          <textarea
-            ref={taRef}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={e => { if (e.key === "Escape") { setEditing(false); setDraft(node.content); } }}
-            style={{ width: "100%", minHeight: 80, background: "transparent", border: "none", outline: "none", resize: "none", fontSize: 13, lineHeight: 1.65, color: "#3E2723", fontFamily: "inherit", boxSizing: "border-box" }}
-          />
-        ) : (
-          <p style={{ fontSize: 13, lineHeight: 1.65, color: node.content ? "#3E2723" : "rgba(0,0,0,0.28)", margin: 0, whiteSpace: "pre-wrap", cursor: "text", minHeight: 80 }}>
+        <div style={{ padding: "10px 14px 12px", flex: 1, overflow: "hidden" }}>
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: node.content ? "var(--color-text-secondary)" : "rgba(0,0,0,0.3)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
             {node.content || "Notiz hinzufügen…"}
           </p>
-        )}
+        </div>
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? 280, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
       </div>
-
-      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "0 10px 7px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
-          {formatNodeTime(node.createdAt)}
-        </span>
-        {node.content && (
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, node.content); }}
-            title="Notiz weiterdenken"
-            style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "rgba(0,0,0,0.3)", cursor: "pointer", lineHeight: 1.3, transition: "all 0.1s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.6)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-          >↺ rethink</button>
-        )}
-        {node.content && (
-          <>
-            <div style={{ flex: 1 }} />
-            <button
-              onClick={e => { e.stopPropagation(); onPromote(node.content); }}
-              title="Notizinhalt als KI-Abfrage starten"
-              style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", cursor: "pointer", transition: "all 0.12s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(249,168,37,0.2)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(249,168,37,0.1)"; }}
-            >Als Abfrage</button>
-          </>
-        )}
-      </div>
-
-      {/* Right resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", zIndex: 10, background: "transparent", transition: "background 0.15s", borderRadius: "0 10px 10px 0" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
-      {/* Bottom resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", zIndex: 10, background: "transparent", transition: "background 0.15s" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
     </div>
   );
 }
 
-// ── IdeaNodeCard ──────────────────────────────────────────────────────────
+// ── IdeaNodeCard (compact) ────────────────────────────────────────────────
 
-function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onUpdate, onPromote, onIterate, nodeW }: {
+function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
+  onUpdate: _onUpdate, onPromote: _onPromote, // editing lives in DetailPanel
+}: {
   node: IdeaNode; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onDelete: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onUpdate: (id: string, title: string, content: string) => void;
   onPromote: (query: string) => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
 }) {
-  const [editingTitle, setEditingTitle] = useState(!node.title);
-  const [editingContent, setEditingContent] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(node.title);
-  const [draftContent, setDraftContent] = useState(node.content);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const nodeH = node.customHeight;
-
-  const commitTitle = () => { setEditingTitle(false); onUpdate(node.id, draftTitle, draftContent); };
-  const commitContent = () => { setEditingContent(false); onUpdate(node.id, draftTitle, draftContent); };
-
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
+      <div
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+        style={{
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 24, overflow: "hidden", background: "var(--pastel-peach)",
+          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          borderLeft: "3px solid #FF9800", borderRadius: 6,
+          userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
+          opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
+        }}
+      >
+        <span style={{ fontSize: 9, flexShrink: 0 }}>💡</span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: "#0A0A0A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.title || node.content.slice(0, 50) || "Idee"}</span>
+      </div>
+    );
+  }
+  const ideaColor = "#FF9800";
   return (
     <div
-      ref={cardRef}
       onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
-      style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: "#FFFBF0",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-        borderTop: "3px solid #FF9800",
-        borderRadius: 10,
-        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.08)" : "0 2px 8px rgba(0,0,0,0.06)",
-        userSelect: "none",
-      }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: node.customHeight ?? 300, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
     >
-      {/* Header / drag handle */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
       <div
-        onPointerDown={e => onDragStart(e, node.id)}
-        style={{ padding: "9px 10px 7px", cursor: "grab", borderBottom: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 8 }}
-      >
-        <span style={{ fontSize: 15, flexShrink: 0 }}>💡</span>
-        {editingTitle ? (
-          <input
-            autoFocus
-            value={draftTitle}
-            onChange={e => setDraftTitle(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={e => { if (e.key === "Enter") commitTitle(); if (e.key === "Escape") { setEditingTitle(false); setDraftTitle(node.title); } }}
-            onPointerDown={e => e.stopPropagation()}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, fontWeight: 600, color: "#0A0A0A", fontFamily: "inherit" }}
-            placeholder="Idee oder Hypothese…"
-          />
-        ) : (
-          <span
-            onClick={() => setEditingTitle(true)}
-            style={{ flex: 1, fontSize: 13, fontWeight: 600, color: node.title ? "#0A0A0A" : "rgba(0,0,0,0.28)", cursor: "text", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >{node.title || "Idee oder Hypothese…"}</span>
-        )}
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onIterate(node.id, [node.title, node.content].filter(Boolean).join(" — ")); }}
-          title="Weitere Iteration starten"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "rgba(0,0,0,0.3)", fontSize: 14, borderRadius: 4, lineHeight: 1, fontWeight: 300, flexShrink: 0 }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#1A9E5A"; }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; }}
-        >+</button>
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "rgba(0,0,0,0.25)", fontSize: 11, flexShrink: 0, borderRadius: 4 }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.25)"}
-        >✕</button>
-      </div>
-
-      {/* Content body */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); if (!editingContent) setEditingContent(true); }}
-        style={{ padding: "8px 10px 6px", minHeight: 60 }}
-      >
-        {editingContent ? (
-          <textarea
-            autoFocus
-            value={draftContent}
-            onChange={e => setDraftContent(e.target.value)}
-            onBlur={commitContent}
-            onKeyDown={e => { if (e.key === "Escape") { setEditingContent(false); setDraftContent(node.content); } }}
-            style={{ width: "100%", minHeight: 60, background: "transparent", border: "none", outline: "none", resize: "none", fontSize: 12, lineHeight: 1.65, color: "#0A0A0A", fontFamily: "inherit", boxSizing: "border-box" }}
-            placeholder="Beschreibung, Begründung oder nächste Schritte…"
-          />
-        ) : (
-          <p style={{ fontSize: 12, lineHeight: 1.65, color: node.content ? "#0A0A0A" : "rgba(0,0,0,0.28)", margin: 0, whiteSpace: "pre-wrap", cursor: "text", minHeight: 60 }}>
-            {node.content || "Beschreibung, Begründung oder nächste Schritte…"}
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Idee weiterentwickeln"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${ideaColor}`, boxShadow: `0 0 8px ${ideaColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${ideaColor}99, 0 0 0 3px ${ideaColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${ideaColor}66`; }}
+      />
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 44, padding: "0 14px", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: "rgba(0,0,0,0.04)", borderBottom: "1px solid rgba(0,0,0,0.12)", borderTopLeftRadius: 11, borderTopRightRadius: 11 }}
+        >
+          <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: ideaColor, background: `${ideaColor}18`, border: `1px solid ${ideaColor}40`, borderRadius: 5, padding: "2px 7px", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>IDEE</span>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: node.title ? "var(--color-text-heading)" : "rgba(0,0,0,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {node.title || "Idee oder Hypothese…"}
+          </span>
+        </div>
+        <div style={{ padding: "10px 14px 12px", flex: 1, overflow: "hidden" }}>
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: node.content ? "var(--color-text-secondary)" : "rgba(0,0,0,0.3)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
+            {node.content || "Beschreibung…"}
           </p>
-        )}
+        </div>
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? 300, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
       </div>
-
-      {/* Footer */}
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        style={{ padding: "5px 10px 8px", borderTop: "1px solid rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 8 }}
-      >
-        <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
-          {formatNodeTime(node.createdAt)}
-        </span>
-        {(node.title || node.content) && (
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, [node.title, node.content].filter(Boolean).join(" — ")); }}
-            style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "rgba(0,0,0,0.3)", cursor: "pointer", lineHeight: 1.3, transition: "all 0.1s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.6)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-          >↺ rethink</button>
-        )}
-        <div style={{ flex: 1 }} />
-        {(node.title || node.content) && (
-          <button
-            onClick={e => { e.stopPropagation(); onPromote([node.title, node.content].filter(Boolean).join(" — ")); }}
-            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.08)", color: "#E65100", cursor: "pointer", transition: "all 0.12s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(255,152,0,0.18)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(255,152,0,0.08)"; }}
-          >Als Abfrage</button>
-        )}
-      </div>
-
-      {/* Right resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", zIndex: 10, background: "transparent", transition: "background 0.15s", borderRadius: "0 10px 10px 0" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
-      {/* Bottom resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 160), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", zIndex: 10, background: "transparent", transition: "background 0.15s" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
     </div>
   );
 }
 
-// ── ListNodeCard ──────────────────────────────────────────────────────────
+// ── ListNodeCard (compact) ────────────────────────────────────────────────
 
-function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onUpdate, onIterate, nodeW }: {
+function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
+  onUpdate: _onUpdate, // editing lives in DetailPanel
+}: {
   node: ListNode; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onDelete: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onUpdate: (id: string, title: string, items: string[]) => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
 }) {
-  const [editingTitle, setEditingTitle] = useState(!node.title);
-  const [draftTitle, setDraftTitle] = useState(node.title);
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const [draftItem, setDraftItem] = useState("");
-  const cardRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const nodeH = node.customHeight;
+  const prefill = [node.title, ...node.items.filter(Boolean)].join(" · ");
+  const previewItems = node.items.filter(Boolean).slice(0, 3);
 
-  const commitTitle = () => { setEditingTitle(false); onUpdate(node.id, draftTitle, node.items); };
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
+      <div
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+        style={{
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 24, overflow: "hidden", background: "var(--pastel-mint)",
+          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          borderLeft: "3px solid #2E7D32", borderRadius: 6,
+          userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
+          opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
+        }}
+      >
+        <span style={{ fontSize: 10, color: "#2E7D32", fontWeight: 700, flexShrink: 0 }}>≡</span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: "#0A0A0A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.title || "Liste"}</span>
+      </div>
+    );
+  }
 
-  const startEditItem = (i: number) => {
-    setEditingIdx(i); setDraftItem(node.items[i]);
-    setTimeout(() => itemRefs.current[i]?.focus(), 0);
-  };
-
-  const commitItem = (i: number) => {
-    const updated = node.items.map((it, idx) => idx === i ? draftItem : it).filter((it, idx) => it.trim() !== "" || idx === node.items.length - 1);
-    onUpdate(node.id, node.title, updated.length > 0 ? updated : [""]);
-    setEditingIdx(null);
-  };
-
-  const addItem = () => {
-    const items = [...node.items, ""];
-    onUpdate(node.id, node.title, items);
-    setTimeout(() => { const i = items.length - 1; setEditingIdx(i); setDraftItem(""); itemRefs.current[i]?.focus(); }, 30);
-  };
-
-  const removeItem = (i: number) => {
-    const items = node.items.filter((_, idx) => idx !== i);
-    onUpdate(node.id, node.title, items.length > 0 ? items : [""]);
-  };
-
-  const handleItemKeyDown = (e: React.KeyboardEvent, i: number) => {
-    if (e.key === "Enter") { e.preventDefault(); commitItem(i); addItem(); }
-    if (e.key === "Escape") { setEditingIdx(null); setDraftItem(node.items[i]); }
-    if (e.key === "Backspace" && draftItem === "" && node.items.length > 1) {
-      e.preventDefault(); removeItem(i); const prev = Math.max(0, i - 1); setTimeout(() => startEditItem(prev), 30);
-    }
-  };
-
-  const prefillForIterate = [node.title, ...node.items.filter(Boolean)].join(" · ");
-
+  const listColor = "#2E7D32";
   return (
     <div
-      ref={cardRef}
       onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
-      style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: "#F1FBF4",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-        borderTop: "3px solid #2E7D32",
-        borderRadius: 10,
-        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.08)" : "0 2px 8px rgba(0,0,0,0.06)",
-        userSelect: "none",
-      }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: node.customHeight ?? LIST_NODE_W, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s" }}
     >
-      {/* Header / drag handle */}
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
       <div
-        onPointerDown={e => onDragStart(e, node.id)}
-        style={{ padding: "9px 10px 7px", cursor: "grab", borderBottom: "1px solid rgba(46,125,50,0.1)", display: "flex", alignItems: "center", gap: 8 }}
-      >
-        <span style={{ fontSize: 13, color: "#2E7D32", flexShrink: 0, fontWeight: 700, lineHeight: 1 }}>≡</span>
-        {editingTitle ? (
-          <input
-            autoFocus
-            value={draftTitle}
-            onChange={e => setDraftTitle(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={e => { if (e.key === "Enter") commitTitle(); if (e.key === "Escape") { setEditingTitle(false); setDraftTitle(node.title); } }}
-            onPointerDown={e => e.stopPropagation()}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, fontWeight: 600, color: "#0A0A0A", fontFamily: "inherit" }}
-            placeholder="Listen-Titel…"
-          />
-        ) : (
-          <span
-            onClick={() => setEditingTitle(true)}
-            style={{ flex: 1, fontSize: 13, fontWeight: 600, color: node.title ? "#0A0A0A" : "rgba(0,0,0,0.28)", cursor: "text", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            title="Klicken zum Bearbeiten"
-          >{node.title || "Listen-Titel…"}</span>
-        )}
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onIterate(node.id, prefillForIterate); }}
-          title="Neue Iteration starten"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "rgba(0,0,0,0.3)", fontSize: 14, borderRadius: 4, lineHeight: 1, fontWeight: 300, flexShrink: 0 }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#1A9E5A"; }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; }}
-        >+</button>
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-          title="Karte löschen"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "rgba(0,0,0,0.25)", fontSize: 11, flexShrink: 0, borderRadius: 4 }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.25)"}
-        >✕</button>
-      </div>
-
-      {/* List items */}
-      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "6px 10px 2px" }}>
-        {node.items.map((item, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 3 }}>
-            <span style={{ color: "#2E7D32", fontSize: 11, marginTop: 3, flexShrink: 0 }}>•</span>
-            {editingIdx === i ? (
-              <input
-                ref={el => { itemRefs.current[i] = el; }}
-                value={draftItem}
-                onChange={e => setDraftItem(e.target.value)}
-                onBlur={() => commitItem(i)}
-                onKeyDown={e => handleItemKeyDown(e, i)}
-                style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#0A0A0A", fontFamily: "inherit", lineHeight: 1.5, minWidth: 0 }}
-              />
-            ) : (
-              <span
-                onClick={() => startEditItem(i)}
-                style={{ flex: 1, fontSize: 13, lineHeight: 1.5, color: item ? "#0A0A0A" : "rgba(0,0,0,0.28)", cursor: "text", minHeight: 20 }}
-                title="Klicken zum Bearbeiten"
-              >{item || "Eintrag…"}</span>
-            )}
-            {node.items.length > 1 && (
-              <button
-                onClick={() => removeItem(i)}
-                title="Eintrag entfernen"
-                style={{ background: "none", border: "none", cursor: "pointer", padding: "0 2px", color: "rgba(0,0,0,0.18)", fontSize: 10, borderRadius: 3, flexShrink: 0, lineHeight: 1, marginTop: 3 }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.18)"}
-              >✕</button>
-            )}
-          </div>
-        ))}
-        <button
-          onClick={addItem}
-          title="Eintrag hinzufügen (oder Enter am Ende)"
-          style={{ marginTop: 4, marginBottom: 4, fontSize: 11, color: "#2E7D32", background: "none", border: "none", cursor: "pointer", padding: "2px 0", display: "flex", alignItems: "center", gap: 4, opacity: 0.65 }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0.65"}
-        >+ Eintrag</button>
-      </div>
-
-      {/* Footer: timestamp + rethink */}
-      <div onPointerDown={e => e.stopPropagation()} style={{ padding: "4px 10px 7px", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
-          {formatNodeTime(node.createdAt)}
-        </span>
-        {(node.title || node.items.some(Boolean)) && (
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, prefillForIterate); }}
-            title="Diesen Inhalt weiterdenken"
-            style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.1)", background: "transparent", color: "rgba(0,0,0,0.3)", cursor: "pointer", lineHeight: 1.3, transition: "all 0.1s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.6)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "rgba(0,0,0,0.3)"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-          >↺ rethink</button>
-        )}
-      </div>
-
-      {/* Right resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", zIndex: 10, background: "transparent", transition: "background 0.15s", borderRadius: "0 10px 10px 0" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Als Analysekontext verwenden"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${listColor}`, boxShadow: `0 0 8px ${listColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${listColor}99, 0 0 0 3px ${listColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${listColor}66`; }}
       />
-      {/* Bottom resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 160), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", zIndex: 10, background: "transparent", transition: "background 0.15s" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 44, padding: "0 14px", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: "rgba(0,0,0,0.04)", borderBottom: "1px solid rgba(0,0,0,0.12)", borderTopLeftRadius: 11, borderTopRightRadius: 11 }}
+        >
+          <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: listColor, background: `${listColor}18`, border: `1px solid ${listColor}40`, borderRadius: 5, padding: "2px 7px", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>LISTE</span>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: node.title ? "var(--color-text-heading)" : "rgba(0,0,0,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {node.title || "Liste…"}
+          </span>
+        </div>
+        <div style={{ padding: "10px 14px 12px", flex: 1, overflow: "hidden" }}>
+          {node.items.filter(Boolean).length > 0
+            ? node.items.filter(Boolean).map((item, i) => (
+                <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", overflow: "hidden", wordBreak: "break-word" }}>• {item}</div>
+              ))
+            : <span style={{ fontSize: 12, color: "rgba(0,0,0,0.3)" }}>Keine Einträge</span>
+          }
+        </div>
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? LIST_NODE_W, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1609,155 +2377,1788 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ── FileNodeCard (compact) ────────────────────────────────────────────────
+
 function FileNodeCard({
-  node, selected, onSelect, onDragStart, onDelete, onResizeStart, onAnalyze, onIterate, nodeW,
+  node, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
+  onAnalyze: _onAnalyze, // action lives in DetailPanel
 }: {
-  node: FileNode;
-  selected: boolean;
+  node: FileNode; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onDelete: (id: string) => void;
-  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v") => void;
+  onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onAnalyze: (query: string, parentId: string) => void;
   onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
   nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const nodeH = node.customHeight;
-  const isImage = node.fileType.startsWith("image/");
   const icon = fileIcon(node.fileType, node.fileName);
-  const analyzeText = node.textContent
-    ? `Analysiere diesen Dateiinhalt ("${node.fileName}"):\n\n${node.textContent.slice(0, 3000)}`
-    : `Was kannst du über diese Datei sagen: ${node.fileName} (${node.fileType})`;
+
+  if (cardZoom !== undefined && cardZoom < 0.45) {
+    return (
+      <div
+        onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+        style={{
+          position: "absolute", left: node.x, top: node.y, width: nodeW,
+          height: 24, overflow: "hidden", background: "var(--pastel-blue)",
+          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          borderLeft: "3px solid #4A6CF7", borderRadius: 6,
+          userSelect: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
+          opacity: dimmed ? 0.18 : node.loading ? 0.6 : 1, transition: "opacity 0.2s",
+        }}
+      >
+        <span style={{ fontSize: 11, flexShrink: 0 }}>{icon}</span>
+        <span style={{ fontSize: 9, fontWeight: 600, color: "#0A0A0A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{node.fileName}</span>
+      </div>
+    );
+  }
+
+  const fileColor = "#4A6CF7";
+  return (
+    <div
+      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      style={{ position: "absolute", left: node.x, top: node.y, width: nodeW, height: node.customHeight ?? FILE_NODE_W, overflow: "visible", userSelect: "none", cursor: "pointer", opacity: dimmed ? 0.18 : node.loading ? 0.6 : 1, transition: "opacity 0.2s" }}
+    >
+      <div onPointerDown={e => e.stopPropagation()} style={{ position: "absolute", left: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", background: "var(--color-surface)", border: "2px solid rgba(0,0,0,0.35)", zIndex: 2, pointerEvents: "auto" }} />
+      <div
+        onPointerDown={e => { e.stopPropagation(); onPortDragStart(e, node.id); }}
+        title="→ Datei analysieren / Folgefrage"
+        style={{ position: "absolute", right: -7, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, borderRadius: "50%", border: `2.5px solid ${fileColor}`, boxShadow: `0 0 8px ${fileColor}66`, zIndex: 2, pointerEvents: "auto", cursor: "pointer" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 14px ${fileColor}99, 0 0 0 3px ${fileColor}33`; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 0 8px ${fileColor}66`; }}
+      />
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}>
+        <div onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
+          style={{ height: 44, padding: "0 14px", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,0,0.04)", borderBottom: "1px solid rgba(0,0,0,0.12)", borderTopLeftRadius: 11, borderTopRightRadius: 11 }}
+        >
+          <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: fileColor, background: `${fileColor}18`, border: `1px solid ${fileColor}40`, borderRadius: 5, padding: "2px 7px", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>DATEI</span>
+          <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={node.fileName}>{node.fileName}</div>
+            <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 1 }}>
+              {formatFileSize(node.fileSize)}{node.loading ? " · hochladen…" : ""}
+            </div>
+          </div>
+        </div>
+        <div
+          onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, node.customHeight ?? FILE_NODE_W, "both"); }}
+          style={{ position: "absolute", right: 3, bottom: 3, width: 14, height: 14, cursor: "nwse-resize", zIndex: 11, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 2 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: "block" }}>
+            <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8" stroke="rgba(0,0,0,0.30)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Collapsible Section ───────────────────────────────────────────────────
+
+function CollapsibleSection({ title, children, defaultOpen = true, accent }: {
+  title: string; children: React.ReactNode; defaultOpen?: boolean; accent?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: "0 0 6px", width: "100%", textAlign: "left" }}
+      >
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: accent ?? "var(--color-text-muted)", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{title}</span>
+        <div style={{ flex: 1, height: 1, background: "var(--color-border)", marginLeft: 4 }} />
+        <span style={{ fontSize: 10, color: "var(--color-text-muted)", transition: "transform 0.15s", transform: open ? "rotate(0deg)" : "rotate(-90deg)", display: "inline-block" }}>▾</span>
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  );
+}
+
+// ── Radar Chart (pure SVG, no D3) ────────────────────────────────────────
+
+function RadarChart({ trends, de }: { trends: MatchedTrend[]; de: boolean }) {
+  if (!trends || trends.length === 0) return null;
+
+  const SIZE = 160;
+  const cx = SIZE / 2, cy = SIZE / 2, r = 58;
+  const axes = [
+    { key: "relevance", label: de ? "Relevanz" : "Relevance" },
+    { key: "confidence", label: de ? "Konfidenz" : "Confidence" },
+    { key: "impact", label: de ? "Impact" : "Impact" },
+    { key: "momentum", label: de ? "Momentum" : "Momentum" },
+    { key: "density", label: de ? "Signaldichte" : "Signal Density" },
+  ];
+  const n = axes.length;
+
+  const avg = (key: string) => {
+    if (key === "momentum") {
+      const rising = trends.filter(t => t.velocity === "rising").length;
+      return rising / Math.max(trends.length, 1);
+    }
+    if (key === "density") {
+      const avgSig = trends.reduce((s, t) => s + (t.signalCount || 0), 0) / Math.max(trends.length, 1);
+      return Math.min(avgSig / 40, 1);
+    }
+    return trends.reduce((s, t) => s + ((t as any)[key] ?? 0), 0) / Math.max(trends.length, 1);
+  };
+
+  const vals = axes.map(ax => avg(ax.key));
+
+  const pt = (axIdx: number, value: number) => {
+    const angle = (axIdx / n) * 2 * Math.PI - Math.PI / 2;
+    return { x: cx + r * value * Math.cos(angle), y: cy + r * value * Math.sin(angle) };
+  };
+
+  const labelPt = (axIdx: number) => {
+    const angle = (axIdx / n) * 2 * Math.PI - Math.PI / 2;
+    return { x: cx + (r + 18) * Math.cos(angle), y: cy + (r + 18) * Math.sin(angle) };
+  };
+
+  const polyPath = (vArr: number[]) =>
+    vArr.map((v, i) => { const p = pt(i, v); return `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`; }).join(" ") + " Z";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <svg width={SIZE + 40} height={SIZE + 32} viewBox={`-20 -16 ${SIZE + 40} ${SIZE + 32}`} style={{ overflow: "visible" }}>
+        {/* Grid rings */}
+        {[0.25, 0.5, 0.75, 1.0].map(lv => (
+          <path key={lv} d={polyPath(Array(n).fill(lv))} fill={lv === 1 ? "none" : "none"} stroke="var(--color-border)" strokeWidth={lv === 1 ? 1 : 0.7} strokeDasharray={lv < 1 ? "2,3" : undefined} />
+        ))}
+        {/* Axis lines */}
+        {axes.map((_, i) => { const p = pt(i, 1); return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--color-border)" strokeWidth={0.8} />; })}
+        {/* Data polygon */}
+        <path d={polyPath(vals)} fill="#1A9E5A1A" stroke="#1A9E5A" strokeWidth={1.8} />
+        {/* Data points */}
+        {vals.map((v, i) => { const p = pt(i, v); return <circle key={i} cx={p.x} cy={p.y} r={3} fill="#1A9E5A" />; })}
+        {/* Axis labels */}
+        {axes.map((ax, i) => {
+          const p = labelPt(i);
+          const anchor = p.x < cx - 4 ? "end" : p.x > cx + 4 ? "start" : "middle";
+          return <text key={i} x={p.x} y={p.y} textAnchor={anchor} dominantBaseline="middle" fontSize={8} fill="var(--color-text-muted)" fontFamily="inherit">{ax.label}</text>;
+        })}
+        {/* Value labels */}
+        {vals.map((v, i) => { const p = pt(i, v); return <text key={i} x={p.x + 4} y={p.y - 4} fontSize={7} fill="#1A9E5A" fontFamily="inherit" fontWeight={600}>{Math.round(v * 100)}</text>; })}
+      </svg>
+      {/* Legend: matched trend count */}
+      <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 2 }}>
+        {trends.length} {de ? "Trends analysiert" : "trends analyzed"} · Ø {Math.round(vals[0] * 100)}% {de ? "Relevanz" : "relevance"}
+      </div>
+    </div>
+  );
+}
+
+// ── DimensionRadar — spider chart for 4 strategic dimensions ─────────────
+
+function DimensionRadar({ dimData, size = 200, mini = false }: {
+  dimData: DimensionEntry[];
+  size?: number;
+  mini?: boolean;
+}) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  if (!dimData || dimData.length === 0) return null;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = size / 2 - (mini ? 12 : 30);
+
+  // 4 axes: top=Tech, right=Gesellschaft, bottom=Wirtschaft, left=Geopolitik
+  const axes = dimData.map((d, i) => {
+    const angle = (i / dimData.length) * 2 * Math.PI - Math.PI / 2;
+    return { ...d, angle, ax: cx + maxR * Math.cos(angle), ay: cy + maxR * Math.sin(angle) };
+  });
+
+  // Polygon points from confidence values
+  const polyPoints = axes.map(a => {
+    const r = a.avgConfidence * maxR;
+    return `${cx + r * Math.cos(a.angle)},${cy + r * Math.sin(a.angle)}`;
+  }).join(" ");
+
+  // Grid rings at 25%, 50%, 75%, 100%
+  const rings = mini ? [0.5, 1] : [0.25, 0.5, 0.75, 1];
+
+  return (
+    <svg width={size} height={size} style={{ display: "block", overflow: "visible" }}>
+      {/* Grid rings */}
+      {rings.map(r => (
+        <polygon key={r}
+          points={axes.map(a => `${cx + maxR * r * Math.cos(a.angle)},${cy + maxR * r * Math.sin(a.angle)}`).join(" ")}
+          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={1}
+        />
+      ))}
+      {/* Axis lines */}
+      {axes.map(a => (
+        <line key={a.key} x1={cx} y1={cy} x2={a.ax} y2={a.ay}
+          stroke={hovered === a.key ? a.color : "rgba(0,0,0,0.1)"} strokeWidth={hovered === a.key ? 1.5 : 1} />
+      ))}
+      {/* Filled polygon */}
+      <polygon points={polyPoints}
+        fill={hovered
+          ? (axes.find(a => a.key === hovered)?.color ?? "#3b82f6") + "30"
+          : "rgba(59,130,246,0.15)"}
+        stroke={hovered ? axes.find(a => a.key === hovered)?.color ?? "#3b82f6" : "#3b82f6"}
+        strokeWidth={1.5}
+      />
+      {/* Data points on axes */}
+      {axes.map(a => {
+        const r = a.avgConfidence * maxR;
+        const px = cx + r * Math.cos(a.angle);
+        const py = cy + r * Math.sin(a.angle);
+        const isH = hovered === a.key;
+        return (
+          <g key={a.key}
+            onMouseEnter={() => setHovered(a.key)}
+            onMouseLeave={() => setHovered(null)}
+            style={{ cursor: mini ? "default" : "pointer" }}
+          >
+            {/* Hit area on axis */}
+            <line x1={cx} y1={cy} x2={a.ax} y2={a.ay} stroke="transparent" strokeWidth={12} />
+            <circle cx={px} cy={py} r={isH ? 5 : 3.5}
+              fill={a.color} strokeWidth={isH ? 2 : 0}
+              stroke="white"
+              opacity={a.trends.length === 0 ? 0.3 : 1}
+            />
+            {!mini && (
+              <>
+                {/* Axis label */}
+                <text
+                  x={a.ax + Math.cos(a.angle) * 8}
+                  y={a.ay + Math.sin(a.angle) * 8 + (Math.sin(a.angle) > 0 ? 10 : Math.sin(a.angle) < -0.1 ? -4 : 4)}
+                  textAnchor={Math.cos(a.angle) > 0.2 ? "start" : Math.cos(a.angle) < -0.2 ? "end" : "middle"}
+                  fontSize={isH ? 11 : 10} fontWeight={isH ? 700 : 400}
+                  fill={isH ? a.color : "var(--color-text-secondary)"}
+                  fontFamily="inherit"
+                >
+                  {a.label.split(" & ")[0]}
+                </text>
+                {/* Confidence % label */}
+                {isH && a.trends.length > 0 && (
+                  <text x={px + 8} y={py - 6} fontSize={10} fontWeight={700} fill={a.color} fontFamily="inherit">
+                    {Math.round(a.avgConfidence * 100)}%
+                  </text>
+                )}
+              </>
+            )}
+          </g>
+        );
+      })}
+      {/* Center dot */}
+      <circle cx={cx} cy={cy} r={2} fill="rgba(0,0,0,0.2)" />
+    </svg>
+  );
+}
+
+// ── Causal Edge List ──────────────────────────────────────────────────────
+
+function CausalEdgeList({ edges, trendNames, de }: {
+  edges: MatchedEdge[]; trendNames: Map<string, string>; de: boolean;
+}) {
+  if (!edges || edges.length === 0) return null;
+  const typeColor: Record<string, string> = {
+    drives: "#1A9E5A", amplifies: "#2563EB", dampens: "#E8402A", correlates: "#8B5CF6",
+  };
+  const typeLabel: Record<string, string> = {
+    drives: de ? "treibt" : "drives",
+    amplifies: de ? "verstärkt" : "amplifies",
+    dampens: de ? "dämpft" : "dampens",
+    correlates: de ? "korreliert" : "correlates",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      {edges.map((e, i) => {
+        const fromName = trendNames.get(e.from) || e.from.replace("mega-", "").replace("macro-", "");
+        const toName = trendNames.get(e.to) || e.to.replace("mega-", "").replace("macro-", "");
+        const color = typeColor[e.type] ?? "#888";
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+            <span style={{ flex: 1, color: "var(--color-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }} title={fromName}>{fromName}</span>
+            <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, color, padding: "1px 6px", borderRadius: 10, background: `${color}18`, border: `1px solid ${color}44` }}>
+              {typeLabel[e.type] ?? e.type} {Math.round(e.strength * 100)}%
+            </span>
+            <span style={{ flex: 1, color: "var(--color-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130, textAlign: "right" }} title={toName}>{toName}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── CausalGraphSVG — standalone graph for DetailPanel ────────────────────
+
+function CausalGraphSVG({ edges, nameMap, width = 700, height = 320 }: {
+  edges: MatchedEdge[];
+  nameMap: Record<string, string>;
+  width?: number;
+  height?: number;
+}) {
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<{ edge: MatchedEdge; mx: number; my: number } | null>(null);
+  const edgeTypeColor: Record<string, string> = {
+    drives: "#1A9E5A", amplifies: "#2563EB", dampens: "#E8402A", correlates: "#9CA3AF",
+  };
+  const edgeTypeLabel: Record<string, string> = {
+    drives: "treibt", amplifies: "verstärkt", dampens: "dämpft", correlates: "korreliert",
+  };
+
+  const trendIds = Array.from(new Set(edges.flatMap(e => [e.from, e.to]))).slice(0, 8);
+  if (trendIds.length === 0) return null;
+
+  // Hub sizing: nodes with more connections get a bigger radius
+  const edgeCount = new Map<string, number>();
+  edges.forEach(e => {
+    edgeCount.set(e.from, (edgeCount.get(e.from) ?? 0) + 1);
+    edgeCount.set(e.to, (edgeCount.get(e.to) ?? 0) + 1);
+  });
+  const maxEdges = Math.max(...Array.from(edgeCount.values()), 1);
+  const nodeR = (id: string) => 7 + ((edgeCount.get(id) ?? 0) / maxEdges) * 5; // 7–12px
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(cx, cy) - 44;
+  const trendPositions = trendIds.map((id, i) => {
+    const angle = (i / trendIds.length) * 2 * Math.PI - Math.PI / 2;
+    return { id, x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  });
+  const posMap = new Map(trendPositions.map(p => [p.id, p]));
+  const visibleEdges = edges.filter(e => trendIds.includes(e.from) && trendIds.includes(e.to));
+
+  const connectedEdges = hoveredNodeId
+    ? new Set(visibleEdges.filter(e => e.from === hoveredNodeId || e.to === hoveredNodeId).map((_, i) => i))
+    : null;
+  const connectedTo = hoveredNodeId ? new Set(
+    visibleEdges.filter(e => e.from === hoveredNodeId || e.to === hoveredNodeId).flatMap(e => [e.from, e.to])
+  ) : null;
+
+  const getName = (id: string) => {
+    const n = nameMap[id] || id.replace(/mega-|macro-|micro-/, "").replace(/-/g, " ");
+    return n.length > 16 ? n.slice(0, 16) + "…" : n;
+  };
+
+  // Build curved path: offset endpoints to node border + slight perpendicular curve
+  const edgePath = (from: { x: number; y: number }, to: { x: number; y: number }, fromR: number, toR: number, idx: number) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    // Offset start/end by node radius + arrow margin
+    const x1 = from.x + ux * (fromR + 3);
+    const y1 = from.y + uy * (fromR + 3);
+    const x2 = to.x - ux * (toR + 7); // extra margin for arrowhead
+    const y2 = to.y - uy * (toR + 7);
+    // Perpendicular curve offset (alternates direction per edge index)
+    const perp = (idx % 2 === 0 ? 1 : -1) * Math.min(dist * 0.18, 28);
+    const qx = (x1 + x2) / 2 - uy * perp;
+    const qy = (y1 + y2) / 2 + ux * perp;
+    return `M ${x1} ${y1} Q ${qx} ${qy} ${x2} ${y2}`;
+  };
+
+  // Label position: push outward from center
+  const labelPos = (x: number, y: number) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const push = 16;
+    return { lx: x + (dx / dist) * push, ly: y + (dy / dist) * push };
+  };
+
+  // Unique arrow marker ids per color
+  const markerIds = Object.entries(edgeTypeColor).map(([type, color]) => ({ type, color, id: `arrow-${type}` }));
+
+  return (
+    <div style={{ position: "relative", background: "rgba(26,158,90,0.025)", borderRadius: 10, border: "1px solid rgba(0,0,0,0.06)" }}>
+      <svg width={width} height={height} style={{ display: "block" }}>
+        <defs>
+          {markerIds.map(({ id, color }) => (
+            <marker key={id} id={id} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill={color} fillOpacity="0.85" />
+            </marker>
+          ))}
+        </defs>
+
+        {/* Edges */}
+        {visibleEdges.map((e, i) => {
+          const from = posMap.get(e.from);
+          const to = posMap.get(e.to);
+          if (!from || !to) return null;
+          const isHighlighted = connectedEdges ? connectedEdges.has(i) : true;
+          const color = edgeTypeColor[e.type] ?? "#9CA3AF";
+          const sw = 1 + e.strength * 2.5; // 1–3.5px based on strength
+          const markerId = `arrow-${e.type}`;
+          return (
+            <path key={i}
+              d={edgePath(from, to, nodeR(e.from), nodeR(e.to), i)}
+              stroke={color}
+              strokeWidth={isHighlighted ? sw : 0.8}
+              strokeOpacity={isHighlighted ? 0.8 : 0.1}
+              strokeDasharray={e.type === "correlates" ? "5 3" : undefined}
+              fill="none"
+              markerEnd={isHighlighted || !connectedEdges ? `url(#${markerId})` : undefined}
+              style={{ cursor: "pointer" }}
+              onMouseEnter={ev => setHoveredEdge({ edge: e, mx: ev.clientX, my: ev.clientY })}
+              onMouseMove={ev => setHoveredEdge(h => h ? { ...h, mx: ev.clientX, my: ev.clientY } : null)}
+              onMouseLeave={() => setHoveredEdge(null)}
+            />
+          );
+        })}
+
+        {/* Nodes */}
+        {trendPositions.map(({ id, x, y }) => {
+          const isHovered = hoveredNodeId === id;
+          const dimmed2 = connectedTo ? !connectedTo.has(id) : false;
+          const r = nodeR(id);
+          const { lx, ly } = labelPos(x, y);
+          const isAbove = ly < y;
+          return (
+            <g key={id}
+              onMouseEnter={() => setHoveredNodeId(id)}
+              onMouseLeave={() => setHoveredNodeId(null)}
+              style={{ cursor: "pointer" }}
+            >
+              {/* Glow ring on hover */}
+              {isHovered && <circle cx={x} cy={y} r={r + 5} fill="#1A9E5A" fillOpacity={0.15} />}
+              <circle cx={x} cy={y} r={isHovered ? r + 2 : r}
+                fill={isHovered ? "#1A9E5A" : "white"}
+                stroke={isHovered ? "#1A9E5A" : "#1A9E5A"}
+                strokeWidth={isHovered ? 2 : 1.5}
+                opacity={dimmed2 ? 0.2 : 1}
+                style={{ filter: isHovered ? "drop-shadow(0 0 4px #1A9E5A88)" : undefined }}
+              />
+              {/* Label with subtle background */}
+              <text x={lx} y={isAbove ? ly - 2 : ly + 12} textAnchor="middle" fontSize={10}
+                fill={dimmed2 ? "rgba(0,0,0,0.2)" : "#111"}
+                fontFamily="inherit" fontWeight={isHovered ? "600" : "400"}
+              >{getName(id)}</text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: "6px 14px 10px", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+        {markerIds.map(({ type, color }) => (
+          <div key={type} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width={20} height={8} style={{ flexShrink: 0 }}>
+              <line x1={1} y1={4} x2={14} y2={4} stroke={color} strokeWidth={2}
+                strokeDasharray={type === "correlates" ? "3 2" : undefined} />
+              <polygon points="13,1 13,7 20,4" fill={color} />
+            </svg>
+            <span style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>{edgeTypeLabel[type] ?? type}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Edge descriptions (shown when a node is hovered) */}
+      {hoveredNodeId && (() => {
+        const relevant = visibleEdges.filter(e => e.from === hoveredNodeId || e.to === hoveredNodeId);
+        if (relevant.length === 0) return null;
+        return (
+          <div style={{ padding: "8px 14px 12px", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 6 }}>Kausalketten</div>
+            {relevant.map((e, i) => {
+              const color = edgeTypeColor[e.type] ?? "#9CA3AF";
+              const fromName = getName(e.from);
+              const toName = getName(e.to);
+              const pct = Math.round(e.strength * 100);
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 6, fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: "#333", fontWeight: e.from === hoveredNodeId ? 600 : 400 }}>{fromName}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color, background: `${color}15`, border: `1px solid ${color}40`, borderRadius: 6, padding: "1px 6px", flexShrink: 0 }}>{edgeTypeLabel[e.type] ?? e.type} {pct}%</span>
+                  <span style={{ color: "#333", fontWeight: e.to === hoveredNodeId ? 600 : 400 }}>{toName}</span>
+                  {e.description && <span style={{ fontSize: 10, color: "var(--color-text-muted)", flex: 1 }}>— {e.description}</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Edge tooltip on hover */}
+      {hoveredEdge && (() => {
+        const { edge: e, mx, my } = hoveredEdge;
+        const color = edgeTypeColor[e.type] ?? "#9CA3AF";
+        const fromName = getName(e.from);
+        const toName = getName(e.to);
+        const pct = Math.round(e.strength * 100);
+        return (
+          <div style={{
+            position: "fixed", left: mx + 12, top: my - 10, zIndex: 9999,
+            background: "white", border: `1.5px solid ${color}55`,
+            borderRadius: 8, padding: "6px 10px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+            pointerEvents: "none", maxWidth: 260,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#111", marginBottom: 2 }}>
+              {fromName} → {toName}
+            </div>
+            <div style={{ fontSize: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color, fontWeight: 700, background: `${color}18`, borderRadius: 5, padding: "1px 6px" }}>{edgeTypeLabel[e.type] ?? e.type}</span>
+              <span style={{ color: "var(--color-text-muted)" }}>Stärke: {pct}%</span>
+            </div>
+            {e.description && <div style={{ fontSize: 10, color: "var(--color-text-secondary)", marginTop: 3 }}>{e.description}</div>}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ── DimensionsDetailBody ─────────────────────────────────────────────────
+
+function DimensionsDetailBody({ dimData, createdAt }: { dimData: DimensionEntry[]; createdAt?: string }) {
+  const [activeDim, setActiveDim] = useState<string | null>(null);
+  const active = activeDim ? dimData.find(d => d.key === activeDim) : null;
+
+  return (
+    <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+      {/* Radar centered, full width */}
+      <GraphLightbox title="Dimensionen-Radar" style={{ borderRadius: 14, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "center", background: "rgba(59,130,246,0.025)", border: "1px solid rgba(0,0,0,0.06)", padding: "20px 0 12px" }}
+          onMouseLeave={() => setActiveDim(null)}>
+          <DimensionRadarInteractive dimData={dimData} size={340} onHover={setActiveDim} />
+        </div>
+      </GraphLightbox>
+      {/* Dimension summary bars — 2×2 grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+        {dimData.map(dim => {
+          const pct = Math.round(dim.avgConfidence * 100);
+          const arrow = dim.direction === "up" ? "↑" : dim.direction === "down" ? "↓" : "→";
+          const isActive = activeDim === dim.key;
+          return (
+            <div key={dim.key}
+              onMouseEnter={() => setActiveDim(dim.key)}
+              onMouseLeave={() => setActiveDim(null)}
+              style={{ cursor: "pointer", padding: "10px 12px", borderRadius: 10, border: `1.5px solid ${isActive ? dim.color + "66" : "rgba(0,0,0,0.07)"}`, background: isActive ? `${dim.color}08` : "white", transition: "all 0.15s" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: dim.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", flex: 1, lineHeight: 1.2 }}>{dim.label}</span>
+                <span style={{ fontSize: 13, color: dim.color, fontWeight: 800 }}>{arrow} {pct}%</span>
+              </div>
+              <div style={{ height: 5, background: "rgba(0,0,0,0.07)", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: dim.color, borderRadius: 3, transition: "width 0.4s ease" }} />
+              </div>
+              <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>
+                {dim.trends.length === 0 ? "Keine Trends" : `${dim.trends.length} Trend${dim.trends.length > 1 ? "s" : ""}`}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Trends for active or all dimensions */}
+      {(active ? [active] : dimData.filter(d => d.trends.length > 0)).map(dim => (
+        <div key={dim.key} style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: dim.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: dim.color }}>{dim.label}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {dim.trends.map(t => (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 8, background: `${dim.color}08`, border: `1px solid ${dim.color}20` }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)" }}>{t.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 1 }}>
+                    {t.ring} · {t.velocity === "rising" ? "↑ steigend" : t.velocity === "falling" ? "↓ fallend" : "→ stabil"} · {Math.round(t.relevance * 100)}% Relevanz
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                  <div style={{ width: 52, height: 4, background: "rgba(0,0,0,0.07)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${t.confidence * 100}%`, background: dim.color, borderRadius: 2 }} />
+                  </div>
+                  <span style={{ fontSize: 9, color: dim.color, fontWeight: 600 }}>{Math.round(t.confidence * 100)}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {createdAt && <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 8 }}>{new Date(createdAt).toLocaleString("de-DE")}</div>}
+    </div>
+  );
+}
+
+function DimensionRadarInteractive({ dimData, size, onHover }: {
+  dimData: DimensionEntry[]; size: number; onHover: (key: string | null) => void;
+}) {
+  const [localHover, setLocalHover] = useState<string | null>(null);
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = size / 2 - 36;
+  const axes = dimData.map((d, i) => {
+    const angle = (i / dimData.length) * 2 * Math.PI - Math.PI / 2;
+    return { ...d, angle, ax: cx + maxR * Math.cos(angle), ay: cy + maxR * Math.sin(angle) };
+  });
+  const polyPoints = axes.map(a => {
+    const r = a.avgConfidence * maxR;
+    return `${cx + r * Math.cos(a.angle)},${cy + r * Math.sin(a.angle)}`;
+  }).join(" ");
+  const hovered = localHover;
+  return (
+    <svg width={size} height={size} style={{ display: "block", overflow: "visible" }}>
+      {[0.25, 0.5, 0.75, 1].map(r => (
+        <polygon key={r}
+          points={axes.map(a => `${cx + maxR * r * Math.cos(a.angle)},${cy + maxR * r * Math.sin(a.angle)}`).join(" ")}
+          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={1}
+        />
+      ))}
+      {axes.map(a => (
+        <line key={a.key} x1={cx} y1={cy} x2={a.ax} y2={a.ay}
+          stroke={hovered === a.key ? a.color : "rgba(0,0,0,0.1)"} strokeWidth={hovered === a.key ? 2 : 1} />
+      ))}
+      <polygon points={polyPoints}
+        fill={hovered ? (axes.find(a => a.key === hovered)?.color ?? "#3b82f6") + "22" : "rgba(59,130,246,0.15)"}
+        stroke={hovered ? (axes.find(a => a.key === hovered)?.color ?? "#3b82f6") : "#3b82f6"}
+        strokeWidth={2}
+        style={{ transition: "fill 0.2s, stroke 0.2s" }}
+      />
+      {axes.map(a => {
+        const r = a.avgConfidence * maxR;
+        const px = cx + r * Math.cos(a.angle);
+        const py = cy + r * Math.sin(a.angle);
+        const isH = hovered === a.key;
+        const cos = Math.cos(a.angle);
+        const sin = Math.sin(a.angle);
+        return (
+          <g key={a.key}
+            onMouseEnter={() => { setLocalHover(a.key); onHover(a.key); }}
+            onMouseLeave={() => { setLocalHover(null); onHover(null); }}
+            style={{ cursor: "pointer" }}
+          >
+            <line x1={cx} y1={cy} x2={a.ax} y2={a.ay} stroke="transparent" strokeWidth={14} />
+            <circle cx={px} cy={py} r={isH ? 6 : 4}
+              fill={a.color} stroke="white" strokeWidth={isH ? 2 : 1}
+              opacity={a.trends.length === 0 ? 0.3 : 1}
+            />
+            <text
+              x={a.ax + cos * 10}
+              y={a.ay + sin * 10 + (sin > 0.1 ? 11 : sin < -0.1 ? -5 : 4)}
+              textAnchor={cos > 0.2 ? "start" : cos < -0.2 ? "end" : "middle"}
+              fontSize={isH ? 11 : 10} fontWeight={isH ? 700 : 500}
+              fill={isH ? a.color : "var(--color-text-secondary)"}
+              fontFamily="inherit"
+            >{a.label.split(" & ")[0]}</text>
+            {isH && a.trends.length > 0 && (
+              <text x={px + (cos > 0 ? 10 : -10)} y={py - 6}
+                textAnchor={cos > 0 ? "start" : "end"}
+                fontSize={11} fontWeight={700} fill={a.color} fontFamily="inherit">
+                {Math.round(a.avgConfidence * 100)}%
+              </text>
+            )}
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r={2.5} fill="rgba(0,0,0,0.25)" />
+    </svg>
+  );
+}
+
+// ── ScenarioComparisonChart ───────────────────────────────────────────────
+
+function ScenarioComparisonChart({ scenarios, currentId, de }: {
+  scenarios: DerivedNode[]; currentId: string; de: boolean;
+}) {
+  if (scenarios.length < 2) return null;
+  const sorted = [...scenarios].sort((a, b) => (b.probability ?? 0) - (a.probability ?? 0));
+  return (
+    <div style={{ marginBottom: 24, padding: "16px 18px 18px", background: "rgba(0,0,0,0.025)", borderRadius: 12, border: "1px solid rgba(0,0,0,0.07)" }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 14 }}>
+        {de ? "Szenario-Vergleich" : "Scenario Comparison"}
+      </div>
+      {sorted.map(s => {
+        const pct = Math.round((s.probability ?? 0) * 100);
+        const isCurrent = s.id === currentId;
+        const cfg = s.colorKey ? SCEN[s.colorKey] ?? SCEN.baseline : SCEN.baseline;
+        return (
+          <div key={s.id} style={{ marginBottom: 13 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+              <span style={{ fontSize: isCurrent ? 13 : 12, fontWeight: isCurrent ? 700 : 400, color: isCurrent ? cfg.color : "var(--color-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {isCurrent && "▶ "}{s.label || s.content.slice(0, 48)}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: cfg.color, flexShrink: 0, minWidth: 36, textAlign: "right" }}>{pct}%</span>
+            </div>
+            <div style={{ height: isCurrent ? 10 : 7, background: "rgba(0,0,0,0.07)", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", width: `${pct}%`, borderRadius: 4,
+                background: cfg.color,
+                opacity: isCurrent ? 1 : 0.38,
+                transition: "width 0.6s ease",
+              }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── DetailPanel ───────────────────────────────────────────────────────────
+
+interface DetailPanelProps {
+  node: CanvasNode;
+  de: boolean;
+  allQueryNodes: QueryNode[];
+  onClose: () => void;
+  onFollowUp: (id: string, prefill?: string) => void;
+  onRefresh: (id: string) => void;
+  onExplore: (id: string, queryText: string) => void;
+  onDelete: (id: string) => void;
+  onUpdateNote: (id: string, content: string) => void;
+  onUpdateIdea: (id: string, title: string, content: string) => void;
+  onUpdateList: (id: string, title: string, items: string[]) => void;
+  onPromoteNote: (query: string) => void;
+  onPromoteIdea: (query: string) => void;
+  onAnalyzeFile: (query: string, parentId: string) => void;
+  onIterate: (nodeId: string, prefill: string) => void;
+  onSetStatus: (id: string, status: NodeStatus) => void;
+  onUpdateTags: (id: string, tags: string[]) => void;
+  siblingScenarios?: DerivedNode[];
+}
+
+function DetailPanel({
+  node, de, allQueryNodes, onClose, onFollowUp, onRefresh, onExplore, onDelete,
+  onUpdateNote, onUpdateIdea, onUpdateList, onPromoteNote, onPromoteIdea,
+  onAnalyzeFile, onIterate, onSetStatus, onUpdateTags, siblingScenarios,
+}: DetailPanelProps) {
+  const [noteDraft, setNoteDraft] = useState(() =>
+    node.nodeType === "note" ? (node as NoteNode).content || "" : ""
+  );
+  const [ideaTitle, setIdeaTitle] = useState(() =>
+    node.nodeType === "idea" ? (node as IdeaNode).title || "" : ""
+  );
+  const [ideaContent, setIdeaContent] = useState(() =>
+    node.nodeType === "idea" ? (node as IdeaNode).content || "" : ""
+  );
+  const [listTitle, setListTitle] = useState(() =>
+    node.nodeType === "list" ? (node as ListNode).title || "" : ""
+  );
+  const [listItems, setListItems] = useState<string[]>(() =>
+    node.nodeType === "list" ? (node as ListNode).items || [""] : [""]
+  );
+  const [editingListIdx, setEditingListIdx] = useState<number | null>(null);
+  const [listDraftItem, setListDraftItem] = useState("");
+  const listItemRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  // Sync state when node switches
+  useEffect(() => {
+    if (node.nodeType === "note") setNoteDraft((node as NoteNode).content || "");
+    if (node.nodeType === "idea") {
+      setIdeaTitle((node as IdeaNode).title || "");
+      setIdeaContent((node as IdeaNode).content || "");
+    }
+    if (node.nodeType === "list") {
+      setListTitle((node as ListNode).title || "");
+      setListItems((node as ListNode).items || [""]);
+      setEditingListIdx(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id]);
+
+  // ── Auto-save handlers ────────────────────────────────────────────────────
+  const handleNoteChange = (val: string) => {
+    setNoteDraft(val);
+    onUpdateNote(node.id, val);
+  };
+  const handleIdeaTitleChange = (val: string) => {
+    setIdeaTitle(val);
+    onUpdateIdea(node.id, val, ideaContent);
+  };
+  const handleIdeaContentChange = (val: string) => {
+    setIdeaContent(val);
+    onUpdateIdea(node.id, ideaTitle, val);
+  };
+  const handleListTitleChange = (val: string) => {
+    setListTitle(val);
+    onUpdateList(node.id, val, listItems);
+  };
+  const commitListItem = (i: number, val: string) => {
+    const updated = listItems.map((it, idx) => idx === i ? val : it)
+      .filter((it, idx) => it.trim() !== "" || idx === listItems.length - 1);
+    const final = updated.length > 0 ? updated : [""];
+    setListItems(final);
+    setEditingListIdx(null);
+    onUpdateList(node.id, listTitle, final);
+  };
+  const addListItem = () => {
+    const items = [...listItems, ""];
+    setListItems(items);
+    setTimeout(() => {
+      const i = items.length - 1;
+      setEditingListIdx(i); setListDraftItem("");
+      listItemRefs.current[i]?.focus();
+    }, 30);
+  };
+  const removeListItem = (i: number) => {
+    const items = listItems.filter((_, idx) => idx !== i);
+    const final = items.length > 0 ? items : [""];
+    setListItems(final);
+    onUpdateList(node.id, listTitle, final);
+  };
+
+  const copyText = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  const renderHeader = () => {
+    if (node.nodeType === "query") {
+      const qNode = node as QueryNode;
+      return (
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 5, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>ABFRAGE</div>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, fontFamily: "var(--font-heading, 'Bricolage Grotesque'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.025em" }}>{qNode.query}</h2>
+        </div>
+      );
+    }
+    if (node.nodeType === "note") return (
+      <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#F9A825", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>NOTIZ</div>
+    );
+    if (node.nodeType === "idea") return (
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#FF9800", marginBottom: 6, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>IDEE</div>
+        <input
+          value={ideaTitle}
+          onChange={e => handleIdeaTitleChange(e.target.value)}
+          placeholder={de ? "Idee oder Hypothese…" : "Idea or hypothesis…"}
+          style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
+        />
+      </div>
+    );
+    if (node.nodeType === "list") return (
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#2E7D32", marginBottom: 6, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>LISTE</div>
+        <input
+          value={listTitle}
+          onChange={e => handleListTitleChange(e.target.value)}
+          placeholder={de ? "Listen-Titel…" : "List title…"}
+          style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
+        />
+      </div>
+    );
+    if (node.nodeType === "file") {
+      const fNode = node as FileNode;
+      return (
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4A6CF7", marginBottom: 5, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>DATEI</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-heading)" }}>{fNode.fileName}</div>
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>{formatFileSize(fNode.fileSize)}</div>
+        </div>
+      );
+    }
+    // Derived
+    const dNode = node as DerivedNode;
+    const type = dNode.nodeType;
+    if (type === "dimensions") {
+      return (
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#3b82f6", marginBottom: 5, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>DIMENSIONEN</div>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", lineHeight: 1.3 }}>Strategische Dimensionsanalyse</h2>
+        </div>
+      );
+    }
+    if (type === "causalgraph") {
+      return (
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#1A9E5A", marginBottom: 5, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>KAUSALNETZ</div>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", lineHeight: 1.3 }}>Kausal-Beziehungen</h2>
+        </div>
+      );
+    }
+    const badge = type === "insight" ? (de ? "ERKENNTNIS" : "INSIGHT")
+      : type === "decision" ? (de ? "EMPFEHLUNG" : "DECISION")
+      : type === "followup" ? (de ? "FOLGEFRAGE" : "FOLLOW-UP")
+      : (() => { const s = SCEN[dNode.colorKey ?? "baseline"] ?? SCEN.baseline; return de ? s.label.toUpperCase() : s.labelEn.toUpperCase(); })();
+    const accentColor = type === "insight" ? "#6B7A00"
+      : type === "decision" ? "#1A9E5A"
+      : type === "scenario" ? (SCEN[dNode.colorKey ?? "baseline"]?.color ?? "#1D4ED8")
+      : "#6B7280";
+    return (
+      <div>
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: accentColor, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{badge}</span>
+        {type === "scenario" && dNode.label && (
+          <h2 style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 700, color: SCEN[dNode.colorKey ?? "baseline"]?.color ?? "#1D4ED8", lineHeight: 1.4 }}>{dNode.label}</h2>
+        )}
+        {(type === "insight" || type === "decision") && dNode.content && (
+          <h2 style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", lineHeight: 1.4 }}>
+            {dNode.content.length > 80 ? dNode.content.slice(0, 80) + "…" : dNode.content}
+          </h2>
+        )}
+      </div>
+    );
+  };
+
+  // ── Body ──────────────────────────────────────────────────────────────────
+  const renderBody = () => {
+    if (node.nodeType === "query") {
+      const qNode = node as QueryNode;
+      const r = qNode.result;
+      const age = nodeAge(qNode.createdAt);
+      const isLoading = qNode.status === "loading" || qNode.status === "streaming";
+
+      // Coherence: find overlapping matched trends with other query nodes
+      const myIds = new Set(r?.matchedTrendIds ?? []);
+      const coherences = myIds.size > 0
+        ? allQueryNodes
+            .filter(n => n.id !== qNode.id && n.status === "done" && (n.result?.matchedTrendIds?.length ?? 0) > 0)
+            .map(n => {
+              const shared = (n.result!.matchedTrendIds ?? []).filter(id => myIds.has(id));
+              return { nodeId: n.id, query: n.query, overlap: shared.length };
+            })
+            .filter(c => c.overlap >= 2)
+            .sort((a, b) => b.overlap - a.overlap)
+            .slice(0, 3)
+        : [];
+
+      // Demographics: trends tagged with demographic/society categories
+      const demographicTrends = (r?.matchedTrends ?? []).filter(t =>
+        t.tags?.some(tag => ["demographics", "society", "aging", "population", "migration", "work", "education", "health"].includes(tag)) ||
+        t.id.includes("demographic") || t.category === "society"
+      );
+
+      // Trend name lookup
+      const trendNames = new Map((r?.matchedTrends ?? []).map(t => [t.id, t.name]));
+
+      return (
+        <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+
+          {/* ── Streaming progress ───────────────────────────────── */}
+          {isLoading && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", background: "var(--pastel-peach)", borderRadius: 8, border: "1px solid #F5A62330" }}>
+              {(() => {
+                const phases = de
+                  ? ["Signale lesen…", "Synthese…", "Kausalketten…", "Szenarien…", "Erkenntnisse…", "Abschliessen…"]
+                  : ["Reading signals…", "Synthesis…", "Causal chains…", "Scenarios…", "Insights…", "Finishing…"];
+                const phase = qNode.streamingPhase ?? 0;
+                return (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: "#F5A623" }}>{phases[phase]}</span>
+                      <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{Math.round((phase / 5) * 100)}%</span>
+                    </div>
+                    <div style={{ height: 3, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(phase / 5) * 100}%`, background: "linear-gradient(90deg, #F5A623, #E4FF97)", borderRadius: 2, transition: "width 0.5s ease" }} />
+                    </div>
+                    <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+                      {phases.map((p, i) => (
+                        <span key={i} style={{ fontSize: 9, padding: "1px 7px", borderRadius: 20, background: i <= phase ? "#F5A62320" : "transparent", border: `1px solid ${i <= phase ? "#F5A623" : "var(--color-border)"}`, color: i <= phase ? "#F5A623" : "var(--color-text-muted)", transition: "all 0.3s" }}>{p.replace("…","")}</span>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── Error ────────────────────────────────────────────── */}
+          {qNode.status === "error" && (
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FEF2F2", borderRadius: 8, border: "1px solid #FCA5A5" }}>
+              <p style={{ fontSize: 13, color: "#E8402A", margin: 0 }}>{qNode.errorMsg || "Fehler bei der Analyse"}</p>
+            </div>
+          )}
+
+          {/* ── Aktueller Kontext ─────────────────────────────────── */}
+          {(r?.newsContext || (r?.usedSignals && r.usedSignals.length > 0)) && (
+            <CollapsibleSection title={`${de ? "Live-Signale & Kontext" : "Live Signals & Context"}${r?.usedSignals?.length ? ` (${r.usedSignals.length})` : ""}`} accent="#2563EB">
+              {r?.newsContext && (
+                <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: "0 0 12px", padding: "8px 12px", background: "#EFF6FF", borderRadius: 7, borderLeft: "3px solid #2563EB" }}>
+                  {r.newsContext}
+                </p>
+              )}
+              {r?.usedSignals && r.usedSignals.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {r.usedSignals.slice(0, 10).map((s, i) => {
+                    // Age badge: green < 24h, yellow < 72h, red > 72h
+                    const signalDate = s.date ? new Date(s.date) : null;
+                    const hoursAgo = signalDate ? (Date.now() - signalDate.getTime()) / 3600000 : null;
+                    const ageBg = hoursAgo == null ? "#9CA3AF" : hoursAgo < 24 ? "#1A9E5A" : hoursAgo < 72 ? "#F5A623" : "#E8402A";
+                    const ageLabel = hoursAgo == null ? "?" : hoursAgo < 1 ? "<1h" : hoursAgo < 24 ? `${Math.round(hoursAgo)}h` : `${Math.round(hoursAgo / 24)}d`;
+                    return (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                        background: "var(--color-page-bg)", borderRadius: 7,
+                        border: "1px solid var(--color-border)", transition: "background 0.12s",
+                      }}>
+                        {/* Age badge */}
+                        <Tooltip content={signalDate ? signalDate.toLocaleString("de-DE") : (de ? "Unbekannt" : "Unknown")} placement="top">
+                          <span style={{
+                            fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+                            background: `${ageBg}18`, color: ageBg, border: `1px solid ${ageBg}33`,
+                            flexShrink: 0, letterSpacing: "0.03em",
+                          }}>{ageLabel}</span>
+                        </Tooltip>
+                        {/* Source badge */}
+                        <span style={{
+                          fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 10,
+                          background: "#2563EB10", color: "#2563EB", border: "1px solid #2563EB25",
+                          flexShrink: 0, fontFamily: "var(--font-code, monospace)",
+                        }}>{s.source}</span>
+                        {/* Title (link if URL exists) */}
+                        <span style={{ fontSize: 11, color: "var(--color-text-secondary)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3 }}>
+                          {s.url ? (
+                            <a href={s.url} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              style={{ color: "inherit", textDecoration: "none" }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#2563EB"}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"}
+                            >{s.title}</a>
+                          ) : s.title}
+                        </span>
+                        {/* Strength indicator */}
+                        {s.strength != null && s.strength > 0 && (
+                          <span style={{ fontSize: 8, color: "var(--color-text-muted)", flexShrink: 0 }}>
+                            {"●".repeat(Math.min(3, Math.ceil(s.strength * 3)))}{"○".repeat(3 - Math.min(3, Math.ceil(s.strength * 3)))}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Synthese ──────────────────────────────────────────── */}
+          {(qNode.synthesis || isLoading) && (
+            <CollapsibleSection title={de ? "Synthese" : "Synthesis"}>
+              {r?.confidence != null && r.confidence > 0 && (
+                <div style={{ marginBottom: 8 }}><ConfidenceBadge value={r.confidence} de={de} /></div>
+              )}
+              <p style={{ fontSize: 14, lineHeight: 1.78, color: "var(--color-text-primary)", margin: "0 0 4px" }}>
+                {qNode.synthesis}
+                {qNode.status === "streaming" && (
+                  <span style={{ display: "inline-block", width: 2, height: "0.9em", background: "#0A0A0A", marginLeft: 2, animation: "cur-blink 0.8s steps(1) infinite", verticalAlign: "text-bottom" }} />
+                )}
+                {qNode.status === "loading" && <span style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Analysiere…" : "Analyzing…"}</span>}
+              </p>
+            </CollapsibleSection>
+          )}
+
+          {/* ── Radar ─────────────────────────────────────────────── */}
+          {r?.matchedTrends && r.matchedTrends.length > 0 && (
+            <CollapsibleSection title={de ? "Radar — Analyseprofil" : "Radar — Analysis Profile"} defaultOpen={false}>
+              <RadarChart trends={r.matchedTrends} de={de} />
+              {/* Category distribution */}
+              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {Object.entries(
+                  r.matchedTrends.reduce<Record<string, number>>((acc, t) => { acc[t.category] = (acc[t.category] ?? 0) + 1; return acc; }, {})
+                ).sort((a, b) => b[1] - a[1]).map(([cat, cnt]) => (
+                  <span key={cat} style={{ fontSize: 9, padding: "1px 8px", borderRadius: 20, background: "var(--color-page-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}>
+                    {cat} ×{cnt}
+                  </span>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* ── Kohärenzen ────────────────────────────────────────── */}
+          {coherences.length > 0 && (
+            <CollapsibleSection title={de ? "Kohärenzen" : "Coherences"} accent="#8B5CF6" defaultOpen={false}>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 8px" }}>
+                {de ? "Geteilte Trends mit anderen Analysen auf diesem Canvas:" : "Shared trends with other analyses on this canvas:"}
+              </p>
+              {coherences.map(c => (
+                <div key={c.nodeId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 10px", background: "#F5F3FF", borderRadius: 7, border: "1px solid #E5E0FF" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#8B5CF6", background: "#EDE9FE", borderRadius: 20, padding: "1px 7px", flexShrink: 0 }}>{c.overlap}</span>
+                  <span style={{ fontSize: 12, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.query}</span>
+                </div>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Kausalnetz ────────────────────────────────────────── */}
+          {r?.matchedEdges && r.matchedEdges.length > 0 && (
+            <CollapsibleSection title={de ? "Kausalnetz" : "Causal Network"} accent="#1A9E5A" defaultOpen={false}>
+              <CausalEdgeList edges={r.matchedEdges} trendNames={trendNames} de={de} />
+              {r?.causalAnalysis && r.causalAnalysis.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {r.causalAnalysis.map((chain, i) => (
+                    <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8, borderLeft: "2px solid #1A9E5A44" }}>{chain}</div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Kernerkenntnisse ──────────────────────────────────── */}
+          {r?.keyInsights && r.keyInsights.length > 0 && (
+            <CollapsibleSection title={de ? "Kernerkenntnisse" : "Key Insights"}>
+              {r.keyInsights.map((ins, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: "#0F6038", marginTop: 3 }}>◉</span>
+                  <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)", margin: 0 }}>{ins}</p>
+                </div>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Szenarien ─────────────────────────────────────────── */}
+          {r?.scenarios && r.scenarios.length > 0 && (
+            <CollapsibleSection title={de ? "Szenarien" : "Scenarios"}>
+              {r.scenarios.map((s, i) => {
+                const sc = SCEN[s.type ?? "baseline"] ?? SCEN.baseline;
+                return (
+                  <div key={i} style={{ marginBottom: 8, padding: "10px 12px", background: sc.bg, borderRadius: 8, borderLeft: `3px solid ${sc.color}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: sc.color, letterSpacing: "0.05em" }}>{de ? sc.label.toUpperCase() : sc.labelEn.toUpperCase()}</span>
+                      {s.timeframe && <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{s.timeframe}</span>}
+                      {s.probability != null && <span style={{ fontSize: 12, fontWeight: 700, color: sc.color, marginLeft: "auto" }}>{Math.round(s.probability * 100)}%</span>}
+                    </div>
+                    {/* Probability bar */}
+                    {s.probability != null && (
+                      <div style={{ height: 2, background: "rgba(255,255,255,0.5)", borderRadius: 1, marginBottom: 6 }}>
+                        <div style={{ height: "100%", width: `${s.probability * 100}%`, background: sc.color, borderRadius: 1 }} />
+                      </div>
+                    )}
+                    {s.name && <div style={{ fontSize: 12, fontWeight: 600, color: sc.color, marginBottom: 4 }}>{s.name}</div>}
+                    <p style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", margin: 0 }}>{s.description}</p>
+                    {s.keyDrivers && s.keyDrivers.length > 0 && (
+                      <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {s.keyDrivers.map((d, j) => (
+                          <span key={j} style={{ fontSize: 10, padding: "1px 7px", borderRadius: 20, background: "rgba(255,255,255,0.6)", border: `1px solid ${sc.border}`, color: sc.color }}>{d}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Demographics ──────────────────────────────────────── */}
+          {demographicTrends.length > 0 && (
+            <CollapsibleSection title={de ? "Demografischer Kontext" : "Demographic Context"} accent="#0369A1" defaultOpen={false}>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 8px" }}>
+                {de ? "Demographisch relevante Trends dieser Analyse:" : "Demographically relevant trends in this analysis:"}
+              </p>
+              {demographicTrends.map(t => (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 10px", background: "#F0F9FF", borderRadius: 7, border: "1px solid #BAE6FD" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)" }}>{t.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 2 }}>{t.category} · {t.velocity === "rising" ? "↑" : t.velocity === "falling" ? "↓" : "→"} {t.ring}</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <div style={{ width: 48, height: 3, background: "var(--color-border)", borderRadius: 1, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${t.relevance * 100}%`, background: "#0369A1", borderRadius: 1 }} />
+                    </div>
+                    <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{Math.round(t.relevance * 100)}% {de ? "Rel." : "rel."}</span>
+                  </div>
+                </div>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Strategische Interpretation ───────────────────────── */}
+          {r?.interpretation && (
+            <CollapsibleSection title={de ? "Strategische Interpretation" : "Strategic Interpretation"} accent="#0A3A20">
+              <div style={{ padding: "10px 14px", background: "#F4FBF7", borderRadius: 8, borderLeft: "3px solid #1A9E5A" }}>
+                <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--color-text-secondary)", margin: 0 }}>{r.interpretation}</p>
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* ── Entscheidungshilfe ────────────────────────────────── */}
+          {r?.decisionFramework && (
+            <CollapsibleSection title={de ? "Entscheidungshilfe" : "Decision Framework"} accent="#1D4ED8">
+              <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 8, borderLeft: "3px solid #2563EB" }}>
+                {r.decisionFramework.replace(/\.\s+(?=\d+\.)/g, ".\n").split("\n").filter(Boolean).map((step, i, arr) => (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: i < arr.length - 1 ? 8 : 0 }}>
+                    <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>{i + 1}</span>
+                    <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--color-text-secondary)", margin: 0 }}>{step.replace(/^\d+\.\s*/, "")}</p>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* ── Regulierung ───────────────────────────────────────── */}
+          {r?.regulatoryContext && r.regulatoryContext.length > 0 && (
+            <CollapsibleSection title={de ? "Regulierung" : "Regulatory Context"} defaultOpen={false}>
+              {r.regulatoryContext.map((reg, i) => (
+                <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8, borderLeft: "2px solid #F5A62344" }}>{reg}</div>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Folgefragen ───────────────────────────────────────── */}
+          {r?.followUpQuestions && r.followUpQuestions.length > 0 && (
+            <CollapsibleSection title={de ? "Folgefragen" : "Follow-up Questions"} defaultOpen={false}>
+              {r.followUpQuestions.map((q, i) => (
+                <button key={i} onClick={() => onFollowUp(node.id, q)}
+                  style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 4, fontSize: 12, fontStyle: "italic", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", lineHeight: 1.4, transition: "all 0.1s" }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "var(--color-page-bg)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.borderColor = "var(--color-border)"; }}
+                >→ {q}</button>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* ── Quellen ───────────────────────────────────────────── */}
+          {r?.references && r.references.length > 0 && (
+            <CollapsibleSection title={de ? "Quellen" : "References"} defaultOpen={false}>
+              {r.references.map((ref, i) => (
+                <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "block", fontSize: 12, color: "var(--color-brand)", textDecoration: "none", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = "underline"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = "none"}
+                >↗ {ref.title}</a>
+              ))}
+            </CollapsibleSection>
+          )}
+
+          {/* Timestamp */}
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>
+            {formatNodeTime(qNode.createdAt)}
+            {age !== "fresh" && <span style={{ marginLeft: 8, color: age === "stale" ? "#F5A623" : "rgba(245,166,35,0.6)" }}>{age === "stale" ? (de ? "· Veraltet" : "· Stale") : (de ? "· Altert" : "· Aging")}</span>}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.nodeType === "note") return (
+      <div style={{ padding: "8px 40px 28px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <textarea
+          value={noteDraft}
+          onChange={e => handleNoteChange(e.target.value)}
+          placeholder={de ? "Notiz hinzufügen…" : "Add note…"}
+          style={{ flex: 1, minHeight: 200, background: "var(--pastel-butter)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.65, color: "#3E2723", fontFamily: "inherit", resize: "none", outline: "none" }}
+        />
+        <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 8 }}>{formatNodeTime(node.createdAt)}</div>
+      </div>
+    );
+
+    if (node.nodeType === "idea") return (
+      <div style={{ padding: "8px 40px 28px", flex: 1, display: "flex", flexDirection: "column" }}>
+        <textarea
+          value={ideaContent}
+          onChange={e => handleIdeaContentChange(e.target.value)}
+          placeholder={de ? "Beschreibung, Begründung oder nächste Schritte…" : "Description, rationale or next steps…"}
+          style={{ flex: 1, minHeight: 200, background: "var(--pastel-peach)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.65, color: "#0A0A0A", fontFamily: "inherit", resize: "none", outline: "none" }}
+        />
+        <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 8 }}>{formatNodeTime(node.createdAt)}</div>
+      </div>
+    );
+
+    if (node.nodeType === "list") return (
+      <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+        {listItems.map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 5 }}>
+            <span style={{ color: "#2E7D32", fontSize: 12, marginTop: 4, flexShrink: 0 }}>•</span>
+            {editingListIdx === i ? (
+              <input
+                ref={el => { listItemRefs.current[i] = el; }}
+                value={listDraftItem}
+                onChange={e => setListDraftItem(e.target.value)}
+                onBlur={() => commitListItem(i, listDraftItem)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { e.preventDefault(); commitListItem(i, listDraftItem); addListItem(); }
+                  if (e.key === "Escape") setEditingListIdx(null);
+                }}
+                style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 14, color: "#0A0A0A", fontFamily: "inherit", lineHeight: 1.5 }}
+              />
+            ) : (
+              <span
+                onClick={() => { setEditingListIdx(i); setListDraftItem(item); setTimeout(() => listItemRefs.current[i]?.focus(), 0); }}
+                style={{ flex: 1, fontSize: 14, lineHeight: 1.5, color: item ? "#0A0A0A" : "rgba(0,0,0,0.3)", cursor: "text", minHeight: 22 }}
+              >{item || (de ? "Eintrag…" : "Item…")}</span>
+            )}
+            {listItems.length > 1 && (
+              <button onClick={() => removeListItem(i)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "0 3px", color: "rgba(0,0,0,0.2)", fontSize: 11, borderRadius: 3, lineHeight: 1, marginTop: 4 }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.2)"}
+              >✕</button>
+            )}
+          </div>
+        ))}
+        <button onClick={addListItem}
+          style={{ marginTop: 6, fontSize: 12, color: "#2E7D32", background: "none", border: "none", cursor: "pointer", padding: "2px 0", display: "flex", alignItems: "center", gap: 4, opacity: 0.7 }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0.7"}
+        >+ {de ? "Eintrag" : "Item"}</button>
+        <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 12 }}>{formatNodeTime(node.createdAt)}</div>
+      </div>
+    );
+
+    if (node.nodeType === "file") {
+      const fNode = node as FileNode;
+      const isImage = fNode.fileType.startsWith("image/");
+      return (
+        <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+          {isImage && fNode.fileUrl && (
+            <div style={{ marginBottom: 16, display: "flex", justifyContent: "center" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={fNode.fileUrl} alt={fNode.fileName} style={{ maxWidth: "100%", maxHeight: 320, borderRadius: 8, objectFit: "contain" }} />
+            </div>
+          )}
+          {!isImage && fNode.textContent && (
+            <div style={{ padding: "12px 14px", background: "#F8F9FC", borderRadius: 8, border: "1px solid var(--color-border)", marginBottom: 12 }}>
+              <pre style={{ fontSize: 11, lineHeight: 1.5, color: "rgba(0,0,0,0.65)", margin: 0, whiteSpace: "pre-wrap", fontFamily: "ui-monospace, monospace", overflowWrap: "break-word" }}>
+                {fNode.textContent.slice(0, 3000)}{fNode.textContent.length > 3000 && "\n…"}
+              </pre>
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)" }}>{formatNodeTime(fNode.createdAt)}</div>
+        </div>
+      );
+    }
+
+    // Dimensions body
+    const dNodeCheck = node as DerivedNode;
+    if (dNodeCheck.nodeType === "dimensions") {
+      const dimData = dNodeCheck.dimensionData ?? [];
+      return (
+        <DimensionsDetailBody dimData={dimData} createdAt={dNodeCheck.createdAt ? String(dNodeCheck.createdAt) : undefined} />
+      );
+    }
+
+    // Causal graph body
+    if (dNodeCheck.nodeType === "causalgraph") {
+      const edges = dNodeCheck.causalEdges ?? [];
+      const trendNames = new Map(Object.entries(dNodeCheck.causalTrendNames ?? {}));
+      const nameMapObj = dNodeCheck.causalTrendNames ?? {};
+      return (
+        <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+          {edges.length > 0 && (
+            <div style={{ marginBottom: 20, padding: "12px 0" }}>
+              <GraphLightbox title={de ? "Kausalnetz — Vollbild" : "Causal Graph — Fullscreen"} style={{ borderRadius: 8, overflow: "hidden" }}>
+                <CausalGraphSVG edges={edges} nameMap={nameMapObj} width={760} height={380} />
+              </GraphLightbox>
+            </div>
+          )}
+          <CausalEdgeList edges={edges} trendNames={trendNames} de={de} />
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 12 }}>{formatNodeTime(dNodeCheck.createdAt)}</div>
+        </div>
+      );
+    }
+
+    // Derived node body
+    const dNode = node as DerivedNode;
+    const type = dNode.nodeType;
+    const isScenario = type === "scenario";
+    const scenCfg = isScenario && dNode.colorKey ? SCEN[dNode.colorKey] ?? SCEN.baseline : null;
+    return (
+      <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
+        {isScenario && siblingScenarios && siblingScenarios.length > 1 && (
+          <ScenarioComparisonChart scenarios={siblingScenarios} currentId={dNode.id} de={de} />
+        )}
+        {isScenario && dNode.probability != null && !siblingScenarios?.length && scenCfg && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.08)", overflow: "hidden", marginBottom: 5 }}>
+              <div style={{ height: 4, width: `${dNode.probability * 100}%`, borderRadius: 2, background: scenCfg?.color ?? "#1D4ED8" }} />
+            </div>
+            <span style={{ fontSize: 11, color: scenCfg?.color ?? "#1D4ED8", fontWeight: 600 }}>{Math.round(dNode.probability * 100)}% {de ? "Wahrscheinlichkeit" : "probability"}</span>
+          </div>
+        )}
+        <p style={{ fontSize: 14, lineHeight: 1.78, color: isScenario ? (scenCfg?.color ?? "var(--color-text-secondary)") : "var(--color-text-secondary)", margin: "0 0 14px", fontStyle: type === "followup" ? "italic" : "normal" }}>
+          {type === "followup" ? `→ ${dNode.content}` : dNode.content}
+        </p>
+        {dNode.sources && dNode.sources.length > 0 && (
+          <div style={{ marginBottom: 12 }}><SourceChips sources={dNode.sources} de={de} /></div>
+        )}
+        <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{formatNodeTime(dNode.createdAt)}</div>
+      </div>
+    );
+  };
+
+  // ── Status selector ──────────────────────────────────────────────────────
+  const renderStatusSelector = () => (
+    <div style={{ display: "flex", gap: 4, padding: "0 40px 8px" }}>
+      {(["open","active","decided","pinned"] as NodeStatus[]).map(s => {
+        const meta = NODE_STATUS_META[s];
+        const current = (node as QueryNode & { nodeStatus?: NodeStatus }).nodeStatus ?? "open";
+        return (
+          <button key={s}
+            onClick={() => onSetStatus(node.id, s)}
+            title={meta.label}
+            style={{
+              fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
+              border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
+              background: current === s ? `${meta.color}18` : "transparent",
+              color: current === s ? meta.color : "var(--color-text-muted)",
+              fontWeight: current === s ? 700 : 400,
+              transition: "all 0.1s",
+            }}
+          >{meta.icon} {meta.label}</button>
+        );
+      })}
+    </div>
+  );
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const renderFooter = () => {
+    const btnBase: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 20, cursor: "pointer" };
+    const btnMuted: React.CSSProperties = { fontSize: 12, padding: "6px 10px", borderRadius: 20, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer" };
+    const btnDelete: React.CSSProperties = { marginLeft: "auto", ...btnMuted };
+
+    if (node.nodeType === "query") {
+      const qNode = node as QueryNode;
+      const age = nodeAge(qNode.createdAt);
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <button onClick={() => onFollowUp(node.id)} style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A" }}>{de ? "Weiterdenken" : "Follow up"}</button>
+            {qNode.status === "done" && (
+              <button onClick={() => onRefresh(node.id)}
+                style={{ ...btnBase, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
+              >⟳ {de ? "Aktualisieren" : "Refresh"}</button>
+            )}
+            {qNode.status === "error" && (
+              <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}>↺ Retry</button>
+            )}
+            {qNode.synthesis && (
+              <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted }}>{copied ? "✓" : "⎘"}</button>
+            )}
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+    if (node.nodeType === "note") {
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onPromoteNote(noteDraft)} disabled={!noteDraft.trim()}
+              style={{ ...btnBase, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", opacity: noteDraft.trim() ? 1 : 0.4 }}
+            >{de ? "Als Abfrage" : "As Query"}</button>
+            <button onClick={() => onIterate(node.id, noteDraft)} style={btnMuted}>↺ rethink</button>
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+    if (node.nodeType === "idea") {
+      const ideaText = [ideaTitle, ideaContent].filter(Boolean).join(" — ");
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onPromoteIdea(ideaText)} disabled={!ideaText.trim()}
+              style={{ ...btnBase, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.08)", color: "#E65100", opacity: ideaText.trim() ? 1 : 0.4 }}
+            >{de ? "Als Abfrage" : "As Query"}</button>
+            <button onClick={() => onIterate(node.id, ideaText)} style={btnMuted}>↺ rethink</button>
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+    if (node.nodeType === "list") {
+      const listText = [listTitle, ...listItems.filter(Boolean)].join(" · ");
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onIterate(node.id, listText)} style={btnMuted}>↺ rethink</button>
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+    if (node.nodeType === "file") {
+      const fNode = node as FileNode;
+      const isImage = fNode.fileType.startsWith("image/");
+      const analyzeText = fNode.textContent
+        ? `Analysiere diesen Dateiinhalt ("${fNode.fileName}"):\n\n${fNode.textContent.slice(0, 3000)}`
+        : `Was kannst du über diese Datei sagen: ${fNode.fileName} (${fNode.fileType})`;
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+            {fNode.fileUrl && (
+              <a href={fNode.fileUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none" }}
+              >↗ {de ? "Öffnen" : "Open"}</a>
+            )}
+            {(fNode.textContent || isImage) && (
+              <button onClick={() => onAnalyzeFile(analyzeText, node.id)}
+                style={{ ...btnBase, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"}
+              >{de ? "Analysieren" : "Analyze"}</button>
+            )}
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+    // Derived
+    const dNode = node as DerivedNode;
+    const type = dNode.nodeType;
+
+    // ── Scenario: 4 action modes ──────────────────────────────────────────
+    if (type === "scenario") {
+      const scenName = dNode.label || dNode.content.slice(0, 60);
+      const firstDriver = dNode.keyDrivers?.[0] ?? scenName;
+      const actionButtons = [
+        { label: "VERTIEFEN ↓", tip: de ? "Tiefenanalyse: Treiber und Implikationen dieses Szenarios genauer untersuchen" : "Deep-dive: Analyze drivers and implications of this scenario", prefill: `Vertiefen: ${scenName} — detaillierte Analyse der Treiber und Implikationen`, color: "#1A9E5A" },
+        { label: "WAS WENN →",  tip: de ? "Sensitivitätstest: Was passiert wenn ein Schlüsseltreiber wegfällt?" : "Sensitivity test: What happens if a key driver disappears?",       prefill: `Was wenn: ${firstDriver} wegfällt — wie verändert sich das Szenario?`,       color: "#2563EB" },
+        { label: "ANGREIFEN ⚡", tip: de ? "Kritische Prüfung: Welche Annahmen könnten falsch sein?" : "Critical review: Which assumptions could be wrong?",             prefill: `Kritisch: Welche Annahmen in '${scenName}' könnten falsch sein?`,             color: "#E8402A" },
+        { label: "STRATEGIE ◇", tip: de ? "Handlungsoptionen: Konkrete Maßnahmen für dieses Szenario ableiten" : "Strategy: Derive concrete actions for this scenario",               prefill: `Spielplan: Gegeben '${scenName}' — konkrete Handlungsoptionen`,               color: "#8B5CF6" },
+      ];
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
+            {actionButtons.map(({ label, tip, prefill, color }) => (
+              <Tooltip key={label} content={tip} placement="top">
+                <button
+                  onClick={() => onIterate(node.id, prefill)}
+                  style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${color}44`, background: `${color}12`, color, letterSpacing: "0.02em", transition: "all 0.12s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}22`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}12`; }}
+                >{label}</button>
+              </Tooltip>
+            ))}
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+
+    // ── Dimensions: single deepen button ──────────────────────────────────
+    if (type === "dimensions") {
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onIterate(node.id, dNode.queryText)}
+              style={{ ...btnBase, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.08)", color: "#3b82f6" }}
+            >{de ? "Dimensionen vertiefen" : "Deepen dimensions"}</button>
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+
+    // ── Causal graph: explore drivers ──────────────────────────────────────
+    if (type === "causalgraph") {
+      return (
+        <>
+          {renderStatusSelector()}
+          <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={() => onIterate(node.id, dNode.queryText)}
+              style={{ ...btnBase, border: "1px solid rgba(26,158,90,0.3)", background: "rgba(26,158,90,0.08)", color: "#1A9E5A" }}
+            >{de ? "Kausaltreiber vertiefen" : "Explore causal drivers"}</button>
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </div>
+        </>
+      );
+    }
+
+    const btnLabel = type === "followup" ? (de ? "Vertiefen" : "Explore")
+      : type === "decision" ? (de ? "Umsetzen" : "Implement")
+      : (de ? "Analysieren" : "Analyze");
+    return (
+      <>
+        {renderStatusSelector()}
+        <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => onExplore(node.id, dNode.queryText)}
+            style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.1)", background: "#E4FF97", color: "#0A0A0A" }}
+          >{btnLabel}</button>
+          <button onClick={() => onIterate(node.id, dNode.queryText)} style={btnMuted}>↺ rethink</button>
+          <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+          >{de ? "Löschen" : "Delete"}</button>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div
-      ref={cardRef}
-      onPointerDown={e => { e.stopPropagation(); onSelect(node.id); }}
+      onPointerDown={e => e.stopPropagation()}
       style={{
-        position: "absolute", left: node.x, top: node.y, width: nodeW,
-        ...(nodeH ? { height: nodeH, overflow: "hidden" } : {}),
-        background: "#F0F4FF",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-        borderTop: "3px solid #4A6CF7",
-        borderRadius: 10,
-        boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.6), 0 4px 16px rgba(0,0,0,0.08)" : "0 2px 8px rgba(0,0,0,0.06)",
-        userSelect: "none",
-        opacity: node.loading ? 0.65 : 1,
+        position: "fixed",
+        left: "50%", top: 56, bottom: 0,
+        transform: "translateX(-50%)",
+        width: "min(880px, calc(100vw - 48px))",
+        background: "rgba(255,255,255,0.98)",
+        backdropFilter: "blur(24px) saturate(180%)",
+        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        border: "1px solid rgba(0,0,0,0.1)",
+        borderBottom: "none",
+        borderRadius: "16px 16px 0 0",
+        boxShadow: "0 -4px 40px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)",
+        zIndex: 150,
+        display: "flex", flexDirection: "column",
       }}
     >
-      {/* Header / drag handle */}
-      <div
-        onPointerDown={e => onDragStart(e, node.id)}
-        style={{ padding: "9px 10px 7px", cursor: "grab", borderBottom: "1px solid rgba(74,108,247,0.1)", display: "flex", alignItems: "center", gap: 8 }}
-      >
-        <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#0A0A0A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            title={node.fileName}
-          >{node.fileName}</div>
-          <div style={{ fontSize: 10, color: "rgba(0,0,0,0.4)", marginTop: 1 }}>
-            {formatFileSize(node.fileSize)}
-            {node.fileType ? ` · ${node.fileType.split("/")[1]?.toUpperCase() ?? node.fileType}` : ""}
-          </div>
-        </div>
-        <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", gap: 1, flexShrink: 0 }}>
-          <button
-            onClick={e => { e.stopPropagation(); onIterate(node.id, node.fileName); }}
-            title="Iteration starten"
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 5px", color: "rgba(0,0,0,0.3)", fontSize: 14, borderRadius: 4, lineHeight: 1, fontWeight: 300 }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#1A9E5A"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.3)"; }}
-          >+</button>
-          <button
-            onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 4px", color: "rgba(0,0,0,0.25)", fontSize: 11, borderRadius: 4 }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#E8402A"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "rgba(0,0,0,0.25)"}
-            title="Karte löschen"
-          >✕</button>
-        </div>
+      {/* Header */}
+      <div style={{ padding: "18px 32px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>{renderHeader()}</div>
+        <button onClick={onClose}
+          title={de ? "Schließen (Esc)" : "Close (Esc)"}
+          style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: "3px 7px", color: "var(--color-text-muted)", fontSize: 15, borderRadius: 6, lineHeight: 1, marginTop: 2 }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-page-bg)"; }}
+          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "none"; }}
+        >✕</button>
       </div>
-
-      {/* Loading state */}
-      {node.loading && (
-        <div style={{ padding: "12px 14px", fontSize: 12, color: "rgba(74,108,247,0.8)", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16, animation: "cur-blink 0.8s steps(1) infinite" }}>⋯</span>
-          Datei wird hochgeladen…
-        </div>
-      )}
-
-      {/* Image preview */}
-      {!node.loading && isImage && node.fileUrl && (
-        <div
-          onPointerDown={e => e.stopPropagation()}
-          style={{ padding: "8px 10px 4px", display: "flex", justifyContent: "center" }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={node.fileUrl}
-            alt={node.fileName}
-            style={{ maxWidth: "100%", maxHeight: nodeH ? nodeH - 120 : 180, borderRadius: 6, objectFit: "contain", display: "block" }}
-          />
-        </div>
-      )}
-
-      {/* Text preview */}
-      {!node.loading && !isImage && node.textContent && (
-        <div
-          onPointerDown={e => e.stopPropagation()}
-          style={{ padding: "8px 10px 4px", maxHeight: 120, overflow: "hidden", position: "relative" }}
-        >
-          <pre style={{ fontSize: 10, lineHeight: 1.5, color: "rgba(0,0,0,0.55)", margin: 0, whiteSpace: "pre-wrap", fontFamily: "ui-monospace, monospace", overflowWrap: "break-word" }}>
-            {node.textContent.slice(0, 400)}
-          </pre>
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 24, background: "linear-gradient(transparent, #F0F4FF)" }} />
-        </div>
-      )}
-
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+        {renderBody()}
+      </div>
+      {/* Tags */}
+      <div style={{ flexShrink: 0, padding: "6px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 8, fontWeight: 700, color: "var(--color-text-muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 2 }}>Tags</span>
+        {(node.tags ?? []).map((tag, i) => {
+          const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+          return (
+            <span key={i} style={{ fontSize: 9, padding: "1px 7px", borderRadius: 10, background: `hsl(${hue}, 55%, 94%)`, border: `1px solid hsl(${hue}, 45%, 80%)`, color: `hsl(${hue}, 55%, 35%)`, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 3 }}>
+              {tag}
+              <button onClick={() => onUpdateTags(node.id, (node.tags ?? []).filter((_, j) => j !== i))}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 9, color: `hsl(${hue}, 40%, 55%)`, padding: 0, lineHeight: 1 }}
+              >✕</button>
+            </span>
+          );
+        })}
+        <input
+          placeholder="+ Tag"
+          style={{ fontSize: 9, width: 60, border: "none", outline: "none", background: "transparent", color: "var(--color-text-secondary)", padding: "2px 4px" }}
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
+              const val = (e.target as HTMLInputElement).value.trim().toLowerCase();
+              const existing = node.tags ?? [];
+              if (!existing.includes(val)) onUpdateTags(node.id, [...existing, val]);
+              (e.target as HTMLInputElement).value = "";
+            }
+          }}
+        />
+      </div>
       {/* Footer */}
-      <div
-        onPointerDown={e => e.stopPropagation()}
-        style={{ padding: "6px 10px 8px", borderTop: "1px solid rgba(74,108,247,0.1)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
-      >
-        <span style={{ fontSize: 9, color: "rgba(0,0,0,0.28)", fontVariantNumeric: "tabular-nums" }}>
-          {formatNodeTime(node.createdAt)}
-        </span>
-        {node.fileUrl && (
-          <a
-            href={node.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            title="Datei in neuem Tab öffnen"
-            style={{ fontSize: 9, padding: "1px 6px", borderRadius: 10, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none", lineHeight: 1.3 }}
-          >↗ Öffnen</a>
-        )}
-        {!node.loading && (node.textContent || isImage) && (
-          <button
-            onClick={e => { e.stopPropagation(); onAnalyze(analyzeText, node.id); }}
-            title="Dateiinhalt mit KI analysieren"
-            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7", cursor: "pointer", transition: "all 0.12s", marginLeft: "auto" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"; }}
-          >Analysieren</button>
-        )}
+      <div style={{ flexShrink: 0 }}>
+        {renderFooter()}
       </div>
+    </div>
+  );
+}
 
-      {/* Right resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "h"); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "ew-resize", zIndex: 10, background: "transparent", transition: "background 0.15s", borderRadius: "0 10px 10px 0" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
-      {/* Bottom resize handle */}
-      <div
-        onPointerDown={e => { e.stopPropagation(); onResizeStart(e, node.id, nodeW, nodeH ?? (cardRef.current?.offsetHeight ?? 200), "v"); }}
-        style={{ position: "absolute", bottom: 0, left: 6, right: 6, height: 6, cursor: "ns-resize", zIndex: 10, background: "transparent", transition: "background 0.15s" }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.08)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-      />
+// ── Minimap ────────────────────────────────────────────────────────────────
+
+const MINIMAP_W = 160;
+const MINIMAP_H = 90;
+const NODE_MINIMAP_COLOR: Record<string, string> = {
+  query: "#1A9E5A", insight: "#6B7A00", scenario: "#1D4ED8", decision: "#1A9E5A",
+  followup: "#9CA3AF", note: "#F5A623", idea: "#F97316", list: "#2E7D32", file: "#4A6CF7",
+  dimensions: "#3b82f6", causalgraph: "#1A9E5A",
+};
+
+function Minimap({ nodes, panX, panY, zoom, viewportW, viewportH, onNavigate, rightOffset }: {
+  nodes: CanvasNode[];
+  panX: number; panY: number; zoom: number;
+  viewportW: number; viewportH: number;
+  onNavigate: (panX: number, panY: number) => void;
+  rightOffset: number;
+}) {
+  if (nodes.length === 0) return null;
+
+  const PAD = 200;
+  const xs = nodes.map(n => n.x);
+  const ys = nodes.map(n => n.y);
+  const minX = Math.min(...xs) - PAD;
+  const minY = Math.min(...ys) - PAD;
+  const maxX = Math.max(...xs) + PAD;
+  const maxY = Math.max(...ys) + PAD;
+  const contentW = Math.max(maxX - minX, 1);
+  const contentH = Math.max(maxY - minY, 1);
+
+  const scaleX = MINIMAP_W / contentW;
+  const scaleY = MINIMAP_H / contentH;
+  const scale = Math.min(scaleX, scaleY);
+
+  const toMX = (cx: number) => (cx - minX) * scale;
+  const toMY = (cy: number) => (cy - minY) * scale;
+
+  const vpLeft = (-panX / zoom - minX) * scale;
+  const vpTop = (-panY / zoom - minY) * scale;
+  const vpW = (viewportW / zoom) * scale;
+  const vpH = (viewportH / zoom) * scale;
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const canvasX = mx / scale + minX;
+    const canvasY = my / scale + minY;
+    onNavigate(-(canvasX - viewportW / zoom / 2) * zoom, -(canvasY - viewportH / zoom / 2) * zoom);
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      style={{
+        position: "absolute", bottom: 16, right: rightOffset,
+        width: MINIMAP_W, height: MINIMAP_H,
+        background: "rgba(255,255,255,0.82)",
+        backdropFilter: "blur(12px) saturate(160%)",
+        WebkitBackdropFilter: "blur(12px) saturate(160%)",
+        border: "1px solid rgba(0,0,0,0.1)",
+        borderRadius: 10,
+        boxShadow: "0 4px 20px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)",
+        overflow: "hidden",
+        zIndex: 40,
+        cursor: "crosshair",
+      }}
+    >
+      {nodes.map(n => (
+        <div key={n.id} style={{
+          position: "absolute",
+          left: toMX(n.x), top: toMY(n.y),
+          width: 4, height: 4,
+          borderRadius: "50%",
+          background: NODE_MINIMAP_COLOR[n.nodeType] ?? "#888",
+        }} />
+      ))}
+      <div style={{
+        position: "absolute",
+        left: vpLeft, top: vpTop,
+        width: Math.max(vpW, 8), height: Math.max(vpH, 8),
+        border: "1.5px solid rgba(255,255,255,0.9)",
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.3)",
+        borderRadius: 2,
+        pointerEvents: "none",
+      }} />
     </div>
   );
 }
@@ -1765,6 +4166,19 @@ function FileNodeCard({
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function CanvasPage() {
+  // Check URL params for embedded mode — must be in useEffect to avoid hydration mismatch
+  const [embedded, setEmbedded] = useState(false);
+  const [hydrated, setHydrated] = useState(false); // prevents flash of empty-state before embedded check
+  const [initialView, setInitialView] = useState<"canvas" | "board">("canvas");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("embedded") === "1") setEmbedded(true);
+    if (params.get("view") === "board") {
+      setInitialView("board");
+      setViewMode("board");
+    }
+    setHydrated(true);
+  }, []);
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [panX, setPanX] = useState(0);
@@ -1773,12 +4187,19 @@ export default function CanvasPage() {
   // locale fixed to "de" — language toggle deferred
   const locale: "de" | "en" = "de";
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [cmdVisible, setCmdVisible] = useState(false);
   const [cmdParentId, setCmdParentId] = useState<string | null>(null);
   const [cmdPrefill, setCmdPrefill] = useState("");
   const [nodePickerVisible, setNodePickerVisible] = useState(false);
   const [iterateCtx, setIterateCtx] = useState<{ parentId: string; prefill: string } | null>(null);
   const iterateCtxRef = useRef<{ parentId: string; prefill: string } | null>(null);
+
+  // ── Template picker + Workflow ───────────────────────────────────────────
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [templateTopic, setTemplateTopic] = useState("");
+  const [activeWorkflow, setActiveWorkflow] = useState<WorkflowState | null>(null);
 
   // ── Project state ─────────────────────────────────────────────────────────
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -1787,6 +4208,15 @@ export default function CanvasPage() {
   const [projects, setProjects] = useState<CanvasProject[]>([]);
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | "error" | null>(null);
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const [projectOp, setProjectOp] = useState<"creating" | "deleting" | "loading" | null>(null);
+
+  const [hiddenLayers, setHiddenLayers] = useState<Set<CanvasLayer>>(new Set());
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView ?? "canvas");
+  const [viewportSize, setViewportSize] = useState({ w: 1200, h: 800 });
+  const [briefingOpen, setBriefingOpen] = useState(false);
+  const [briefingText, setBriefingText] = useState("");
+  const [briefingLoading, setBriefingLoading] = useState(false);
 
   const de = locale === "de";
   const queryNodes = useMemo(() => nodes.filter((n): n is QueryNode => n.nodeType === "query"), [nodes]);
@@ -1807,7 +4237,7 @@ export default function CanvasPage() {
   useEffect(() => { iterateCtxRef.current = iterateCtx; }, [iterateCtx]);
 
   const draggingRef  = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number } | null>(null);
-  const resizingRef  = useRef<{ id: string; dir: "h" | "v"; startX: number; startW: number; startY: number; startH: number } | null>(null);
+  const resizingRef  = useRef<{ id: string; dir: "h" | "v" | "both"; startX: number; startW: number; startY: number; startH: number } | null>(null);
   const panningRef   = useRef<{ sx: number; sy: number; opx: number; opy: number } | null>(null);
   const viewportRef  = useRef<HTMLDivElement>(null);
   const saveTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1818,15 +4248,38 @@ export default function CanvasPage() {
   const fileUploadPosRef = useRef<{ x: number; y: number } | null>(null);
   const fileUploadParentRef = useRef<string | null>(null);
 
+  // ── Port drag refs ─────────────────────────────────────────────────────────
+  const portDragRef = useRef<{
+    nodeId: string;
+    prefill: string;
+    sourceCanvasX: number;
+    sourceCanvasY: number;
+    startClientX: number;
+    startClientY: number;
+  } | null>(null);
+  const [portDragPreview, setPortDragPreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const portDropCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [nodePickerPos, setNodePickerPos] = useState<{ x: number; y: number } | null>(null); // viewport coords
+  const nextQueryPosOverrideRef = useRef<{ x: number; y: number } | null>(null);
+
   // ── Project API functions ─────────────────────────────────────────────────
+
+  const showProjectError = useCallback((msg: string) => {
+    setProjectError(msg);
+    console.error("[SIS Canvas]", msg);
+    setTimeout(() => setProjectError(null), 6000);
+  }, []);
 
   const loadProjects = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/canvas");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setProjects(json.canvases ?? []);
-    } catch {}
-  }, []);
+    } catch (e) {
+      showProjectError(de ? `Projekte laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load projects: ${(e as Error).message}`);
+    }
+  }, [de, showProjectError]);
 
   const saveCanvasToDb = useCallback(async (id: string) => {
     setSaveStatus("saving");
@@ -1852,21 +4305,24 @@ export default function CanvasPage() {
       ));
     } catch {
       setSaveStatus("error");
+      setTimeout(() => setSaveStatus(null), 4000);
     }
   }, []);
 
   const createNewProject = useCallback(async () => {
     const name = window.prompt(de ? "Projektname:" : "Project name:", de ? "Neues Projekt" : "New project");
     if (!name?.trim()) return;
+    setProjectOp("creating");
     try {
       const res = await fetch("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const json = await res.json();
       const newCanvas = json.canvas;
-      if (!newCanvas?.id) return;
+      if (!newCanvas?.id) throw new Error("API returned no canvas ID");
       setProjectId(newCanvas.id);
       setProjectName(name.trim());
       setNodes([]); setConnections([]);
@@ -1875,57 +4331,85 @@ export default function CanvasPage() {
       setSaveStatus(null);
       try { localStorage.setItem("sis-active-canvas", newCanvas.id); } catch {}
       await loadProjects();
-    } catch {}
-  }, [de, loadProjects]);
+      // Show template picker for the new project
+      setShowTemplatePicker(true);
+      setTemplateTopic("");
+    } catch (e) {
+      showProjectError(de ? `Projekt erstellen fehlgeschlagen: ${(e as Error).message}` : `Failed to create project: ${(e as Error).message}`);
+    } finally {
+      setProjectOp(null);
+    }
+  }, [de, loadProjects, showProjectError]);
 
   const loadProject = useCallback(async (id: string) => {
+    setProjectOp("loading");
     try {
       const res = await fetch(`/api/v1/canvas/${id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const canvas = json.canvas;
-      if (!canvas) return;
+      if (!canvas) throw new Error("Canvas not found");
       setProjectId(id);
       setProjectName(canvas.name);
       setSaveStatus(null);
       try { localStorage.setItem("sis-active-canvas", id); } catch {}
       if (canvas.canvas_state) {
         const state = JSON.parse(canvas.canvas_state);
-        if (state.nodes) setNodes(state.nodes);
-        if (state.conns) setConnections(state.conns);
-        if (state.pan) { setPanX(state.pan.x); setPanY(state.pan.y); }
-        if (state.zoom) setZoom(state.zoom);
+        if (state.v !== 2) {
+          setNodes([]); setConnections([]);
+          setPanX(0); setPanY(0); setZoom(1);
+        } else {
+          if (state.nodes) setNodes(state.nodes);
+          if (state.conns) setConnections(state.conns);
+          if (state.pan) { setPanX(state.pan.x); setPanY(state.pan.y); }
+          if (state.zoom) setZoom(state.zoom);
+        }
       } else {
         setNodes([]); setConnections([]);
         setPanX(0); setPanY(0); setZoom(1);
       }
       setProjectDropdownOpen(false);
-    } catch {}
-  }, []);
+    } catch (e) {
+      showProjectError(de ? `Projekt laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load project: ${(e as Error).message}`);
+    } finally {
+      setProjectOp(null);
+    }
+  }, [de, showProjectError]);
 
   const saveProjectName = useCallback(async () => {
     setEditingName(false);
     if (!projectId || !projectName.trim()) return;
     try {
-      await fetch(`/api/v1/canvas/${projectId}`, {
+      const res = await fetch(`/api/v1/canvas/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: projectName.trim() }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, name: projectName.trim() } : p));
-    } catch {}
-  }, [projectId, projectName]);
+    } catch (e) {
+      showProjectError(de ? `Umbenennen fehlgeschlagen: ${(e as Error).message}` : `Rename failed: ${(e as Error).message}`);
+    }
+  }, [projectId, projectName, de, showProjectError]);
 
   const deleteProject = useCallback(async (id: string) => {
     if (!window.confirm(de ? "Projekt unwiderruflich löschen?" : "Delete project permanently?")) return;
+    setProjectOp("deleting");
     try {
-      await fetch(`/api/v1/canvas/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/v1/canvas/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       setProjects(prev => prev.filter(p => p.id !== id));
       if (projectId === id) {
         setProjectId(null); setProjectName(""); setSaveStatus(null);
+        setNodes([]); setConnections([]);
         try { localStorage.removeItem("sis-active-canvas"); } catch {}
       }
-    } catch {}
-  }, [de, projectId]);
+    } catch (e) {
+      showProjectError(de ? `Löschen fehlgeschlagen: ${(e as Error).message}` : `Delete failed: ${(e as Error).message}`);
+    } finally {
+      setProjectOp(null);
+    }
+  }, [de, projectId, showProjectError]);
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -1934,7 +4418,32 @@ export default function CanvasPage() {
 
     loadProjects();
 
-    const activeId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+    // Check if transferring an analysis from main page
+    const transferRaw = (() => { try { const v = localStorage.getItem("sis-transfer-to-canvas"); localStorage.removeItem("sis-transfer-to-canvas"); return v; } catch { return null; } })();
+    if (transferRaw) {
+      try {
+        const { query, result } = JSON.parse(transferRaw);
+        if (query && result) {
+          const id = `transfer-${Date.now()}`;
+          const qNode: QueryNode = {
+            id, nodeType: "query", x: 80, y: 80,
+            query, locale: "de", status: "done",
+            synthesis: result.synthesis ?? "",
+            result, collapsed: false, createdAt: Date.now(),
+          };
+          const derived = computeDerivedNodes(id, 80, 80, result);
+          const conns: Connection[] = derived.map(d => ({ from: id, to: d.id, derived: true }));
+          setNodes([qNode, ...derived]);
+          setConnections(conns);
+          setZoom(0.7);
+          return; // skip all other init paths
+        }
+      } catch { /* ignore malformed transfer data */ }
+    }
+
+    // Check if launched from Projects page → takes priority
+    const fromProjects = (() => { try { const v = localStorage.getItem("sis-canvas-project"); localStorage.removeItem("sis-canvas-project"); return v; } catch { return null; } })();
+    const activeId = fromProjects ?? (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
 
     if (activeId) {
       fetch(`/api/v1/canvas/${activeId}`)
@@ -1959,13 +4468,207 @@ export default function CanvasPage() {
 
     function fallbackLocalStorage() {
       const saved = loadFromStorage();
-      if (saved) {
+      if (saved && saved.nodes.length > 0) {
         setNodes(saved.nodes); setConnections(saved.conns);
         setPanX(saved.pan.x); setPanY(saved.pan.y); setZoom(saved.zoom);
+      } else {
+        // No saved state → load demo project as onboarding
+        const demo = buildDemoProject();
+        setNodes(demo.nodes);
+        setConnections(demo.conns);
+        setZoom(0.8);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Viewport size tracking (for Minimap)
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    setViewportSize({ w: el.clientWidth, h: el.clientHeight });
+    const ro = new ResizeObserver(() => {
+      setViewportSize({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const toggleLayer = useCallback((layer: CanvasLayer) => {
+    setHiddenLayers(prev => {
+      const next = new Set(prev);
+      if (next.has(layer)) next.delete(layer); else next.add(layer);
+      return next;
+    });
+  }, []);
+
+  const handleSetNodeStatus = useCallback((id: string, status: NodeStatus) => {
+    setNodes(prev => prev.map(n => n.id === id ? { ...n, nodeStatus: status } : n));
+  }, []);
+
+  const pipelineChain = useMemo<Set<string>>(() => {
+    if (!selectedId) return new Set();
+    const visited = new Set<string>();
+    const queue = [selectedId];
+    while (queue.length) {
+      const id = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      connections.forEach(c => {
+        if (c.from === id && !visited.has(c.to)) queue.push(c.to);
+        if (c.to === id && !visited.has(c.from)) queue.push(c.from);
+      });
+    }
+    return visited;
+  }, [selectedId, connections]);
+
+  const visibleNodes = useMemo(() =>
+    nodes.filter(n => !hiddenLayers.has(NODE_LAYER[n.nodeType] ?? "karte")),
+  [nodes, hiddenLayers]);
+
+  const canvasGroups = useMemo<CanvasGroup[]>(() => {
+    const doneQueries = queryNodes.filter(n => n.status === "done" && (n.result?.matchedTrendIds?.length ?? 0) > 0);
+    if (doneQueries.length < 2) return [];
+
+    const groups: Set<string>[] = [];
+    doneQueries.forEach(q => {
+      const myIds = new Set(q.result!.matchedTrendIds!);
+      let merged = false;
+      for (const g of groups) {
+        const gNodes = [...g].map(id => doneQueries.find(n => n.id === id)!).filter(Boolean);
+        const gIds = new Set(gNodes.flatMap(n => n.result!.matchedTrendIds!));
+        const shared = [...myIds].filter(id => gIds.has(id)).length;
+        if (shared >= 2) { g.add(q.id); merged = true; break; }
+      }
+      if (!merged) groups.push(new Set([q.id]));
+    });
+
+    const colors = ["#1A9E5A", "#2563EB", "#8B5CF6", "#F97316", "#0369A1"];
+    return groups.filter(g => g.size >= 2).map((g, i) => {
+      const gNodeIds = [...g];
+      const gNodes = gNodeIds.map(id => nodes.find(n => n.id === id)!).filter(Boolean);
+      const xs = gNodes.map(n => n.x);
+      const ys = gNodes.map(n => n.y);
+      const PAD = 40;
+      const bounds = {
+        x: Math.min(...xs) - PAD,
+        y: Math.min(...ys) - PAD,
+        w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2,
+        h: Math.max(...ys) + 100 - Math.min(...ys) + PAD * 2,
+      };
+      const allIds = gNodeIds.flatMap(id => {
+        const q = doneQueries.find(n => n.id === id);
+        return q?.result?.matchedTrendIds ?? [];
+      });
+      const freq: Record<string, number> = {};
+      allIds.forEach(id => { freq[id] = (freq[id] ?? 0) + 1; });
+      const topTrend = Object.entries(freq).sort((a,b) => b[1]-a[1])[0]?.[0] ?? "";
+      const label = topTrend.replace("mega-","").replace("macro-","").replace(/-/g," ").replace(/\b\w/g,c=>c.toUpperCase()).slice(0,24);
+      return { id: `group-${i}`, nodeIds: gNodeIds, label, color: colors[i % colors.length], bounds };
+    });
+  }, [queryNodes, nodes]);
+
+  // ── Canvas Export ────────────────────────────────────────────────────────
+
+  const exportCanvas = useCallback((format: "markdown" | "json") => {
+    if (format === "json") {
+      const state = { nodes, conns: connections, pan: { x: panX, y: panY }, zoom, v: 2 };
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `sis-canvas-${projectName || "export"}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      return;
+    }
+    // Markdown export
+    const doneQs = nodes.filter(n => n.nodeType === "query" && (n as QueryNode).synthesis) as QueryNode[];
+    const lines: string[] = [
+      `# SIS Canvas Export`,
+      `_${new Date().toLocaleString("de-DE")} · ${projectName || "Canvas"} · ${doneQs.length} ${de ? "Analysen" : "analyses"}_`,
+      "", "---", "",
+    ];
+    doneQs.forEach((q, idx) => {
+      lines.push(`## ${idx + 1}. ${q.query}`, "");
+      if (q.synthesis) lines.push(q.synthesis, "");
+      // Insights
+      const insights = nodes.filter(n => n.parentId === q.id && n.nodeType === "insight") as DerivedNode[];
+      if (insights.length) {
+        lines.push(`### ${de ? "Erkenntnisse" : "Insights"}`, "");
+        insights.forEach(ins => lines.push(`- ${ins.content}`, ""));
+      }
+      // Scenarios
+      const scenarios = nodes.filter(n => n.parentId === q.id && n.nodeType === "scenario") as DerivedNode[];
+      if (scenarios.length) {
+        lines.push(`### ${de ? "Szenarien" : "Scenarios"}`, "");
+        scenarios.forEach(sc => {
+          const prob = sc.probability != null ? ` (${Math.round(sc.probability * 100)}%)` : "";
+          lines.push(`- **${sc.label || sc.content.slice(0, 60)}**${prob}: ${sc.content}`, "");
+        });
+      }
+      // Decisions
+      const decisions = nodes.filter(n => n.parentId === q.id && n.nodeType === "decision") as DerivedNode[];
+      if (decisions.length) {
+        lines.push(`### ${de ? "Empfehlungen" : "Decisions"}`, "");
+        decisions.forEach(dec => lines.push(`- ${dec.content}`, ""));
+      }
+      lines.push("---", "");
+    });
+    const md = lines.join("\n");
+    const blob = new Blob([md], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `sis-canvas-${projectName || "export"}-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [nodes, connections, panX, panY, zoom, projectName, de]);
+
+  const generateBriefing = useCallback(async () => {
+    setBriefingLoading(true);
+    setBriefingOpen(true);
+    setBriefingText("");
+
+    const qNodes = queryNodes.filter(n => n.status === "done");
+    const chain = qNodes.map(q => {
+      const insights = nodes.filter(n => n.nodeType === "insight" && (n as DerivedNode).parentId === q.id) as DerivedNode[];
+      const decisions = nodes.filter(n => n.nodeType === "decision" && (n as DerivedNode).parentId === q.id) as DerivedNode[];
+      return `FRAGE: ${q.query}\nSYNTHESE: ${q.synthesis?.slice(0,400) ?? ""}\nERKENNTNISSE: ${insights.map(i => i.content).join("; ")}\nEMPFEHLUNG: ${decisions.map(d => d.content).join("; ")}`;
+    }).join("\n\n---\n\n");
+
+    try {
+      const res = await fetch("/api/v1/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `Erstelle ein prägnantes strategisches Briefing-Memo (max 500 Wörter) aus folgendem Canvas-Kontext. Struktur: Executive Summary (2-3 Sätze), Kernerkenntnisse (3-5 Bullet Points), Handlungsempfehlungen (3 konkrete Schritte), Kritische Unsicherheiten (2-3 Punkte).\n\nCanvas-Kontext:\n${chain}`,
+          locale,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n"); buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const evt = JSON.parse(line.slice(6).trim());
+            if (evt.type === "complete" && evt.result?.synthesis) {
+              setBriefingText(evt.result.synthesis);
+            }
+          } catch {}
+        }
+      }
+    } catch (e) {
+      setBriefingText(String(e));
+    } finally {
+      setBriefingLoading(false);
+    }
+  }, [queryNodes, nodes, locale]);
 
   // Debounced localStorage persist
   useEffect(() => {
@@ -1980,16 +4683,30 @@ export default function CanvasPage() {
   // Debounced DB persist (only when a project is active)
   useEffect(() => {
     if (!projectId) return;
+    if (nodesRef.current.length === 0) return; // don't save empty canvas
     clearTimeout(dbSaveTimerRef.current);
     dbSaveTimerRef.current = setTimeout(() => {
-      const hasDone = nodesRef.current.some(n =>
-        n.nodeType !== "query" || (n as QueryNode).status === "done" || (n as QueryNode).status === "error"
-      );
-      if (hasDone) saveCanvasToDb(projectId);
+      saveCanvasToDb(projectId);
     }, 2000);
     return () => clearTimeout(dbSaveTimerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, connections, panX, panY, zoom, projectId]);
+
+  // Save on browser close / tab close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const pid = projectIdRef.current;
+      if (!pid || nodesRef.current.length === 0) return;
+      // Synchronous localStorage save as last resort
+      const doneNodes = nodesRef.current.filter(n => n.nodeType !== "query" || (n as QueryNode).status === "done" || (n as QueryNode).status === "error");
+      if (doneNodes.length > 0) saveToStorage(doneNodes, connectionsRef.current, { x: panXRef.current, y: panYRef.current }, zoomRef.current);
+      // Also try async DB save via sendBeacon (best-effort)
+      const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
+      try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, JSON.stringify({ canvasState: state })); } catch {}
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // ── Global pointer events ─────────────────────────────────────────────────
 
@@ -2002,22 +4719,55 @@ export default function CanvasPage() {
         setNodes(prev => prev.map(n => n.id === id ? { ...n, x: ox + dx, y: oy + dy } : n));
       } else if (resizingRef.current) {
         const { id, dir, startX, startW, startY, startH } = resizingRef.current;
-        if (dir === "h") {
+        if (dir === "h" || dir === "both") {
           const dx = (e.clientX - startX) / zoomRef.current;
           const newW = Math.max(200, Math.min(900, Math.round(startW + dx)));
           setNodes(prev => prev.map(n => n.id === id ? { ...n, customWidth: newW } : n));
-        } else {
+        }
+        if (dir === "v" || dir === "both") {
           const dy = (e.clientY - startY) / zoomRef.current;
-          const newH = Math.max(80, Math.min(1400, Math.round(startH + dy)));
+          const newH = Math.max(60, Math.min(1400, Math.round(startH + dy)));
           setNodes(prev => prev.map(n => n.id === id ? { ...n, customHeight: newH } : n));
         }
       } else if (panningRef.current) {
         const { sx, sy, opx, opy } = panningRef.current;
         setPanX(opx + e.clientX - sx);
         setPanY(opy + e.clientY - sy);
+      } else if (portDragRef.current) {
+        const rect2 = viewportRef.current?.getBoundingClientRect();
+        if (rect2) {
+          const cx = (e.clientX - rect2.left - panXRef.current) / zoomRef.current;
+          const cy = (e.clientY - rect2.top - panYRef.current) / zoomRef.current;
+          setPortDragPreview({
+            x1: portDragRef.current.sourceCanvasX,
+            y1: portDragRef.current.sourceCanvasY,
+            x2: cx, y2: cy,
+          });
+        }
       }
     };
-    const up = () => { draggingRef.current = null; resizingRef.current = null; panningRef.current = null; };
+    const up = (e: PointerEvent) => {
+      draggingRef.current = null; resizingRef.current = null; panningRef.current = null;
+      if (portDragRef.current) {
+        const { nodeId, prefill, startClientX, startClientY } = portDragRef.current;
+        const didDrag = Math.abs(e.clientX - startClientX) > 12 || Math.abs(e.clientY - startClientY) > 12;
+        portDragRef.current = null;
+        setPortDragPreview(null);
+        const rect2 = viewportRef.current?.getBoundingClientRect();
+        if (didDrag && rect2) {
+          const dropCanvasX = (e.clientX - rect2.left - panXRef.current) / zoomRef.current;
+          const dropCanvasY = (e.clientY - rect2.top - panYRef.current) / zoomRef.current;
+          portDropCanvasPosRef.current = { x: dropCanvasX, y: dropCanvasY };
+          setNodePickerPos({ x: e.clientX - rect2.left, y: e.clientY - rect2.top });
+        } else {
+          portDropCanvasPosRef.current = null;
+          setNodePickerPos(null);
+        }
+        setIterateCtx({ parentId: nodeId, prefill });
+        setNodePickerVisible(true);
+        setSelectedId(nodeId);
+      }
+    };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
@@ -2026,21 +4776,33 @@ export default function CanvasPage() {
   // Keyboard shortcuts
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); }
+      if (e.key === "Escape") { setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); setDetailNodeId(null); setDeleteConfirmId(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; portDragRef.current = null; setPortDragPreview(null); }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId && !cmdVisible) {
         const el = document.activeElement;
         if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
-        deleteNode(selectedId);
+        e.preventDefault();
+        setDeleteConfirmId(selectedId);
+      }
+      if (e.key === "Enter" && deleteConfirmId) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+        deleteNode(deleteConfirmId);
+        setDeleteConfirmId(null);
       }
     };
     window.addEventListener("keydown", kd);
     return () => window.removeEventListener("keydown", kd);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, cmdVisible]);
+  }, [selectedId, cmdVisible, deleteConfirmId]);
 
   // ── Positioning ───────────────────────────────────────────────────────────
 
   const getNextQueryPos = useCallback((parentId?: string): { x: number; y: number } => {
+    if (nextQueryPosOverrideRef.current) {
+      const p = nextQueryPosOverrideRef.current;
+      nextQueryPosOverrideRef.current = null;
+      return p;
+    }
     if (parentId) {
       const parent = nodesRef.current.find(n => n.id === parentId);
       if (parent) {
@@ -2050,7 +4812,7 @@ export default function CanvasPage() {
           parent.nodeType === "file"  ? FILE_NODE_W  : DERIVED_W
         );
         const siblings = nodesRef.current.filter(n => n.parentId === parentId && n.nodeType === "query");
-        return { x: parent.x + parentW + 80, y: parent.y + siblings.length * 28 };
+        return { x: parent.x + parentW + 80, y: parent.y + siblings.length * (QUERY_NODE_H + 40) };
       }
     }
     if (nodesRef.current.length === 0) {
@@ -2066,6 +4828,17 @@ export default function CanvasPage() {
   // ── Query submission ──────────────────────────────────────────────────────
 
   const submitQuery = useCallback((query: string, parentId?: string, opts?: { refreshed?: boolean }) => {
+    // ── Test-Modus: "test" in Command-Line eingeben ───────────────────────
+    if (query.trim().toLowerCase() === "test" && !parentId) {
+      const { nodes: testNodes, conns: testConns } = buildTestDataset();
+      setNodes(testNodes);
+      setConnections(testConns);
+      setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+      setPanX(0); setPanY(0); setZoom(0.72);
+      setSelectedId(null);
+      return;
+    }
+
     const id = uid();
     const pos = getNextQueryPos(parentId);
     const qNode: QueryNode = {
@@ -2078,8 +4851,22 @@ export default function CanvasPage() {
     setSelectedId(id);
     setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
 
+    // ── Context passing: include parent synthesis so follow-up steps can build on previous results
+    let queryWithContext = query;
+    if (parentId) {
+      const parentNode = nodesRef.current.find(n => n.id === parentId);
+      if (parentNode) {
+        const parentText = parentNode.nodeType === "query"
+          ? (parentNode as QueryNode).synthesis
+          : (parentNode as DerivedNode).content;
+        if (parentText && parentText.length > 20) {
+          queryWithContext = `KONTEXT AUS VORHERIGEM ANALYSESCHRITT:\n${parentText.slice(0, 2000)}\n\n---\n\n${query}`;
+        }
+      }
+    }
+
     streamQuery(
-      query, locale,
+      queryWithContext, locale,
       (chunk) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, status: "streaming", synthesis: (n as QueryNode).synthesis + chunk } : n)),
       (result) => {
         setNodes(prev => prev.map(n =>
@@ -2096,15 +4883,24 @@ export default function CanvasPage() {
         });
       },
       (msg) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, status: "error", errorMsg: msg } as QueryNode : n)),
+      (phase) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, streamingPhase: phase } as QueryNode : n)),
     );
-  }, [locale, getNextQueryPos]);
+  }, [locale, getNextQueryPos, setPanX, setPanY, setZoom]);
 
   // ── Node actions ──────────────────────────────────────────────────────────
 
+  const DERIVED_TYPES = new Set(["insight","scenario","decision","followup","dimensions","causalgraph"]);
   const deleteNode = useCallback((id: string) => {
-    setNodes(prev => prev.filter(n => n.id !== id && n.parentId !== id));
+    // Only cascade-delete auto-generated derived children; preserve user-created nodes (note/idea/list/file/query)
+    setNodes(prev => prev.filter(n => n.id !== id && !(n.parentId === id && DERIVED_TYPES.has(n.nodeType))));
     setConnections(prev => prev.filter(c => c.from !== id && c.to !== id));
     setSelectedId(prev => prev === id ? null : prev);
+    setDetailNodeId(prev => prev === id ? null : prev);
+  }, []);
+
+  const handleSelectNode = useCallback((id: string) => {
+    setSelectedId(id);
+    setDetailNodeId(id);
   }, []);
 
   const toggleCollapse = useCallback((id: string) => {
@@ -2118,9 +4914,14 @@ export default function CanvasPage() {
   const handleExplore = useCallback((nodeId: string, queryText: string) => {
     const n = nodesRef.current.find(x => x.id === nodeId);
     if (!n || n.nodeType === "query") return;
-    const derivedType = (n as DerivedNode).nodeType;
+    const dNode = n as DerivedNode;
+    const derivedType = dNode.nodeType;
     if (derivedType === "followup") {
       handleFollowUp(nodeId, queryText);
+    } else if (derivedType === "dimensions" || derivedType === "causalgraph") {
+      // Use the owning query as parentId so the new query attaches to the
+      // correct level of the tree, not to the derived card itself.
+      submitQuery(queryText, dNode.parentId);
     } else {
       submitQuery(queryText, nodeId);
     }
@@ -2233,12 +5034,25 @@ export default function CanvasPage() {
       const prefix = ANALYSIS_PREFIXES[type] ?? "";
       const prefill = ctx ? `${prefix}${ctx.prefill}` : "";
       const parentId = ctx?.parentId ?? null;
+      if (portDropCanvasPosRef.current) {
+        nextQueryPosOverrideRef.current = {
+          x: portDropCanvasPosRef.current.x - QUERY_NODE_W / 2,
+          y: portDropCanvasPosRef.current.y - QUERY_NODE_H / 2,
+        };
+        portDropCanvasPosRef.current = null;
+      }
       setCmdParentId(parentId); setCmdPrefill(prefill); setCmdVisible(true);
+      setNodePickerPos(null);
       return;
     }
 
     // Position near parent if we have context
     const getCtxPos = () => {
+      if (portDropCanvasPosRef.current) {
+        const p = portDropCanvasPosRef.current;
+        portDropCanvasPosRef.current = null;
+        return { x: p.x - DERIVED_W / 2, y: p.y - 60 };
+      }
       if (!ctx) return getNextQueryPos();
       const parent = nodesRef.current.find(n => n.id === ctx.parentId);
       if (!parent) return getNextQueryPos();
@@ -2288,6 +5102,7 @@ export default function CanvasPage() {
       return; // node creation happens asynchronously in handleFileInputChange
     }
     setSelectedId(id);
+    setNodePickerPos(null);
   }, [getNextQueryPos, triggerFileUpload]);
 
   const clearCanvas = useCallback(() => {
@@ -2347,16 +5162,20 @@ export default function CanvasPage() {
       const childQNodes = children.filter((n): n is QueryNode => n.nodeType === "query")
         .sort((a, b) => a.createdAt - b.createdAt);
 
-      const insights  = derived.filter(n => n.nodeType === "insight");
-      const decisions = derived.filter(n => n.nodeType === "decision");
-      const scenarios = derived.filter(n => n.nodeType === "scenario");
-      const followups = derived.filter(n => n.nodeType === "followup");
-      const hasSrc    = derived.some(n => (n as DerivedNode).sources?.length);
+      const insights   = derived.filter(n => n.nodeType === "insight");
+      const decisions  = derived.filter(n => n.nodeType === "decision");
+      const scenarios  = derived.filter(n => n.nodeType === "scenario");
+      const followups  = derived.filter(n => n.nodeType === "followup");
+      const dimensions = derived.filter(n => n.nodeType === "dimensions");
+      const causalgraphs = derived.filter(n => n.nodeType === "causalgraph");
+      const hasSrc     = derived.some(n => (n as DerivedNode).sources?.length);
 
       const colA_X = startX + curQW + DERIVED_COL_GAP_X;
       const colB_X = colA_X + curDW + DERIVED_COL_GAP;
+      const colC_X = colB_X + curDW + DERIVED_COL_GAP;
       let colA_Y   = startY;
       let colB_Y   = startY;
+      let colC_Y   = startY;
 
       for (const n of insights) {
         newPos.set(n.id, { x: colA_X, y: colA_Y });
@@ -2371,14 +5190,22 @@ export default function CanvasPage() {
         newPos.set(n.id, { x: colB_X, y: colB_Y });
         colB_Y += estimateCardHeight("scenario", n.content, n.label, hasSrc) + DERIVED_ROW_GAP;
       }
-      const rowY = Math.max(colA_Y, colB_Y) + 20;
+      for (const n of dimensions) {
+        newPos.set(n.id, { x: colC_X, y: colC_Y });
+        colC_Y += DIMENSIONS_CARD_H + DERIVED_ROW_GAP;
+      }
+      for (const n of causalgraphs) {
+        newPos.set(n.id, { x: colC_X, y: colC_Y });
+        colC_Y += CAUSAL_GRAPH_CARD_H + DERIVED_ROW_GAP;
+      }
+      const rowY = Math.max(colA_Y, colB_Y, colC_Y) + 20;
       followups.forEach((n, i) => {
         newPos.set(n.id, { x: colA_X + i * (curDW + DERIVED_COL_GAP), y: rowY });
       });
 
       let clusterBottom = Math.max(
         startY + 160,
-        colA_Y, colB_Y,
+        colA_Y, colB_Y, colC_Y,
         followups.length > 0 ? rowY + 130 : 0
       );
 
@@ -2426,9 +5253,33 @@ export default function CanvasPage() {
     draggingRef.current = { id, sx: e.clientX, sy: e.clientY, ox: n.x, oy: n.y };
   }, []);
 
-  const handleResizeStart = useCallback((e: React.PointerEvent, id: string, currentW: number, currentH: number, dir: "h" | "v" = "h") => {
+  const handleResizeStart = useCallback((e: React.PointerEvent, id: string, currentW: number, currentH: number, dir: "h" | "v" | "both" = "both") => {
     e.stopPropagation();
     resizingRef.current = { id, dir, startX: e.clientX, startW: currentW, startY: e.clientY, startH: currentH };
+  }, []);
+
+  const handlePortDragStart = useCallback((e: React.PointerEvent, nodeId: string) => {
+    e.stopPropagation();
+    const node = nodesRef.current.find(n => n.id === nodeId);
+    if (!node) return;
+    const nw = node.nodeType === "query" ? ((node as QueryNode).customWidth ?? QUERY_NODE_W) :
+      node.nodeType === "list" ? ((node as ListNode).customWidth ?? LIST_NODE_W) :
+      node.nodeType === "file" ? ((node as FileNode).customWidth ?? FILE_NODE_W) :
+      ((node as DerivedNode | NoteNode | IdeaNode).customWidth ?? DERIVED_W);
+    const nh = node.nodeType === "query" ? ((node as QueryNode).customHeight ?? QUERY_NODE_H) :
+      node.nodeType === "dimensions" ? DIMENSIONS_CARD_H :
+      node.nodeType === "causalgraph" ? CAUSAL_GRAPH_CARD_H :
+      ((node as DerivedNode | NoteNode | IdeaNode).customHeight ?? DERIVED_W);
+    const prefill = node.nodeType === "query" ? (node as QueryNode).query :
+      "queryText" in node ? (node as DerivedNode).queryText :
+      node.nodeType === "note" ? (node as NoteNode).content :
+      node.nodeType === "idea" ? (node as IdeaNode).title :
+      node.nodeType === "list" ? (node as ListNode).title :
+      node.nodeType === "file" ? (node as FileNode).fileName : "";
+    const sourceCanvasX = node.x + nw;
+    const sourceCanvasY = node.y + nh / 2;
+    portDragRef.current = { nodeId, prefill, sourceCanvasX, sourceCanvasY, startClientX: e.clientX, startClientY: e.clientY };
+    setPortDragPreview({ x1: sourceCanvasX, y1: sourceCanvasY, x2: sourceCanvasX, y2: sourceCanvasY });
   }, []);
 
   const handleViewportPointerDown = useCallback((e: React.PointerEvent) => {
@@ -2436,6 +5287,7 @@ export default function CanvasPage() {
     setProjectDropdownOpen(false);
     panningRef.current = { sx: e.clientX, sy: e.clientY, opx: panXRef.current, opy: panYRef.current };
     setSelectedId(null);
+    setDetailNodeId(null);
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -2447,7 +5299,12 @@ export default function CanvasPage() {
     if (!cmdParentId) return undefined;
     const n = nodes.find(x => x.id === cmdParentId);
     if (!n) return undefined;
-    return n.nodeType === "query" ? (n as QueryNode).query : (n as DerivedNode).content.slice(0, 80);
+    if (n.nodeType === "query") return (n as QueryNode).query;
+    if (n.nodeType === "file") return (n as FileNode).fileName ?? "Datei";
+    if (n.nodeType === "list") return (n as ListNode).title ?? "Liste";
+    if (n.nodeType === "note") return ((n as NoteNode).content ?? "").slice(0, 80);
+    if (n.nodeType === "idea") return ((n as IdeaNode).title || (n as IdeaNode).content || "").slice(0, 80);
+    return (n as DerivedNode).content?.slice(0, 80) ?? "";
   }, [cmdParentId, nodes]);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -2460,19 +5317,40 @@ export default function CanvasPage() {
         <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setProjectDropdownOpen(false)} />
       )}
 
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <header style={{ height: 48, flexShrink: 0, zIndex: 200, display: "flex", alignItems: "center", padding: "0 20px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)" }}>
+      {/* ── Header (hidden when embedded in main page) ────────── */}
+      {!embedded && hydrated && (
+      <header style={{ height: 48, flexShrink: 0, zIndex: 200, display: "flex", alignItems: "center", padding: "0 20px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "rgba(255,255,255,0.88)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)" }}>
 
         {/* Logo + back */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 6, background: "#E4FF97", border: "1.5px solid rgba(0,0,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#0A0A0A", letterSpacing: "0.05em" }}>SIS</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 24, height: 16 }} />
           <a href="/" style={{ fontSize: 12, color: "var(--color-text-secondary)", textDecoration: "none", fontWeight: 500 }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"}
-          >← {de ? "Zurück" : "Back"}</a>
+          >← {de ? "Start" : "Home"}</a>
+          <a href="/projects" style={{ fontSize: 11, color: "var(--color-text-muted)", textDecoration: "none" }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"}
+          >{de ? "Projekte" : "Projects"}</a>
         </div>
         <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-heading)", letterSpacing: "-0.01em", flexShrink: 0 }}>Canvas</span>
+        <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+
+        {/* ── Global nav links ───────────────────────────────── */}
+        {([
+          { href: "/wissen",   label: de ? "Wissen"   : "Knowledge", tip: de ? "Trends, Signale & Quellen" : "Trends, signals & sources" },
+        ] as { href: string; label: string; tip: string }[]).map(({ href, label, tip }) => (
+          <Tooltip key={href} content={tip} placement="bottom">
+            <a
+              href={href}
+              style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-muted)", textDecoration: "none", padding: "2px 6px", borderRadius: 4, transition: "color 0.12s, background 0.12s", whiteSpace: "nowrap" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >{label}</a>
+          </Tooltip>
+        ))}
         <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
 
         {/* ── Project management ─────────────────────────────── */}
@@ -2611,22 +5489,218 @@ export default function CanvasPage() {
             >⊞ {de ? "Ordnen" : "Arrange"}</button>
           )}
 
+          <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+          {(["analyse", "karte", "datei"] as CanvasLayer[]).map(layer => (
+            <button key={layer}
+              onClick={() => toggleLayer(layer)}
+              title={`Layer ${LAYER_LABELS[layer].de} ${hiddenLayers.has(layer) ? "einblenden" : "ausblenden"}`}
+              style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                border: `1px solid ${hiddenLayers.has(layer) ? "var(--color-border)" : LAYER_LABELS[layer].color}`,
+                background: hiddenLayers.has(layer) ? "transparent" : `${LAYER_LABELS[layer].color}18`,
+                color: hiddenLayers.has(layer) ? "var(--color-text-muted)" : LAYER_LABELS[layer].color,
+                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
+                textDecoration: hiddenLayers.has(layer) ? "line-through" : "none",
+              }}
+            >{LAYER_LABELS[layer].de}</button>
+          ))}
+
+          <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+          {(["canvas","board","timeline","orbit"] as ViewMode[]).map(mode => {
+            const icons: Record<ViewMode, string> = { canvas: "⊞", board: "☰", timeline: "⏱", orbit: "⬡" };
+            const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: de ? "Zeitlinie" : "Timeline", orbit: "Orbit" };
+            const tips: Record<ViewMode, string> = {
+              canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
+              board: de ? "Strukturierte Spalten-Ansicht nach Node-Typ" : "Structured column view by node type",
+              timeline: de ? "Chronologische Ansicht aller Analysen" : "Chronological view of all analyses",
+              orbit: de ? "Kausal-Orbit: Alle Trends als verbundenes Netzwerk" : "Causal Orbit: All trends as connected network",
+            };
+            return (
+              <Tooltip key={mode} content={tips[mode]} placement="bottom">
+                <button
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    fontSize: 10, padding: "2px 8px", borderRadius: 20,
+                    border: `1px solid ${viewMode === mode ? "#0A0A0A" : "var(--color-border)"}`,
+                    background: viewMode === mode ? "#0A0A0A" : "transparent",
+                    color: viewMode === mode ? "#fff" : "var(--color-text-muted)",
+                    cursor: "pointer", fontWeight: 600,
+                  }}
+                >{icons[mode]} {labels[mode]}</button>
+              </Tooltip>
+            );
+          })}
+
+          {nodes.length >= 2 && (
+            <>
+              <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+              <Tooltip content={de ? "Strategisches Memo aus allen Analysen generieren" : "Generate strategic memo from all analyses"} placement="bottom">
+                <button
+                  onClick={generateBriefing}
+                  disabled={briefingLoading}
+                  style={{ fontSize: 10, padding: "2px 10px", borderRadius: 20, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", fontWeight: 600, opacity: briefingLoading ? 0.5 : 1 }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+                >{briefingLoading ? (de ? "Generiere…" : "Generating…") : "📄 Briefing"}</button>
+              </Tooltip>
+            </>
+          )}
+
           <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right" }}>{Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
-            title={de ? "Zoom zurücksetzen und zentrieren" : "Reset zoom and center"}
-            style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer" }}
-          >⊙</button>
+          <Tooltip content={de ? "Zoom zurücksetzen und Canvas zentrieren" : "Reset zoom and center canvas"} placement="bottom">
+            <button
+              onClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
+              style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer" }}
+            >⊙</button>
+          </Tooltip>
           {nodes.length > 0 && (
-            <button onClick={clearCanvas}
-              title={de ? "Canvas komplett leeren" : "Clear entire canvas"}
-              style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; }}
-            >{de ? "Leeren" : "Clear"}</button>
+            <>
+              <Tooltip content={de ? "Canvas als Markdown exportieren" : "Export canvas as Markdown"} placement="bottom">
+                <button onClick={() => exportCanvas("markdown")}
+                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
+                >⬇ .md</button>
+              </Tooltip>
+              <Tooltip content={de ? "Canvas-State als JSON sichern" : "Save canvas state as JSON"} placement="bottom">
+                <button onClick={() => exportCanvas("json")}
+                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
+                >⬇ .json</button>
+              </Tooltip>
+              <button onClick={clearCanvas}
+                title={de ? "Canvas komplett leeren" : "Clear entire canvas"}
+                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; }}
+              >{de ? "Leeren" : "Clear"}</button>
+            </>
           )}
         </div>
       </header>
+      )}
+
+      {/* Error banner */}
+      {projectError && (
+        <div style={{
+          position: "absolute", top: 52, left: "50%", transform: "translateX(-50%)", zIndex: 9000,
+          padding: "8px 20px", borderRadius: 8, background: "#FEF2F2", border: "1px solid #FCA5A5",
+          color: "#E8402A", fontSize: 12, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          display: "flex", alignItems: "center", gap: 8, maxWidth: 500,
+          animation: "sis-tooltip-in 0.15s ease",
+        }}>
+          <span>⚠</span>
+          <span style={{ flex: 1 }}>{projectError}</span>
+          <button onClick={() => setProjectError(null)} style={{ background: "none", border: "none", color: "#E8402A", cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
+        </div>
+      )}
+
+      {/* Loading overlay for project operations */}
+      {projectOp && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 8000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(255,255,255,0.7)", backdropFilter: "blur(4px)",
+          pointerEvents: "all",
+        }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 20, marginBottom: 8, animation: "spin 1s linear infinite" }}>⟳</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)" }}>
+              {projectOp === "creating" ? (de ? "Erstelle Projekt…" : "Creating project…") :
+               projectOp === "deleting" ? (de ? "Lösche Projekt…" : "Deleting project…") :
+               (de ? "Lade Projekt…" : "Loading project…")}
+            </div>
+          </div>
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+      {/* ── Template Picker Modal ─────────────────────────────── */}
+      {showTemplatePicker && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowTemplatePicker(false)}
+        >
+          <div style={{ background: "var(--color-surface)", borderRadius: 16, padding: "28px 32px", width: "min(680px, 90vw)", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-heading)", margin: "0 0 4px" }}>
+              {de ? "Wie möchtest du starten?" : "How would you like to start?"}
+            </h2>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 20px" }}>
+              {de ? "Wähle ein Analyse-Framework oder starte mit einem leeren Canvas." : "Choose an analysis framework or start with an empty canvas."}
+            </p>
+
+            {/* Template Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
+              {TEMPLATES.map(t => (
+                <button key={t.id}
+                  onClick={() => {
+                    if (t.id === "empty") {
+                      setShowTemplatePicker(false);
+                      return;
+                    }
+                    const topic = window.prompt(de ? "Thema eingeben:" : "Enter topic:", "");
+                    if (!topic?.trim()) return;
+
+                    // Find the framework definition for workflow mode
+                    const fw = FRAMEWORKS.find(f => f.id === t.id);
+                    if (fw) {
+                      // Start guided workflow
+                      const steps: WorkflowStep[] = fw.steps.map((s, i) => ({
+                        id: `step-${i}`,
+                        title: s.title,
+                        description: s.description,
+                        status: (i === 0 ? "pending" : s.dependsOn.every(d => false) ? "pending" : "locked") as "pending" | "locked",
+                        queryTemplate: s.queryTemplate,
+                        dependsOn: s.dependsOn,
+                        userInputPrompt: s.userInputPrompt,
+                      }));
+                      // Unlock steps that have no dependencies
+                      steps.forEach((s, i) => {
+                        if (fw.steps[i].dependsOn.length === 0) s.status = "pending";
+                        else s.status = "locked";
+                      });
+                      setActiveWorkflow({
+                        frameworkId: fw.id,
+                        frameworkName: de ? fw.name : fw.nameEn,
+                        methodology: de ? fw.methodology : fw.methodologyEn,
+                        topic: topic.trim(),
+                        steps,
+                        currentStepIndex: 0,
+                      });
+                      setShowTemplatePicker(false);
+                      return;
+                    }
+
+                    // Fallback: static template
+                    const result = t.build(topic.trim());
+                    setNodes(result.nodes as any[]);
+                    setConnections(result.conns as any[]);
+                    setZoom(0.7);
+                    setShowTemplatePicker(false);
+                  }}
+                  style={{
+                    padding: "16px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)",
+                    background: "white", cursor: "pointer", textAlign: "left",
+                    transition: "all 0.12s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#E4FF97"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.boxShadow = "none"; }}
+                >
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>{t.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 3 }}>{de ? t.labelDe : t.labelEn}</div>
+                  <div style={{ fontSize: 10, color: "var(--color-text-muted)", lineHeight: 1.4 }}>{de ? t.descDe : t.descEn}</div>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => setShowTemplatePicker(false)}
+              style={{ fontSize: 12, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
+            >{de ? "Abbrechen" : "Cancel"}</button>
+          </div>
+        </div>
+      )}
 
       {/* Hidden file input for NodePicker "Datei" upload */}
       <input
@@ -2637,6 +5711,125 @@ export default function CanvasPage() {
         onChange={handleFileInputChange}
       />
 
+      {/* ── Workflow Panel (right sidebar when active) ────────────── */}
+      {activeWorkflow && (
+        <div style={{ position: "fixed", right: 0, top: embedded ? 0 : 48, bottom: 0, zIndex: 500 }}>
+          <WorkflowPanel
+            workflow={activeWorkflow}
+            onClose={() => setActiveWorkflow(null)}
+            onStartStep={(stepIndex, userContext) => {
+              if (!activeWorkflow) return;
+              const step = activeWorkflow.steps[stepIndex];
+              if (!step) return;
+
+              // Build query from template
+              const fw = FRAMEWORKS.find(f => f.id === activeWorkflow.frameworkId);
+              if (!fw) return;
+              const fwStep = fw.steps[stepIndex];
+
+              // Gather context from dependency steps
+              let context = "";
+              fwStep.dependsOn.forEach(depIdx => {
+                const depStep = activeWorkflow.steps[depIdx];
+                if (depStep?.synthesis) {
+                  context += `[${depStep.title}]: ${depStep.synthesis}\n\n`;
+                }
+              });
+
+              let query = fwStep.queryTemplate
+                .replace(/\{topic\}/g, activeWorkflow.topic)
+                .replace(/\{context\}/g, context);
+
+              // Add user context if provided
+              if (userContext?.trim()) {
+                query += `\n\nNUTZER-KONTEXT: ${userContext.trim()}`;
+              }
+
+              // Update step status to running
+              setActiveWorkflow(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                newSteps[stepIndex] = { ...newSteps[stepIndex], status: "running" };
+                return { ...prev, steps: newSteps, currentStepIndex: stepIndex };
+              });
+
+              // Submit the query with a generated parent connection
+              const parentNodeId = stepIndex > 0
+                ? activeWorkflow.steps.find((s, i) => i < stepIndex && s.queryNodeId)?.queryNodeId
+                : undefined;
+
+              const nodeId = uid();
+              const pos = getNextQueryPos(parentNodeId);
+              const qNode: QueryNode = {
+                id: nodeId, nodeType: "query", x: pos.x, y: pos.y, query: query.slice(0, 200) + "...", locale,
+                status: "loading", synthesis: "", result: null, collapsed: false,
+                parentId: parentNodeId, createdAt: Date.now(), tags: [activeWorkflow.frameworkId, `schritt-${stepIndex + 1}`],
+              };
+              setNodes(prev => [...prev, qNode]);
+              if (parentNodeId) setConnections(prev => [...prev, { from: parentNodeId, to: nodeId, connectionType: "builds-on" }]);
+
+              // Store nodeId in workflow
+              setActiveWorkflow(prev => {
+                if (!prev) return null;
+                const newSteps = [...prev.steps];
+                newSteps[stepIndex] = { ...newSteps[stepIndex], queryNodeId: nodeId };
+                return { ...prev, steps: newSteps };
+              });
+
+              // Stream the query
+              streamQuery(
+                query, locale,
+                (chunk) => setNodes(prev => prev.map(n => n.id === nodeId && n.nodeType === "query" ? { ...n, status: "streaming", synthesis: (n as QueryNode).synthesis + chunk } : n)),
+                (result) => {
+                  const synthesis = result.synthesis ?? "";
+                  setNodes(prev => prev.map(n => n.id === nodeId && n.nodeType === "query" ? { ...n, status: "done", synthesis, result } as QueryNode : n));
+
+                  // Update workflow: mark step as done, unlock dependents
+                  setActiveWorkflow(prev => {
+                    if (!prev) return null;
+                    const newSteps = [...prev.steps];
+                    newSteps[stepIndex] = { ...newSteps[stepIndex], status: "done", synthesis };
+
+                    // Unlock steps whose dependencies are all done
+                    newSteps.forEach((s, i) => {
+                      if (s.status === "locked") {
+                        const deps = fw!.steps[i].dependsOn;
+                        if (deps.every(d => newSteps[d]?.status === "done")) {
+                          newSteps[i] = { ...newSteps[i], status: "pending" };
+                        }
+                      }
+                    });
+
+                    // Find next pending step
+                    const nextPending = newSteps.findIndex(s => s.status === "pending");
+
+                    return { ...prev, steps: newSteps, currentStepIndex: nextPending >= 0 ? nextPending : stepIndex };
+                  });
+
+                  // Also generate derived nodes from the result
+                  const derived = computeDerivedNodes(nodeId, pos.x, pos.y, result);
+                  const derivedConns = derived.map(d => ({ from: nodeId, to: d.id, derived: true }));
+                  setTimeout(() => {
+                    setNodes(prev => [...prev, ...derived]);
+                    setConnections(prev => [...prev, ...derivedConns]);
+                  }, 300);
+                },
+                (errMsg) => {
+                  setNodes(prev => prev.map(n => n.id === nodeId && n.nodeType === "query" ? { ...n, status: "error", errorMsg: errMsg } as QueryNode : n));
+                  setActiveWorkflow(prev => {
+                    if (!prev) return null;
+                    const newSteps = [...prev.steps];
+                    newSteps[stepIndex] = { ...newSteps[stepIndex], status: "pending" }; // allow retry
+                    return { ...prev, steps: newSteps };
+                  });
+                },
+                (phase) => setNodes(prev => prev.map(n => n.id === nodeId && n.nodeType === "query" ? { ...n, streamingPhase: phase } as QueryNode : n)),
+              );
+            }}
+          />
+        </div>
+      )}
+
       {/* ── Canvas viewport ──────────────────────────────────────── */}
       <div
         ref={viewportRef}
@@ -2646,122 +5839,378 @@ export default function CanvasPage() {
         onDrop={handleCanvasDrop}
         style={{
           flex: 1, position: "relative", overflow: "hidden",
-          backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.09) 1px, transparent 1px)",
-          backgroundSize: `${22 * zoom}px ${22 * zoom}px`,
-          backgroundPosition: `${panX % (22 * zoom)}px ${panY % (22 * zoom)}px`,
+          background: "var(--color-page-bg)",
+          backgroundImage: `radial-gradient(var(--color-border) 1.5px, transparent 1.5px)`,
+          backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+          backgroundPosition: `${panX % (20 * zoom)}px ${panY % (20 * zoom)}px`,
         }}
       >
         {/* Canvas transform layer */}
-        <div style={{ position: "absolute", top: 0, left: 0, transform: `translate(${panX}px, ${panY}px) scale(${zoom})`, transformOrigin: "0 0" }}>
-          <ConnectionsSVG nodes={nodes} connections={connections} />
+        {viewMode === "canvas" && (
+          <ErrorBoundary>
+          <div style={{ position: "absolute", top: 0, left: 0, transform: `translate(${panX}px, ${panY}px) scale(${zoom})`, transformOrigin: "0 0" }}>
+            <ConnectionsSVG nodes={visibleNodes} connections={connections} pipelineChain={pipelineChain} selectedId={selectedId} />
 
-          {nodes.map(n => {
-            if (n.nodeType === "query") {
-              const qNode = n as QueryNode;
+            {/* Port drag preview line */}
+            {portDragPreview && (
+              <svg style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, overflow: "visible", pointerEvents: "none", zIndex: 100 }}>
+                <defs>
+                  <marker id="portDragArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L6,3 z" fill="var(--color-brand)" opacity="0.7" />
+                  </marker>
+                </defs>
+                <line
+                  x1={portDragPreview.x1} y1={portDragPreview.y1}
+                  x2={portDragPreview.x2} y2={portDragPreview.y2}
+                  stroke="var(--color-brand)"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                  opacity={0.65}
+                  markerEnd="url(#portDragArrow)"
+                />
+                <circle cx={portDragPreview.x2} cy={portDragPreview.y2} r={5} fill="var(--color-brand)" opacity={0.7} />
+              </svg>
+            )}
+
+            {/* Group blobs */}
+            {canvasGroups.map(g => (
+              <div key={g.id} style={{
+                position: "absolute",
+                left: g.bounds.x, top: g.bounds.y,
+                width: g.bounds.w, height: g.bounds.h,
+                background: `${g.color}08`,
+                border: `1.5px dashed ${g.color}40`,
+                borderRadius: 20,
+                pointerEvents: "none",
+              }}>
+                <div style={{
+                  position: "absolute", top: 8, left: 14,
+                  fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
+                  color: `${g.color}AA`,
+                  fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                }}>{g.label}</div>
+              </div>
+            ))}
+
+            {visibleNodes.map(n => {
+              const isDimmed = selectedId !== null && !pipelineChain.has(n.id);
+              if (n.nodeType === "query") {
+                const qNode = n as QueryNode;
+                return (
+                  <QueryNodeCard key={n.id}
+                    node={qNode} de={de}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onFollowUp={handleFollowUp}
+                    onFollowUpQ={(id, q) => handleFollowUp(id, q)}
+                    onDelete={deleteNode}
+                    onToggleCollapse={toggleCollapse}
+                    onRefresh={handleRefresh}
+                    onResizeStart={handleResizeStart}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={qNode.customWidth ?? QUERY_NODE_W}
+                    dimmed={isDimmed}
+                    zoom={zoom}
+                    causalFingerprint={(() => {
+                      const cg = nodes.find(c => c.parentId === n.id && c.nodeType === "causalgraph") as DerivedNode | undefined;
+                      if (!cg?.causalEdges?.length) return undefined;
+                      const names = cg.causalTrendNames ?? {};
+                      const counts = new Map<string, number>();
+                      cg.causalEdges.forEach(e => {
+                        counts.set(e.from, (counts.get(e.from) ?? 0) + 1);
+                        counts.set(e.to, (counts.get(e.to) ?? 0) + 1);
+                      });
+                      return Array.from(counts.entries())
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 3)
+                        .map(([id]) => names[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
+                    })()}
+                  />
+                );
+              }
+              if (n.nodeType === "note") {
+                const nNode = n as NoteNode;
+                return (
+                  <NoteNodeCard key={n.id}
+                    node={nNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onUpdate={handleUpdateNote}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    onPromote={handlePromoteNote}
+                    nodeW={nNode.customWidth ?? 280}
+                    dimmed={isDimmed}
+                    zoom={zoom}
+                  />
+                );
+              }
+              if (n.nodeType === "idea") {
+                const iNode = n as IdeaNode;
+                return (
+                  <IdeaNodeCard key={n.id}
+                    node={iNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onUpdate={handleUpdateIdea}
+                    onPromote={handlePromoteIdea}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={iNode.customWidth ?? 300}
+                    dimmed={isDimmed}
+                    zoom={zoom}
+                  />
+                );
+              }
+              if (n.nodeType === "list") {
+                const lNode = n as ListNode;
+                return (
+                  <ListNodeCard key={n.id}
+                    node={lNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onUpdate={handleUpdateList}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={lNode.customWidth ?? 280}
+                    dimmed={isDimmed}
+                    zoom={zoom}
+                  />
+                );
+              }
+              if (n.nodeType === "file") {
+                const fNode = n as FileNode;
+                return (
+                  <FileNodeCard key={n.id}
+                    node={fNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onAnalyze={(query, parentId) => submitQuery(query, parentId)}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={fNode.customWidth ?? FILE_NODE_W}
+                    dimmed={isDimmed}
+                    zoom={zoom}
+                  />
+                );
+              }
+              const dNode = n as DerivedNode;
+              if (dNode.nodeType === "dimensions") {
+                return (
+                  <DimensionsNodeCard key={n.id}
+                    node={dNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={dNode.customWidth ?? DERIVED_W}
+                    dimmed={isDimmed}
+                  />
+                );
+              }
+              if (dNode.nodeType === "causalgraph") {
+                return (
+                  <CausalGraphNodeCard key={n.id}
+                    node={dNode}
+                    selected={selectedId === n.id}
+                    onSelect={handleSelectNode}
+                    onDragStart={handleDragStart}
+                    onDelete={deleteNode}
+                    onResizeStart={handleResizeStart}
+                    onIterate={handleIterateFromNode}
+                    onPortDragStart={handlePortDragStart}
+                    nodeW={dNode.customWidth ?? DERIVED_W}
+                    dimmed={isDimmed}
+                  />
+                );
+              }
               return (
-                <QueryNodeCard key={n.id}
-                  node={qNode} de={de}
+                <DerivedNodeCard key={n.id}
+                  node={dNode} de={de}
                   selected={selectedId === n.id}
-                  onSelect={setSelectedId}
+                  onSelect={handleSelectNode}
                   onDragStart={handleDragStart}
-                  onFollowUp={handleFollowUp}
-                  onFollowUpQ={(id, q) => handleFollowUp(id, q)}
+                  onExplore={handleExplore}
                   onDelete={deleteNode}
-                  onToggleCollapse={toggleCollapse}
-                  onRefresh={handleRefresh}
                   onResizeStart={handleResizeStart}
                   onIterate={handleIterateFromNode}
-                  nodeW={qNode.customWidth ?? QUERY_NODE_W}
+                  onPortDragStart={handlePortDragStart}
+                  nodeW={dNode.customWidth ?? DERIVED_W}
+                  dimmed={isDimmed}
+                  zoom={zoom}
                 />
               );
-            }
-            if (n.nodeType === "note") {
-              const nNode = n as NoteNode;
+            })}
+          </div>
+          </ErrorBoundary>
+        )}
+
+        {/* Board mode */}
+        {viewMode === "board" && (
+          <div style={{ display: "flex", gap: 0, height: "100%", overflowX: "auto" }}>
+            {[
+              { key: "query",     label: de ? "Fragen" : "Queries",           color: "#1A9E5A", types: ["query"] },
+              { key: "insights",  label: de ? "Erkenntnisse" : "Insights",   color: "#6B7A00", types: ["insight"] },
+              { key: "scenarios", label: de ? "Szenarien" : "Scenarios",     color: "#1D4ED8", types: ["scenario"] },
+              { key: "decisions", label: de ? "Entscheidungen" : "Decisions",color: "#1A9E5A", types: ["decision"] },
+              { key: "followups", label: de ? "Folgefragen" : "Follow-ups",  color: "#6B7280", types: ["followup"] },
+              { key: "analysis",  label: de ? "Analyse" : "Analysis",        color: "#3b82f6", types: ["dimensions","causalgraph"] },
+              { key: "notes",     label: de ? "Notizen" : "Notes",           color: "#F5A623", types: ["note","idea","list","file"] },
+            ].map(col => {
+              const colNodes = nodes.filter(n => col.types.includes(n.nodeType));
               return (
-                <NoteNodeCard key={n.id}
-                  node={nNode}
-                  selected={selectedId === n.id}
-                  onSelect={setSelectedId}
-                  onDragStart={handleDragStart}
-                  onDelete={deleteNode}
-                  onResizeStart={handleResizeStart}
-                  onUpdate={handleUpdateNote}
-                  onIterate={handleIterateFromNode}
-                  onPromote={handlePromoteNote}
-                  nodeW={nNode.customWidth ?? 280}
-                />
+                <div key={col.key} style={{ minWidth: 280, flex: 1, borderRight: "1px solid var(--color-border)", display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: "12px 16px 10px", borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: col.color, flexShrink: 0 }} />
+                    <span className="section-label" style={{ color: col.color, marginBottom: 0 }}>{col.label}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", fontWeight: 600, color: "var(--color-text-muted)", background: "var(--color-page-bg)", padding: "1px 6px", borderRadius: 10, border: "1px solid var(--color-border)" }}>{colNodes.length}</span>
+                  </div>
+                  <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {colNodes.map(n => (
+                      <div key={n.id}
+                        onClick={() => handleSelectNode(n.id)}
+                        style={{
+                          padding: "10px 12px", borderRadius: 10, border: `1px solid ${selectedId === n.id ? col.color : "var(--color-border)"}`,
+                          background: "var(--color-surface)", cursor: "pointer", transition: "all 0.12s",
+                          boxShadow: selectedId === n.id ? `0 0 0 2px ${col.color}40` : "0 1px 4px rgba(0,0,0,0.06)",
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = col.color}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = selectedId === n.id ? col.color : "var(--color-border)"}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.35, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                          {n.nodeType === "query" ? (n as QueryNode).query
+                           : n.nodeType === "note" ? (n as NoteNode).content.slice(0,80)
+                           : n.nodeType === "idea" ? (n as IdeaNode).title || (n as IdeaNode).content.slice(0,80)
+                           : n.nodeType === "list" ? (n as ListNode).title || (n as ListNode).items?.[0] || "Liste"
+                           : n.nodeType === "file" ? (n as FileNode).fileName
+                           : (n as DerivedNode).label || (n as DerivedNode).content?.slice(0,80)}
+                        </div>
+                        {n.nodeType === "query" && (n as QueryNode).synthesis && (
+                          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {(n as QueryNode).synthesis.slice(0,120)}
+                          </p>
+                        )}
+                        <div style={{ marginTop: 6, fontSize: 9, color: "var(--color-text-muted)" }}>{formatNodeTime(n.createdAt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               );
-            }
-            if (n.nodeType === "idea") {
-              const iNode = n as IdeaNode;
+            })}
+          </div>
+        )}
+
+        {/* Timeline mode */}
+        {viewMode === "timeline" && (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto", padding: "24px 32px" }}>
+            <div className="section-label" style={{ marginBottom: 20 }}>
+              {de ? "Gedankenverlauf" : "Thought History"}
+            </div>
+            {[...nodes].sort((a,b) => a.createdAt - b.createdAt).map((n, i) => {
+              const color = NODE_MINIMAP_COLOR[n.nodeType] ?? "#888";
               return (
-                <IdeaNodeCard key={n.id}
-                  node={iNode}
-                  selected={selectedId === n.id}
-                  onSelect={setSelectedId}
-                  onDragStart={handleDragStart}
-                  onDelete={deleteNode}
-                  onResizeStart={handleResizeStart}
-                  onUpdate={handleUpdateIdea}
-                  onPromote={handlePromoteIdea}
-                  onIterate={handleIterateFromNode}
-                  nodeW={iNode.customWidth ?? 300}
-                />
+                <div key={n.id} style={{ display: "flex", gap: 16, marginBottom: 4 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 16 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 4 }} />
+                    {i < nodes.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 20, background: "var(--color-border)", marginTop: 3 }} />}
+                  </div>
+                  <div
+                    onClick={() => { handleSelectNode(n.id); setViewMode("canvas"); }}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{n.nodeType}</span>
+                      <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{formatNodeTime(n.createdAt)}</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-heading)", lineHeight: 1.4 }}>
+                      {n.nodeType === "query" ? (n as QueryNode).query
+                       : n.nodeType === "note" ? (n as NoteNode).content.slice(0,100)
+                       : n.nodeType === "idea" ? (n as IdeaNode).title
+                       : n.nodeType === "list" ? (n as ListNode).title
+                       : (n as DerivedNode).label || (n as DerivedNode).content.slice(0,100)}
+                    </div>
+                  </div>
+                </div>
               );
-            }
-            if (n.nodeType === "list") {
-              const lNode = n as ListNode;
-              return (
-                <ListNodeCard key={n.id}
-                  node={lNode}
-                  selected={selectedId === n.id}
-                  onSelect={setSelectedId}
-                  onDragStart={handleDragStart}
-                  onDelete={deleteNode}
-                  onResizeStart={handleResizeStart}
-                  onUpdate={handleUpdateList}
-                  onIterate={handleIterateFromNode}
-                  nodeW={lNode.customWidth ?? 280}
-                />
-              );
-            }
-            if (n.nodeType === "file") {
-              const fNode = n as FileNode;
-              return (
-                <FileNodeCard key={n.id}
-                  node={fNode}
-                  selected={selectedId === n.id}
-                  onSelect={setSelectedId}
-                  onDragStart={handleDragStart}
-                  onDelete={deleteNode}
-                  onResizeStart={handleResizeStart}
-                  onAnalyze={(query, parentId) => submitQuery(query, parentId)}
-                  onIterate={handleIterateFromNode}
-                  nodeW={fNode.customWidth ?? FILE_NODE_W}
-                />
-              );
-            }
-            const dNode = n as DerivedNode;
-            return (
-              <DerivedNodeCard key={n.id}
-                node={dNode} de={de}
-                selected={selectedId === n.id}
-                onSelect={setSelectedId}
-                onDragStart={handleDragStart}
-                onExplore={handleExplore}
-                onDelete={deleteNode}
-                onResizeStart={handleResizeStart}
-                onIterate={handleIterateFromNode}
-                nodeW={dNode.customWidth ?? DERIVED_W}
-              />
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
+
+        {/* ── Orbit view ──────────────────────────────────────────── */}
+        {viewMode === "orbit" && (() => {
+          // Aggregate all causal edges + trend names from causalgraph nodes
+          const cgNodes = nodes.filter(n => n.nodeType === "causalgraph") as DerivedNode[];
+          const orbitEdges = cgNodes.flatMap(n => n.causalEdges ?? []);
+          const orbitNames: Record<string, string> = {};
+          cgNodes.forEach(n => { Object.assign(orbitNames, n.causalTrendNames ?? {}); });
+          // Build trendId → parentQueryId map
+          const trendQueryMap: Record<string, string[]> = {};
+          cgNodes.forEach(cg => {
+            const parentQId = cg.parentId;
+            if (!parentQId) return;
+            (cg.causalEdges ?? []).forEach(e => {
+              [e.from, e.to].forEach(tid => {
+                if (!trendQueryMap[tid]) trendQueryMap[tid] = [];
+                if (!trendQueryMap[tid].includes(parentQId)) trendQueryMap[tid].push(parentQId);
+              });
+            });
+          });
+          return (
+            <OrbitGraphView
+              allEdges={orbitEdges}
+              allTrendNames={orbitNames}
+              trendQueryMap={trendQueryMap}
+              de={de}
+              onSelectQuery={(qId) => {
+                if (qId.startsWith("__orbit_deepen__")) {
+                  const trendLabel = qId.replace("__orbit_deepen__", "");
+                  setCmdVisible(true);
+                  setCmdPrefill(`Vertiefen: ${trendLabel} — Wie beeinflusst dieser Trend andere strategische Bereiche?`);
+                  setViewMode("canvas");
+                } else {
+                  handleSelectNode(qId);
+                  setViewMode("canvas");
+                }
+              }}
+            />
+          );
+        })()}
 
         {/* ── Empty state ─────────────────────────────────────────── */}
-        {isEmpty && !cmdVisible && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--color-text-muted)", marginBottom: 28 }}>
+        {/* Embedded empty state — subtle hint */}
+        {viewMode === "canvas" && isEmpty && embedded && hydrated && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ textAlign: "center", color: "var(--color-text-muted)", opacity: 0.5 }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>⊞</div>
+              <div style={{ fontSize: 12 }}>Starte eine Analyse im Standard-View</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>Die Ergebnisse erscheinen hier als Karten</div>
+            </div>
+          </div>
+        )}
+        {/* Standalone empty state */}
+        {viewMode === "canvas" && isEmpty && !cmdVisible && !embedded && hydrated && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, background: "radial-gradient(ellipse at 30% 40%, rgba(228,255,151,0.14) 0%, transparent 55%), radial-gradient(ellipse at 70% 60%, rgba(10,10,10,0.03) 0%, transparent 50%)" }}>
+            <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--color-text-muted)", marginBottom: 28, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>
               {projectId ? projectName : "Intelligence Canvas"}
             </div>
             <CommandLine onSubmit={q => submitQuery(q)} onClose={() => {}} locale={locale} />
@@ -2787,7 +6236,7 @@ export default function CanvasPage() {
         )}
 
         {/* ── Floating command line ───────────────────────────────── */}
-        {cmdVisible && (
+        {viewMode === "canvas" && cmdVisible && !(embedded && isEmpty) && hydrated && (
           <div style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 50 }}>
             <CommandLine
               key={cmdPrefill + cmdParentId}
@@ -2801,28 +6250,165 @@ export default function CanvasPage() {
         )}
 
         {/* ── NodePicker overlay ──────────────────────────────────── */}
-        {nodePickerVisible && (
+        {viewMode === "canvas" && nodePickerVisible && (
           <>
             {/* Backdrop */}
-            <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onPointerDown={() => { setNodePickerVisible(false); setIterateCtx(null); }} />
-            <div style={{ position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }}>
-              <NodePicker onSelect={handleNodeTypeSelect} onClose={() => { setNodePickerVisible(false); setIterateCtx(null); }} hasContext={!!iterateCtx} />
+            <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onPointerDown={() => { setNodePickerVisible(false); setIterateCtx(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; }} />
+            <div style={nodePickerPos
+              ? { position: "absolute", left: nodePickerPos.x, top: nodePickerPos.y, transform: "translate(-50%, -100%) translateY(-16px)", zIndex: 50 }
+              : { position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }
+            }>
+              <NodePicker onSelect={handleNodeTypeSelect} onClose={() => { setNodePickerVisible(false); setIterateCtx(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; }} hasContext={!!iterateCtx} />
             </div>
           </>
         )}
 
-        {/* bottom-center floating button removed — "+" is now in the header top-right */}
-
         {/* ── Hints bottom-right ──────────────────────────────────── */}
-        <div style={{ position: "absolute", bottom: 14, right: 18, fontSize: 10, color: "var(--color-text-muted)", textAlign: "right", pointerEvents: "none", lineHeight: 1.6 }}>
-          <div>{de ? "Scrollen = Zoom · Hintergrund ziehen = Pan" : "Scroll = zoom · Drag background = pan"}</div>
-          <div style={{ fontVariantNumeric: "tabular-nums", opacity: 0.7 }}>
-            {Math.round(panX)},{Math.round(panY)} · {Math.round(zoom * 100)}%
+        {viewMode === "canvas" && (
+          <div style={{ position: "absolute", bottom: 14, right: 18, fontSize: 10, color: "var(--color-text-muted)", textAlign: "right", pointerEvents: "none", lineHeight: 1.6 }}>
+            <div>{de ? "Scrollen = Zoom · Hintergrund ziehen = Pan" : "Scroll = zoom · Drag background = pan"}</div>
           </div>
-        </div>
+        )}
+
+        {/* ── Minimap ──────────────────────────────────────────────── */}
+        {viewMode === "canvas" && (
+          <Minimap
+            nodes={visibleNodes}
+            panX={panX} panY={panY} zoom={zoom}
+            viewportW={viewportSize.w} viewportH={viewportSize.h}
+            onNavigate={(px, py) => { setPanX(px); setPanY(py); }}
+            rightOffset={16}
+          />
+        )}
       </div>
 
       <style>{`@keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+
+      {/* ── Detail Panel ────────────────────────────────────────────── */}
+      {detailNodeId && (() => {
+        const detailNode = nodes.find(n => n.id === detailNodeId);
+        if (!detailNode) return null;
+        return (
+          <>
+            {/* Backdrop */}
+            <div
+              onClick={() => setDetailNodeId(null)}
+              style={{ position: "fixed", inset: 0, zIndex: 149, background: "rgba(0,0,0,0.22)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+            />
+            <DetailPanel
+              key={detailNodeId}
+              node={detailNode}
+              de={de}
+              allQueryNodes={queryNodes}
+              siblingScenarios={detailNode.nodeType === "scenario"
+                ? (nodes.filter(n => n.nodeType === "scenario" && (n as DerivedNode).parentId === (detailNode as DerivedNode).parentId) as DerivedNode[])
+                : undefined
+              }
+              onClose={() => setDetailNodeId(null)}
+              onFollowUp={handleFollowUp}
+              onRefresh={handleRefresh}
+              onExplore={handleExplore}
+              onDelete={deleteNode}
+              onUpdateNote={handleUpdateNote}
+              onUpdateIdea={handleUpdateIdea}
+              onUpdateList={handleUpdateList}
+              onPromoteNote={handlePromoteNote}
+              onPromoteIdea={handlePromoteIdea}
+              onAnalyzeFile={(query, parentId) => submitQuery(query, parentId)}
+              onIterate={handleIterateFromNode}
+              onSetStatus={handleSetNodeStatus}
+              onUpdateTags={(id, tags) => setNodes(prev => prev.map(n => n.id === id ? { ...n, tags } : n))}
+            />
+          </>
+        );
+      })()}
+
+      {/* ── Delete Confirmation Toast ──────────────────────────────── */}
+      {deleteConfirmId && (() => {
+        const dn = nodes.find(n => n.id === deleteConfirmId);
+        const label = dn
+          ? dn.nodeType === "query" ? `„${(dn as QueryNode).query.slice(0, 42)}${(dn as QueryNode).query.length > 42 ? "…" : ""}"`
+          : dn.nodeType === "note" ? "diese Notiz"
+          : dn.nodeType === "idea" ? "diese Idee"
+          : dn.nodeType === "list" ? "diese Liste"
+          : dn.nodeType === "file" ? `„${(dn as FileNode).fileName}"`
+          : "diese Karte"
+          : "diese Karte";
+        return (
+          <div style={{
+            position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+            border: "1.5px solid var(--signal-negative-border, #F4A090)",
+            borderRadius: 14,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+            padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
+            zIndex: 9999, minWidth: 340,
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+              background: "var(--signal-negative-light, #FDEEE9)",
+              border: "1px solid var(--signal-negative-border, #F4A090)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+            }}>🗑</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>Karte löschen?</p>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {label} · nicht rückgängig machbar · Enter zum Bestätigen
+              </p>
+            </div>
+            <button
+              onClick={() => { deleteNode(deleteConfirmId); setDeleteConfirmId(null); }}
+              style={{ background: "var(--signal-negative-light, #FDEEE9)", border: "1.5px solid var(--signal-negative-border, #F4A090)", color: "var(--signal-negative-text, #A01A08)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E8402A"; el.style.color = "#fff"; el.style.borderColor = "#E8402A"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "var(--signal-negative-light, #FDEEE9)"; el.style.color = "var(--signal-negative-text, #A01A08)"; el.style.borderColor = "var(--signal-negative-border, #F4A090)"; }}
+            >Löschen</button>
+            <button
+              onClick={() => setDeleteConfirmId(null)}
+              style={{ background: "transparent", border: "1.5px solid var(--color-border)", color: "var(--color-text-secondary)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
+            >Abbrechen</button>
+          </div>
+        );
+      })()}
+
+      {/* ── Briefing Modal ─────────────────────────────────────────── */}
+      {briefingOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 250 }} onClick={() => setBriefingOpen(false)} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+            width: "min(680px, 92vw)", maxHeight: "80vh",
+            background: "rgba(255,255,255,0.95)",
+            backdropFilter: "blur(24px) saturate(200%)",
+            WebkitBackdropFilter: "blur(24px) saturate(200%)",
+            border: "1px solid rgba(0,0,0,0.1)",
+            borderRadius: 18,
+            boxShadow: "0 24px 80px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.08)", zIndex: 251,
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>
+            <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)" }}>{de ? "Strategisches Briefing" : "Strategic Briefing"}</span>
+              <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: 4 }}>{de ? "generiert aus Canvas" : "generated from canvas"}</span>
+              <button onClick={() => setBriefingOpen(false)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--color-text-muted)", padding: "2px 6px" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+              {briefingLoading && !briefingText && (
+                <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Generiere Briefing…" : "Generating briefing…"}</div>
+              )}
+              {briefingText && (
+                <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--color-text-primary)", margin: 0, whiteSpace: "pre-wrap" }}>{briefingText}</p>
+              )}
+            </div>
+            {briefingText && (
+              <div style={{ padding: "12px 24px", borderTop: "1px solid var(--color-border)", display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(briefingText); }}
+                  style={{ fontSize: 12, padding: "5px 14px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", cursor: "pointer", color: "var(--color-text-secondary)" }}
+                >{de ? "Kopieren" : "Copy"}</button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

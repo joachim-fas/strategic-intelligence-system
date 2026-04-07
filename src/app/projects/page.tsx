@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { AppHeader } from "@/components/AppHeader";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,14 +65,14 @@ interface Note {
 // ── Scenario type config ──────────────────────────────────────────────────
 
 const SCENARIO_CONFIG: Record<string, { color: string; bg: string; border: string; labelDe: string; labelEn: string }> = {
-  optimistic:  { color: "#0F6038", bg: "#E8F8EF", border: "#7DD4A8", labelDe: "Optimistisch", labelEn: "Optimistic" },
-  baseline:    { color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", labelDe: "Basisfall",    labelEn: "Baseline" },
-  pessimistic: { color: "#B91C1C", bg: "#FEF2F2", border: "#FCA5A5", labelDe: "Pessimistisch", labelEn: "Pessimistic" },
-  wildcard:    { color: "#92400E", bg: "#FFFBEB", border: "#FDE68A", labelDe: "Wildcard",      labelEn: "Wildcard" },
+  optimistic:  { color: "var(--signal-positive-text)",  bg: "var(--signal-positive-light)",  border: "var(--signal-positive-border)",  labelDe: "Optimistisch", labelEn: "Optimistic" },
+  baseline:    { color: "var(--pastel-blue-text)",       bg: "var(--pastel-blue)",             border: "var(--pastel-blue-border)",       labelDe: "Basisfall",    labelEn: "Baseline" },
+  pessimistic: { color: "var(--signal-negative-text)",  bg: "var(--signal-negative-light)",  border: "var(--signal-negative-border)",  labelDe: "Pessimistisch", labelEn: "Pessimistic" },
+  wildcard:    { color: "var(--pastel-butter-text)",     bg: "var(--pastel-butter)",           border: "var(--pastel-butter-border)",     labelDe: "Wildcard",      labelEn: "Wildcard" },
 };
 
 function getScenarioCfg(type?: string) {
-  return SCENARIO_CONFIG[type ?? ""] ?? { color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", labelDe: "Szenario", labelEn: "Scenario" };
+  return SCENARIO_CONFIG[type ?? ""] ?? { color: "var(--pastel-blue-text)", bg: "var(--pastel-blue)", border: "var(--pastel-blue-border)", labelDe: "Szenario", labelEn: "Scenario" };
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────
@@ -91,12 +92,12 @@ function timeAgo(dateStr: string, de: boolean): string {
 function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
   const pct = Math.round(value * 100);
   const s = value > 0.7
-    ? { background: "#E8F8EF", color: "#0F6038", border: "1px solid #7DD4A8" }
+    ? { background: "var(--signal-positive-light)", color: "var(--signal-positive-text)", border: "1px solid var(--signal-positive-border)" }
     : value > 0.4
-    ? { background: "#FFFBEB", color: "#92400E", border: "1px solid #FDE68A" }
-    : { background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FCA5A5" };
+    ? { background: "var(--pastel-butter)", color: "var(--pastel-butter-text)", border: "1px solid var(--pastel-butter-border)" }
+    : { background: "var(--signal-negative-light)", color: "var(--signal-negative-text)", border: "1px solid var(--signal-negative-border)" };
   return (
-    <span style={{ ...s, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600, display: "inline-block" }}>
+    <span className="volt-badge" style={{ ...s }}>
       {pct}% {de ? "Konfidenz" : "confidence"}
     </span>
   );
@@ -104,11 +105,7 @@ function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
-      fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-      letterSpacing: "0.08em", color: "var(--color-text-muted)",
-      marginBottom: 8,
-    }}>{children}</div>
+    <div className="volt-label" style={{ marginBottom: 8 }}>{children}</div>
   );
 }
 
@@ -125,21 +122,15 @@ function ActionBtn({
   danger?: boolean;
   title?: string;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
     <button
+      className={`volt-btn ${active ? "volt-btn-active" : danger ? "volt-btn-danger" : "volt-btn-ghost"}`}
       onClick={onClick}
       title={title}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
         fontSize: 12,
-        color: active ? "#0A0A0A" : danger && hovered ? "#E8402A" : hovered ? "var(--color-text-heading)" : "var(--color-text-muted)",
-        background: active ? "#E4FF97" : hovered && !danger ? "var(--color-surface-2, #F5F5F5)" : "transparent",
-        border: active ? "1px solid rgba(0,0,0,0.12)" : "1px solid transparent",
-        borderRadius: "var(--radius-full)",
-        padding: "3px 8px", cursor: "pointer",
-        transition: "all 0.12s",
+        padding: "3px 8px",
+        ...(active ? { background: "var(--color-lime)", color: "var(--color-brand-text)", border: "1px solid rgba(0,0,0,0.12)" } : {}),
       }}
     >{children}</button>
   );
@@ -245,11 +236,9 @@ function QueryCard({
 
   return (
     <div
+      className="volt-card"
       style={{
-        borderRadius: "var(--radius-md)",
-        border: "1px solid var(--color-border)",
-        borderLeft: isPinned ? "3px solid #E4FF97" : "1px solid var(--color-border)",
-        background: "var(--color-surface)",
+        borderLeft: isPinned ? "3px solid var(--color-lime)" : undefined,
         overflow: "hidden",
         transition: "box-shadow 0.15s",
         boxShadow: hovered ? "var(--shadow-sm)" : "none",
@@ -269,21 +258,20 @@ function QueryCard({
           }}>▶</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-              <p style={{
-                fontSize: 14, fontWeight: 600, color: "var(--color-text-heading)",
-                margin: 0, lineHeight: 1.4,
+              <p className="volt-body" style={{
+                fontWeight: 600,
+                margin: 0,
                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
               }}>{query.query}</p>
-              <span style={{ fontSize: 11, color: "var(--color-text-muted)", flexShrink: 0, marginTop: 2 }}>
+              <span className="volt-label" style={{ flexShrink: 0, marginTop: 2 }}>
                 {timeAgo(query.created_at, de)}
               </span>
             </div>
 
             {/* Synthesis preview (collapsed only) */}
             {!expanded && result?.synthesis && (
-              <p style={{
-                fontSize: 12, color: "var(--color-text-secondary)",
-                lineHeight: 1.55, margin: "6px 0 0",
+              <p className="volt-body-sm" style={{
+                margin: "6px 0 0",
                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
               }}>{result.synthesis}</p>
             )}
@@ -379,7 +367,7 @@ function QueryCard({
           {/* Synthesis */}
           <div>
             <SectionLabel>{de ? "Synthese" : "Synthesis"}</SectionLabel>
-            <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--color-text-primary)", margin: 0 }}>
+            <p className="volt-body" style={{ lineHeight: 1.75, margin: 0 }}>
               {result.synthesis}
             </p>
             {result.confidence != null && result.confidence > 0 && (
@@ -424,16 +412,16 @@ function QueryCard({
                     color: "var(--color-text-primary)",
                     outline: "none",
                   }}
-                  onFocus={e => (e.target as HTMLElement).style.borderColor = "#0A0A0A"}
+                  onFocus={e => (e.target as HTMLElement).style.borderColor = "var(--color-text-primary)"}
                   onBlur={e => (e.target as HTMLElement).style.borderColor = "var(--color-border)"}
                 />
                 <button
+                  className="volt-btn"
                   onClick={handleAddNote}
                   style={{
                     fontSize: 12, fontWeight: 600, padding: "6px 12px",
-                    borderRadius: "var(--radius-md)",
+                    background: "var(--color-lime)", color: "var(--color-text-primary)",
                     border: "1px solid rgba(0,0,0,0.1)",
-                    background: "#E4FF97", color: "#0A0A0A", cursor: "pointer",
                   }}
                 >+</button>
               </div>
@@ -445,9 +433,9 @@ function QueryCard({
             <div>
               <SectionLabel>{de ? "Entscheidungshilfe" : "Decision Framework"}</SectionLabel>
               <div style={{
-                background: "#E8F8EF", border: "1px solid #7DD4A8",
+                background: "var(--signal-positive-light)", border: "1px solid var(--signal-positive-border)",
                 borderRadius: "var(--radius-md)", padding: "12px 14px",
-                fontSize: 13, color: "#0A3A20", lineHeight: 1.6,
+                fontSize: 13, color: "var(--signal-positive-text)", lineHeight: 1.6,
               }}>{result.decisionFramework}</div>
             </div>
           )}
@@ -474,10 +462,8 @@ function QueryCard({
                       padding: "12px 12px 10px",
                     }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
+                        <span className="volt-badge" style={{
                           color: cfg.color, background: "white", border: `1px solid ${cfg.border}`,
-                          borderRadius: "var(--radius-full)", padding: "1px 7px",
                         }}>{label}</span>
                         <span style={{ fontSize: 20, fontWeight: 800, color: cfg.color, fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
                       </div>
@@ -493,10 +479,9 @@ function QueryCard({
                       {s.keyDrivers && s.keyDrivers.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 6 }}>
                           {s.keyDrivers.slice(0, 3).map((d, j) => (
-                            <span key={j} style={{
-                              fontSize: 9, fontWeight: 600, color: cfg.color,
+                            <span key={j} className="volt-badge" style={{
+                              color: cfg.color,
                               background: "rgba(255,255,255,0.7)", border: `1px solid ${cfg.border}`,
-                              borderRadius: "var(--radius-full)", padding: "1px 6px",
                             }}>{d}</span>
                           ))}
                         </div>
@@ -515,12 +500,11 @@ function QueryCard({
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {result.keyInsights.map((insight, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <span style={{
-                      background: "#E4FF97", color: "#0A0A0A",
-                      borderRadius: 4, padding: "1px 6px",
-                      fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 2,
+                    <span className="volt-badge" style={{
+                      background: "var(--color-lime)", color: "var(--color-text-primary)",
+                      flexShrink: 0, marginTop: 2,
                     }}>→</span>
-                    <span style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{insight}</span>
+                    <span className="volt-body-sm" style={{ lineHeight: 1.55 }}>{insight}</span>
                   </div>
                 ))}
               </div>
@@ -532,9 +516,9 @@ function QueryCard({
             <div>
               <SectionLabel>{de ? "Interpretation" : "Interpretation"}</SectionLabel>
               <div style={{
-                background: "#EFF6FF", border: "1px solid #93C5FD",
+                background: "var(--pastel-blue)", border: "1px solid var(--pastel-blue-border)",
                 borderRadius: "var(--radius-md)", padding: "12px 14px",
-                fontSize: 13, color: "#1D4ED8", lineHeight: 1.6,
+                fontSize: 13, color: "var(--pastel-blue-text)", lineHeight: 1.6,
               }}>{result.interpretation}</div>
             </div>
           )}
@@ -560,7 +544,7 @@ function QueryCard({
                       maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       transition: "border-color 0.12s",
                     }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A"}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-text-primary)"}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
                   >
                     <span>↗</span><span>{ref.title}</span>
@@ -588,7 +572,7 @@ function QueryCard({
                       transition: "all 0.12s",
                     }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A";
+                      (e.currentTarget as HTMLElement).style.borderColor = "var(--color-text-primary)";
                       (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)";
                     }}
                     onMouseLeave={e => {
@@ -611,6 +595,7 @@ function QueryCard({
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [queries, setQueries] = useState<SavedQuery[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -621,6 +606,7 @@ export default function ProjectsPage() {
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [projectNewNote, setProjectNewNote] = useState("");
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [canvasProjectId, setCanvasProjectId] = useState<string | null>(null);
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
 
@@ -659,6 +645,8 @@ export default function ProjectsPage() {
       if (l === "en") setLocale("en");
       const ap = localStorage.getItem("sis-active-project");
       if (ap) setActiveProjectId(ap);
+      const cp = localStorage.getItem("sis-active-canvas");
+      if (cp) setCanvasProjectId(cp);
     } catch {}
     loadProjects();
   }, [loadProjects]);
@@ -785,63 +773,23 @@ export default function ProjectsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-page-bg)", overflow: "hidden" }}>
-      {/* Header */}
-      <header style={{
-        height: 52, flexShrink: 0,
-        display: "flex", alignItems: "center", padding: "0 24px", gap: 16,
-        borderBottom: "1px solid var(--color-border)",
-        background: "var(--color-surface)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: "var(--radius-sm)",
-            background: "#E4FF97", border: "1.5px solid rgba(0,0,0,0.1)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 10, fontWeight: 700, color: "#0A0A0A", letterSpacing: "0.05em",
-          }}>SIS</div>
-          <a
-            href="/"
-            style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-secondary)", textDecoration: "none" }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"}
-          >← {de ? "Zurück" : "Back"}</a>
-        </div>
-        <span style={{ color: "var(--color-border-strong, #D0D0D0)", fontSize: 16 }}>|</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-heading)" }}>
-          {de ? "Projekte" : "Projects"}
-        </span>
-        <a
-          href="/canvas"
-          style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", fontWeight: 500, marginLeft: 4 }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"}
-        >Canvas ↗</a>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-          {(["de", "en"] as const).map(l => (
-            <button
-              key={l}
-              onClick={() => {
-                setLocale(l);
-                try { localStorage.setItem("sis-locale", l); } catch {}
-              }}
-              style={{
-                padding: "3px 10px", borderRadius: "var(--radius-full)",
-                border: `1px solid ${locale === l ? "rgba(0,0,0,0.12)" : "var(--color-border)"}`,
-                background: locale === l ? "#E4FF97" : "transparent",
-                color: locale === l ? "#0A0A0A" : "var(--color-text-muted)",
-                fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-              }}
-            >{l.toUpperCase()}</button>
-          ))}
-        </div>
-      </header>
+    <div style={{ minHeight: "100vh", background: "transparent" }}>
+      <AppHeader />
 
       {/* Body: left rail + main content */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ display: "flex", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+
+        {/* Mobile sidebar backdrop */}
+        {sidebarOpen && (
+          <div
+            className="sis-sidebar-btn"
+            onClick={() => setSidebarOpen(false)}
+            style={{ display: "none", position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.25)" }}
+          />
+        )}
 
         {/* LEFT RAIL */}
-        <aside style={{
+        <aside className={`sis-sidebar${sidebarOpen ? "" : " closed"}`} style={{
           width: 280, flexShrink: 0,
           borderRight: "1px solid var(--color-border)",
           background: "var(--color-surface)",
@@ -864,16 +812,17 @@ export default function ProjectsPage() {
                   color: "var(--color-text-primary)",
                   outline: "none", transition: "border-color 0.15s",
                 }}
-                onFocus={e => (e.target as HTMLElement).style.borderColor = "#0A0A0A"}
+                onFocus={e => (e.target as HTMLElement).style.borderColor = "var(--color-text-primary)"}
                 onBlur={e => (e.target as HTMLElement).style.borderColor = "var(--color-border)"}
               />
               <button
+                className="volt-btn"
                 onClick={createProject}
                 style={{
-                  padding: "7px 12px", borderRadius: "var(--radius-md)",
+                  padding: "7px 12px",
+                  background: "var(--color-lime)", color: "var(--color-text-primary)",
                   border: "1px solid rgba(0,0,0,0.1)",
-                  background: "#E4FF97", color: "#0A0A0A",
-                  fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  fontSize: 14, fontWeight: 700,
                 }}
               >+</button>
             </div>
@@ -884,7 +833,7 @@ export default function ProjectsPage() {
             {projects.length === 0 ? (
               <div style={{ padding: "32px 12px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📂</div>
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)", lineHeight: 1.5, marginBottom: 14 }}>
+                <p className="volt-body-sm" style={{ marginBottom: 14 }}>
                   {de
                     ? "Noch keine Projekte. Projekte helfen dir, Analysen über Zeit zu sammeln und wiederzufinden."
                     : "No projects yet. Projects let you collect and revisit saved analyses over time."}
@@ -894,6 +843,7 @@ export default function ProjectsPage() {
               projects.map(p => {
                 const isSelected = selectedId === p.id;
                 const isPActive = activeProjectId === p.id;
+                const isInCanvas = canvasProjectId === p.id;
                 return (
                   <button
                     key={p.id}
@@ -903,7 +853,7 @@ export default function ProjectsPage() {
                       padding: "10px 12px",
                       borderRadius: "var(--radius-md)",
                       border: `1px solid ${isSelected ? "rgba(0,0,0,0.15)" : "transparent"}`,
-                      background: isSelected ? "#E4FF97" : "transparent",
+                      background: isSelected ? "var(--color-lime)" : "transparent",
                       marginBottom: 2,
                       cursor: "pointer", transition: "all 0.12s",
                       position: "relative",
@@ -921,8 +871,13 @@ export default function ProjectsPage() {
                       <span>{p.query_count} {de ? "Abfr." : "queries"}</span>
                       <span>·</span>
                       <span>{p.note_count} {de ? "Notiz." : "notes"}</span>
-                      {isPActive && (
-                        <span style={{ marginLeft: "auto", background: "#C3F4D3", color: "#0F6038", borderRadius: 4, padding: "1px 5px", fontSize: 9, fontWeight: 700 }}>
+                      {isInCanvas && (
+                        <span className="volt-badge" style={{ marginLeft: "auto", background: "#D4E8FF", color: "#1A4A8A" }}>
+                          ⊞ CANVAS
+                        </span>
+                      )}
+                      {isPActive && !isInCanvas && (
+                        <span className="volt-badge" style={{ marginLeft: "auto", background: "var(--pastel-mint)", color: "var(--pastel-mint-text)" }}>
                           {de ? "AKTIV" : "ACTIVE"}
                         </span>
                       )}
@@ -940,17 +895,17 @@ export default function ProjectsPage() {
             /* Empty state */
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: 40 }}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>📂</div>
-              <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--color-text-heading)", margin: "0 0 8px" }}>
+              <h3 className="volt-display-md" style={{ fontSize: 18, margin: "0 0 8px" }}>
                 {de ? "Projekt auswählen" : "Select a project"}
               </h3>
-              <p style={{ fontSize: 14, color: "var(--color-text-muted)", textAlign: "center", maxWidth: 320, lineHeight: 1.6 }}>
+              <p className="volt-body-sm" style={{ textAlign: "center", maxWidth: 320 }}>
                 {de
                   ? "Wähle ein Projekt aus der linken Liste oder erstelle ein neues."
                   : "Select a project from the left, or create a new one."}
               </p>
             </div>
           ) : (
-            <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 32px 60px" }}>
+            <div className="volt-container" style={{ maxWidth: 860, margin: "0 auto", padding: "28px 32px 60px" }}>
 
               {/* Project Header */}
               <div style={{ marginBottom: 20 }}>
@@ -964,67 +919,59 @@ export default function ProjectsPage() {
                     )}
                   </div>
                   {isActive ? (
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, flexShrink: 0,
-                      background: "#C3F4D3", color: "#0F6038", border: "1px solid #7DD4A8",
-                      borderRadius: "var(--radius-full)", padding: "3px 10px",
+                    <span className="volt-badge" style={{
+                      background: "var(--pastel-mint)", color: "var(--pastel-mint-text)", border: "1px solid var(--pastel-mint-border)",
+                      padding: "3px 10px",
                       display: "flex", alignItems: "center", gap: 4,
                     }}>◆ {de ? "Aktiv" : "Active"}</span>
                   ) : (
                     <button
+                      className="volt-btn volt-btn-outline"
                       onClick={() => setActiveProject(selectedId)}
                       style={{
-                        fontSize: 11, fontWeight: 600, flexShrink: 0, cursor: "pointer",
-                        border: "1px solid var(--color-border)",
-                        background: "transparent", color: "var(--color-text-secondary)",
-                        borderRadius: "var(--radius-full)", padding: "3px 10px",
-                        transition: "all 0.12s",
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A";
-                        (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)";
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)";
-                        (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)";
+                        fontSize: 11, fontWeight: 600, flexShrink: 0,
+                        padding: "3px 10px",
                       }}
                     >{de ? "Als aktiv setzen" : "Set as active"}</button>
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                  <span className="volt-label">
                     {queries.length} {de ? "Abfragen" : "queries"} · {projectNotes.length} {de ? "Notizen" : "notes"}
                     {selectedProject && <> · {de ? "Aktualisiert" : "Updated"} {timeAgo(selectedProject.updated_at, de)}</>}
                   </span>
                   <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-                    <button
-                      onClick={exportProject}
-                      style={{
-                        fontSize: 11, padding: "4px 10px", borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--color-border)", background: "transparent",
-                        color: "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.12s",
+                    <a
+                      className="volt-btn volt-btn-outline"
+                      href="/canvas"
+                      onClick={() => {
+                        if (selectedId) {
+                          try {
+                            localStorage.setItem("sis-canvas-project", selectedId);
+                            localStorage.setItem("sis-active-canvas", selectedId);
+                            localStorage.setItem("sis-active-project", selectedId);
+                          } catch {}
+                        }
                       }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "#0A0A0A"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: "4px 10px",
+                        border: "1px solid #1A9E5A44", background: "#1A9E5A0C",
+                        color: "#1A9E5A",
+                        textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4,
+                      }}
+                    >⊞ {de ? "Im Canvas öffnen" : "Open in Canvas"}</a>
+                    <button
+                      className="volt-btn volt-btn-outline"
+                      onClick={exportProject}
+                      style={{ fontSize: 11, padding: "4px 10px" }}
                     >{de ? "Export JSON" : "Export JSON"}</button>
                     <button
+                      className="volt-btn volt-btn-danger"
                       onClick={() => {
                         if (window.confirm(de ? `Projekt "${selectedProject?.name}" löschen?` : `Delete project "${selectedProject?.name}"?`))
                           deleteProject(selectedId);
                       }}
-                      style={{
-                        fontSize: 11, padding: "4px 10px", borderRadius: "var(--radius-md)",
-                        border: "1px solid var(--color-border)", background: "transparent",
-                        color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s",
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.color = "#E8402A";
-                        (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5";
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)";
-                        (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)";
-                      }}
+                      style={{ fontSize: 11, padding: "4px 10px" }}
                     >{de ? "Projekt löschen" : "Delete project"}</button>
                   </div>
                 </div>
@@ -1047,7 +994,7 @@ export default function ProjectsPage() {
                       background: "var(--color-surface)", color: "var(--color-text-primary)",
                       fontSize: 12, outline: "none", transition: "border-color 0.15s",
                     }}
-                    onFocus={e => (e.target as HTMLElement).style.borderColor = "#0A0A0A"}
+                    onFocus={e => (e.target as HTMLElement).style.borderColor = "var(--color-text-primary)"}
                     onBlur={e => (e.target as HTMLElement).style.borderColor = "var(--color-border)"}
                   />
                 </div>
@@ -1065,13 +1012,11 @@ export default function ProjectsPage() {
                   <option value="pinned">{de ? "Gepinnte zuerst" : "Pinned first"}</option>
                 </select>
                 <button
+                  className={`volt-btn ${showPinnedOnly ? "volt-btn-active" : "volt-btn-outline"}`}
                   onClick={() => setShowPinnedOnly(v => !v)}
                   style={{
-                    fontSize: 12, padding: "5px 10px", borderRadius: "var(--radius-md)",
-                    border: `1px solid ${showPinnedOnly ? "rgba(0,0,0,0.12)" : "var(--color-border)"}`,
-                    background: showPinnedOnly ? "#E4FF97" : "transparent",
-                    color: showPinnedOnly ? "#0A0A0A" : "var(--color-text-muted)",
-                    cursor: "pointer", transition: "all 0.15s", fontWeight: showPinnedOnly ? 600 : 400,
+                    fontSize: 12, padding: "5px 10px",
+                    ...(showPinnedOnly ? { background: "var(--color-lime)", color: "var(--color-brand-text)", border: "1px solid rgba(0,0,0,0.12)", fontWeight: 600 } : {}),
                   }}
                 >★ {de ? "Nur Pins" : "Pinned only"}</button>
               </div>
@@ -1080,18 +1025,18 @@ export default function ProjectsPage() {
               {queries.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "48px 0" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 6 }}>
+                  <p className="volt-body" style={{ fontWeight: 600, marginBottom: 6 }}>
                     {de ? "Noch keine gespeicherten Abfragen" : "No saved queries yet"}
                   </p>
-                  <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.6, marginBottom: 16, maxWidth: 340, margin: "0 auto 16px" }}>
+                  <p className="volt-body-sm" style={{ maxWidth: 340, margin: "0 auto 16px" }}>
                     {de
                       ? "Stelle eine Frage auf der Hauptseite — wenn dieses Projekt aktiv ist, erscheint ein \"Speichern\" Button."
                       : "Ask a question on the main page — when this project is active, a \"Save\" button will appear."}
                   </p>
-                  <a href="/" style={{
-                    fontSize: 13, fontWeight: 600, color: "#0A0A0A",
-                    background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)",
-                    borderRadius: "var(--radius-md)", padding: "8px 16px",
+                  <a className="volt-btn" href="/" style={{
+                    fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)",
+                    background: "var(--color-lime)", border: "1px solid rgba(0,0,0,0.1)",
+                    padding: "8px 16px",
                     textDecoration: "none", display: "inline-block",
                   }}>
                     {de ? "Zur Hauptseite →" : "Go to main page →"}
@@ -1108,7 +1053,7 @@ export default function ProjectsPage() {
                   {pinnedQueries.length > 0 && (
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        <span className="volt-label">
                           ★ {de ? "Gepinnt" : "Pinned"} ({pinnedQueries.length})
                         </span>
                       </div>
@@ -1134,7 +1079,7 @@ export default function ProjectsPage() {
                   {unpinnedQueries.length > 0 && (
                     <div>
                       {pinnedQueries.length > 0 && (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                        <div className="volt-label" style={{ marginBottom: 10 }}>
                           {de ? "Alle Abfragen" : "All Queries"} ({unpinnedQueries.length})
                         </div>
                       )}
@@ -1161,9 +1106,8 @@ export default function ProjectsPage() {
               {/* Project Notes — collapsible */}
               <div style={{ marginTop: 40 }}>
                 <details open={projectNotes.length > 0}>
-                  <summary style={{
-                    fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em",
-                    color: "var(--color-text-muted)", cursor: "pointer", userSelect: "none",
+                  <summary className="volt-label" style={{
+                    cursor: "pointer", userSelect: "none",
                     listStyle: "none", display: "flex", alignItems: "center", gap: 8,
                     paddingBottom: 12, borderBottom: "1px solid var(--color-border)",
                     marginBottom: 12,
@@ -1171,7 +1115,7 @@ export default function ProjectsPage() {
                     <span>▸</span>
                     <span>{de ? "Projektnotizen" : "Project Notes"}</span>
                     {projectNotes.length > 0 && (
-                      <span style={{ background: "var(--color-border)", color: "var(--color-text-muted)", borderRadius: 8, padding: "0 5px", fontSize: 10, fontWeight: 600 }}>
+                      <span className="volt-badge" style={{ background: "var(--color-border)", color: "var(--color-text-muted)" }}>
                         {projectNotes.length}
                       </span>
                     )}
@@ -1203,15 +1147,17 @@ export default function ProjectsPage() {
                         background: "var(--color-surface)", color: "var(--color-text-primary)",
                         outline: "none", transition: "border-color 0.15s",
                       }}
-                      onFocus={e => (e.target as HTMLElement).style.borderColor = "#0A0A0A"}
+                      onFocus={e => (e.target as HTMLElement).style.borderColor = "var(--color-text-primary)"}
                       onBlur={e => (e.target as HTMLElement).style.borderColor = "var(--color-border)"}
                     />
                     <button
+                      className="volt-btn"
                       onClick={addProjectNote}
                       style={{
-                        padding: "7px 12px", borderRadius: "var(--radius-md)",
+                        padding: "7px 12px",
+                        background: "var(--color-lime)", color: "var(--color-text-primary)",
                         border: "1px solid rgba(0,0,0,0.1)",
-                        background: "#E4FF97", color: "#0A0A0A", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                        fontSize: 14, fontWeight: 700,
                       }}
                     >+</button>
                   </div>

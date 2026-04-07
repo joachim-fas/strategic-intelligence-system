@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
+import { ensureEnvLoaded } from "@/lib/env";
 import { storeSignals, pruneOldSignals, getSignalAge } from "@/lib/signals";
+
+// Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
+ensureEnvLoaded();
 
 // GET — signal store status
 export async function GET() {
@@ -43,10 +47,10 @@ export async function POST() {
           title: s.sourceTitle,
           content: s.rawData
             ? Object.entries(s.rawData)
-                .filter(([k]) => ["summary", "description", "excerpt", "text"].includes(k))
-                .map(([, v]) => String(v).slice(0, 300))
+                .filter(([k]) => ["summary", "description", "excerpt", "text", "trailText", "snippet", "abstract", "lead_paragraph", "content"].includes(k))
+                .map(([, v]) => String(v).slice(0, 400))
                 .join(" | ")
-                .slice(0, 500) || undefined
+                .slice(0, 600) || undefined
             : undefined,
           url: s.sourceUrl || undefined,
           topic: s.topic || undefined,

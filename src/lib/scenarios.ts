@@ -190,7 +190,7 @@ export function applyScenario(
       const cascadeShift = impact.relevanceShift * damping;
 
       const originalRing = trend.ring;
-      const sign = edge.type === "inhibits" ? -1 : 1;
+      const sign = edge.type === "dampens" ? -1 : 1;
       trend.relevance = clamp(trend.relevance + cascadeShift * sign);
       trend.ring = calculateRing(trend.relevance, trend.confidence, trend.impact);
 

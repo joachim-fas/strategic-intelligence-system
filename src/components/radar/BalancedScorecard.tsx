@@ -51,11 +51,12 @@ const TREND_COLORS: Record<BSCPerspective["trend"], string> = {
   uncertain: "#C8820A",
 };
 
+// Node positions on 700×380 canvas — corners with breathing room
 const NODE_POSITIONS: Record<string, { x: number; y: number }> = {
-  p1: { x: 120, y: 100 },
-  p2: { x: 480, y: 100 },
-  p3: { x: 120, y: 220 },
-  p4: { x: 480, y: 220 },
+  p1: { x: 160, y: 110 },
+  p2: { x: 540, y: 110 },
+  p3: { x: 160, y: 270 },
+  p4: { x: 540, y: 270 },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -390,155 +391,152 @@ function NodeView({
   const overallPct = Math.round(effectiveOverall * 100);
   const centerLabel = locale === "de" ? "Gesamt" : "Overall";
 
+  const NODE_R = 48; // circle radius
+  const ARC_C = 2 * Math.PI * (NODE_R - 7); // circumference for progress ring
+
   return (
     <svg
-      viewBox="0 0 600 300"
+      viewBox="0 0 700 380"
       preserveAspectRatio="xMidYMid meet"
-      style={{ width: "100%", height: 300, display: "block" }}
+      style={{ width: "100%", height: 380, display: "block" }}
     >
+      <defs>
+        <marker id="arrow-pos" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#1A9E5A" fillOpacity="0.7" />
+        </marker>
+        <marker id="arrow-neg" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#E8402A" fillOpacity="0.7" />
+        </marker>
+      </defs>
+
+      {/* Subtle background grid lines */}
+      <line x1={350} y1={40} x2={350} y2={340} stroke="rgba(0,0,0,0.05)" strokeWidth={1} />
+      <line x1={60} y1={190} x2={640} y2={190} stroke="rgba(0,0,0,0.05)" strokeWidth={1} />
+
       {/* Edges */}
       {edges.map((edge, i) => {
-        const strokeColor =
-          edge.impact > 0 ? "#1A9E5A" : "#E8402A";
-        const opacity = Math.min(Math.abs(edge.impact), 1);
+        const strokeColor = edge.impact > 0 ? "#1A9E5A" : "#E8402A";
+        const sw = 1.5 + Math.abs(edge.impact) * 2.5;
+        // Offset endpoints to node border
+        const dx = edge.toPos.x - edge.fromPos.x;
+        const dy = edge.toPos.y - edge.fromPos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const x1 = edge.fromPos.x + (dx / dist) * (NODE_R + 4);
+        const y1 = edge.fromPos.y + (dy / dist) * (NODE_R + 4);
+        const x2 = edge.toPos.x - (dx / dist) * (NODE_R + 10);
+        const y2 = edge.toPos.y - (dy / dist) * (NODE_R + 10);
+        // Slight curve
+        const qx = (x1 + x2) / 2 + (dy / dist) * 20 * (i % 2 === 0 ? 1 : -1);
+        const qy = (y1 + y2) / 2 - (dx / dist) * 20 * (i % 2 === 0 ? 1 : -1);
         return (
-          <line
+          <path
             key={i}
-            x1={edge.fromPos.x}
-            y1={edge.fromPos.y}
-            x2={edge.toPos.x}
-            y2={edge.toPos.y}
+            d={`M ${x1} ${y1} Q ${qx} ${qy} ${x2} ${y2}`}
             stroke={strokeColor}
-            strokeOpacity={opacity}
-            strokeWidth={2}
-            strokeDasharray={edge.impact < 0 ? "5,4" : undefined}
+            strokeOpacity={0.6 + Math.abs(edge.impact) * 0.3}
+            strokeWidth={sw}
+            strokeDasharray={edge.impact < 0 ? "6 4" : undefined}
+            fill="none"
+            markerEnd={`url(#arrow-${edge.impact > 0 ? "pos" : "neg"})`}
           />
         );
       })}
 
-      {/* Center: overall readiness */}
-      <text
-        x={300}
-        y={152}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={11}
-        fill="#6B7280"
-      >
+      {/* Center hub: overall readiness */}
+      <circle cx={350} cy={190} r={36} fill="white" stroke="rgba(0,0,0,0.1)" strokeWidth={1.5} />
+      <circle cx={350} cy={190} r={32} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={4} />
+      <circle
+        cx={350} cy={190} r={32}
+        fill="none"
+        stroke={effectiveOverall > 0.6 ? "#1A9E5A" : effectiveOverall > 0.35 ? "#C8820A" : "#E8402A"}
+        strokeWidth={4}
+        strokeDasharray={`${effectiveOverall * 201} 201`}
+        strokeLinecap="round"
+        transform="rotate(-90 350 190)"
+        style={{ transition: "stroke-dasharray 0.4s ease" }}
+      />
+      <text x={350} y={184} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9CA3AF" fontFamily="inherit">
         {centerLabel}
       </text>
-      <text
-        x={300}
-        y={168}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={18}
-        fontWeight={700}
-        fill={
-          effectiveOverall > 0.6
-            ? "#1A9E5A"
-            : effectiveOverall > 0.35
-            ? "#C8820A"
-            : "#E8402A"
-        }
+      <text x={350} y={200} textAnchor="middle" dominantBaseline="middle" fontSize={20} fontWeight={800}
+        fill={effectiveOverall > 0.6 ? "#1A9E5A" : effectiveOverall > 0.35 ? "#C8820A" : "#E8402A"}
+        fontFamily="inherit"
       >
         {overallPct}%
       </text>
 
       {/* Nodes */}
       {perspectives.map((p, index) => {
-        const pos = NODE_POSITIONS[p.id] ?? { x: 300, y: 160 };
+        const pos = NODE_POSITIONS[p.id] ?? { x: 350, y: 190 };
         const { color, bg } = getPerspectiveColor(index);
         const score = computedScore(p, perspectives, whatIfMode ? deltas : {});
-        const [line1, line2] = splitLabel(p.label);
+        const pct = Math.round(score * 100);
+        const trendIcon = TREND_ICONS[p.trend] ?? "?";
+        const trendColor = TREND_COLORS[p.trend] ?? "#6B7280";
+        // Label position: push outward from center
+        const isLeft = pos.x < 350;
+        const isTop = pos.y < 190;
 
         return (
           <g key={p.id}>
-            {/* Node circle */}
+            {/* Node background circle */}
+            <circle cx={pos.x} cy={pos.y} r={NODE_R} fill={bg} stroke={color} strokeWidth={2} />
+            {/* Progress ring track */}
+            <circle cx={pos.x} cy={pos.y} r={NODE_R - 7} fill="none" stroke={color} strokeWidth={5} strokeOpacity={0.18} />
+            {/* Progress ring fill */}
             <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={30}
-              fill={bg}
-              stroke={color}
-              strokeWidth={2}
-            />
-            {/* Score arc indicator — simple fill arc using stroke-dasharray trick */}
-            <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={26}
-              fill="none"
-              stroke={color}
-              strokeWidth={4}
-              strokeOpacity={0.25}
-            />
-            <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={26}
-              fill="none"
-              stroke={color}
-              strokeWidth={4}
-              strokeDasharray={`${score * 163.4} 163.4`}
+              cx={pos.x} cy={pos.y} r={NODE_R - 7}
+              fill="none" stroke={color} strokeWidth={5}
+              strokeDasharray={`${score * ARC_C} ${ARC_C}`}
               strokeLinecap="round"
               transform={`rotate(-90 ${pos.x} ${pos.y})`}
-              style={{ transition: "stroke-dasharray 0.3s ease" }}
+              style={{ transition: "stroke-dasharray 0.4s ease" }}
             />
-            {/* Label inside node */}
-            {line2 ? (
-              <>
-                <text
-                  x={pos.x}
-                  y={pos.y - 6}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={8}
-                  fontWeight={600}
-                  fill={color}
-                >
-                  {line1}
-                </text>
-                <text
-                  x={pos.x}
-                  y={pos.y + 6}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={8}
-                  fontWeight={600}
-                  fill={color}
-                >
-                  {line2}
-                </text>
-              </>
-            ) : (
+            {/* Score inside */}
+            <text x={pos.x} y={pos.y - 4} textAnchor="middle" dominantBaseline="middle"
+              fontSize={18} fontWeight={800} fill={color} fontFamily="inherit">
+              {pct}%
+            </text>
+            {/* Trend icon */}
+            <text x={pos.x} y={pos.y + 14} textAnchor="middle" dominantBaseline="middle"
+              fontSize={12} fill={trendColor} fontFamily="inherit">
+              {trendIcon}
+            </text>
+
+            {/* Label outside the circle */}
+            <text
+              x={isLeft ? pos.x - NODE_R - 10 : pos.x + NODE_R + 10}
+              y={isTop ? pos.y - 12 : pos.y + 12}
+              textAnchor={isLeft ? "end" : "start"}
+              dominantBaseline="middle"
+              fontSize={13} fontWeight={700} fill={color} fontFamily="inherit"
+            >
+              {p.label.split(" ").slice(0, 2).join(" ")}
+            </text>
+            {p.label.split(" ").length > 2 && (
               <text
-                x={pos.x}
-                y={pos.y}
-                textAnchor="middle"
+                x={isLeft ? pos.x - NODE_R - 10 : pos.x + NODE_R + 10}
+                y={isTop ? pos.y + 4 : pos.y + 28}
+                textAnchor={isLeft ? "end" : "start"}
                 dominantBaseline="middle"
-                fontSize={9}
-                fontWeight={600}
-                fill={color}
+                fontSize={13} fontWeight={700} fill={color} fontFamily="inherit"
               >
-                {line1}
+                {p.label.split(" ").slice(2).join(" ")}
               </text>
             )}
-            {/* Score label below circle */}
-            <text
-              x={pos.x}
-              y={pos.y + 40}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize={10}
-              fontWeight={700}
-              fill={color}
-            >
-              {(score * 100).toFixed(0)}%
-            </text>
           </g>
         );
       })}
+
+      {/* Legend */}
+      <g transform="translate(20, 358)">
+        <line x1={0} y1={4} x2={18} y2={4} stroke="#1A9E5A" strokeWidth={2} />
+        <polygon points="16,1 16,7 22,4" fill="#1A9E5A" fillOpacity="0.7" />
+        <text x={26} y={8} fontSize={10} fill="#6B7280" fontFamily="inherit">verstärkt</text>
+        <line x1={90} y1={4} x2={108} y2={4} stroke="#E8402A" strokeWidth={2} strokeDasharray="5 3" />
+        <polygon points="106,1 106,7 112,4" fill="#E8402A" fillOpacity="0.7" />
+        <text x={116} y={8} fontSize={10} fill="#6B7280" fontFamily="inherit">hemmt</text>
+      </g>
     </svg>
   );
 }

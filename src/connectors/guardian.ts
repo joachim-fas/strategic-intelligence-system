@@ -1,0 +1,79 @@
+import { SourceConnector, RawSignal } from "./types";
+
+/**
+ * The Guardian Open Platform Connector
+ *
+ * World news from The Guardian's open API.
+ * Requires a free API key from https://open-platform.theguardian.com/
+ *
+ * API: https://open-platform.theguardian.com/documentation/
+ */
+
+const SECTION_TOPICS: Record<string, string> = {
+  technology: "Artificial Intelligence & Automation",
+  science: "Artificial Intelligence & Automation",
+  environment: "Climate Change & Sustainability",
+  business: "Economic Trends",
+  politics: "Geopolitical Fragmentation",
+  world: "Geopolitical Fragmentation",
+  "uk-news": "Geopolitical Fragmentation",
+  "us-news": "Geopolitical Fragmentation",
+  society: "Future of Work",
+  "global-development": "Demographic Shifts & Migration",
+  education: "Future of Work",
+  money: "Economic Trends",
+  law: "Regulation & Digital Governance",
+};
+
+export const guardianConnector: SourceConnector = {
+  name: "guardian",
+  displayName: "The Guardian (News)",
+
+  async fetchSignals(): Promise<RawSignal[]> {
+    const signals: RawSignal[] = [];
+    const key = process.env.GUARDIAN_API_KEY;
+    if (!key) return signals;
+
+    try {
+      const url = `https://content.guardianapis.com/search?q=*&order-by=newest&show-fields=trailText,headline&page-size=20&api-key=${key}`;
+
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) return signals;
+
+      const data = await res.json();
+      const results = data.response?.results || [];
+
+      for (const article of results) {
+        const section = article.sectionId || "world";
+        const topic = SECTION_TOPICS[section] || "Geopolitical Fragmentation";
+        const headline = article.fields?.headline || article.webTitle || "Unknown";
+        const trailText = article.fields?.trailText || "";
+
+        signals.push({
+          sourceType: "guardian",
+          sourceUrl: article.webUrl || "https://www.theguardian.com/",
+          sourceTitle: `Guardian: ${headline}`,
+          signalType: "mention",
+          topic,
+          rawStrength: 0.6,
+          rawData: {
+            section,
+            headline,
+            trailText,
+            publishedAt: article.webPublicationDate,
+            type: article.type,
+          },
+          detectedAt: new Date(),
+        });
+      }
+    } catch {
+      // API unavailable
+    }
+
+    return signals;
+  },
+};

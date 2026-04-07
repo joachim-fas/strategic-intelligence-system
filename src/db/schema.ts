@@ -184,3 +184,32 @@ export const dataSources = pgTable("data_sources", {
   runInterval: text("run_interval").default("6h"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── Query Versions (versioned query results) ─────────────
+export const queryVersions = pgTable("query_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  canvasNodeId: text("canvas_node_id").notNull(),
+  radarId: uuid("radar_id").references(() => radars.id, { onDelete: "cascade" }),
+  queryText: text("query_text").notNull(),
+  locale: text("locale").notNull().default("de"),
+  versionNumber: integer("version_number").notNull().default(1),
+  resultJson: jsonb("result_json").notNull(),
+  confidence: real("confidence"),
+  matchedTrendCount: integer("matched_trend_count"),
+  signalCount: integer("signal_count"),
+  executedAt: timestamp("executed_at").defaultNow().notNull(),
+  notes: text("notes"),
+});
+
+// ─── Scenario Alerts (staleness detection) ───────────────
+export const scenarioAlerts = pgTable("scenario_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  canvasNodeId: text("canvas_node_id").notNull(),
+  radarId: uuid("radar_id").references(() => radars.id, { onDelete: "cascade" }),
+  queryText: text("query_text").notNull(),
+  triggerSignalId: text("trigger_signal_id"),
+  reason: text("reason").notNull(),
+  severity: text("severity").notNull().default("medium"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  dismissedAt: timestamp("dismissed_at"),
+});

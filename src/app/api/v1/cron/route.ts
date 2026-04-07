@@ -21,13 +21,11 @@ export const maxDuration = 300; // 5 minutes max for Vercel Pro
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  // Validate CRON_SECRET
+  // Validate CRON_SECRET — always required (fail closed)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const authHeader = request.headers.get("authorization");
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

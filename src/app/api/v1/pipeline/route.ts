@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
+import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
+
+// Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
+ensureEnvLoaded();
 import { processSignals } from "@/lib/scoring";
 import { RawSignal } from "@/connectors/types";
 import { megaTrends } from "@/lib/mega-trends";

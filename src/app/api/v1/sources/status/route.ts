@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
+
+ensureEnvLoaded();
 
 export const dynamic = "force-dynamic";
 

@@ -37,14 +37,14 @@ export default function SignInPage() {
 
   if (submitted) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>
         <div style={{ maxWidth: 420, width: "100%", padding: "40px 32px", textAlign: "center" }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: "#C3F4D3", border: "1px solid #6FD99A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 20px" }}>
+          <div style={{ width: 48, height: 48, borderRadius: "var(--radius-lg)", background: "var(--pastel-mint)", border: "1px solid var(--pastel-mint-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 20px" }}>
             ✓
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginBottom: 10 }}>E-Mail gesendet</h1>
-          <p style={{ fontSize: 14, color: "#6B6B6B", lineHeight: 1.6 }}>
-            Ein Anmeldelink wurde an <strong style={{ color: "#1A1A1A" }}>{email}</strong> gesendet.
+          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", marginBottom: 10 }}>E-Mail gesendet</h1>
+          <p className="volt-body-sm" style={{ color: "var(--color-text-subtle)", lineHeight: 1.6 }}>
+            Ein Anmeldelink wurde an <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong> gesendet.
             Klicke auf den Link in der E-Mail um die Anmeldung abzuschließen.
           </p>
         </div>
@@ -53,31 +53,27 @@ export default function SignInPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>
       <div style={{ maxWidth: 420, width: "100%", padding: "40px 32px" }}>
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: "#E4FF97", border: "1.5px solid rgba(0,0,0,0.12)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 10, fontWeight: 700, color: "#0A0A0A", letterSpacing: "0.05em",
-          }}>SIS</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 32, height: 21 }} />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Strategic Intelligence System</div>
-            <div style={{ fontSize: 11, color: "#9B9B9B" }}>Zugang nur für autorisierte Nutzer</div>
+            <div className="volt-heading" style={{ color: "var(--color-text-heading)" }}>Strategic Intelligence System</div>
+            <div className="volt-body-sm" style={{ color: "var(--color-text-muted)" }}>Zugang nur für autorisierte Nutzer</div>
           </div>
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #E8E8E8", borderRadius: 16, padding: "28px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", margin: "0 0 6px" }}>Anmelden</h1>
-          <p style={{ fontSize: 13, color: "#9B9B9B", margin: "0 0 24px" }}>
+        <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-2xl)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
+          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", margin: "0 0 6px" }}>Anmelden</h1>
+          <p className="volt-body-sm" style={{ color: "var(--color-text-muted)", margin: "0 0 24px" }}>
             Gib deine E-Mail ein — du erhältst einen Magic Link.
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <label htmlFor="email" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <label htmlFor="email" className="volt-label-text" style={{ display: "block", color: "var(--color-text-subtle)", marginBottom: 6 }}>
                 E-Mail-Adresse
               </label>
               <input
@@ -87,32 +83,21 @@ export default function SignInPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="du@beispiel.de"
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  padding: "10px 14px", borderRadius: 10, fontSize: 14,
-                  border: "1px solid #E8E8E8", background: "#FAFAFA", color: "#1A1A1A",
-                  outline: "none", transition: "border-color 0.15s",
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#1A1A1A"; e.currentTarget.style.background = "#FFFFFF"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "#E8E8E8"; e.currentTarget.style.background = "#FAFAFA"; }}
+                className="volt-input"
+                style={{ width: "100%", boxSizing: "border-box" }}
               />
             </div>
 
             {error && (
-              <div style={{ padding: "10px 14px", borderRadius: 8, background: "#FDEEE9", border: "1px solid #F4A090" }}>
-                <p style={{ fontSize: 13, color: "#C0341D", margin: 0 }}>{error}</p>
+              <div style={{ padding: "10px 14px", borderRadius: "var(--radius-md)", background: "var(--signal-negative-light)", border: "1px solid var(--signal-negative-border)" }}>
+                <p className="volt-error-text" style={{ margin: 0 }}>{error}</p>
               </div>
             )}
 
             <button
               type="submit"
-              style={{
-                width: "100%", padding: "11px 16px", borderRadius: 10,
-                background: "#0A0A0A", color: "white", fontSize: 14, fontWeight: 600,
-                border: "none", cursor: "pointer", transition: "background 0.15s",
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "#1A1A1A"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "#0A0A0A"; }}
+              className="volt-btn volt-btn-solid"
+              style={{ width: "100%" }}
             >
               Magic Link senden →
             </button>

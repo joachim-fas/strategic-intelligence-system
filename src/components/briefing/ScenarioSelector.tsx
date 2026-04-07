@@ -53,13 +53,35 @@ function buildPrompt(
 
 // ── ScenarioCard ──────────────────────────────────────────────────────────────
 function ScenarioCard({
-  s, i, isSelected, onToggle, onAction, de,
+  s, i, isSelected, onToggle, onAction, de, query,
 }: {
   s: Scenario; i: number; isSelected: boolean;
   onToggle: () => void;
   onAction: (a: "deep" | "whatif" | "challenge" | "strategy") => void;
   de: boolean;
+  query?: string;
 }) {
+  const [saved, setSaved] = useState(false);
+  const saveToBuilder = async () => {
+    if (saved) return;
+    try {
+      await fetch("/api/v1/scenarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: s.name,
+          description: s.description,
+          type: s.type ?? "custom",
+          probability: s.probability,
+          timeframe: s.timeframe,
+          key_drivers: s.keyDrivers ?? [],
+          source: "llm",
+          source_query: query,
+        }),
+      });
+      setSaved(true);
+    } catch { /* silent */ }
+  };
   const cfg   = getTypeConfig(s.type);
   const pct   = (s.probability * 100).toFixed(0);
   const label = de ? cfg.labelDe : cfg.labelEn;
@@ -108,6 +130,20 @@ function ScenarioCard({
             color: cfg.color, lineHeight: 1, flexShrink: 0,
             fontVariantNumeric: "tabular-nums",
           }}>{pct}%</span>
+
+          {/* Save to scenario builder */}
+          <button
+            onClick={(e) => { e.stopPropagation(); saveToBuilder(); }}
+            title={de ? "Im Szenario-Builder speichern" : "Save to scenario builder"}
+            style={{
+              fontSize: 11, padding: "2px 6px", borderRadius: 6,
+              border: saved ? "1px solid #1A9E5A" : "1px solid var(--color-border)",
+              background: saved ? "#C3F4D3" : "transparent",
+              color: saved ? "var(--pastel-mint-text)" : "var(--color-text-muted)",
+              cursor: saved ? "default" : "pointer", flexShrink: 0, marginLeft: 4,
+              transition: "all 0.15s",
+            }}
+          >{saved ? "✓" : "💾"}</button>
         </div>
 
         {/* Probability bar */}
@@ -293,6 +329,7 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp }: {
             onToggle={() => toggle(i)}
             onAction={(a) => onFollowUp?.(buildPrompt(a, s, query, de))}
             de={de}
+            query={query}
           />
         ))}
       </div>

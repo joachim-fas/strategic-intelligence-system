@@ -21,9 +21,37 @@ import { worldbankConnector } from "./worldbank";
 // Official statistics & economic data
 import { eurostatConnector } from "./eurostat";
 import { oecdConnector } from "./oecd";
-// fredConnector — US-only data, redundant with Eurostat/OECD/WorldBank for EU focus
+import { fredConnector } from "./fred";
 import { owidConnector } from "./owid";
 import { destatisConnector } from "./destatis";
+// Global intelligence & forecasting
+import { guardianConnector } from "./guardian";
+import { acledConnector } from "./acled";
+import { finnhubConnector } from "./finnhub";
+import { metaculusConnector } from "./metaculus";
+import { whoGhoConnector } from "./who-gho";
+import { iloConnector } from "./ilo";
+// Batch 2: Conflict, academic, UN & IMF data
+import { ucdpConnector } from "./ucdp";
+import { crossrefConnector } from "./crossref";
+import { semanticScholarConnector } from "./semantic-scholar";
+import { unDataConnector } from "./un-data";
+import { unSdgConnector } from "./un-sdg";
+import { imfConnector } from "./imf";
+// Batch 3: News, climate, labor & FX
+import { nytConnector } from "./nyt";
+import { newsdataConnector } from "./newsdata";
+import { openMeteoConnector } from "./open-meteo";
+import { blsConnector } from "./bls";
+import { openExchangeConnector } from "./open-exchange";
+import { mediaCloudConnector } from "./media-cloud";
+// Batch 4: Social, containers, patents & prediction markets
+import { blueskyConnector } from "./bluesky";
+import { mastodonApiConnector } from "./mastodon-api";
+import { dockerHubConnector } from "./docker-hub";
+import { vdemConnector } from "./vdem";
+import { patentsviewConnector } from "./patentsview";
+import { kalshiConnector } from "./kalshi";
 
 export const connectors: SourceConnector[] = [
   // Tech & Developer signals
@@ -54,9 +82,45 @@ export const connectors: SourceConnector[] = [
   worldbankConnector,
   // Official statistics & economic data
   eurostatConnector,
+  fredConnector,
   oecdConnector,
   owidConnector,
   destatisConnector,
+  // Global intelligence & forecasting
+  guardianConnector,
+  acledConnector,
+  finnhubConnector,
+  metaculusConnector,
+  // Health & labour
+  whoGhoConnector,
+  iloConnector,
+  // Conflict & geopolitics
+  ucdpConnector,
+  vdemConnector,
+  // Academic & research
+  crossrefConnector,
+  semanticScholarConnector,
+  // UN & international organizations
+  unDataConnector,
+  unSdgConnector,
+  imfConnector,
+  // News sources
+  nytConnector,
+  newsdataConnector,
+  mediaCloudConnector,
+  // Climate & environment
+  openMeteoConnector,
+  // Labor & economics
+  blsConnector,
+  openExchangeConnector,
+  // Social & community
+  blueskyConnector,
+  mastodonApiConnector,
+  // Infrastructure & tech
+  dockerHubConnector,
+  patentsviewConnector,
+  // Prediction markets
+  kalshiConnector,
 ];
 
 export function getConnector(name: string): SourceConnector | undefined {
