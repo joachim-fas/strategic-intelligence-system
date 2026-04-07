@@ -6,6 +6,7 @@ import { IntelligenceBriefing } from "@/lib/intelligence-engine";
 import { TrendDot } from "@/types";
 import { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { VoltBadge, VoltButton } from "@/components/volt";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ReasoningTrace } from "./ReasoningTrace";
@@ -118,17 +119,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           <BriefingExport entry={entry} locale={locale} />
         )}
         {!isLoading && !isHelp && briefing.synthesis && onOpenInCanvas && (
-          <button
-            onClick={() => onOpenInCanvas(entry)}
-            style={{
-              fontSize: 11, fontWeight: 600, padding: "2px 10px", borderRadius: 20,
-              border: "1px solid #1A9E5A44", background: "#1A9E5A08",
-              color: "var(--signal-positive)", cursor: "pointer", transition: "all 0.12s",
-              display: "inline-flex", alignItems: "center", gap: 3,
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A18"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A08"; }}
-          >⊞ Canvas</button>
+          <VoltButton variant="outline" size="sm" onClick={() => onOpenInCanvas(entry)}>
+            ⊞ Canvas
+          </VoltButton>
         )}
         {briefing.confidence > 0 && !isLoading && (
           <Badge

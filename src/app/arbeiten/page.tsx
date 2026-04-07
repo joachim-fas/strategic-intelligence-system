@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
-import { VoltButton, VoltCard } from "@/components/volt";
+import { VoltButton, VoltCard, VoltTabs } from "@/components/volt";
 
 interface Project {
   id: string;
@@ -69,30 +69,16 @@ export default function ArbeitenPage() {
       {/* Tab bar */}
       <div style={{ borderBottom: "1px solid var(--color-border)", padding: "0 24px" }}>
         <div className="volt-container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", gap: 0 }}>
-            {TABS.map(t => {
-              const active = tab === t.key;
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  style={{
-                    fontFamily: "var(--volt-font-ui)",
-                    fontSize: 13, fontWeight: active ? 600 : 400,
-                    padding: "12px 18px",
-                    borderBottom: active ? "2px solid var(--color-text-heading)" : "2px solid transparent",
-                    background: "transparent", border: "none", borderRadius: 0,
-                    color: active ? "var(--color-text-heading)" : "var(--color-text-muted)",
-                    cursor: "pointer", transition: "all 150ms",
-                    display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
-                  <span style={{ fontSize: 12 }}>{de ? t.iconDe : t.iconEn}</span>
-                  {de ? t.labelDe : t.labelEn}
-                </button>
-              );
-            })}
-          </div>
+          <VoltTabs
+            variant="underline"
+            activeTab={tab}
+            onTabChange={(id) => setTab(id as WorkTab)}
+            tabs={TABS.map(t => ({
+              id: t.key,
+              label: de ? t.labelDe : t.labelEn,
+              icon: <span>{de ? t.iconDe : t.iconEn}</span>,
+            }))}
+          />
           {tab === "projekte" && (
             <VoltButton variant="solid" size="sm" onClick={createProject}>
               + {de ? "Neues Projekt" : "New Project"}

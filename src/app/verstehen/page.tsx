@@ -7,7 +7,7 @@ import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_CLUSTERS, TREND_CLUSTER_MAP, getIntraClusterEdges } from "@/lib/trend-clusters";
-import { VoltBadge } from "@/components/volt";
+import { VoltBadge, VoltTabs, VoltTrendCard } from "@/components/volt";
 import dynamic from "next/dynamic";
 
 // ── Lazy-load heavy visualization components ────────────────────────────────
@@ -216,28 +216,19 @@ const RING_COLOR: Record<string, string> = { adopt: "var(--color-adopt)", trial:
 const RING_BG: Record<string, string> = { adopt: "#F0FDF6", trial: "#EFF6FF", assess: "#FFFBEB", hold: "#F9FAFB" };
 
 function TrendCard({ t, isSel, onSelect }: { t: TrendDot; isSel: boolean; onSelect: (t: TrendDot) => void }) {
-  const vel = t.velocity === "rising" ? { s: "↑", c: "var(--volt-positive)" } : t.velocity === "falling" ? { s: "↓", c: "var(--volt-negative)" } : { s: "→", c: "var(--volt-text-faint)" };
+  const dir = t.velocity === "rising" ? "up" as const : t.velocity === "falling" ? "down" as const : "stable" as const;
+  const status = t.ring as "adopt" | "trial" | "assess" | "hold";
   return (
-    <div onClick={() => onSelect(t)} className="volt-card" style={{
-      padding: "12px 14px", cursor: "pointer",
-      borderLeft: `3px solid ${RING_COLOR[t.ring]}`,
-      border: isSel ? "1.5px solid var(--volt-text)" : undefined,
-      transition: "all 150ms ease",
-    }}
-      onMouseEnter={e => { if (!isSel) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.borderColor = "var(--volt-border-strong)"; } }}
-      onMouseLeave={e => { if (!isSel) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = ""; } }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-        <span style={{ fontFamily: "var(--volt-font-display)", fontSize: 12, fontWeight: 600, color: "var(--volt-text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: vel.c, flexShrink: 0 }}>{vel.s}</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span className="volt-badge volt-badge-muted" style={{ fontSize: 9 }}>{t.relevance > 0.75 ? "MEGA" : "MAKRO"}</span>
-        <span className="volt-badge" style={{ fontSize: 9, background: RING_COLOR[t.ring], color: "#fff" }}>{t.ring}</span>
-        <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 9, color: "var(--volt-text-faint)" }}>{t.signalCount} sig.</span>
-        <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 9, color: "var(--volt-text-faint)", marginLeft: "auto" }}>{Math.round(t.confidence * 100)}%</span>
-      </div>
-    </div>
+    <VoltTrendCard
+      title={t.name}
+      category={t.relevance > 0.75 ? "MEGA" : "MAKRO"}
+      status={status}
+      direction={dir}
+      signals={t.signalCount}
+      confidence={Math.round(t.confidence * 100)}
+      active={isSel}
+      onClick={() => onSelect(t)}
+    />
   );
 }
 
@@ -470,26 +461,17 @@ export default function WissenPage() {
             </div>
           </div>
 
-          {/* Lens switcher */}
-          <div style={{ display: "flex", gap: 0, marginBottom: -1 }}>
-            {LENSES.map(l => {
-              const active = lens === l.key;
-              return (
-                <button key={l.key} onClick={() => setLens(l.key)}
-                  className={active ? "volt-btn volt-btn-solid volt-btn-sm" : "volt-btn volt-btn-ghost volt-btn-sm"}
-                  style={{
-                    padding: "10px 18px",
-                    borderBottom: active ? "2px solid var(--color-text-heading)" : "2px solid transparent",
-                    borderRadius: 0,
-                    display: "flex", alignItems: "center", gap: 5,
-                  }}
-                >
-                  <span style={{ fontSize: 11 }}>{l.icon}</span>
-                  {de ? l.labelDe : l.labelEn}
-                </button>
-              );
-            })}
-          </div>
+          {/* Lens switcher — VoltTabs */}
+          <VoltTabs
+            variant="underline"
+            activeTab={lens}
+            onTabChange={(id) => setLens(id as Lens)}
+            tabs={LENSES.map(l => ({
+              id: l.key,
+              label: de ? l.labelDe : l.labelEn,
+              icon: <span style={{ fontSize: 11 }}>{l.icon}</span>,
+            }))}
+          />
         </div>
       </div>
 
