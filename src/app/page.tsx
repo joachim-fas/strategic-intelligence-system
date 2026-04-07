@@ -678,10 +678,20 @@ export default function Home() {
         <div style={{
           maxWidth: 700, margin: "0 auto", width: "100%",
           padding: isFirstVisit && !showFullRadar ? "80px 24px 0" : "20px 24px 0",
+          position: "relative",
         }}>
+          {/* Subtle lime radial gradient orb behind search area */}
+          {isFirstVisit && !showFullRadar && (
+            <div style={{
+              position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
+              width: 600, height: 400,
+              background: "radial-gradient(ellipse at center, rgba(228,255,151,0.08) 0%, transparent 70%)",
+              pointerEvents: "none", zIndex: 0,
+            }} />
+          )}
           {/* Headline — only on first visit */}
           {isFirstVisit && !showFullRadar && (
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ textAlign: "center", marginBottom: 32, position: "relative", zIndex: 1 }}>
               <h1 style={{
                 fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
                 fontSize: "clamp(1.25rem, 3vw, 1.75rem)",
@@ -746,6 +756,7 @@ export default function Home() {
             {(query || isAnalyzing) && (
               <button onClick={() => handleSubmit()}
                 disabled={isAnalyzing}
+                className={isAnalyzing ? "" : "sis-shimmer-btn"}
                 style={{
                   fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
                   borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
@@ -753,7 +764,6 @@ export default function Home() {
                   color: isAnalyzing ? "var(--volt-text-muted)" : "var(--volt-white, #fff)",
                   border: "none", cursor: isAnalyzing ? "wait" : "pointer",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                  transition: "all 150ms ease",
                 }}
               >
                 {isAnalyzing

@@ -125,15 +125,27 @@ export default function QuellenPage() {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
-  // Load signal counts from DB
+  // Load signal counts + connector status from DB
   const [signalCounts, setSignalCounts] = useState<Record<string, number>>({});
+  const [connectorStatus, setConnectorStatus] = useState<Record<string, string>>({});
+  const [totalSignals, setTotalSignals] = useState(0);
+  const [activeConnectors, setActiveConnectors] = useState(0);
   useEffect(() => {
     fetch("/api/v1/feed")
       .then(r => r.json())
       .then(data => {
         const counts: Record<string, number> = {};
-        (data.sourceStatus ?? []).forEach((s: any) => { counts[s.source] = s.signalCount; });
+        const statuses: Record<string, string> = {};
+        let active = 0;
+        (data.sourceStatus ?? []).forEach((s: any) => {
+          counts[s.source] = s.signalCount;
+          statuses[s.source] = s.status;
+          if (s.status === "fresh") active++;
+        });
         setSignalCounts(counts);
+        setConnectorStatus(statuses);
+        setTotalSignals(data.meta?.totalSignals ?? 0);
+        setActiveConnectors(active);
       })
       .catch(() => {});
   }, []);
@@ -163,9 +175,37 @@ export default function QuellenPage() {
         <h1 className="volt-display-md" style={{ margin: "0 0 4px" }}>
           {de ? "Alle Datenquellen" : "All Data Sources"}
         </h1>
-        <p className="volt-body-sm" style={{ color: "var(--color-text-muted)", margin: "0 0 16px" }}>
-          {ALL_SOURCES.length} {de ? "Quellen insgesamt" : "sources total"} · {integratedCount} {de ? "integriert" : "integrated"} · {newCount} neu · {plannedCount} {de ? "geplant" : "planned"} · {downloadCount} {de ? "nur Download" : "download only"}
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          <span style={{
+            fontFamily: "var(--volt-font-mono)", fontSize: 11, fontWeight: 600,
+            color: "var(--color-text-muted)",
+          }}>
+            {ALL_SOURCES.length} {de ? "Quellen" : "sources"}
+          </span>
+          {totalSignals > 0 && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "3px 8px", borderRadius: 6,
+              background: "var(--volt-lime, #E4FF97)", color: "var(--volt-black)",
+              fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 700,
+            }}>
+              ● {totalSignals.toLocaleString()} {de ? "Signale" : "signals"}
+            </span>
+          )}
+          {activeConnectors > 0 && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "3px 8px", borderRadius: 6,
+              background: "var(--pastel-mint, #C3F4D3)", color: "var(--pastel-mint-text, #0F6038)",
+              fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 600,
+            }}>
+              {activeConnectors} {de ? "aktiv" : "active"}
+            </span>
+          )}
+          <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 10, color: "var(--color-text-muted)" }}>
+            {integratedCount} {de ? "integriert" : "integrated"} · {newCount} neu · {plannedCount} {de ? "geplant" : "planned"}
+          </span>
+        </div>
 
         {/* Filter + Search */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
