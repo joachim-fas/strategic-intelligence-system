@@ -8,6 +8,7 @@ import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_CLUSTERS, TREND_CLUSTER_MAP, getIntraClusterEdges } from "@/lib/trend-clusters";
 import { VoltBadge, VoltTabs, VoltTrendCard, VoltStat } from "@/components/volt";
+import { Tooltip } from "@/components/ui/Tooltip";
 import dynamic from "next/dynamic";
 
 // ── Lazy-load heavy visualization components ────────────────────────────────
@@ -317,10 +318,18 @@ export default function CockpitPage() {
             <div style={{ padding: "16px 24px" }}>
               {/* KPI Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
-                <VoltStat label="Trends" value={String(trends.length)} variant="default" size="sm" />
-                <VoltStat label="Mega-Trends" value={String(megaCount)} variant="default" size="sm" />
-                <VoltStat label={de ? "Steigend" : "Rising"} value={String(risingCount)} change={risingCount > 10 ? +(risingCount / trends.length * 100).toFixed(0) : undefined} variant="positive" size="sm" />
-                <VoltStat label={de ? "Cluster" : "Clusters"} value={String(TREND_CLUSTERS.length)} variant="default" size="sm" />
+                <Tooltip content={de ? "Gesamtanzahl ueberwachter Trends im System" : "Total number of monitored trends"} placement="bottom">
+                  <VoltStat label="Trends" value={String(trends.length)} variant="default" size="sm" />
+                </Tooltip>
+                <Tooltip content={de ? "Mega-Trends: Langfristige, branchentransformierende Entwicklungen" : "Mega trends: Long-term, industry-transforming developments"} placement="bottom">
+                  <VoltStat label="Mega-Trends" value={String(megaCount)} variant="default" size="sm" />
+                </Tooltip>
+                <Tooltip content={de ? "Trends deren Relevanz in den letzten 30 Tagen gestiegen ist" : "Trends whose relevance increased in the last 30 days"} placement="bottom">
+                  <VoltStat label={de ? "Steigend" : "Rising"} value={String(risingCount)} change={risingCount > 10 ? +(risingCount / trends.length * 100).toFixed(0) : undefined} variant="positive" size="sm" />
+                </Tooltip>
+                <Tooltip content={de ? "Thematische Cluster: Gruppen verwandter Trends" : "Thematic clusters: Groups of related trends"} placement="bottom">
+                  <VoltStat label={de ? "Cluster" : "Clusters"} value={String(TREND_CLUSTERS.length)} variant="default" size="sm" />
+                </Tooltip>
               </div>
               <RadarView
                 trends={trends}

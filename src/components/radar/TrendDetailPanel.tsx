@@ -613,15 +613,39 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
                 tag === "mega-trend"  ? { bg: "var(--pastel-orchid-light, #FDE2FF)", color: "var(--pastel-orchid-text, #7C1A9E)", border: "var(--pastel-orchid-border, #D4A0F0)" } :
                 tag === "makro-trend" ? { bg: "var(--pastel-sky, #D4E8FF)", color: "var(--pastel-sky-text, #1A4A8A)", border: "var(--pastel-sky-border, #80B8F0)" } :
                                         { bg: "var(--color-surface-2, #F0F2F7)", color: "var(--volt-text-muted, #6B6B6B)", border: "var(--volt-border, #E0E0E0)" };
-              return (
+              // STEEP+V tooltip explanations
+              const steepTooltips: Record<string, string> = locale === "de" ? {
+                technology: "Technological: Technologische Entwicklungen und Innovationen",
+                social: "Social: Gesellschaftliche und demografische Veraenderungen",
+                economic: "Economic: Wirtschaftliche Dynamiken und Marktverschiebungen",
+                environmental: "Environmental: Umwelt, Klima und Ressourcen",
+                political: "Political: Regulierung, Governance und geopolitische Entwicklungen",
+                values: "Values: Wertewandel und kulturelle Verschiebungen",
+                "frontier-tech": "Frontier Tech: Emerging Technologies an der Grenze des Machbaren",
+                "net-zero": "Net Zero: Dekarbonisierung und Klimaneutralitaet",
+                geopolitics: "Geopolitik: Internationale Machtverschiebungen",
+              } : {
+                technology: "Technological: Tech developments and innovations",
+                social: "Social: Societal and demographic changes",
+                economic: "Economic: Market dynamics and economic shifts",
+                environmental: "Environmental: Climate, resources, sustainability",
+                political: "Political: Regulation, governance, geopolitics",
+                values: "Values: Cultural shifts and changing value systems",
+                "frontier-tech": "Frontier Tech: Emerging technologies at the edge",
+                "net-zero": "Net Zero: Decarbonization and climate neutrality",
+                geopolitics: "Geopolitics: International power shifts",
+              };
+              const tip = steepTooltips[tag.toLowerCase()];
+              const badge = (
                 <span
                   key={tag}
-                  className="px-2.5 py-0.5 rounded-full text-xs border"
+                  className={`px-2.5 py-0.5 rounded-full text-xs border ${tip ? "cursor-help" : ""}`}
                   style={{ background: style.bg, color: style.color, borderColor: style.border }}
                 >
                   {tag}
                 </span>
               );
+              return tip ? <Tooltip key={tag} content={tip} placement="top">{badge}</Tooltip> : badge;
             })}
         </div>
       </div>
