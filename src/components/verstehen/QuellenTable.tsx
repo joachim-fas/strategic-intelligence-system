@@ -21,7 +21,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { connectors } from "@/connectors";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
-import { PLANNED_CONNECTORS, PLANNED_CATEGORY_LABELS } from "@/lib/planned-connectors";
+import { PLANNED_CONNECTORS } from "@/lib/planned-connectors";
+import {
+  CATEGORIES,
+  CATEGORY_TO_MACRO,
+  STEEP_V_META,
+  STEEP_V_ORDER,
+  type CategoryKey,
+  type SteepVKey,
+} from "@/lib/source-taxonomy";
 import {
   VoltFilterPill,
   VoltTypeBadge,
@@ -30,46 +38,12 @@ import {
   StatusKind,
 } from "./VoltPrimitives";
 
-// ─── Category config ────────────────────────────────────────────────────
-// Core categories for the live connectors PLUS every category that appears
-// only in the planned list (wetten, kultur, gaming, crypto, cyber, …).
-// Keeping both in one map lets us build a single filter-pill row whose
-// dynamic counts reflect BOTH live and planned sources.
-const CATEGORIES = {
-  all:          { de: "Alle",                     en: "All" },
-  tech:         { de: "Tech & Developer",         en: "Tech & Developers" },
-  wissenschaft: { de: "Wissenschaft",             en: "Science" },
-  geopolitik:   { de: "Geopolitik",               en: "Geopolitics" },
-  makro:        { de: "Makroökonomie",            en: "Macroeconomics" },
-  gesellschaft: { de: "Gesellschaft",             en: "Society" },
-  news:         { de: "News & Medien",            en: "News & Media" },
-  klima:        { de: "Klima & Umwelt",           en: "Climate & Environment" },
-  gesundheit:   { de: "Gesundheit",               en: "Health" },
-  prognose:     { de: "Prognosemärkte",           en: "Prediction Markets" },
-  // New categories introduced by the planned-connectors roadmap
-  wetten:       { de: "Wettmärkte",               en: "Betting Markets" },
-  kultur:       { de: "Kultur & Entertainment",   en: "Culture & Entertainment" },
-  gaming:       { de: "Gaming",                   en: "Gaming" },
-  crypto:       { de: "Finanzen & Crypto",        en: "Finance & Crypto" },
-  cyber:        { de: "Cybersecurity",            en: "Cybersecurity" },
-  energie:      { de: "Energie & Rohstoffe",      en: "Energy & Commodities" },
-  recht:        { de: "Gesetzgebung",             en: "Legislation" },
-  arbeit:       { de: "Arbeitsmarkt",             en: "Labor Market" },
-  migration:    { de: "Migration",                en: "Migration" },
-  mobilitaet:   { de: "Mobilität",                en: "Mobility" },
-  agrar:        { de: "Nahrungsmittel & Agrar",   en: "Food & Agriculture" },
-  supply:       { de: "Supply Chain",             en: "Supply Chain" },
-  publishing:   { de: "Publishing & Podcasts",    en: "Publishing & Podcasts" },
-  foresight:    { de: "Foresight",                en: "Foresight" },
-  umfragen:     { de: "Umfragen",                 en: "Surveys" },
-  // "forschung" is a special pseudo-category: selecting it switches the view
-  // from the live-connector table to the curated research source grid.
-  forschung:    { de: "Forschung",                en: "Research" },
-} as const;
-
-type CategoryKey = keyof typeof CATEGORIES;
-
-const CONNECTOR_CATEGORY: Record<string, CategoryKey> = {
+// ─── Live connector → fine category / type mapping ─────────────────────
+// Live connectors resolve their fine category here (planned connectors
+// carry it directly on the PlannedConnector type). The fine category is
+// then mapped to a STEEP+V bucket via CATEGORY_TO_MACRO from
+// source-taxonomy.ts so the macro filter row works for both kinds.
+const CONNECTOR_CATEGORY: Record<string, Exclude<CategoryKey, "all" | "forschung">> = {
   hackernews: "tech", github: "tech", reddit: "gesellschaft", "stackoverflow": "tech",
   "npm-pypi": "tech", producthunt: "tech", "docker-hub": "tech", bluesky: "gesellschaft",
   "mastodon-api": "gesellschaft", wikipedia: "wissenschaft",
@@ -86,6 +60,13 @@ const CONNECTOR_CATEGORY: Record<string, CategoryKey> = {
   polymarket: "prognose", manifold: "prognose", metaculus: "prognose", kalshi: "prognose",
   "google-trends": "tech", sentiment: "news",
   "un-data": "makro", "un-sdg": "makro",
+  // ── Batch-5 (2026-04): added here so STEEP+V buckets are honest ─────
+  coingecko:       "crypto",
+  "defi-llama":    "crypto",
+  clinicaltrials:  "gesundheit",
+  openfda:         "gesundheit",
+  unhcr:           "migration",
+  nextstrain:      "gesundheit",
 };
 
 const CONNECTOR_TYPE: Record<string, TypeBadgeKind> = {
@@ -107,6 +88,13 @@ const CONNECTOR_TYPE: Record<string, TypeBadgeKind> = {
   polymarket: "prognose", manifold: "prognose", metaculus: "prognose", kalshi: "prognose",
   "google-trends": "live-signal",
   "un-data": "forschung", "un-sdg": "forschung",
+  // ── Batch-5 (2026-04) ───────────────────────────────────────────────
+  coingecko:       "live-signal",
+  "defi-llama":    "live-signal",
+  clinicaltrials:  "forschung",
+  openfda:         "live-signal",
+  unhcr:           "live-signal",
+  nextstrain:      "live-signal",
 };
 
 // Short descriptions per connector (derived from Volt UI sample)
@@ -160,6 +148,15 @@ const DESCRIPTIONS: Record<string, { de: string; en: string }> = {
   "un-sdg":        { de: "UN Sustainable Development Goals Tracker", en: "UN Sustainable Development Goals tracker" },
 };
 
+// Grid column template shared by the header row and every data row.
+// Widths tuned for a ~1320px content area:
+//   Quelle    : minmax(240, 1fr)    — fills remainder
+//   Kategorie : 220                 — icon + longest label ("Nahrungsmittel & Agrar")
+//   Typ       : 140                 — VoltTypeBadge widest label "LIVE-SIGNAL"
+//   Beschreibung : minmax(260, 1.4fr) — ellipsis overflow handles the rest
+//   Status    : 120                 — VoltStatusBadge "Backlog" in italic
+const GRID_COLS = "minmax(240px, 1fr) 220px 140px minmax(260px, 1.4fr) 120px";
+
 interface QuellenTableProps {
   de: boolean;
 }
@@ -170,17 +167,19 @@ type StatusFilter = "all" | "aktiv" | "geplant";
 interface UnifiedRow {
   key: string;
   displayName: string;
+  slug: string;             // machine id rendered under the display name
   category: CategoryKey;
   type: TypeBadgeKind;
   descDe: string;
   descEn: string;
-  status: StatusKind; // "aktiv" | "inaktiv" | "geplant"
+  status: StatusKind;
   docUrl?: string;
   priority?: "high" | "medium" | "low";
 }
 
 export default function QuellenTable({ de }: QuellenTableProps) {
   const [statusMap, setStatusMap] = useState<Record<string, { lastRunAt?: string; status?: string }>>({});
+  const [activeMacro, setActiveMacro] = useState<SteepVKey | "all">("all");
   const [activeFilter, setActiveFilter] = useState<CategoryKey>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -223,6 +222,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
       return {
         key: `live:${c.name}`,
         displayName: c.displayName,
+        slug: c.name,
         category,
         type,
         descDe: desc.de,
@@ -231,17 +231,29 @@ export default function QuellenTable({ de }: QuellenTableProps) {
       } as UnifiedRow;
     });
 
-    const plannedRows: UnifiedRow[] = PLANNED_CONNECTORS.map((p) => ({
-      key: `planned:${p.slug}`,
-      displayName: p.displayName,
-      category: p.category as CategoryKey,
-      type: p.type as TypeBadgeKind,
-      descDe: p.descriptionDe,
-      descEn: p.descriptionEn,
-      status: "geplant",
-      docUrl: p.docUrl,
-      priority: p.priority,
-    }));
+    // Planned connectors resolve status from their backlog / needsKey
+    // flags so the table surfaces those states automatically. Priority
+    // order: backlog > needs-key > geplant. This is intentional — a
+    // deferred-AND-keyed connector is more "backlog" than "keyed".
+    const plannedRows: UnifiedRow[] = PLANNED_CONNECTORS.map((p) => {
+      const status: StatusKind = p.backlog
+        ? "backlog"
+        : p.needsKey
+          ? "needs-key"
+          : "geplant";
+      return {
+        key: `planned:${p.slug}`,
+        displayName: p.displayName,
+        slug: p.slug,
+        category: p.category as CategoryKey,
+        type: p.type as TypeBadgeKind,
+        descDe: p.descriptionDe,
+        descEn: p.descriptionEn,
+        status,
+        docUrl: p.docUrl,
+        priority: p.priority,
+      };
+    });
 
     return [...liveRows, ...plannedRows];
   }, [statusMap]);
@@ -256,31 +268,58 @@ export default function QuellenTable({ de }: QuellenTableProps) {
     return map;
   }, [allRows]);
 
-  // Apply all three filters (category, status, search) in one pass.
+  // Counts per STEEP+V macro bucket so the macro filter row shows live
+  // numbers. "forschung" has no actual connectors, so the values bucket
+  // only counts explicit "foresight" entries here — the forschung pseudo
+  // is added visually but not counted.
+  const macroCounts = useMemo(() => {
+    const map = new Map<SteepVKey, number>();
+    for (const r of allRows) {
+      if (r.category === "forschung" || r.category === "all") continue;
+      const macro = CATEGORY_TO_MACRO[r.category];
+      if (macro) map.set(macro, (map.get(macro) ?? 0) + 1);
+    }
+    return map;
+  }, [allRows]);
+
+  // Apply all four filters (macro, category, status, search) in one pass.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return allRows.filter((r) => {
       if (activeFilter === "forschung") return false; // handled by research grid
+      if (activeMacro !== "all" && r.category !== "forschung" && r.category !== "all") {
+        if (CATEGORY_TO_MACRO[r.category] !== activeMacro) return false;
+      }
       if (activeFilter !== "all" && r.category !== activeFilter) return false;
       if (statusFilter === "aktiv" && r.status !== "aktiv") return false;
-      if (statusFilter === "geplant" && r.status !== "geplant") return false;
+      if (statusFilter === "geplant" && !(r.status === "geplant" || r.status === "backlog" || r.status === "needs-key")) return false;
       if (q) {
-        const hay = `${r.displayName} ${r.descDe} ${r.descEn}`.toLowerCase();
+        const hay = `${r.displayName} ${r.slug} ${r.descDe} ${r.descEn}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [allRows, activeFilter, statusFilter, search]);
+  }, [allRows, activeMacro, activeFilter, statusFilter, search]);
 
-  // Sort rows: aktiv first, then geplant (by priority), then inaktiv.
+  // Sort rows: aktiv → geplant → needs-key → backlog → inaktiv → fehler.
+  // Within "geplant", high-priority entries float to the top.
   const sorted = useMemo(() => {
     const prioRank = { high: 0, medium: 1, low: 2 } as const;
+    const statusRank = (s: StatusKind): number => {
+      switch (s) {
+        case "aktiv":     return 0;
+        case "geplant":   return 1;
+        case "needs-key": return 2;
+        case "backlog":   return 3;
+        case "inaktiv":   return 4;
+        case "fehler":    return 5;
+        default:          return 6;
+      }
+    };
     return [...filtered].sort((a, b) => {
-      const statusRank = (s: StatusKind) =>
-        s === "aktiv" ? 0 : s === "geplant" ? 1 : 2;
       const sr = statusRank(a.status) - statusRank(b.status);
       if (sr !== 0) return sr;
-      if (a.status === "geplant" && b.status === "geplant") {
+      if ((a.status === "geplant" || a.status === "needs-key") && a.status === b.status) {
         const ar = prioRank[a.priority ?? "low"];
         const br = prioRank[b.priority ?? "low"];
         if (ar !== br) return ar - br;
@@ -352,19 +391,78 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         )}
       </p>
 
-      {/* Unified filter-pills + search row.
-           Top row: category filter (all live + planned categories).
-           Bottom row: status segmented control (Alle / Aktiv / Geplant).
-           "Forschung" is a pseudo-category that switches the view from
-           the unified table to the curated research grid. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
+      {/* ── Row 1: STEEP+V macro filter + search ──────────────────────
+           Six wide chips grouping the 24 fine categories under the
+           Social/Technological/Economic/Environmental/Political/Values
+           buckets from source-taxonomy.ts. Clicking a macro chip scopes
+           the fine pill row below. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, flex: 1 }}>
+          <MacroChip
+            active={activeMacro === "all"}
+            onClick={() => {
+              setActiveMacro("all");
+              // Reset fine filter to "all" so the scoped pill row doesn't
+              // end up pointing at a pill that's about to disappear.
+              if (activeFilter !== "all" && activeFilter !== "forschung") setActiveFilter("all");
+            }}
+            label={de ? "Alle" : "All"}
+            count={allRows.length}
+          />
+          {STEEP_V_ORDER.map((key) => {
+            const meta = STEEP_V_META[key];
+            const Icon = meta.icon;
+            const count = macroCounts.get(key) ?? 0;
+            return (
+              <MacroChip
+                key={key}
+                active={activeMacro === key}
+                onClick={() => {
+                  setActiveMacro(key);
+                  // If the current fine filter doesn't belong to the new macro,
+                  // reset it to "all" so the pill row scope makes sense.
+                  if (
+                    activeFilter !== "all" &&
+                    activeFilter !== "forschung" &&
+                    CATEGORY_TO_MACRO[activeFilter] !== key
+                  ) {
+                    setActiveFilter("all");
+                  }
+                }}
+                label={de ? meta.labelDe : meta.labelEn}
+                count={count}
+                icon={<Icon size={13} strokeWidth={2} />}
+                bg={meta.bg}
+                text={meta.text}
+              />
+            );
+          })}
+        </div>
+        <SearchBox value={search} onChange={setSearch} de={de} />
+      </div>
+
+      {/* ── Row 2: Fine category pills (scoped by active macro) ───────
+           When a macro chip is active, only the fine categories
+           belonging to that macro render here. "Alle" and "Forschung"
+           are always visible so the user can leave scoped mode cleanly. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "var(--volt-text-faint, #999)",
+          marginRight: 4,
+        }}>
+          {de ? "Kategorie" : "Category"}
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
           {(Object.keys(CATEGORIES) as CategoryKey[]).map((key) => {
-            // Skip empty categories (nothing live AND nothing planned) to keep the
-            // pill row tight. "all" and "forschung" are always shown.
+            // Always show "all" and "forschung" regardless of macro scope.
             if (key !== "all" && key !== "forschung") {
               const count = categoryCounts.get(key) ?? 0;
               if (count === 0) return null;
+              // Scope: hide fine pills that don't belong to the active macro.
+              if (activeMacro !== "all" && CATEGORY_TO_MACRO[key] !== activeMacro) return null;
             }
             return (
               <VoltFilterPill
@@ -377,7 +475,6 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             );
           })}
         </div>
-        <SearchBox value={search} onChange={setSearch} de={de} />
       </div>
 
       {/* Status segmented control — only shown when not in research mode */}
@@ -434,7 +531,11 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         </div>
       )}
 
-      {/* Connectors table — shown when a normal category (or "all") is active */}
+      {/* Connectors grid — Sessions-style layout (SessionList.tsx:525+).
+           Custom CSS Grid rather than <table> so the row hover, the 3px
+           left-border "active" indicator, and the macro icon column all
+           compose cleanly. gridTemplateColumns is repeated on the
+           header row and every data row. */}
       {!showResearch && (
         <div
           style={{
@@ -444,81 +545,159 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             background: "var(--card)",
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-ui)" }}>
-            <thead>
-              <tr style={{ background: "var(--muted, #F7F7F7)" }}>
-                <Th>{de ? "Quelle" : "Source"}</Th>
-                <Th>{de ? "Kategorie" : "Category"}</Th>
-                <Th>{de ? "Typ" : "Type"}</Th>
-                <Th style={{ width: "44%" }}>{de ? "Beschreibung" : "Description"}</Th>
-                <Th style={{ width: 100, textAlign: "center" }}>Status</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((r) => {
-                const isPlanned = r.status === "geplant";
-                return (
-                  <tr
-                    key={r.key}
-                    style={{
-                      borderTop: "1px solid var(--color-border)",
-                      transition: "background 0.1s",
-                      opacity: isPlanned ? 0.82 : 1,
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--muted, #F7F7F7)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <Td>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--foreground)", display: "flex", alignItems: "center", gap: 6 }}>
-                        {r.displayName}
-                        {isPlanned && r.priority === "high" && (
-                          <span
-                            title={de ? "Hohe Priorität in der Roadmap" : "High priority on the roadmap"}
-                            style={{
-                              fontSize: 9,
-                              color: "#C8102E",
-                              fontWeight: 700,
-                            }}
-                          >●</span>
-                        )}
-                      </div>
-                    </Td>
-                    <Td>
-                      <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                        {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
-                      </span>
-                    </Td>
-                    <Td>
-                      <VoltTypeBadge kind={r.type} />
-                    </Td>
-                    <Td>
-                      <span style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.4 }}>
-                        {de ? r.descDe : r.descEn}
-                      </span>
-                    </Td>
-                    <Td style={{ textAlign: "center" }}>
-                      <VoltStatusBadge kind={r.status} />
-                    </Td>
-                  </tr>
-                );
-              })}
-              {sorted.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    style={{
-                      padding: "40px 16px",
-                      textAlign: "center",
-                      color: "var(--muted-foreground)",
-                      fontSize: 13,
-                    }}
-                  >
-                    {de ? "Keine Quellen gefunden" : "No sources found"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {/* Header row — mono uppercase column labels */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: GRID_COLS,
+              gap: 16,
+              padding: "10px 20px",
+              background: "var(--volt-surface, #FAFAFA)",
+              borderBottom: "1px solid var(--volt-border, #EEE)",
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "var(--volt-text-faint, #999)",
+            }}
+          >
+            <div>{de ? "Quelle" : "Source"}</div>
+            <div>{de ? "Kategorie" : "Category"}</div>
+            <div>{de ? "Typ" : "Type"}</div>
+            <div>{de ? "Beschreibung" : "Description"}</div>
+            <div>Status</div>
+          </div>
+
+          {/* Data rows */}
+          {sorted.map((r, idx) => {
+            const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
+            const isActiveRow = r.status === "aktiv";
+            // "all" never appears as a row category in practice (no connector
+            // carries it), but narrowing it out here makes CATEGORY_TO_MACRO
+            // indexable for the rest of this block.
+            const macroKey =
+              r.category !== "forschung" && r.category !== "all"
+                ? CATEGORY_TO_MACRO[r.category]
+                : undefined;
+            const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
+            const MacroIcon = macroMeta?.icon;
+            return (
+              <div
+                key={r.key}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: GRID_COLS,
+                  gap: 16,
+                  padding: "14px 20px",
+                  borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
+                  transition: "background-color 120ms ease",
+                  opacity: isPlanned ? 0.86 : 1,
+                  borderLeft: isActiveRow
+                    ? "3px solid var(--signal-positive, #1A9E5A)"
+                    : "3px solid transparent",
+                  alignItems: "center",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(79,99,138,0.07)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {/* Col 1: Source name + slug */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    fontFamily: "var(--font-display)",
+                    fontSize: 14, fontWeight: 600,
+                    color: "var(--foreground)",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {r.displayName}
+                    {isPlanned && r.priority === "high" && (
+                      <span
+                        title={de ? "Hohe Priorität in der Roadmap" : "High priority on the roadmap"}
+                        style={{ fontSize: 9, color: "#C8102E", fontWeight: 700, flexShrink: 0 }}
+                      >●</span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--volt-text-faint, #A8A8A8)",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    marginTop: 2,
+                  }}>
+                    {r.slug}
+                  </div>
+                </div>
+
+                {/* Col 2: Macro icon + fine category label */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  {MacroIcon && macroMeta && (
+                    <span
+                      style={{
+                        width: 22, height: 22, borderRadius: 5,
+                        background: macroMeta.bg,
+                        color: macroMeta.text,
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <MacroIcon size={12} strokeWidth={2.25} />
+                    </span>
+                  )}
+                  <span style={{
+                    fontSize: 12,
+                    color: "var(--muted-foreground)",
+                    fontFamily: "var(--font-ui)",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
+                  </span>
+                </div>
+
+                {/* Col 3: Typ badge */}
+                <div>
+                  <VoltTypeBadge kind={r.type} />
+                </div>
+
+                {/* Col 4: Description (single-line ellipsis) */}
+                <div style={{
+                  fontSize: 12,
+                  color: "var(--muted-foreground)",
+                  fontFamily: "var(--font-ui)",
+                  lineHeight: 1.4,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  minWidth: 0,
+                }}
+                title={de ? r.descDe : r.descEn}
+                >
+                  {de ? r.descDe : r.descEn}
+                </div>
+
+                {/* Col 5: Status badge */}
+                <div>
+                  <VoltStatusBadge kind={r.status} />
+                </div>
+              </div>
+            );
+          })}
+
+          {sorted.length === 0 && (
+            <div style={{
+              padding: "40px 16px",
+              textAlign: "center",
+              color: "var(--muted-foreground)",
+              fontSize: 13,
+              fontFamily: "var(--font-ui)",
+            }}>
+              {de ? "Keine Quellen gefunden" : "No sources found"}
+            </div>
+          )}
         </div>
       )}
 
@@ -611,49 +790,70 @@ function SearchBox({ value, onChange, de }: { value: string; onChange: (v: strin
   );
 }
 
-function Th({
-  children,
-  style,
+// STEEP+V macro filter chip. Inline helper — this component is the only
+// consumer. Active state uses the macro's own pastel bg/text so the chip
+// visually matches the icon color in the Kategorie column of the rows
+// belonging to that macro.
+function MacroChip({
+  active,
+  onClick,
+  label,
+  count,
+  icon,
+  bg,
+  text,
 }: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  icon?: React.ReactNode;
+  bg?: string;
+  text?: string;
 }) {
   return (
-    <th
+    <button
+      type="button"
+      onClick={onClick}
       style={{
-        padding: "12px 14px",
-        textAlign: "left",
-        fontSize: 10,
-        fontWeight: 700,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 14px",
+        borderRadius: 9999,
+        border: active
+          ? `1px solid ${text ?? "var(--foreground, #0A0A0A)"}`
+          : "1px solid var(--color-border, #E8E8E8)",
+        background: active ? (bg ?? "var(--foreground, #0A0A0A)") : "transparent",
+        color: active ? (text ?? "var(--background, #fff)") : "var(--muted-foreground, #6B6B6B)",
+        fontFamily: "var(--font-ui)",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer",
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.borderColor = "var(--foreground, #0A0A0A)";
+          e.currentTarget.style.color = "var(--foreground, #0A0A0A)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.borderColor = "var(--color-border, #E8E8E8)";
+          e.currentTarget.style.color = "var(--muted-foreground, #6B6B6B)";
+        }
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+      <span style={{
         fontFamily: "var(--font-mono)",
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        color: "var(--muted-foreground)",
-        ...style,
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: React.CSSProperties;
-}) {
-  return (
-    <td
-      style={{
-        padding: "12px 14px",
-        verticalAlign: "middle",
-        ...style,
-      }}
-    >
-      {children}
-    </td>
+        fontSize: 10,
+        opacity: active ? 0.85 : 0.55,
+      }}>{count}</span>
+    </button>
   );
 }
 

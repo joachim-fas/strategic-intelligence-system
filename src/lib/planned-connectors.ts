@@ -23,6 +23,8 @@
  *   4. Flip "Bereits integriert" in the Notion database
  */
 
+import type { CategoryKey } from "./source-taxonomy";
+
 export type PlannedConnectorPriority = "high" | "medium" | "low";
 export type PlannedConnectorAccess =
   | "no-auth"
@@ -33,32 +35,12 @@ export type PlannedConnectorAccess =
   | "open-source"
   | "public-scrape";
 
-/** Matches the category keys used in QuellenTable CATEGORIES. */
-export type PlannedConnectorCategory =
-  | "agrar"
-  | "arbeit"
-  | "crypto"
-  | "cyber"
-  | "energie"
-  | "foresight"
-  | "gaming"
-  | "geopolitik"
-  | "gesellschaft"
-  | "gesundheit"
-  | "klima"
-  | "kultur"
-  | "makro"
-  | "migration"
-  | "mobilitaet"
-  | "news"
-  | "prognose"
-  | "publishing"
-  | "recht"
-  | "supply"
-  | "tech"
-  | "umfragen"
-  | "wetten"
-  | "wissenschaft";
+/**
+ * Category keys a planned connector can carry. These are the fine-grain
+ * domain categories from source-taxonomy.ts minus the two pseudo keys
+ * "all" and "forschung" (no connector lives in either pseudo bucket).
+ */
+export type PlannedConnectorCategory = Exclude<CategoryKey, "all" | "forschung">;
 
 /** Matches the TypeBadgeKind shape used by VoltTypeBadge. */
 export type PlannedConnectorType = "live-signal" | "social" | "forschung" | "prognose";

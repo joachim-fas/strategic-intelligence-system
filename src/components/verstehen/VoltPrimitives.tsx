@@ -17,6 +17,7 @@
  */
 
 import React from "react";
+import { Key as KeyIcon } from "lucide-react";
 
 // ─── StatusRing: adopt / trial / assess / hold ─────────────────────────
 // Color mapping is SEMANTIC — matches Volt UI pastel spec exactly.
@@ -277,17 +278,38 @@ export function VoltTypeBadge({ kind }: { kind: TypeBadgeKind }) {
 // ─── VoltStatusBadge ───────────────────────────────────────────────────
 // Used in: Quellen-Tabelle "Status" column.
 //   aktiv/inaktiv/fehler → state of a LIVE connector
-//   geplant              → planned connector on the roadmap, not yet built
+//   geplant              → planned connector on the roadmap, next up
+//   backlog              → planned but deferred (grey, italic)
+//   needs-key            → planned but waiting on a user-provided API key
+//                          (butter + key icon)
 //   frei/key             → legacy "Auth" column (kept for backwards compat)
-export type StatusKind = "aktiv" | "inaktiv" | "geplant" | "frei" | "key" | "fehler";
+export type StatusKind =
+  | "aktiv"
+  | "inaktiv"
+  | "geplant"
+  | "backlog"
+  | "needs-key"
+  | "frei"
+  | "key"
+  | "fehler";
 
-const STATUS_STYLES: Record<StatusKind, { bg: string; text: string; label: string }> = {
-  aktiv:    { bg: "var(--pastel-mint, #C3F4D3)",   text: "#0F6038", label: "AKTIV" },
-  inaktiv:  { bg: "var(--color-surface-2, #F0F2F7)", text: "#6B7A9A", label: "INAKTIV" },
-  geplant:  { bg: "var(--pastel-butter, #FFF5BA)", text: "#7A5C00", label: "GEPLANT" },
-  frei:     { bg: "var(--color-surface-2, #F0F2F7)", text: "#6B7A9A", label: "FREI" },
-  key:      { bg: "var(--pastel-butter, #FFF5BA)", text: "#7A5C00", label: "KEY" },
-  fehler:   { bg: "var(--pastel-rose, #FFD6E0)",   text: "#A0244A", label: "FEHLER" },
+interface StatusStyle {
+  bg: string;
+  text: string;
+  label: string;
+  italic?: boolean;
+  withKeyIcon?: boolean;
+}
+
+const STATUS_STYLES: Record<StatusKind, StatusStyle> = {
+  aktiv:       { bg: "var(--pastel-mint, #C3F4D3)",    text: "#0F6038", label: "AKTIV" },
+  inaktiv:     { bg: "var(--color-surface-2, #F0F2F7)", text: "#6B7A9A", label: "INAKTIV" },
+  geplant:     { bg: "var(--pastel-butter, #FFF5BA)",  text: "#7A5C00", label: "GEPLANT" },
+  backlog:     { bg: "var(--color-surface-2, #F0F2F7)", text: "#6B7A9A", label: "Backlog", italic: true },
+  "needs-key": { bg: "var(--pastel-butter, #FFF5BA)",  text: "#7A5C00", label: "KEY", withKeyIcon: true },
+  frei:        { bg: "var(--color-surface-2, #F0F2F7)", text: "#6B7A9A", label: "FREI" },
+  key:         { bg: "var(--pastel-butter, #FFF5BA)",  text: "#7A5C00", label: "KEY" },
+  fehler:      { bg: "var(--pastel-rose, #FFD6E0)",    text: "#A0244A", label: "FEHLER" },
 };
 
 export function VoltStatusBadge({ kind }: { kind: StatusKind }) {
@@ -297,6 +319,7 @@ export function VoltStatusBadge({ kind }: { kind: StatusKind }) {
       style={{
         display: "inline-flex",
         alignItems: "center",
+        gap: s.withKeyIcon ? 4 : 0,
         padding: "3px 8px",
         borderRadius: 4,
         background: s.bg,
@@ -304,11 +327,13 @@ export function VoltStatusBadge({ kind }: { kind: StatusKind }) {
         fontFamily: "var(--font-mono)",
         fontSize: 10,
         fontWeight: 700,
+        fontStyle: s.italic ? "italic" : "normal",
         letterSpacing: "0.05em",
         lineHeight: 1.2,
         whiteSpace: "nowrap",
       }}
     >
+      {s.withKeyIcon && <KeyIcon size={10} strokeWidth={2.5} />}
       {s.label}
     </span>
   );
