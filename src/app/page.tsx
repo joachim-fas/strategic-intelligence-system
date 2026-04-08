@@ -143,11 +143,13 @@ export default function Home() {
         yOff += 180;
       });
 
-      // Scenarios
+      // Scenarios — position in a second column, stacked vertically
+      let scenarioY = 80;
       (briefing.scenarios ?? []).slice(0, 4).forEach((s: any) => {
         const id = uid();
-        derived.push({ id, nodeType: "scenario", x: DX + 320, y: derived.length * 200 + 80, parentId: qId, content: s.description, label: s.name, colorKey: s.type ?? "baseline", probability: s.probability, keyDrivers: s.keyDrivers, queryText: s.name, createdAt: now });
+        derived.push({ id, nodeType: "scenario", x: DX + 320, y: scenarioY, parentId: qId, content: s.description, label: s.name, colorKey: s.type ?? "baseline", probability: s.probability, keyDrivers: s.keyDrivers, queryText: s.name, createdAt: now });
         conns.push({ from: qId, to: id, derived: true });
+        scenarioY += 200;
       });
 
       // Decision
@@ -196,8 +198,9 @@ export default function Home() {
           existingNodes = state.nodes ?? [];
           existingConns = state.conns ?? [];
           // Offset new nodes below existing ones
-          const maxY = existingNodes.reduce((max: number, n: any) => Math.max(max, n.y ?? 0), 0);
-          const yShift = maxY + 500;
+          // Find the maximum Y + estimated card height to prevent overlap
+          const maxY = existingNodes.reduce((max: number, n: any) => Math.max(max, (n.y ?? 0) + 250), 0);
+          const yShift = maxY + 80;
           qNode.y += yShift;
           derived.forEach((d: any) => { d.y += yShift; });
         }
@@ -441,9 +444,10 @@ export default function Home() {
               : e
           ));
 
-          // ── Sync to Canvas DB so Canvas/Board views show the same data ──
-          syncToCanvasDb(q, llmBriefing, entryId);
           setIsAnalyzing(false);
+          // ── Sync to Canvas DB so Canvas/Board views show the same data ──
+          // Run AFTER setIsAnalyzing(false) so a canvas sync error doesn't block the UI
+          syncToCanvasDb(q, llmBriefing, entryId).catch(() => {});
         } else {
           setIsAnalyzing(false);
           // ❌ LLM returned null or empty synthesis — show error, no silent fallback
