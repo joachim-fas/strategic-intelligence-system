@@ -227,24 +227,24 @@ export default function Home() {
     if (!q || isAnalyzing) return;
 
     // ── Special commands ──
-    if (q === "/radar" || q === "/r") { window.location.href = "/cockpit"; return; }
-    if (q === "/graph" || q === "/g") { window.location.href = "/cockpit?lens=network"; return; }
+    if (q === "/radar" || q === "/r") { window.location.href = "/verstehen"; return; }
+    if (q === "/graph" || q === "/g") { window.location.href = "/verstehen?tab=netzwerk"; return; }
     if (q === "/close" || q === "/c") { setShowFullRadar(false); setShowGraph(false); setQuery(""); return; }
 
     // ── Query Shortcuts (Bloomberg Learning 1) ──
     if (q.startsWith("TREND:") || q.startsWith("trend:")) {
       const trendName = q.slice(6).trim();
-      window.location.href = `/cockpit?lens=trends&q=${encodeURIComponent(trendName)}`;
+      window.location.href = `/verstehen?tab=radar&q=${encodeURIComponent(trendName)}`;
       return;
     }
     if (q.startsWith("SIGNAL:") || q.startsWith("signal:")) {
       const filter = q.slice(7).trim();
-      window.location.href = `/cockpit?lens=trends&q=${encodeURIComponent(filter)}`;
+      window.location.href = `/verstehen?tab=signale&q=${encodeURIComponent(filter)}`;
       return;
     }
     if (q.startsWith("SCENARIO:") || q.startsWith("scenario:")) {
       const topic = q.slice(9).trim();
-      window.location.href = `/werkstatt`;
+      window.location.href = `/workspace`;
       return;
     }
 
@@ -543,9 +543,8 @@ export default function Home() {
           {/* Nav — Desktop only */}
           <nav className="sis-nav-desktop" style={{ display: "flex", alignItems: "center", gap: 2 }}>
             {[
-              { href: "/cockpit", label: locale === "de" ? "Cockpit" : "Cockpit" },
-              { href: "/werkstatt", label: locale === "de" ? "Werkstatt" : "Workshop" },
-              { href: "/archiv", label: locale === "de" ? "Archiv" : "Archive" },
+              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
+              { href: "/workspace", label: "Workspace" },
             ].map(({ href, label }) => (
               <a key={href} href={href}
                 style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-subtle)", textDecoration: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", transition: "all 0.15s", whiteSpace: "nowrap" }}
@@ -625,9 +624,8 @@ export default function Home() {
             <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
             </>)}
             {[
-              { href: "/cockpit", label: locale === "de" ? "Cockpit" : "Cockpit" },
-              { href: "/werkstatt", label: locale === "de" ? "Werkstatt" : "Workshop" },
-              { href: "/archiv", label: locale === "de" ? "Archiv" : "Archive" },
+              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
+              { href: "/workspace", label: "Workspace" },
             ].map(({ href, label }) => (
               <a key={href} href={href} onClick={() => setMobileMenuOpen(false)}
                 style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)", textDecoration: "none", padding: "11px 24px" }}

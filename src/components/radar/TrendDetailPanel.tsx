@@ -678,7 +678,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           <div style={{ display: "flex", gap: 8 }}>
             {/* Deep dive */}
             <a
-              href={`/cockpit/${trend.id}`}
+              href={`/verstehen/${trend.id}`}
               style={{
                 flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
                 padding: "8px 12px", borderRadius: 8,
@@ -706,7 +706,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
                     body: JSON.stringify({ query: `Trend: ${trend.name}`, result: { synthesis: `${trend.name} — ${trend.category}, ${trend.ring}, Relevanz ${Math.round(trend.relevance * 100)}%` } }),
                   });
                 } else {
-                  window.location.href = "/werkstatt";
+                  window.location.href = "/workspace";
                 }
               }}
               style={{

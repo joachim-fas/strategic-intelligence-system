@@ -23,12 +23,14 @@ export async function middleware(request: NextRequest) {
   // Public paths that do not require authentication
   const publicPaths = [
     "/",              // FRAGEN — main intelligence terminal
-    "/cockpit",       // COCKPIT — trend radar, network, trends (public read)
-    "/werkstatt",     // WERKSTATT — project workspace
-    "/archiv",        // ARCHIV — source registry, methodology
-    "/verstehen",     // Legacy redirect → /cockpit
-    "/arbeiten",      // Legacy redirect → /werkstatt
-    "/quellen",       // Legacy redirect → /archiv
+    "/verstehen",     // VERSTEHEN — radar, network, signals, sources, methodology
+    "/workspace",     // WORKSPACE — canvas, board, nodes, kanban
+    "/canvas",        // CANVAS — workspace canvas (direct access)
+    "/cockpit",       // Legacy redirect → /verstehen
+    "/werkstatt",     // Legacy redirect → /workspace
+    "/archiv",        // Legacy redirect → /verstehen?tab=quellen
+    "/arbeiten",      // Legacy redirect → /workspace
+    "/quellen",       // Legacy redirect → /verstehen?tab=quellen
     "/briefing",      // Print-optimized briefing (shareable)
     "/api/auth",      // NextAuth endpoints
     "/auth",          // Sign-in pages

@@ -5,9 +5,9 @@ import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/cockpit",    labelDe: "Cockpit",    labelEn: "Cockpit"   },
-  { href: "/werkstatt",  labelDe: "Werkstatt",  labelEn: "Workshop"  },
-  { href: "/archiv",     labelDe: "Archiv",     labelEn: "Archive"   },
+  { href: "/",           labelDe: "Fragen",     labelEn: "Ask"        },
+  { href: "/verstehen",  labelDe: "Verstehen",  labelEn: "Understand" },
+  { href: "/workspace",  labelDe: "Workspace",  labelEn: "Workspace"  },
 ];
 
 /**

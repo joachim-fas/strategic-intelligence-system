@@ -1,2 +1,2 @@
 import { redirect } from "next/navigation";
-export default function QuellenPage() { redirect("/archiv"); }
+export default function Page() { redirect("/verstehen?tab=quellen"); }
