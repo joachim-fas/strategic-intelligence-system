@@ -20,24 +20,55 @@ function getDb() {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const limit = Math.max(10, Math.min(100, Number(url.searchParams.get("limit") ?? "60")));
+  // Upper bound raised from 100 → 200 so the LiveSignalStream's default
+  // `?limit=200` actually gets that many signals. Lower bound stays at 10.
+  const limit = Math.max(10, Math.min(200, Number(url.searchParams.get("limit") ?? "60")));
   const hours = Math.max(6, Math.min(168, Number(url.searchParams.get("hours") ?? "48")));
+  // NEW: max rows per source. This is the diversity knob. Default 10 — with
+  // 27 active sources in the DB that caps each at 10, so 270 candidate rows
+  // before the final hard limit trims to the requested `limit`. Before this
+  // knob existed, Reddit (which ran last AND had many strength=1.0 items)
+  // monopolized the ticker — polymarket (609 signals) and news (192) were
+  // invisible under the Reddit wave.
+  const perSource = Math.max(1, Math.min(50, Number(url.searchParams.get("perSource") ?? "10")));
 
   const db = getDb();
   const now = Date.now();
 
   try {
-    // Mix of strongest AND most recent signals — gives the ticker a healthy
-    // blend of "breaking" and "hot" entries instead of just the top-10
-    // re-scored bucket.
+    // Per-source quota via ROW_NUMBER() window function + round-robin
+    // outer ordering. Each source can contribute at most `perSource` rows.
+    //
+    // The critical piece is the OUTER ORDER BY — it's by `source_rank ASC`,
+    // which interleaves sources: first the top-1 signal from every source
+    // (ordered by strength across sources), then the top-2 signal from every
+    // source, and so on. The effect: the user sees a diverse mix at the top
+    // of the feed instead of 10 reddits, then 10 arxivs, then 10 npm-pypis.
+    //
+    // Without this interleave, the previous naïve `ORDER BY fetched_at DESC`
+    // produced a Reddit-dominant feed because Reddit fetched last AND had
+    // the most max-strength items, monopolizing the top positions.
+    //
+    // SQLite ≥ 3.25 supports window functions natively (we're on 3.51).
     const rows = db.prepare(`
+      WITH ranked AS (
+        SELECT id, source, title, url, strength, topic, signal_type, fetched_at,
+               ROW_NUMBER() OVER (
+                 PARTITION BY source
+                 ORDER BY COALESCE(strength, 0) DESC, fetched_at DESC
+               ) AS source_rank
+        FROM live_signals
+        WHERE fetched_at > datetime('now', ?)
+          AND title IS NOT NULL AND title != ''
+      )
       SELECT id, source, title, url, strength, topic, signal_type, fetched_at
-      FROM live_signals
-      WHERE fetched_at > datetime('now', ?)
-        AND title IS NOT NULL AND title != ''
-      ORDER BY fetched_at DESC, COALESCE(strength, 0) DESC
+      FROM ranked
+      WHERE source_rank <= ?
+      ORDER BY source_rank ASC,
+               COALESCE(strength, 0) DESC,
+               fetched_at DESC
       LIMIT ?
-    `).all(`-${hours} hours`, limit) as Array<{
+    `).all(`-${hours} hours`, perSource, limit) as Array<{
       id: string; source: string; title: string; url: string | null;
       strength: number | null; topic: string | null; signal_type: string | null;
       fetched_at: string;

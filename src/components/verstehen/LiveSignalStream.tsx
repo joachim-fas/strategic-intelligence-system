@@ -73,7 +73,11 @@ function ageLabel(h: number, de: boolean): string {
   return de ? `vor ${days} Tg` : `${days}d ago`;
 }
 
-type SortKey = "newest" | "strongest";
+// "mixed" is the default — preserves the server-side round-robin interleave
+// from /api/v1/feed/ticker so the feed opens with a diverse cross-source mix
+// instead of whichever source happened to fetch last. "newest" and
+// "strongest" are explicit user-requested re-sorts.
+type SortKey = "mixed" | "newest" | "strongest";
 
 const TIME_WINDOWS = [
   { key: "6",  labelDe: "6 Stunden",  labelEn: "6 hours",  hours: 6 },
@@ -91,7 +95,9 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [topicFilter, setTopicFilter] = useState<string>("all");
   const [timeWindow, setTimeWindow] = useState<TimeWindowKey>("48");
-  const [sortKey, setSortKey] = useState<SortKey>("newest");
+  // Default to "mixed" — preserves the server's round-robin interleave so the
+  // first thing a user sees is a diverse cross-source feed, not 10 reddits.
+  const [sortKey, setSortKey] = useState<SortKey>("mixed");
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = () => {
@@ -147,12 +153,15 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
 
   // Filtered + sorted signals
   const displaySignals = useMemo(() => {
-    let out = signals.filter((s) => {
+    const filtered = signals.filter((s) => {
       if (sourceFilter !== "all" && s.source !== sourceFilter) return false;
       if (topicFilter !== "all" && s.topic !== topicFilter) return false;
       return true;
     });
-    out = [...out].sort((a, b) => {
+    // "mixed" preserves the server's round-robin interleave — DO NOT sort.
+    // Only "newest" and "strongest" apply a client-side re-sort.
+    if (sortKey === "mixed") return filtered;
+    const out = [...filtered].sort((a, b) => {
       if (sortKey === "newest") return a.hoursAgo - b.hoursAgo;
       return (b.strength ?? 0) - (a.strength ?? 0);
     });
@@ -266,13 +275,20 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           padding: 2,
           background: "var(--volt-surface-raised, #fff)",
         }}>
-          {(["newest", "strongest"] as SortKey[]).map((key) => {
+          {(["mixed", "newest", "strongest"] as SortKey[]).map((key) => {
             const active = sortKey === key;
+            const label =
+              key === "mixed"     ? (de ? "Gemischt"  : "Mixed")
+              : key === "newest"  ? (de ? "Neueste"   : "Newest")
+              :                     (de ? "Stärkste"  : "Strongest");
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => setSortKey(key)}
+                title={key === "mixed"
+                  ? (de ? "Quellen-ausgewogener Mix (Round-Robin)" : "Source-balanced mix (round-robin)")
+                  : undefined}
                 style={{
                   fontSize: 11, fontWeight: 600,
                   padding: "5px 12px",
@@ -285,9 +301,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
                   transition: "all 120ms ease",
                 }}
               >
-                {key === "newest"
-                  ? (de ? "Neueste" : "Newest")
-                  : (de ? "Stärkste" : "Strongest")}
+                {label}
               </button>
             );
           })}
