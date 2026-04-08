@@ -5,7 +5,6 @@ import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/",           labelDe: "Fragen",     labelEn: "Ask"        },
   { href: "/verstehen",  labelDe: "Verstehen",  labelEn: "Understand" },
   { href: "/workspace",  labelDe: "Workspace",  labelEn: "Workspace"  },
 ];
@@ -56,12 +55,13 @@ export function AppHeader() {
         display: "flex", alignItems: "center", gap: 0,
       }}>
 
-        {/* ── Logo ─────────────────────────────────────────── */}
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", flexShrink: 0, marginRight: 20 }}
+        {/* ── Logo + Title (matches Home header) ─────────── */}
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", flexShrink: 0, marginRight: 20 }}
           title="Strategic Intelligence System"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 28, height: 18 }} />
+          <span className="sis-title-long" style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 14, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-heading)" }}>Strategic Intelligence System</span>
         </a>
 
         {/* ── Desktop nav ──────────────────────────────────── */}
