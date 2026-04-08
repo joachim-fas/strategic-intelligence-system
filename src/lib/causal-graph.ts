@@ -339,6 +339,47 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.5,
     description: "Decentralization offers alternative data ownership models",
   },
+
+  // ─── Migration & Displacement (added 2026-04) ─────────────────
+  // UNHCR + IDMC data stream into this node. Migration is driven by climate,
+  // geopolitics, and inequality; it feeds back into social instability and
+  // demographic shifts. Core causal links only — will be expanded as the
+  // signal base grows.
+  {
+    from: "mega-climate-sustainability",
+    to: "mega-migration-displacement",
+    type: "drives",
+    strength: 0.8,
+    description: "Climate shocks (drought, flooding, sea-level rise) are a primary structural driver of displacement",
+  },
+  {
+    from: "mega-geopolitical-fracturing",
+    to: "mega-migration-displacement",
+    type: "drives",
+    strength: 0.9,
+    description: "Armed conflict and state collapse drive the largest refugee flows",
+  },
+  {
+    from: "mega-social-instability",
+    to: "mega-migration-displacement",
+    type: "amplifies",
+    strength: 0.6,
+    description: "Economic inequality and political polarization push voluntary and forced migration",
+  },
+  {
+    from: "mega-migration-displacement",
+    to: "mega-social-instability",
+    type: "amplifies",
+    strength: 0.5,
+    description: "Large-scale migration amplifies social instability in both origin and destination regions",
+  },
+  {
+    from: "mega-migration-displacement",
+    to: "mega-demographic-shift",
+    type: "correlates",
+    strength: 0.55,
+    description: "Migration flows reshape demographic composition in aging societies",
+  },
 ];
 
 /**

@@ -23,14 +23,17 @@ interface DeFiLlamaProtocol {
   url: string | null;
 }
 
-// Map DeFi category tags to SIS trend topics.
+// Map DeFi category tags to SIS trend topics. All DeFi-adjacent categories
+// subsume into "Web3 & Decentralization" because the DB has no dedicated
+// "Alternative Finance" or "Privacy & Data Protection" trend. Granularity
+// is preserved in rawData.category for downstream analysis.
 const CATEGORY_TOPICS: ReadonlyArray<readonly [readonly string[], string]> = [
   [["lending", "credit", "cdp"],             "Web3 & Decentralization"],
   [["dex", "dexes", "liquidity"],             "Web3 & Decentralization"],
-  [["stablecoin", "cdp"],                     "Web3 & Decentralization"],
+  [["stablecoin"],                            "Web3 & Decentralization"],
   [["restaking", "staking", "yield"],         "Web3 & Decentralization"],
-  [["rwa", "real world"],                     "Alternative Finance"],
-  [["privacy"],                               "Privacy & Data Protection"],
+  [["rwa", "real world"],                     "Web3 & Decentralization"],
+  [["privacy"],                               "Web3 & Decentralization"],
 ];
 
 export const defiLlamaConnector = buildDeclarativeConnector<DeFiLlamaProtocol>({

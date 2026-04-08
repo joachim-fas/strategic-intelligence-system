@@ -30,22 +30,37 @@ interface FdaResponse {
   results?: FdaEventResult[];
 }
 
+// Indication keyword → SIS trend topic. All indications currently subsume
+// into "Health, Biotech & Longevity" until/unless the DB grows dedicated
+// sub-categories (Mental Health, Cardiovascular, etc.).
 const INDICATION_TOPICS: ReadonlyArray<readonly [readonly string[], string]> = [
   [["cancer", "neoplasm", "carcinoma", "lymphoma", "leukemia"], "Health, Biotech & Longevity"],
   [["diabetes", "obesity", "metabolic", "weight"],               "Health, Biotech & Longevity"],
   [["alzheimer", "dementia", "parkinson"],                       "Health, Biotech & Longevity"],
-  [["depression", "anxiety", "psychiatric", "bipolar"],          "Mental Health"],
+  [["depression", "anxiety", "psychiatric", "bipolar"],          "Health, Biotech & Longevity"],
   [["covid", "viral", "infection"],                              "Health, Biotech & Longevity"],
   [["cardiovascular", "heart", "hypertension"],                  "Health, Biotech & Longevity"],
   [["autoimmune", "lupus", "arthritis", "inflammatory"],         "Health, Biotech & Longevity"],
 ];
+
+// Last 12 months window. OpenFDA has ~1.3M+ drug events; we take the most
+// recent slice. The `[` and `]` in the date range must be URL-encoded or
+// curl/fetch will reject the URL client-side — that bug cost us an entire
+// smoke test before we spotted it.
+function lastYearRange(): string {
+  const end = new Date();
+  const start = new Date(end.getTime() - 365 * 86_400_000);
+  const fmt = (d: Date) =>
+    `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+  return `${fmt(start)}+TO+${fmt(end)}`;
+}
 
 export const openFdaConnector = buildDeclarativeConnector<FdaEventResult>({
   name: "openfda",
   displayName: "OpenFDA (Drug Events)",
   endpoint:
     "https://api.fda.gov/drug/event.json" +
-    "?search=receivedate:[20260201+TO+20270101]" +
+    `?search=receivedate:%5B${lastYearRange()}%5D` +
     "&limit=100",
   rowsPath: "results",
   defaultTopic: "Health, Biotech & Longevity",

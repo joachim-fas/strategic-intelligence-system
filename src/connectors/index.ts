@@ -60,7 +60,10 @@ import { clinicaltrialsConnector } from "./clinicaltrials";
 import { openFdaConnector } from "./openfda";
 import { unhcrConnector } from "./unhcr";
 import { nextstrainConnector } from "./nextstrain";
-import { idmcConnector } from "./idmc";
+// NOTE: idmcConnector was removed here after the Phase-A smoke test revealed
+// that the IDMC Helix API requires client registration ("Client is not
+// registered." on every public-looking endpoint). IDMC is back in the
+// planned-connectors list with needsKey: true until someone registers.
 
 export const connectors: SourceConnector[] = [
   // Tech & Developer signals
@@ -140,7 +143,6 @@ export const connectors: SourceConnector[] = [
   nextstrainConnector,
   // Batch 5: Migration & displacement
   unhcrConnector,
-  idmcConnector,
 ];
 
 export function getConnector(name: string): SourceConnector | undefined {

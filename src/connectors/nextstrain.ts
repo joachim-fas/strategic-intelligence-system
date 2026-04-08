@@ -1,80 +1,126 @@
 import { buildDeclarativeConnector, matchTopicByKeywords } from "./framework";
 
 /**
- * Nextstrain — Pathogen phylogenetics + outbreak snapshots.
+ * Nextstrain — Pathogen phylogenetics catalog.
  *
- * Open-source, no-auth. Nextstrain publishes real-time phylogenetic
- * analyses of viral pathogens (SARS-CoV-2, flu, mpox, measles, …). Each
- * "dataset" tracks a pathogen over time. We fetch the dataset index and
- * treat each active dataset as a mention signal; recently-updated datasets
- * score higher.
+ * Nextstrain hosts real-time phylogenetic analyses of viral pathogens
+ * (SARS-CoV-2, avian flu, mpox, measles, …). The public Charon API lists
+ * all available datasets. Each dataset represents an actively-tracked
+ * pathogen or a sub-clade.
  *
- * Endpoint: https://data.nextstrain.org/datasets.json
- * Docs:     https://docs.nextstrain.org/
+ * The correct listing endpoint (discovered 2026-04-08 during a smoke test
+ * that caught the previously-assumed `data.nextstrain.org/datasets.json`
+ * returning 404):
+ *
+ *   https://nextstrain.org/charon/getAvailable?prefix=/
+ *
+ * Response shape:
+ *   { datasets: [{ request: "ncov/open/global/6m", snapshots, secondTreeOptions, buildUrl }, ...] }
+ *
+ * The top-level listing does NOT include last-updated timestamps — for that
+ * we would need to call `getDataset?prefix=<path>` per entry, which is
+ * expensive. We instead treat each listed dataset as a "mention" signal with
+ * a flat strength based on the pathogen type (high-impact clades get
+ * slightly higher strength).
  */
 
-interface NextstrainDataset {
-  name: string;
-  url?: string;
-  lastUpdated?: string; // ISO
-  lastModified?: string;
-  narrative?: string;
-  groups?: string[];
-  description?: string;
+interface CharonDataset {
+  request: string;                // e.g. "ncov/open/global/6m"
+  snapshots?: unknown;
+  secondTreeOptions?: string[];
+  buildUrl?: string | null;
 }
 
-type NextstrainIndex = NextstrainDataset[] | { datasets?: NextstrainDataset[] };
+type CharonResponse = { datasets?: CharonDataset[] };
 
-const PATHOGEN_TOPICS: ReadonlyArray<readonly [readonly string[], string]> = [
-  [["ncov", "sars-cov-2", "coronavirus", "covid"], "Health, Biotech & Longevity"],
-  [["flu", "h5n1", "h1n1", "influenza", "bird flu", "avian"], "Health, Biotech & Longevity"],
-  [["measles", "mpox", "monkeypox", "ebola", "zika", "dengue"], "Health, Biotech & Longevity"],
-  [["tb", "tuberculosis", "malaria", "cholera"], "Health, Biotech & Longevity"],
-  [["rsv", "norovirus", "rotavirus"], "Health, Biotech & Longevity"],
+// Pathogen keyword → SIS trend topic. All pathogens currently subsume into
+// "Health, Biotech & Longevity" — the DB does not yet distinguish specific
+// outbreak trends. The pathogen family is preserved in rawData for
+// downstream analysis.
+const PATHOGEN_KEYWORDS: ReadonlyArray<readonly [readonly string[], string]> = [
+  [["ncov", "sars-cov", "coronavirus", "covid"],           "Health, Biotech & Longevity"],
+  [["avian-flu", "h5n1", "h1n1", "influenza", "flu"],      "Health, Biotech & Longevity"],
+  [["mpox", "monkeypox", "measles", "ebola", "zika"],      "Health, Biotech & Longevity"],
+  [["dengue", "yellow-fever", "chikungunya"],              "Health, Biotech & Longevity"],
+  [["tb", "tuberculosis", "malaria", "cholera"],           "Health, Biotech & Longevity"],
+  [["rsv", "norovirus", "rotavirus"],                      "Health, Biotech & Longevity"],
+  [["oropouche", "west-nile", "rabies"],                   "Health, Biotech & Longevity"],
 ];
 
-function ageBoostStrength(iso: string | undefined): number {
-  if (!iso) return 0.3;
-  const ts = Date.parse(iso);
-  if (!Number.isFinite(ts)) return 0.3;
-  const days = (Date.now() - ts) / 86_400_000;
-  if (days < 7) return 0.9;
-  if (days < 30) return 0.7;
-  if (days < 90) return 0.5;
-  if (days < 180) return 0.35;
-  return 0.2;
+// High-concern clade patterns → boost strength. The rest get a baseline of 0.35.
+function pathogenStrength(path: string): number {
+  const p = path.toLowerCase();
+  if (p.includes("h5n1") || p.includes("cattle-outbreak")) return 0.85; // active zoonotic
+  if (p.includes("ncov")) return 0.7;                                     // ongoing global
+  if (p.includes("mpox")) return 0.65;                                    // recent outbreak
+  if (p.includes("avian")) return 0.6;                                    // influenza surveillance
+  if (p.includes("measles")) return 0.5;                                  // vaccination gap indicator
+  if (p.includes("dengue") || p.includes("zika")) return 0.45;
+  return 0.35;
 }
 
-export const nextstrainConnector = buildDeclarativeConnector<NextstrainDataset>({
+// Pretty-print the Charon dataset path as a human-readable title.
+//   "ncov/open/global/6m" → "SARS-CoV-2 · global · 6 months"
+//   "avian-flu/h5n1-cattle-outbreak/genome" → "Avian Flu · H5N1 cattle outbreak · genome"
+function prettyTitle(path: string): string {
+  const parts = path.replace(/^\//, "").split("/");
+  const headMap: Record<string, string> = {
+    "ncov": "SARS-CoV-2",
+    "avian-flu": "Avian Flu",
+    "mpox": "Mpox",
+    "measles": "Measles",
+    "dengue": "Dengue",
+    "zika": "Zika",
+    "ebola": "Ebola",
+    "tb": "Tuberculosis",
+    "flu": "Influenza",
+    "rsv": "RSV",
+    "oropouche": "Oropouche",
+    "yellow-fever": "Yellow Fever",
+  };
+  const head = headMap[parts[0]] ?? parts[0].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const rest = parts.slice(1).map((p) => p.replace(/-/g, " ")).join(" · ");
+  return rest ? `Nextstrain: ${head} · ${rest}` : `Nextstrain: ${head}`;
+}
+
+export const nextstrainConnector = buildDeclarativeConnector<CharonDataset>({
   name: "nextstrain",
   displayName: "Nextstrain (Pathogen Tracking)",
-  endpoint: "https://data.nextstrain.org/datasets.json",
-  // The response is either a top-level array OR an object with a "datasets" key —
-  // we point rowsPath at the object case and the framework's extractRows falls
-  // back to the top-level array when "datasets" is missing.
+  endpoint: "https://nextstrain.org/charon/getAvailable?prefix=/",
   rowsPath: "datasets",
   defaultTopic: "Health, Biotech & Longevity",
   defaultSignalType: "mention",
   minStrength: 0.3,
-  limit: 80,
+  limit: 120,
   map: (ds) => {
-    if (!ds.name) return null;
-    const haystack = [ds.name, ds.description ?? "", (ds.groups ?? []).join(" ")].join(" ");
-    const topic = matchTopicByKeywords(haystack, PATHOGEN_TOPICS);
+    const path = ds.request;
+    if (!path || typeof path !== "string") return null;
+
+    // Skip sub-segments (e.g. the individual gene trees of a cattle outbreak
+    // build) — we only want the parent genome entry. Heuristic: keep paths
+    // that end in "/genome", "/6m", "/2y", "/global", or are one segment.
+    const segments = path.split("/");
+    const tail = segments[segments.length - 1];
+    const isAggregate =
+      segments.length === 1 ||
+      tail === "genome" ||
+      tail === "global" ||
+      /^\d+[mwy]$/.test(tail); // "6m", "2y", etc.
+    if (!isAggregate && segments.length > 2) return null;
+
+    const topic = matchTopicByKeywords(path, PATHOGEN_KEYWORDS);
     if (!topic) return null;
 
-    const strength = ageBoostStrength(ds.lastUpdated ?? ds.lastModified);
-
     return {
-      sourceUrl: ds.url ?? `https://nextstrain.org/${ds.name.replace(/^\//, "")}`,
-      sourceTitle: `Nextstrain: ${ds.name}${ds.description ? ` — ${ds.description.slice(0, 80)}` : ""}`,
+      sourceUrl: `https://nextstrain.org/${path}`,
+      sourceTitle: prettyTitle(path),
       topic,
-      rawStrength: strength,
-      detectedAt: ds.lastUpdated ? new Date(ds.lastUpdated) : new Date(),
+      rawStrength: pathogenStrength(path),
+      detectedAt: new Date(),
       rawData: {
-        dataset: ds.name,
-        groups: ds.groups,
-        lastUpdated: ds.lastUpdated,
+        path,
+        segments,
+        buildUrl: ds.buildUrl ?? null,
       },
     };
   },

@@ -338,6 +338,25 @@ export const PLANNED_CONNECTORS: PlannedConnector[] = [
     needsKey: true,
   },
   {
+    // IDMC was originally shipped as a live connector in Batch 5, but the
+    // Phase-A smoke test revealed that every helix-tools-api.idmcdb.org
+    // endpoint returns "Client is not registered." — IDMC requires a
+    // client registration that we do not have. Demoted back to the
+    // planned roadmap with needsKey: true.
+    slug: "idmc-helix",
+    displayName: "IDMC API (Internal Displacement)",
+    category: "migration",
+    type: "live-signal",
+    priority: "medium",
+    access: "free-signup",
+    descriptionDe: "Binnenvertreibung weltweit (Konflikt + Disaster). Ergänzt UNHCR um Non-Refugee-Flüsse. Braucht Client-Registrierung bei IDMC Helix.",
+    descriptionEn: "Internal displacement worldwide (conflict + disaster). Complements UNHCR with non-refugee flows. Requires client registration with IDMC Helix.",
+    docUrl: "https://helix-tools-api.idmcdb.org/external-api/",
+    apiUrl: "https://helix-tools-api.idmcdb.org/external-api/gidd/",
+    notionUrl: "https://www.notion.so/1b39708d23e18007b4bffcf6cd3a6afe",
+    needsKey: true,
+  },
+  {
     slug: "crunchbase",
     displayName: "Crunchbase API",
     category: "crypto",

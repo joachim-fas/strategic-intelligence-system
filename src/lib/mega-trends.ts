@@ -258,6 +258,31 @@ export const megaTrends: TrendDot[] = [
     userOverride: false,
   },
 
+  // ─── Migration & Vertreibung ──────────────────────────────────
+  // Added 2026-04 to accommodate the UNHCR connector (134 refugee-data
+  // signals per pipeline run) and the upcoming IDMC connector (internal
+  // displacement). Before this trend existed, every migration signal was
+  // orphaned. Quellen: UNHCR Refugee Data Finder, IDMC Helix (planned),
+  // World Monitor (geopolitical context).
+  {
+    id: "mega-migration-displacement",
+    name: "Migration & Displacement",
+    description: "Erzwungene und freiwillige Migration verändern Gesellschaften und politische Systeme. Klimawandel, Konflikte und Ungleichheit treiben die Zahlen auf historische Höchststände.",
+    category: "Mega-Trend",
+    tags: ["migration", "displacement", "refugees", "forced-migration", "mega-trend",
+      "UNHCR", "IDMC", "World Monitor"],
+    relevance: 0.78,
+    confidence: 0.82, // High — UNHCR data is well-established and auditable
+    impact: 0.85,     // Migration reshapes labor, housing, and political systems
+    timeHorizon: "long",
+    ring: "adopt",    // It's happening now, not speculative
+    quadrant: 1,      // Social-political quadrant, same as Social Instability
+    signalCount: 134, // UNHCR single-run baseline; rises as IDMC comes online
+    topSources: ["UNHCR", "IDMC", "World Monitor"],
+    velocity: "rising",
+    userOverride: false,
+  },
+
   // ─── Energie-Transformation ───────────────────────────────────
   // Quellen: EU ESPAS, Roland Berger, PwC (Climate), TRENDONE (Planet Centricity)
   {

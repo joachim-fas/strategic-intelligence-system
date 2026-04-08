@@ -47,13 +47,17 @@ interface CtResponse {
 }
 
 // Map condition keywords to SIS trend topics.
+// NOTE: All conditions (including mental-health topics like depression and
+// anxiety) currently subsume into "Health, Biotech & Longevity" because the
+// DB has no dedicated mental-health trend. If/when a "Mental Health" trend
+// gets added, the mental/depression/psychiatric keyword row can be split off.
 const CONDITION_TOPICS: ReadonlyArray<readonly [readonly string[], string]> = [
   [["cancer", "tumor", "oncolog", "lymphoma", "leukemia", "melanoma"], "Health, Biotech & Longevity"],
   [["alzheimer", "dementia", "parkinson", "neurodegener"],               "Health, Biotech & Longevity"],
   [["obesity", "diabet", "metabolic"],                                    "Health, Biotech & Longevity"],
   [["covid", "sars-cov", "influenza", "pandemic", "virus", "outbreak"],   "Health, Biotech & Longevity"],
   [["gene therapy", "crispr", "mrna", "stem cell"],                       "Health, Biotech & Longevity"],
-  [["mental", "depression", "anxiety", "psychiatric"],                    "Mental Health"],
+  [["mental", "depression", "anxiety", "psychiatric"],                    "Health, Biotech & Longevity"],
   [["vaccine", "immuniz"],                                                "Health, Biotech & Longevity"],
   [["longevity", "aging", "senolytic"],                                   "Health, Biotech & Longevity"],
 ];
