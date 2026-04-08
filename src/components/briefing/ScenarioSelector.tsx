@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { VoltSectionLabel } from "@/components/verstehen/VoltPrimitives";
 
 // ── Scenario type ─────────────────────────────────────────────────────────────
 interface Scenario {
@@ -96,39 +97,46 @@ function ScenarioCard({
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      borderRadius: "var(--radius-lg)",
+      borderRadius: 12,
       border: `1px solid ${isSelected ? cfg.border : "var(--color-border)"}`,
-      borderLeft: `3px solid ${cfg.color}`,
       background: isSelected ? cfg.bg : "var(--color-surface)",
-      boxShadow: isSelected ? `0 0 0 2px ${cfg.color}20` : "var(--shadow-xs)",
+      boxShadow: isSelected ? `0 0 0 2px ${cfg.color}20` : "none",
       transition: "all 0.15s",
       overflow: "hidden",
     }}>
 
       {/* ── Clickable body ─────────────────────────── */}
-      <div onClick={onToggle} style={{ padding: "13px 14px 12px", cursor: "pointer", flex: 1 }}>
+      <div onClick={onToggle} style={{ padding: "14px 14px 12px", cursor: "pointer", flex: 1 }}>
 
-        {/* Row 1: type badge + timeframe + probability */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
+        {/* Row 1: type pill + timeframe + probability */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          {/* Volt UI pastel pill — matches Status-Pill spec */}
           <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+            fontFamily: "var(--font-mono)",
+            fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
             color: cfg.color, background: cfg.bg,
             border: `1px solid ${cfg.border}`,
-            borderRadius: "var(--radius-full)", padding: "2px 8px", flexShrink: 0,
+            borderRadius: 9999, padding: "3px 9px", flexShrink: 0, lineHeight: 1.2,
           }}>{label}</span>
 
           {s.timeframe && (
             <span style={{
-              fontSize: 10, color: "var(--color-text-muted)",
-              background: "var(--color-surface-2)",
-              borderRadius: "var(--radius-full)", padding: "2px 7px", flexShrink: 0,
+              fontFamily: "var(--font-mono)",
+              fontSize: 9, color: "var(--muted-foreground, #6B7A9A)",
+              background: "var(--muted, #F7F7F7)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 9999, padding: "3px 9px", flexShrink: 0, lineHeight: 1.2,
+              letterSpacing: "0.03em",
             }}>{s.timeframe}</span>
           )}
 
           <span style={{
-            marginLeft: "auto", fontSize: 22, fontWeight: 800,
+            marginLeft: "auto",
+            fontFamily: "var(--font-display)",
+            fontSize: 22, fontWeight: 700,
             color: cfg.color, lineHeight: 1, flexShrink: 0,
             fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.02em",
           }}>{pct}%</span>
 
           {/* Save to scenario builder */}
@@ -258,11 +266,12 @@ function ActionBtn({
 }
 
 // ── ScenarioSelector ──────────────────────────────────────────────────────────
-export function ScenarioSelector({ scenarios, query, locale, onFollowUp }: {
+export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHeader = false }: {
   scenarios: Scenario[];
   query: string;
   locale: Locale;
   onFollowUp?: (q: string) => void;
+  hideHeader?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const de = locale === "de";
@@ -294,26 +303,29 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp }: {
 
   return (
     <div>
-      {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div className="section-label">{de ? "Zukunftsszenarien" : "Future Scenarios"}</div>
-          <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            {de ? "Karte wählen · Aktionen unten" : "Select card · Actions below"}
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {selected.size > 1 && (
-            <Button onClick={combineSelected} size="sm"
-              className="text-[12px] bg-[#E4FF97] text-[#0A0A0A] hover:bg-[#D4F080] border border-black/10 font-semibold">
-              {de ? `${selected.size} kombinieren →` : `Combine ${selected.size} →`}
+      {/* Header row — Volt UI SectionLabel with hint + actions */}
+      {!hideHeader && (
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <VoltSectionLabel
+              hint={de ? "Karte wählen · Aktionen unten" : "Select card · Actions below"}
+            >
+              {de ? "Zukunftsszenarien" : "Future Scenarios"}
+            </VoltSectionLabel>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {selected.size > 1 && (
+              <Button onClick={combineSelected} size="sm"
+                className="text-[12px] bg-[#E4FF97] text-[#0A0A0A] hover:bg-[#D4F080] border border-black/10 font-semibold">
+                {de ? `${selected.size} kombinieren →` : `Combine ${selected.size} →`}
+              </Button>
+            )}
+            <Button variant="outline" onClick={generateMore} size="sm" className="text-[12px]">
+              {de ? "+ Weitere" : "+ More"}
             </Button>
-          )}
-          <Button variant="outline" onClick={generateMore} size="sm" className="text-[12px]">
-            {de ? "+ Weitere" : "+ More"}
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Cards grid */}
       <div style={{

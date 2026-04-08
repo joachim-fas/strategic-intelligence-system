@@ -9,16 +9,17 @@ import { classifyTrends } from "@/lib/classify";
 import { useLocale } from "@/lib/locale-context";
 import TrendDetailPanel from "@/components/radar/TrendDetailPanel";
 import { parseContextFromText, applyContextProfile, PRESET_PROFILES, ContextProfile } from "@/lib/context-profiles";
+import { FRAMEWORKS } from "@/lib/canvas-templates";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { connectors } from "@/connectors";
 import { BriefingResult, HistoryEntry } from "@/components/briefing/BriefingResult";
+import { SessionBar } from "@/components/session/SessionBar";
 import { GrainCard } from "@/components/grain/GrainCard";
 import { GrainBadge } from "@/components/grain/GrainBadge";
 import {
   saveHistoryToStorage,
   loadHistoryFromStorage,
   clearHistoryStorage,
-  downloadSessionMarkdown,
 } from "@/lib/briefing-export";
 // Demo briefings moved to /beispiele page
 
@@ -26,14 +27,6 @@ import {
 import dynamic from "next/dynamic";
 const RadarView = dynamic(() => import("@/components/radar/RadarView"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", fontSize: 12, color: "#999" }}>Radar laden…</div> });
 const CausalGraphView = dynamic(() => import("@/components/radar/CausalGraphView"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", fontSize: 12, color: "#999" }}>Kausalnetz laden…</div> });
-const FeedTeaser = dynamic(() => import("@/components/radar/FeedTeaser"), { ssr: false });
-// Canvas is embedded via iframe to avoid Next.js PageProps conflicts
-function CanvasEmbed() {
-  return <iframe src="/canvas" style={{ width: "100%", height: "100%", border: "none" }} />;
-}
-
-type ProjectView = "standard" | "canvas" | "board";
-
 export default function Home() {
   const { locale, toggleLocale } = useLocale();
   const [baseTrends, setBaseTrends] = useState<TrendDot[]>(megaTrends);
@@ -53,12 +46,16 @@ export default function Home() {
       .catch(() => { /* keep megaTrends as fallback */ });
   }, []);
 
-  const [projectView, setProjectView] = useState<ProjectView>("standard");
   const [query, setQuery] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Phase 1+2: Active node within the session. Null = latest. Non-null = user has picked a specific node.
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  // Phase 5: Custom session title override (otherwise auto-generated from first query)
+  const [customSessionTitle, setCustomSessionTitle] = useState<string | null>(null);
+  // Phase 5: Past sessions for the picker dropdown
+  const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; updatedAt?: string }>>([]);
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
-  const [sessionExported, setSessionExported] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -72,10 +69,25 @@ export default function Home() {
     if (next) { document.documentElement.classList.add("dark", "volt-dark"); localStorage.setItem("sis-theme", "dark"); }
     else { document.documentElement.classList.remove("dark", "volt-dark"); localStorage.setItem("sis-theme", "light"); }
   };
-  const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string } | null>(null);
+  const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string } } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
-  const frameworkTopicRef = useRef<HTMLInputElement>(null);
+  const [frameworkTopicFocused, setFrameworkTopicFocused] = useState(false);
+  // Phase 1 guidance: values of optional structured fields per framework.
+  // Keys match FrameworkField.key in canvas-templates.ts. Cleared whenever
+  // the modal opens for a new framework.
+  const [frameworkFieldValues, setFrameworkFieldValues] = useState<Record<string, string>>({});
+  // Textarea (multi-line, auto-growing) replaces the legacy single-line
+  // input to prevent horizontal text overflow for longer questions.
+  const frameworkTopicRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the textarea to fit its content on every change.
+  useEffect(() => {
+    const el = frameworkTopicRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [frameworkTopic, frameworkModal]);
   // demoTab removed — demos moved to /beispiele
 
   // Load persisted history and active project on mount
@@ -84,10 +96,44 @@ export default function Home() {
     if (stored.length > 0) setHistory(stored);
     const storedProject = localStorage.getItem("sis-active-project");
     if (storedProject) setActiveProjectId(storedProject);
+    // Phase 5: Load custom session title if set
+    try {
+      const savedTitle = localStorage.getItem("sis-session-title");
+      if (savedTitle) setCustomSessionTitle(savedTitle);
+    } catch {}
+    // Phase 5: Load past sessions for the picker
+    fetch("/api/v1/canvas")
+      .then(r => r.json())
+      .then(data => {
+        const list = (data?.canvases || data?.projects || []) as Array<any>;
+        const activeCanvasId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+        const sessions = list
+          .filter((c: any) => c.id !== activeCanvasId && (c.queryCount || 0) > 0)
+          .slice(0, 8)
+          .map((c: any) => ({
+            id: c.id,
+            name: c.name || "Unbenannt",
+            nodeCount: c.queryCount || 0,
+            updatedAt: c.updated_at,
+          }));
+        setPastSessions(sessions);
+      })
+      .catch(() => {});
+    const params = new URLSearchParams(window.location.search);
     // Re-run from /projects page
-    const urlQ = new URLSearchParams(window.location.search).get("q");
+    const urlQ = params.get("q");
     if (urlQ) {
       setQuery(decodeURIComponent(urlQ));
+    }
+    // Phase 5: Jump to a specific node from Zusammenfassung-View
+    const urlNode = params.get("node");
+    if (urlNode && stored.length > 0) {
+      const targetQuery = decodeURIComponent(urlNode);
+      const match = stored.find(h => h.query === targetQuery)
+        ?? stored.find(h => h.query.toLowerCase().trim() === targetQuery.toLowerCase().trim());
+      if (match) setActiveNodeId(match.id ?? match.query);
+    }
+    if (urlQ || urlNode) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -418,6 +464,8 @@ export default function Home() {
       timestamp: new Date(),
       parentQuery: prevCtx?.query, // link to parent if this is a follow-up
     }, ...prev]);
+    // New query always becomes the active node in the session
+    setActiveNodeId(entryId);
     setQuery("");
 
     const ctxProfile = contextProfile
@@ -489,64 +537,6 @@ export default function Home() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <AppHeader />
 
-      {/* ── View Toggle + Session controls (below global header) ─── */}
-      {!isFirstVisit && (
-      <div style={{
-        borderBottom: "1px solid var(--color-border)",
-        background: "var(--color-surface)",
-      }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 40, display: "flex", alignItems: "center", gap: 16 }}>
-
-          {/* View Toggle: Standard / Canvas / Board */}
-          <div style={{ display: "flex", alignItems: "center", gap: 2, background: "var(--color-surface-2, #f5f5f5)", borderRadius: "var(--radius-md)", padding: 2 }}>
-            {([
-              { key: "standard" as ProjectView, icon: "●", label: "Standard" },
-              { key: "canvas" as ProjectView, icon: "⊞", label: "Canvas" },
-              { key: "board" as ProjectView, icon: "☰", label: "Board" },
-            ]).map(v => {
-              const active = projectView === v.key;
-              return (
-                <button key={v.key} onClick={() => setProjectView(v.key)}
-                  style={{
-                    fontSize: 12, fontWeight: active ? 600 : 400, padding: "4px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    background: active ? "var(--color-surface)" : "transparent",
-                    color: active ? "var(--color-text-heading)" : "var(--color-text-muted)",
-                    cursor: "pointer", transition: "all 0.12s",
-                    border: active ? "1px solid var(--volt-border-strong, #D0D0D0)" : "1px solid transparent",
-                    display: "flex", alignItems: "center", gap: 4,
-                  }}
-                ><span style={{ fontSize: 10 }}>{v.icon}</span> {v.label}</button>
-              );
-            })}
-          </div>
-
-          {/* Session controls */}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            {history.length > 0 && (
-              <>
-                <button
-                  onClick={() => { downloadSessionMarkdown(history, locale); setSessionExported(true); setTimeout(() => setSessionExported(false), 2500); }}
-                  style={{ fontSize: 12, color: sessionExported ? "var(--signal-positive)" : "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", cursor: "pointer" }}
-                >{sessionExported ? "✓" : "↑"} Session</button>
-                <button
-                  onClick={() => {
-                    if (window.confirm(locale === "de" ? "Session loeschen?" : "Clear session?")) {
-                      setHistory([]); setQuery("");
-                      try { localStorage.removeItem("sis-history"); const cid = localStorage.getItem("sis-active-canvas"); if (cid) { fetch("/api/v1/canvas/" + cid, { method: "DELETE" }).catch(() => {}); localStorage.removeItem("sis-active-canvas"); } } catch {}
-                    }
-                  }}
-                  style={{ fontSize: 12, color: "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", cursor: "pointer" }}
-                >✕ {locale === "de" ? "Loeschen" : "Clear"}</button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-      )}
-
-
-
       {/* ── Full Radar / Graph ───────────────────────────────────── */}
       {showFullRadar && (
         <div style={{ borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)" }}>
@@ -559,148 +549,83 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Canvas / Board View ──────────────────────────────────── */}
-      {projectView !== "standard" && (
-        <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 52px)" }}>
-          <iframe
-            key={`canvas-${projectView}`}
-            src={`/canvas?embedded=1&view=${projectView}`}
-            style={{ width: "100%", height: "100%", border: "none" }}
-          />
-        </div>
-      )}
+      {/* ── Main (Briefing) View ─────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        // Vertically center the framework grid + command line in the empty state
+        // so they sit in the visual middle instead of being pinned to top/bottom.
+        justifyContent: isFirstVisit && !showFullRadar ? "center" : "flex-start",
+        position: "relative",
+      }}>
 
-      {/* ── Standard (Briefing) View ─────────────────────────────── */}
-      {projectView === "standard" && (<>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-start" }}>
-
-        {/* Hero + Search */}
+        {/* Hero + Search — only render the command line here when NOT first visit */}
         <div style={{
           maxWidth: 700, margin: "0 auto", width: "100%",
-          padding: isFirstVisit && !showFullRadar ? "80px 24px 0" : "20px 24px 0",
+          padding: isFirstVisit && !showFullRadar ? "0" : "20px 24px 0",
           position: "relative",
         }}>
-          {/* Subtle lime radial gradient orb behind search area */}
-          {isFirstVisit && !showFullRadar && (
-            <div style={{
-              position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
-              width: 600, height: 400,
-              background: "radial-gradient(ellipse at center, rgba(228,255,151,0.08) 0%, transparent 70%)",
-              pointerEvents: "none", zIndex: 0,
-            }} />
-          )}
-          {/* Headline — only on first visit */}
-          {isFirstVisit && !showFullRadar && (
-            <div style={{ textAlign: "center", marginBottom: 32, position: "relative", zIndex: 1 }}>
-              <h1 style={{
-                fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-                fontSize: "clamp(1.25rem, 3vw, 1.75rem)",
-                fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2,
-                color: "var(--volt-text, #0A0A0A)", margin: "0 0 8px",
-              }}>
-                {locale === "de"
-                  ? "Welche strategische Frage beschäftigt dich?"
-                  : "What strategic question are you working on?"}
-              </h1>
-              <p style={{
-                fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase" as const,
-                color: "var(--volt-text-faint, #AAA)", margin: 0,
-              }}>
-                50 {locale === "de" ? "Quellen" : "Sources"} · 39 Trends · STEEP+V · EU-Fokus
-              </p>
-            </div>
-          )}
-          <div
-            style={{
-              display: "flex", alignItems: "center",
-              padding: "0 22px",
-              height: 56,
-              borderRadius: "var(--volt-radius-lg, 14px)",
-              border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
-              transition: "border-color 150ms ease",
-              background: "var(--volt-surface-raised, #fff)",
-              /* no shadow — Volt depth via border */
-              position: "relative",
-            }}
-            onClick={() => inputRef.current?.focus()}
-          >
-            {/* Hidden span to measure text width */}
-            <span ref={measureRef} style={{
-              position: "absolute", visibility: "hidden", whiteSpace: "pre",
-              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-            }} />
-            {/* Blinking block cursor — visible on focus or when typing */}
-            {!isAnalyzing && (query || inputFocused) && (
-              <span className="sis-blink-cursor" style={{
-                position: "absolute",
-                left: 22 + cursorLeft,
-                top: "50%", transform: "translateY(-50%)",
-                width: 10, height: 20,
-                background: "var(--volt-text, #0A0A0A)",
-                zIndex: 2,
+          {/* Command line for session state (history exists) — stays at top */}
+          {(!isFirstVisit || showFullRadar) && (
+            <div
+              style={{
+                display: "flex", alignItems: "center",
+                padding: "0 22px",
+                height: 56,
+                borderRadius: "var(--volt-radius-lg, 14px)",
+                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                transition: "border-color 150ms ease",
+                background: "var(--volt-surface-raised, #fff)",
+                position: "relative",
+              }}
+              onClick={() => inputRef.current?.focus()}
+            >
+              <span ref={measureRef} style={{
+                position: "absolute", visibility: "hidden", whiteSpace: "pre",
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
               }} />
-            )}
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
-              placeholder={inputFocused ? "" : (locale === "de" ? "Frage stellen oder Stichwort eingeben…" : "Ask a question or drop a keyword…")}
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {(query || isAnalyzing) && (
-              <button onClick={() => handleSubmit()}
-                disabled={isAnalyzing}
-                className={isAnalyzing ? "" : "sis-shimmer-btn"}
-                style={{
-                  fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
-                  borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                  background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
-                  color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
-                  border: "none", cursor: isAnalyzing ? "wait" : "pointer",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                }}
-              >
-                {isAnalyzing
-                  ? (locale === "de" ? "Analysiere…" : "Analyzing…")
-                  : (locale === "de" ? "Analysieren →" : "Analyze →")}
-              </button>
-            )}
-          </div>
-
-          {/* Suggestion chips — only on first visit, when not typing */}
-          {isFirstVisit && !query && !isAnalyzing && (
-            <div style={{
-              display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap",
-              marginTop: 12, position: "relative", zIndex: 1,
-            }}>
-              {(locale === "de"
-                ? ["KI-Regulierung EU", "Energiewende 2030", "Zukunft der Arbeit", "Cybersecurity Trends", "Supply Chain Risiken"]
-                : ["AI Regulation EU", "Energy Transition 2030", "Future of Work", "Cybersecurity Trends", "Supply Chain Risks"]
-              ).map(suggestion => (
-                <button
-                  key={suggestion}
-                  onClick={() => { setQuery(suggestion); inputRef.current?.focus(); }}
+              {!isAnalyzing && (query || inputFocused) && (
+                <span className="sis-blink-cursor" style={{
+                  position: "absolute",
+                  left: 22 + cursorLeft,
+                  top: "50%", transform: "translateY(-50%)",
+                  width: 10, height: 20,
+                  background: "var(--volt-text, #0A0A0A)",
+                  zIndex: 2,
+                }} />
+              )}
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                placeholder={inputFocused ? "" : (locale === "de" ? "Session vertiefen oder neue Frage stellen…" : "Deepen session or ask a new question…")}
+                style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {(query || isAnalyzing) && (
+                <button onClick={() => handleSubmit()}
+                  disabled={isAnalyzing}
+                  className={isAnalyzing ? "" : "sis-shimmer-btn"}
                   style={{
-                    fontFamily: "var(--volt-font-ui)", fontSize: 11, fontWeight: 500,
-                    padding: "5px 12px", borderRadius: 20,
-                    border: "1px solid var(--volt-border, #E8E8E8)",
-                    background: "var(--volt-surface-raised, #fff)",
-                    color: "var(--volt-text-muted, #6B6B6B)",
-                    cursor: "pointer", transition: "all 150ms ease",
+                    fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
+                    borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
+                    background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
+                    color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
+                    border: "none", cursor: isAnalyzing ? "wait" : "pointer",
+                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text)"; e.currentTarget.style.color = "var(--volt-text)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; e.currentTarget.style.color = "var(--volt-text-muted)"; }}
                 >
-                  {suggestion}
+                  {isAnalyzing
+                    ? (locale === "de" ? "Analysiere…" : "Analyzing…")
+                    : (locale === "de" ? "Analysieren →" : "Analyze →")}
                 </button>
-              ))}
+              )}
             </div>
           )}
 
@@ -715,21 +640,23 @@ export default function Home() {
                 position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
                 zIndex: 41, width: "100%", maxWidth: 480,
                 background: "var(--volt-surface-raised, #fff)", borderRadius: 16,
-                border: "1px solid #E8E8E8",
+                border: `1px solid ${frameworkModal.p.border}`,
                 padding: "28px 32px",
               }}>
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12,
-                    background: "#F7F7F7", border: "1px solid #E8E8E8",
+                    background: frameworkModal.p.icon,
+                    border: `1px solid ${frameworkModal.p.border}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
                   }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={frameworkModal.icon} alt="" style={{ width: 22, height: 22, opacity: 0.7 }} />
+                    <img src={frameworkModal.icon} alt="" style={{ width: 22, height: 22, opacity: 0.85 }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-heading)" }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: frameworkModal.p.type }}>
                       {frameworkModal.label}
                     </div>
                     <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -742,135 +669,358 @@ export default function Home() {
                   >✕</button>
                 </div>
 
-                {/* Topic Input */}
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 6 }}>
-                  {locale === "de" ? "Welches Thema möchtest du analysieren?" : "What topic do you want to analyze?"}
+                {/* ── Phase 1: Framework-specific question guidance ───────
+                     Pulls the guidance object from FRAMEWORKS by templateId
+                     and renders a shape explainer + clickable example chips
+                     + optional structured field inputs. If no guidance is
+                     defined for a framework, the modal falls back to the
+                     legacy single-input layout. */}
+                {(() => {
+                  const fw = FRAMEWORKS.find(f => f.id === frameworkModal.templateId);
+                  const guidance = fw?.guidance;
+                  if (!guidance) return null;
+                  return (
+                    <div style={{ marginBottom: 18 }}>
+                      {/* Shape explainer — the only guidance now.
+                           Examples were removed per user feedback: they led
+                           to copy-paste instead of users formulating their
+                           own specific question. */}
+                      <div style={{
+                        padding: "12px 14px",
+                        borderRadius: "var(--volt-radius-md, 10px)",
+                        background: frameworkModal.p.card,
+                        border: `1px solid ${frameworkModal.p.border}`,
+                      }}>
+                        <div style={{
+                          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                          fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          color: frameworkModal.p.type,
+                          marginBottom: 6,
+                        }}>
+                          {locale === "de" ? "So muss deine Frage aussehen" : "How your question should look"}
+                        </div>
+                        <div style={{
+                          fontSize: 12, lineHeight: 1.55,
+                          color: "var(--volt-text, #0A0A0A)",
+                        }}>
+                          {locale === "de" ? guidance.questionShape.de : guidance.questionShape.en}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Question Input — force concrete question formulation.
+                     Topic keywords ("KI", "Automotive") are explicitly
+                     discouraged by label + placeholder + shape explainer. */}
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 8 }}>
+                  {locale === "de" ? "Stelle deine konkrete Frage" : "Ask your concrete question"}
                 </label>
-                <input
-                  ref={frameworkTopicRef}
-                  type="text"
-                  value={frameworkTopic}
-                  onChange={(e) => setFrameworkTopic(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter" && frameworkTopic.trim()) {
-                      e.preventDefault();
-                      // Same logic as before, but from state
-                      try {
-                        const { TEMPLATES } = await import("@/lib/canvas-templates");
-                        const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
-                        if (!tmpl) return;
-                        const result = tmpl.build(frameworkTopic.trim());
-                        const res = await fetch("/api/v1/canvas", {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name: `${frameworkModal.label}: ${frameworkTopic.trim()}` }),
-                        });
-                        if (!res.ok) return;
-                        const json = await res.json();
-                        const pid = json.canvas?.id;
-                        if (!pid) return;
-                        await fetch(`/api/v1/canvas/${pid}`, {
-                          method: "PATCH", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
-                        });
-                        localStorage.setItem("sis-active-canvas", pid);
-                        setFrameworkModal(null);
-                        setProjectView("canvas");
-                      } catch (err) { console.error(err); }
-                    }
-                  }}
-                  placeholder={locale === "de"
-                    ? "z.B. KI-Regulierung in der EU, Energiewende Deutschland, ..."
-                    : "e.g. AI regulation in the EU, energy transition, ..."}
+                {/* Auto-growing textarea container — vertical stack so long
+                     questions wrap and the container grows with the content.
+                     Submit button sits at the bottom-right, only shown when
+                     the textarea has text. Enter submits, Shift+Enter = new
+                     line. */}
+                <div
                   style={{
-                    width: "100%", fontSize: 15, padding: "12px 16px",
-                    borderRadius: 10, border: "1px solid var(--color-border)",
-                    background: "var(--color-page-bg)", color: "var(--color-text-primary)",
-                    outline: "none", transition: "border-color 0.15s",
+                    display: "flex", flexDirection: "column",
+                    padding: "14px 18px",
+                    minHeight: 52,
+                    borderRadius: "var(--volt-radius-lg, 14px)",
+                    border: frameworkTopicFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                    transition: "border-color 150ms ease",
+                    background: "var(--volt-surface-raised, #fff)",
+                    position: "relative",
                   }}
-                  onFocus={e => e.currentTarget.style.borderColor = "var(--color-lime)"}
-                  onBlur={e => e.currentTarget.style.borderColor = "var(--color-border)"}
-                />
-
-                {/* Hint */}
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "8px 0 0", lineHeight: 1.5 }}>
-                  {locale === "de"
-                    ? "Das Framework erstellt eine strukturierte Analyse im Canvas mit geführtem Workflow."
-                    : "The framework creates a structured analysis in the Canvas with a guided workflow."}
-                </p>
-
-                {/* Actions */}
-                <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-                  <button
-                    onClick={() => setFrameworkModal(null)}
-                    style={{
-                      fontSize: 13, fontWeight: 500, padding: "9px 20px", borderRadius: 10,
-                      border: "1px solid var(--color-border)", background: "transparent",
-                      color: "var(--color-text-secondary)", cursor: "pointer",
+                  onClick={() => frameworkTopicRef.current?.focus()}
+                >
+                  <textarea
+                    ref={frameworkTopicRef}
+                    value={frameworkTopic}
+                    rows={1}
+                    onChange={(e) => {
+                      setFrameworkTopic(e.target.value);
+                      // Immediate auto-grow on input — effect also fires,
+                      // but inline makes the transition feel tighter.
+                      const el = e.currentTarget;
+                      el.style.height = "auto";
+                      el.style.height = `${el.scrollHeight}px`;
                     }}
-                  >{locale === "de" ? "Abbrechen" : "Cancel"}</button>
-                  <button
-                    onClick={async () => {
-                      if (!frameworkTopic.trim() || frameworkLoading) return;
-                      setFrameworkLoading(true);
-                      try {
-                        const { TEMPLATES } = await import("@/lib/canvas-templates");
-                        const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
-                        if (!tmpl) { setFrameworkLoading(false); return; }
-                        const result = tmpl.build(frameworkTopic.trim());
-                        const res = await fetch("/api/v1/canvas", {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ name: `${frameworkModal.label}: ${frameworkTopic.trim()}` }),
-                        });
-                        if (!res.ok) { setFrameworkLoading(false); alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project."); return; }
-                        const json = await res.json();
-                        const pid = json.canvas?.id;
-                        if (!pid) { setFrameworkLoading(false); return; }
-                        await fetch(`/api/v1/canvas/${pid}`, {
-                          method: "PATCH", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
-                        });
-                        localStorage.setItem("sis-active-canvas", pid);
-                        setFrameworkLoading(false);
-                        setFrameworkModal(null);
-                        setProjectView("canvas");
-                      } catch (err) {
-                        setFrameworkLoading(false);
-                        console.error(err);
-                        alert(locale === "de" ? "Fehler beim Erstellen der Analyse." : "Error creating analysis.");
+                    onKeyDown={async (e) => {
+                      // Enter submits, Shift+Enter inserts a newline
+                      if (e.key === "Enter" && !e.shiftKey && frameworkTopic.trim() && !frameworkLoading) {
+                        e.preventDefault();
+                        setFrameworkLoading(true);
+                        try {
+                          const { TEMPLATES, FRAMEWORKS: FWS } = await import("@/lib/canvas-templates");
+                          const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
+                          if (!tmpl) { setFrameworkLoading(false); return; }
+                          // Compose a richer topic string with optional field values.
+                          // Canvas NAME keeps the framework label prefix + main topic
+                          // (so framework-detect by name prefix keeps working).
+                          // Canvas QUERIES receive the enriched topic with appended context.
+                          const fw = FWS.find(f => f.id === frameworkModal.templateId);
+                          const fieldParts: string[] = [];
+                          if (fw?.guidance?.fields) {
+                            for (const f of fw.guidance.fields) {
+                              const v = frameworkFieldValues[f.key]?.trim();
+                              if (v) fieldParts.push(`${locale === "de" ? f.labelDe : f.labelEn}: ${v}`);
+                            }
+                          }
+                          const mainTopic = frameworkTopic.trim();
+                          const enrichedTopic = fieldParts.length
+                            ? `${mainTopic} (${fieldParts.join("; ")})`
+                            : mainTopic;
+                          const result = tmpl.build(enrichedTopic);
+                          const res = await fetch("/api/v1/canvas", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
+                          });
+                          if (!res.ok) { setFrameworkLoading(false); return; }
+                          const json = await res.json();
+                          const pid = json.canvas?.id;
+                          if (!pid) { setFrameworkLoading(false); return; }
+                          await fetch(`/api/v1/canvas/${pid}`, {
+                            method: "PATCH", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
+                          });
+                          localStorage.setItem("sis-active-canvas", pid);
+                          setFrameworkLoading(false);
+                          setFrameworkModal(null);
+                          window.location.href = `/canvas/${pid}`;
+                        } catch (err) {
+                          setFrameworkLoading(false);
+                          console.error(err);
+                        }
                       }
                     }}
-                    disabled={!frameworkTopic.trim() || frameworkLoading}
+                    onFocus={() => setFrameworkTopicFocused(true)}
+                    onBlur={() => setFrameworkTopicFocused(false)}
+                    placeholder={locale === "de" ? "Formuliere eine vollständige, konkrete Frage…" : "Formulate a complete, concrete question…"}
                     style={{
-                      fontSize: 13, fontWeight: 600, padding: "9px 24px", borderRadius: 10,
+                      width: "100%",
+                      minHeight: 24,
+                      resize: "none",
                       border: "none",
-                      background: frameworkLoading ? "var(--color-text-muted)" : frameworkTopic.trim() ? "var(--color-text-heading)" : "var(--color-border)",
-                      color: frameworkLoading || frameworkTopic.trim() ? "white" : "var(--color-text-muted)",
-                      cursor: frameworkLoading ? "wait" : frameworkTopic.trim() ? "pointer" : "not-allowed",
-                      transition: "all 0.15s",
-                      display: "flex", alignItems: "center", gap: 6,
+                      outline: "none",
+                      background: "transparent",
+                      color: "var(--volt-text, #0A0A0A)",
+                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                      overflow: "hidden",
+                      padding: 0,
                     }}
-                  >
-                    {frameworkLoading
-                      ? (locale === "de" ? "Erstelle…" : "Creating…")
-                      : (locale === "de" ? "Analyse starten →" : "Start Analysis →")}
-                  </button>
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
                 </div>
+
+                {/* ── Phase 1: Optional structured fields + anti-example + submit ─
+                     Group fields under an "Optionaler Kontext" header so users
+                     immediately see they're not required. Submit button lives at
+                     the absolute bottom of the modal (not inside the textarea)
+                     so the flow is: shape → question → context → warning → submit. */}
+                {(() => {
+                  const fw = FRAMEWORKS.find(f => f.id === frameworkModal.templateId);
+                  const guidance = fw?.guidance;
+                  return (
+                    <>
+                      {guidance?.fields && guidance.fields.length > 0 && (
+                        <div style={{ marginTop: 22 }}>
+                          {/* Group header — signals these are optional refinements */}
+                          <div style={{
+                            fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                            fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            color: "var(--volt-text-faint, #999)",
+                            marginBottom: 10,
+                            display: "flex", alignItems: "center", gap: 8,
+                          }}>
+                            <span>{locale === "de" ? "Optionaler Kontext" : "Optional context"}</span>
+                            <span style={{ flex: 1, height: 1, background: "var(--volt-border, #EEE)" }} />
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {guidance.fields.map(field => {
+                              // Strip "(optional)" from labels — now redundant because the whole group is labeled Optional
+                              const labelRaw = locale === "de" ? field.labelDe : field.labelEn;
+                              const label = labelRaw.replace(/\s*\((optional|optional)\)\s*$/i, "");
+                              return (
+                                <div key={field.key}>
+                                  <label style={{
+                                    display: "block",
+                                    fontSize: 11, fontWeight: 600,
+                                    color: "var(--volt-text-muted, #6B6B6B)",
+                                    marginBottom: 4,
+                                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                                  }}>
+                                    {label}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={frameworkFieldValues[field.key] ?? ""}
+                                    onChange={(e) => setFrameworkFieldValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); /* prevent accidental submit from a field */ }}
+                                    placeholder={locale === "de" ? field.placeholderDe : field.placeholderEn}
+                                    style={{
+                                      width: "100%",
+                                      padding: "8px 12px",
+                                      fontSize: 13,
+                                      border: "1px solid var(--volt-border, #E8E8E8)",
+                                      borderRadius: "var(--volt-radius-sm, 8px)",
+                                      background: "var(--volt-surface-raised, #fff)",
+                                      color: "var(--volt-text, #0A0A0A)",
+                                      outline: "none",
+                                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                                      boxSizing: "border-box",
+                                    }}
+                                    onFocus={(e) => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
+                                    onBlur={(e) => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {guidance?.antiExample && (
+                        <p style={{
+                          fontSize: 11,
+                          color: "var(--volt-text-muted, #6B6B6B)",
+                          margin: "18px 0 0",
+                          lineHeight: 1.5,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 6,
+                        }}>
+                          <span style={{ flexShrink: 0, color: "var(--volt-text-faint, #BBB)" }}>⚠</span>
+                          <span>{locale === "de" ? guidance.antiExample.de : guidance.antiExample.en}</span>
+                        </p>
+                      )}
+
+                      {!guidance && (
+                        <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "10px 0 0", lineHeight: 1.5 }}>
+                          {locale === "de"
+                            ? "Das Framework erstellt eine strukturierte Analyse im Canvas mit geführtem Workflow."
+                            : "The framework creates a structured analysis in the Canvas with a guided workflow."}
+                        </p>
+                      )}
+
+                      {/* ── Absolute bottom: Submit button row ──────────
+                           Divider + right-aligned Analyse button. Button is
+                           disabled until the main question has text — optional
+                           context fields don't gate activation. */}
+                      <div style={{
+                        marginTop: 20,
+                        paddingTop: 16,
+                        borderTop: "1px solid var(--volt-border, #EEE)",
+                        display: "flex",
+                        justifyContent: "flex-end",
+                      }}>
+                        <button
+                          onClick={async () => {
+                            if (!frameworkTopic.trim() || frameworkLoading) return;
+                            setFrameworkLoading(true);
+                            try {
+                              const { TEMPLATES, FRAMEWORKS: FWS } = await import("@/lib/canvas-templates");
+                              const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
+                              if (!tmpl) { setFrameworkLoading(false); return; }
+                              const fwInner = FWS.find(f => f.id === frameworkModal.templateId);
+                              const fieldParts: string[] = [];
+                              if (fwInner?.guidance?.fields) {
+                                for (const f of fwInner.guidance.fields) {
+                                  const v = frameworkFieldValues[f.key]?.trim();
+                                  if (v) fieldParts.push(`${locale === "de" ? f.labelDe : f.labelEn}: ${v}`);
+                                }
+                              }
+                              const mainTopic = frameworkTopic.trim();
+                              const enrichedTopic = fieldParts.length
+                                ? `${mainTopic} (${fieldParts.join("; ")})`
+                                : mainTopic;
+                              const result = tmpl.build(enrichedTopic);
+                              const res = await fetch("/api/v1/canvas", {
+                                method: "POST", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
+                              });
+                              if (!res.ok) { setFrameworkLoading(false); alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project."); return; }
+                              const json = await res.json();
+                              const pid = json.canvas?.id;
+                              if (!pid) { setFrameworkLoading(false); return; }
+                              await fetch(`/api/v1/canvas/${pid}`, {
+                                method: "PATCH", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
+                              });
+                              localStorage.setItem("sis-active-canvas", pid);
+                              setFrameworkLoading(false);
+                              setFrameworkModal(null);
+                              window.location.href = `/canvas/${pid}`;
+                            } catch (err) {
+                              setFrameworkLoading(false);
+                              console.error(err);
+                              alert(locale === "de" ? "Fehler beim Erstellen der Analyse." : "Error creating analysis.");
+                            }
+                          }}
+                          disabled={frameworkLoading || !frameworkTopic.trim()}
+                          className={frameworkLoading || !frameworkTopic.trim() ? "" : "sis-shimmer-btn"}
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            height: 40,
+                            padding: "0 22px",
+                            borderRadius: "var(--volt-radius-md, 10px)",
+                            background: frameworkLoading
+                              ? "var(--volt-surface, #F7F7F7)"
+                              : !frameworkTopic.trim()
+                                ? "var(--volt-surface, #F0F0F0)"
+                                : "var(--volt-lime, #E4FF97)",
+                            color: frameworkLoading || !frameworkTopic.trim()
+                              ? "var(--volt-text-faint, #BBB)"
+                              : "#0A0A0A",
+                            border: "none",
+                            cursor: frameworkLoading
+                              ? "wait"
+                              : !frameworkTopic.trim()
+                                ? "not-allowed"
+                                : "pointer",
+                            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                            transition: "background-color 160ms ease, color 160ms ease",
+                          }}
+                        >
+                          {frameworkLoading
+                            ? (locale === "de" ? "Erstelle…" : "Creating…")
+                            : (locale === "de" ? "Analysieren →" : "Analyze →")}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </>
           )}
 
         </div>
 
-        {/* Framework grid — own wider container, outside 640px constraint */}
+        {/* Framework grid — empty state primary entry point */}
         {isFirstVisit && !showFullRadar && (
-          <div style={{ maxWidth: 700, margin: "0 auto", width: "100%", padding: "32px 24px 0" }}>
+          <div style={{ maxWidth: 700, margin: "0 auto", width: "100%", padding: "0 24px" }}>
+            {/* Tiny mono stats line — was the subtitle before, now the only header */}
+            <div style={{
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const,
+              color: "var(--volt-text-faint, #AAA)",
+              textAlign: "center", marginBottom: 28,
+            }}>
+              50 {locale === "de" ? "Quellen" : "Sources"} · 39 Trends · STEEP+V · EU-Fokus
+            </div>
             <div style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
               fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
               color: "var(--volt-text-faint, #BBB)",
               marginBottom: 12, textAlign: "center",
             }}>
-              {locale === "de" ? "Oder starte mit einem Framework" : "Or start with a framework"}
+              {locale === "de" ? "Starte mit einem Framework" : "Start with a framework"}
             </div>
             <div className="sis-framework-grid">
               {([
@@ -887,8 +1037,8 @@ export default function Home() {
                   withGrain
                   role="button"
                   tabIndex={0}
-                  onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
-                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
+                  onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
+                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
                   className="cursor-pointer"
                   style={{ background: t.p.card, borderColor: t.p.border }}
                 >
@@ -908,51 +1058,224 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 40px", maxWidth: 960, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-          {history.map((entry, i) => (
-            <BriefingResult
-              key={`${entry.query}-${i}`}
-              entry={entry}
-              locale={locale}
-              trendCount={trends.length}
-              onTrendClick={setSelectedTrend}
-              activeProjectId={activeProjectId}
-              onFollowUp={(q) => {
-                setQuery(q);
-                // Build multi-turn context: collect this entry + its parent (if follow-up chain)
-                const ctxMessages: { query: string; synthesis: string }[] = [];
-                // Find parent in history if this is itself a follow-up
-                if (entry.parentQuery) {
-                  const parent = history.find(h => h.query === entry.parentQuery && h.briefing?.synthesis);
-                  if (parent?.briefing?.synthesis) {
-                    ctxMessages.push({ query: parent.query, synthesis: parent.briefing.synthesis.slice(0, 2000) });
+        {/* Empty-state command line — sits directly below the framework grid.
+             The lime gradient glow is rendered separately as a fixed element at the
+             very bottom of the viewport, above the ticker. */}
+        {isFirstVisit && !showFullRadar && (
+          <div style={{
+            position: "relative",
+            marginTop: 36,
+            paddingTop: 0,
+            paddingBottom: 0,
+            paddingLeft: 24,
+            paddingRight: 24,
+            zIndex: 2,
+          }}>
+            <div style={{
+              maxWidth: 700, margin: "0 auto", width: "100%",
+              position: "relative", zIndex: 1,
+            }}>
+              <div
+                style={{
+                  display: "flex", alignItems: "center",
+                  padding: "0 22px",
+                  height: 56,
+                  borderRadius: "var(--volt-radius-lg, 14px)",
+                  border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                  transition: "border-color 150ms ease, box-shadow 150ms ease",
+                  background: "var(--volt-surface-raised, #fff)",
+                  boxShadow: inputFocused ? "0 6px 24px rgba(228,255,151,0.35), 0 2px 8px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.04)",
+                  position: "relative",
+                }}
+                onClick={() => inputRef.current?.focus()}
+              >
+                <span ref={measureRef} style={{
+                  position: "absolute", visibility: "hidden", whiteSpace: "pre",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                }} />
+                {!isAnalyzing && (query || inputFocused) && (
+                  <span className="sis-blink-cursor" style={{
+                    position: "absolute",
+                    left: 22 + cursorLeft,
+                    top: "50%", transform: "translateY(-50%)",
+                    width: 10, height: 20,
+                    background: "var(--volt-text, #0A0A0A)",
+                    zIndex: 2,
+                  }} />
+                )}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  placeholder={inputFocused ? "" : (locale === "de" ? "Oder frage direkt etwas Strategisches…" : "Or ask something strategic directly…")}
+                  style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {(query || isAnalyzing) && (
+                  <button onClick={() => handleSubmit()}
+                    disabled={isAnalyzing}
+                    className={isAnalyzing ? "" : "sis-shimmer-btn"}
+                    style={{
+                      fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
+                      borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
+                      background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
+                      color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
+                      border: "none", cursor: isAnalyzing ? "wait" : "pointer",
+                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                    }}
+                  >
+                    {isAnalyzing
+                      ? (locale === "de" ? "Analysiere…" : "Analyzing…")
+                      : (locale === "de" ? "Analysieren →" : "Analyze →")}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results — Phase 1+2: Session Bar + Active Node rendering. Only rendered when there is content, so the empty-state gradient command line can claim the full flex space. Bottom padding clears the fixed SignalTicker. */}
+        {!isFirstVisit && (
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 60px", maxWidth: 960, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Session Bar: only when history has 2+ entries. The single-shot experience stays clean. */}
+          {history.length >= 2 && (() => {
+            // Ensure the active entry is valid; default to latest (index 0, since history is newest-first).
+            const resolvedActiveId = activeNodeId && history.find(h => (h.id ?? h.query) === activeNodeId)
+              ? activeNodeId
+              : (history[0].id ?? history[0].query);
+            const autoTitle = history[history.length - 1]?.query ?? "Session";
+            const sessionTitle = customSessionTitle || autoTitle;
+            return (
+              <SessionBar
+                sessionTitle={sessionTitle}
+                nodes={[...history].reverse().map(h => ({
+                  id: h.id ?? h.query,
+                  query: h.query,
+                  isLoading: h.isLoading,
+                  hasError: !!h.error,
+                }))}
+                activeNodeId={resolvedActiveId}
+                onNodeClick={(id) => setActiveNodeId(id)}
+                onNewSession={() => {
+                  if (!window.confirm(locale === "de" ? "Aktuelle Session beenden und neue starten?" : "End current session and start new?")) return;
+                  clearHistoryStorage();
+                  setHistory([]);
+                  setActiveNodeId(null);
+                  setCustomSessionTitle(null);
+                  try { localStorage.removeItem("sis-session-title"); } catch {}
+                  try { localStorage.removeItem("sis-active-canvas"); } catch {}
+                  setQuery("");
+                  inputRef.current?.focus();
+                }}
+                onOpenCanvas={() => {
+                  window.location.href = "/canvas";
+                }}
+                onOpenSummary={() => {
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+                  if (pid) {
+                    window.location.href = `/canvas/${pid}/zusammenfassung`;
+                  } else {
+                    window.location.href = "/canvas?view=zusammenfassung";
                   }
-                }
-                // Add current entry
-                if (entry.briefing?.synthesis && entry.briefing.synthesis.length > 50) {
-                  ctxMessages.push({ query: entry.query, synthesis: entry.briefing.synthesis.slice(0, 2000) });
-                }
-                // Pass the most recent as previousContext (API supports single-turn for now)
-                const prevCtx = ctxMessages.length > 0 ? ctxMessages[ctxMessages.length - 1] : undefined;
-                handleSubmit(q, prevCtx);
-              }}
-              onOpenInCanvas={() => {
-                // Data is already synced to canvas DB — just switch view
-                setProjectView("canvas");
-              }}
-            />
-          ))}
+                }}
+                onTitleChange={(newTitle) => {
+                  setCustomSessionTitle(newTitle);
+                  try { localStorage.setItem("sis-session-title", newTitle); } catch {}
+                  // Also rename the canvas project so it's reflected in the picker and elsewhere
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+                  if (pid) {
+                    fetch(`/api/v1/canvas/${pid}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: newTitle }),
+                    }).catch(() => {});
+                  }
+                }}
+                pastSessions={pastSessions}
+                onPickSession={(id) => {
+                  // Switch to selected canvas project — load its name as session title
+                  // and navigate to /canvas/[id] for direct access
+                  try { localStorage.setItem("sis-active-canvas", id); } catch {}
+                  window.location.href = `/canvas/${id}`;
+                }}
+                de={locale === "de"}
+              />
+            );
+          })()}
+
+          {/* Active Briefing: show only the currently-focused entry with crossfade animation */}
+          {history.length > 0 && (() => {
+            const entries = history;
+            const activeEntry = activeNodeId
+              ? entries.find(h => (h.id ?? h.query) === activeNodeId) ?? entries[0]
+              : entries[0];
+            const i = entries.indexOf(activeEntry);
+            return (
+              <div
+                key={`active-${activeEntry.id ?? activeEntry.query}`}
+                style={{ animation: "sis-brief-fade 220ms ease-out" }}
+              >
+                <BriefingResult
+                  entry={activeEntry}
+                  locale={locale}
+                  trendCount={trends.length}
+                  onTrendClick={setSelectedTrend}
+                  activeProjectId={activeProjectId}
+                  onFollowUp={(q) => {
+                    setQuery(q);
+                    const ctxMessages: { query: string; synthesis: string }[] = [];
+                    if (activeEntry.parentQuery) {
+                      const parent = history.find(h => h.query === activeEntry.parentQuery && h.briefing?.synthesis);
+                      if (parent?.briefing?.synthesis) {
+                        ctxMessages.push({ query: parent.query, synthesis: parent.briefing.synthesis.slice(0, 2000) });
+                      }
+                    }
+                    if (activeEntry.briefing?.synthesis && activeEntry.briefing.synthesis.length > 50) {
+                      ctxMessages.push({ query: activeEntry.query, synthesis: activeEntry.briefing.synthesis.slice(0, 2000) });
+                    }
+                    const prevCtx = ctxMessages.length > 0 ? ctxMessages[ctxMessages.length - 1] : undefined;
+                    handleSubmit(q, prevCtx);
+                  }}
+                />
+              </div>
+            );
+          })()}
         </div>
+        )}
+        <style>{`
+          @keyframes sis-brief-fade {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0);   }
+          }
+        `}</style>
       </div>
 
-      {/* Intelligence Feed */}
-      {/* Feed Teaser — compact highlights, links to /wissen#signale */}
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px" }}>
-        <FeedTeaser locale={locale} />
-      </div>
-
-      </>)}
+      {/* ── Fixed bottom gradient glow ─────────────────────────────
+           Decoupled from the command line so the command line can sit in
+           the visual middle while the lime "horizon" glow stays anchored
+           to the viewport bottom (just above the SignalTicker). Only shown
+           in the empty (first-visit) state. */}
+      {isFirstVisit && !showFullRadar && (
+        <div
+          aria-hidden
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 34, // sits directly above the 34px-tall SignalTicker
+            height: 360,
+            background:
+              "linear-gradient(to top, rgba(228,255,151,0.62) 0%, rgba(228,255,151,0.36) 28%, rgba(228,255,151,0.16) 55%, rgba(228,255,151,0.05) 80%, transparent 100%)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        />
+      )}
 
       {/* Trend Detail Panel */}
       {selectedTrend && (

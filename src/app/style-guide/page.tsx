@@ -1100,7 +1100,6 @@ export default function StyleGuide() {
             style={{
               background: "var(--pastel-butter)",
               border: "1px solid var(--pastel-butter-border)",
-              borderLeft: "3px solid var(--color-warning)",
               borderRadius: "var(--radius-lg)",
               padding: "12px 16px",
               fontSize: 13,

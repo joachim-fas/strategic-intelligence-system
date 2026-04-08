@@ -180,7 +180,7 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
                       className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg group hover:shadow-sm transition-all"
                       style={{
                         background: cfg.bg,
-                        borderLeft: `3px solid ${cfg.border}`,
+                        border: `1px solid ${cfg.border}`,
                         cursor: signal.trendName ? "pointer" : "default",
                       }}>
                       {/* Icon */}
@@ -244,7 +244,6 @@ export default function IntelligenceFeed({ trends, locale, onTrendClick }: Intel
               width: 260,
               background: "var(--volt-surface, #fff)",
               border: `1px solid ${cfg.border}`,
-              borderLeft: `3px solid ${cfg.color}`,
               borderRadius: 10,
               boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
               padding: "12px 14px",

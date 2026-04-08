@@ -145,7 +145,7 @@ function BriefingContent() {
             Kausale Zusammenhänge
           </h2>
           {(b.causalAnalysis ?? b.causalChain)?.map((chain: string, i: number) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 6, paddingLeft: 12, borderLeft: "2px solid var(--volt-lime, #E4FF97)" }}>
+            <div key={i} style={{ fontSize: 13, marginBottom: 6, paddingLeft: 12 }}>
               {chain}
             </div>
           ))}

@@ -52,6 +52,15 @@ import { dockerHubConnector } from "./docker-hub";
 import { vdemConnector } from "./vdem";
 import { patentsviewConnector } from "./patentsview";
 import { kalshiConnector } from "./kalshi";
+// Batch 5: Declarative-framework connectors (2026-04) —
+// Crypto/DeFi, clinical research, migration, pathogen tracking.
+import { coingeckoConnector } from "./coingecko";
+import { defiLlamaConnector } from "./defi-llama";
+import { clinicaltrialsConnector } from "./clinicaltrials";
+import { openFdaConnector } from "./openfda";
+import { unhcrConnector } from "./unhcr";
+import { nextstrainConnector } from "./nextstrain";
+import { idmcConnector } from "./idmc";
 
 export const connectors: SourceConnector[] = [
   // Tech & Developer signals
@@ -121,6 +130,17 @@ export const connectors: SourceConnector[] = [
   patentsviewConnector,
   // Prediction markets
   kalshiConnector,
+  // Batch 5: Crypto / DeFi
+  coingeckoConnector,
+  defiLlamaConnector,
+  // Batch 5: Clinical research & drug events
+  clinicaltrialsConnector,
+  openFdaConnector,
+  // Batch 5: Pathogen tracking
+  nextstrainConnector,
+  // Batch 5: Migration & displacement
+  unhcrConnector,
+  idmcConnector,
 ];
 
 export function getConnector(name: string): SourceConnector | undefined {

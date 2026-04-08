@@ -15,6 +15,34 @@ import { EigenerGedanke } from "./EigenerGedanke";
 import { CausalOrbit } from "./CausalOrbit";
 import { ScenarioSelector } from "./ScenarioSelector";
 import { BriefingExport } from "./BriefingExport";
+import {
+  VoltInfoBlock,
+  VoltSectionLabel,
+  VoltMetaRow,
+  VoltReferencePill,
+  VoltKpiCard,
+  VoltSectionCard,
+  VoltIconBox,
+  VoltInsightChip,
+} from "@/components/verstehen/VoltPrimitives";
+import {
+  Target,
+  Zap,
+  BookOpen,
+  Gauge,
+  Network,
+  Sparkles,
+  Lightbulb,
+  AlertTriangle,
+  TrendingUp,
+  Radio,
+  Scale,
+  ArrowRight,
+  Newspaper,
+  Compass,
+  FileText as DocIcon,
+  MessageSquare,
+} from "lucide-react";
 
 const MiniRadar = dynamic(() => import("@/components/radar/MiniRadar"), { ssr: false });
 const BalancedScorecard = dynamic(() => import("@/components/radar/BalancedScorecard"), { ssr: false });
@@ -32,14 +60,13 @@ export interface HistoryEntry {
 }
 
 // ── BriefingResult ────────────────────────────────────────────────────────────
-export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp, onOpenInCanvas }: {
+export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp }: {
   entry: HistoryEntry;
   locale: Locale;
   trendCount: number;
   onTrendClick: (trend: TrendDot) => void;
   activeProjectId?: string | null;
   onFollowUp?: (query: string) => void;
-  onOpenInCanvas?: (entry: HistoryEntry) => void;
 }) {
   const { briefing } = entry;
   const isHelp = entry.query === "/help";
@@ -82,7 +109,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   };
 
   return (
-    <article className="card volt-texture" style={{ borderLeft: entry.parentQuery ? "3px solid var(--volt-sky, #7AB8F5)" : "3px solid var(--volt-lime, #E4FF97)" }}>
+    <article className="card volt-texture">
 
       {/* Thread indicator */}
       {entry.parentQuery && (
@@ -117,11 +144,6 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         )}
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
           <BriefingExport entry={entry} locale={locale} />
-        )}
-        {!isLoading && !isHelp && briefing.synthesis && onOpenInCanvas && (
-          <VoltButton variant="outline" size="sm" onClick={() => onOpenInCanvas(entry)}>
-            ⊞ Canvas
-          </VoltButton>
         )}
         {briefing.confidence > 0 && !isLoading && (
           <Badge
@@ -172,139 +194,198 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         </div>
       )}
 
-      {/* ── Completed state ────────────────────────────────────── */}
+      {/* ── Completed state (Volt UI Dashboard structure) ──────── */}
       {!isLoading && (
-        <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* 1. Synthesis — truncated by default */}
+          {/* ═══ LEVEL 1: SYNTHESIS + KPI HERO ═══ */}
+
+          {/* 1a. Synthesis — the main answer */}
           {briefing.synthesis && (
             <SynthesisBlock text={briefing.synthesis} locale={locale} isHelp={isHelp} />
           )}
 
-          {/* 1b. Section preview chips — VoltBadge */}
-          {!isHelp && (b.scenarios?.length > 0 || briefing.causalChain?.length > 0 || b.balancedScorecard || briefing.keyInsights?.length > 0) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {b.scenarios?.length > 0 && (
-                <VoltBadge variant="muted" size="sm">◈ {b.scenarios.length} {locale === "de" ? "Szenarien" : "Scenarios"}</VoltBadge>
+          {/* 1b. KPI Hero Grid — Volt UI Dashboard pattern (4 cards) */}
+          {!isHelp && (b.usedSignals?.length > 0 || b.references?.length > 0 || briefing.confidence > 0 || b.scenarios?.length > 0) && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {briefing.confidence > 0 && (
+                <VoltKpiCard
+                  variant={briefing.confidence > 0.7 ? "lime" : "light"}
+                  label={locale === "de" ? "Konfidenz" : "Confidence"}
+                  value={`${Math.round(briefing.confidence * 100)}%`}
+                  subLabel={briefing.confidence > 0.7
+                    ? (locale === "de" ? "Breite Datenbasis, starke Übereinstimmung" : "Broad data basis, strong agreement")
+                    : briefing.confidence > 0.4
+                    ? (locale === "de" ? "Mittlere Verlässlichkeit" : "Moderate reliability")
+                    : (locale === "de" ? "Geringe Datenbasis" : "Limited data basis")
+                  }
+                  icon={<Gauge size={16} />}
+                />
               )}
-              {briefing.causalChain?.length > 0 && (
-                <VoltBadge variant="muted" size="sm">⬡ Kausalnetz</VoltBadge>
-              )}
-              {b.balancedScorecard?.perspectives?.length > 0 && (
-                <VoltBadge variant="muted" size="sm">◉ Scorecard</VoltBadge>
-              )}
-              {briefing.keyInsights?.length > 0 && (
-                <VoltBadge variant="muted" size="sm">→ {briefing.keyInsights.length} {locale === "de" ? "Erkenntnisse" : "Insights"}</VoltBadge>
-              )}
-              {b.followUpQuestions?.length > 0 && (
-                <VoltBadge variant="muted" size="sm">↺ {b.followUpQuestions.length} {locale === "de" ? "Folgefragen" : "Follow-ups"}</VoltBadge>
-              )}
-            </div>
-          )}
-
-          {/* 1c. Transparency indicator — shows data sources used */}
-          {!isHelp && !isLoading && (b.usedSignals?.length > 0 || b.references?.length > 0 || briefing.confidence > 0) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "rgba(37,99,235,0.04)", borderRadius: 8, border: "1px solid rgba(37,99,235,0.1)" }}>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "var(--volt-neutral-text, #2563EB)", textTransform: "uppercase" }}>
-                {locale === "de" ? "Datengrundlage" : "Data Basis"}
-              </span>
               {b.usedSignals?.length > 0 && (
-                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
-                  {b.usedSignals.length} {locale === "de" ? "Live-Signale" : "live signals"}
-                </span>
+                <VoltKpiCard
+                  variant="light"
+                  label={locale === "de" ? "Live-Signale" : "Live Signals"}
+                  value={b.usedSignals.length}
+                  subLabel={locale === "de" ? "Aus aktiven Connectors" : "From active connectors"}
+                  icon={<Radio size={16} />}
+                />
               )}
               {b.references?.length > 0 && (
-                <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
-                  {b.references.length} {locale === "de" ? "Quellen" : "sources"}
-                </span>
+                <VoltKpiCard
+                  variant="light"
+                  label={locale === "de" ? "Quellen" : "Sources"}
+                  value={b.references.length}
+                  subLabel={locale === "de" ? "Authoritative Referenzen" : "Authoritative references"}
+                  icon={<BookOpen size={16} />}
+                />
               )}
-              {briefing.confidence > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 600, color: briefing.confidence > 0.7 ? "var(--signal-positive)" : briefing.confidence > 0.4 ? "#F5A623" : "var(--signal-negative)" }}>
-                  {Math.round(briefing.confidence * 100)}% {locale === "de" ? "Konfidenz" : "confidence"}
-                </span>
+              {b.scenarios?.length > 0 && (
+                <VoltKpiCard
+                  variant="dark"
+                  label={locale === "de" ? "Szenarien" : "Scenarios"}
+                  value={b.scenarios.length}
+                  subLabel={locale === "de" ? "Optimistisch · Basis · Pessimistisch" : "Optimistic · Base · Pessimistic"}
+                  icon={<Compass size={16} />}
+                />
               )}
-              <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: "auto" }}>
-                STEEP+V · EU-Fokus
-              </span>
             </div>
           )}
 
-          {/* 2. Scenarios */}
+          {/* ═══ LEVEL 2: MAIN SECTION CARDS ═══ */}
+
+          {/* 2. Scenarios in Section Card */}
           {b.scenarios?.length > 0 && (
-            <ScenarioSelector
-              scenarios={b.scenarios}
-              query={entry.query}
-              locale={locale}
-              onFollowUp={onFollowUp}
-            />
-          )}
-
-          {/* 3. Causal Orbit */}
-          {briefing.causalChain?.length > 0 && (
-            <CausalOrbit
-              chains={briefing.causalChain}
-              locale={locale}
-              onNodeClick={(node) => onFollowUp?.(
-                locale === "de"
-                  ? `Analysiere den Knoten "${node}" im Kontext von: ${entry.query}`
-                  : `Analyze the node "${node}" in the context of: ${entry.query}`
-              )}
-            />
-          )}
-
-          {/* 4. Balanced Scorecard */}
-          {b.balancedScorecard?.perspectives?.length > 0 && (
-            <BalancedScorecard
-              data={b.balancedScorecard}
-              locale={locale}
-              onRating={(perspectiveId, rating) => {
-                const queryHash = btoa(entry.query.slice(0, 64) + entry.timestamp.toISOString().slice(0, 16))
-                  .replace(/[^a-z0-9]/gi, "").slice(0, 32);
-                fetch("/api/v1/bsc-ratings", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ queryHash, perspectiveId, rating }),
-                }).catch(() => {});
-              }}
-            />
-          )}
-
-          {/* 5. Key Insights (first 3) */}
-          {briefing.keyInsights?.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {briefing.keyInsights.slice(0, isHelp ? undefined : 3).map((insight: string, i: number) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
-                    background: isHelp ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
-                    fontSize: 10, fontWeight: 700, color: "var(--volt-text, #0A0A0A)",
-                  }}>{isHelp ? "·" : "→"}</span>
-                  <span style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{insight}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 6. Strategic Interpretation */}
-          {b.interpretation && (
-            <div className="info-block info-block-brand">
-              <div className="section-label" style={{ color: "var(--color-brand)", marginBottom: 6 }}>
-                {locale === "de" ? "Strategische Interpretation" : "Strategic Interpretation"}
-              </div>
-              <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.6 }}>{b.interpretation}</p>
-            </div>
-          )}
-
-          {/* 7. Mini Radar (≥3 matched trends) */}
-          {briefing.matchedTrends.length > 2 && (
-            <div style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", overflow: "hidden", background: "var(--color-page-bg)" }}>
-              <MiniRadar
-                trends={briefing.matchedTrends.map((m: any) => m.trend)}
-                onTrendClick={onTrendClick}
-                width={640} height={280}
+            <VoltSectionCard
+              icon={<Compass size={18} />}
+              iconVariant="blue"
+              title={locale === "de" ? "Zukunftsszenarien" : "Future Scenarios"}
+              subtitle={locale === "de"
+                ? `${b.scenarios.length} Szenarien modelliert — wähle eine Karte für Aktionen`
+                : `${b.scenarios.length} scenarios modeled — pick a card for actions`}
+            >
+              <ScenarioSelector
+                scenarios={b.scenarios}
+                query={entry.query}
+                locale={locale}
+                onFollowUp={onFollowUp}
+                hideHeader
               />
-            </div>
+            </VoltSectionCard>
+          )}
+
+          {/* 3. Key Insights in Section Card */}
+          {briefing.keyInsights?.length > 0 && !isHelp && (
+            <VoltSectionCard
+              icon={<Lightbulb size={18} />}
+              iconVariant="lime"
+              title={locale === "de" ? "Wichtigste Erkenntnisse" : "Key Insights"}
+              subtitle={locale === "de"
+                ? `${briefing.keyInsights.length} strategische Punkte`
+                : `${briefing.keyInsights.length} strategic points`}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {briefing.keyInsights.slice(0, 3).map((insight: string, i: number) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <VoltIconBox
+                      icon={<span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{String(i + 1).padStart(2, "0")}</span>}
+                      variant="lime"
+                      size={32}
+                      rounded="full"
+                    />
+                    <p
+                      style={{
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        color: "var(--foreground)",
+                        margin: 0,
+                        fontFamily: "var(--font-ui)",
+                        flex: 1,
+                        paddingTop: 5,
+                      }}
+                    >
+                      {insight}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </VoltSectionCard>
+          )}
+
+          {/* 4. Causal Orbit in Section Card */}
+          {briefing.causalChain?.length > 0 && (
+            <VoltSectionCard
+              icon={<Network size={18} />}
+              iconVariant="orchid"
+              title={locale === "de" ? "Kausalnetz" : "Causal Network"}
+              subtitle={locale === "de"
+                ? `${briefing.causalChain.length} Ketten visualisiert`
+                : `${briefing.causalChain.length} chains visualized`}
+            >
+              <CausalOrbit
+                chains={briefing.causalChain}
+                locale={locale}
+                onNodeClick={(node) => onFollowUp?.(
+                  locale === "de"
+                    ? `Analysiere den Knoten "${node}" im Kontext von: ${entry.query}`
+                    : `Analyze the node "${node}" in the context of: ${entry.query}`
+                )}
+              />
+            </VoltSectionCard>
+          )}
+
+          {/* 5. Balanced Scorecard in Section Card */}
+          {b.balancedScorecard?.perspectives?.length > 0 && (
+            <VoltSectionCard
+              icon={<Target size={18} />}
+              iconVariant="mint"
+              title={locale === "de" ? "Strategische Dimensionen" : "Strategic Dimensions"}
+              subtitle={locale === "de"
+                ? "Balanced Scorecard — 4 Perspektiven"
+                : "Balanced Scorecard — 4 perspectives"}
+            >
+              <BalancedScorecard
+                data={b.balancedScorecard}
+                locale={locale}
+                onRating={(perspectiveId, rating) => {
+                  const queryHash = btoa(entry.query.slice(0, 64) + entry.timestamp.toISOString().slice(0, 16))
+                    .replace(/[^a-z0-9]/gi, "").slice(0, 32);
+                  fetch("/api/v1/bsc-ratings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ queryHash, perspectiveId, rating }),
+                  }).catch(() => {});
+                }}
+              />
+            </VoltSectionCard>
+          )}
+
+          {/* 6. Mini Radar (if ≥3 matched trends) */}
+          {briefing.matchedTrends.length > 2 && (
+            <VoltSectionCard
+              icon={<TrendingUp size={18} />}
+              iconVariant="butter"
+              title={locale === "de" ? "Trend-Radar" : "Trend Radar"}
+              subtitle={locale === "de"
+                ? `${briefing.matchedTrends.length} verwandte Trends`
+                : `${briefing.matchedTrends.length} related trends`}
+              padding="none"
+            >
+              <div style={{ padding: "0 20px 20px", background: "var(--muted, #F7F7F7)" }}>
+                <MiniRadar
+                  trends={briefing.matchedTrends.map((m: any) => m.trend)}
+                  onTrendClick={onTrendClick}
+                  width={640}
+                  height={280}
+                />
+              </div>
+            </VoltSectionCard>
           )}
 
           {/* Trend chips (≤2 matched trends) */}
@@ -324,7 +405,46 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
 
-          {/* 8. Suggested Tags (pre-fills input, does not submit) */}
+          {/* ═══ LEVEL 3: CONTEXT INFOBLOCKS (InfoBlocks, side-by-side on wide screens) ═══ */}
+
+          {(b.interpretation || b.newsContext || b.decisionFramework) && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {b.interpretation && (
+                <VoltInfoBlock
+                  variant="brand"
+                  label={locale === "de" ? "Strategische Interpretation" : "Strategic Interpretation"}
+                >
+                  {b.interpretation}
+                </VoltInfoBlock>
+              )}
+              {b.newsContext && (
+                <VoltInfoBlock
+                  variant="warning"
+                  label={locale === "de" ? "Aktueller Kontext" : "Current Context"}
+                >
+                  {b.newsContext}
+                </VoltInfoBlock>
+              )}
+              {b.decisionFramework && (
+                <VoltInfoBlock
+                  variant="success"
+                  label={locale === "de" ? "Entscheidungshilfe" : "Decision Framework"}
+                >
+                  {b.decisionFramework}
+                </VoltInfoBlock>
+              )}
+            </div>
+          )}
+
+          {/* ═══ LEVEL 4: SOURCES + FOLLOW-UPS + DETAILS ═══ */}
+
+          {/* Suggested Tags */}
           {b.suggestedTags?.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {b.suggestedTags.map((tag: string, i: number) => (
@@ -347,27 +467,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
 
-          {/* 9. News Context */}
-          {b.newsContext && (
-            <div className="info-block info-block-warning">
-              <div className="section-label" style={{ color: "var(--color-warning)", marginBottom: 6 }}>
-                {locale === "de" ? "Aktueller Kontext" : "Current Context"}
-              </div>
-              <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.6 }}>{b.newsContext}</p>
-            </div>
-          )}
-
-          {/* 10. Decision Framework */}
-          {b.decisionFramework && (
-            <div className="info-block info-block-success">
-              <div className="section-label" style={{ color: "var(--color-success)", marginBottom: 6 }}>
-                {locale === "de" ? "Entscheidungshilfe" : "Decision Framework"}
-              </div>
-              <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.6 }}>{b.decisionFramework}</p>
-            </div>
-          )}
-
-          {/* 10b. References — always visible; fallback if none */}
+          {/* Sources — References */}
           {(!b.references || b.references.length === 0) && !isHelp && briefing.synthesis && (
             <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic", padding: "4px 0" }}>
               {locale === "de"
@@ -376,129 +476,209 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
           {b.references?.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>
-                {locale === "de" ? "Quellen" : "Sources"}
-              </span>
-              {b.references.map((ref: { title: string; url: string; relevance?: string }, i: number) => (
-                <a
-                  key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
-                  title={ref.relevance}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 4,
-                    fontSize: 11, color: "var(--color-brand)", textDecoration: "none",
-                    padding: "2px 8px", borderRadius: "var(--radius-full)",
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                    transition: "background 0.12s, border-color 0.12s",
-                    whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--color-surface-2)";
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--color-brand-light)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--color-surface)";
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)";
-                  }}
-                >
-                  <span style={{ fontSize: 10 }}>↗</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{ref.title}</span>
-                </a>
-              ))}
-            </div>
-          )}
-
-          {/* 11. Follow-up Questions */}
-          {b.followUpQuestions?.length > 0 && (
-            <div>
-              <div className="section-label" style={{ marginBottom: 8 }}>
-                {locale === "de" ? "Weiterführende Fragen" : "Follow-up Questions"}
-              </div>
+            <VoltSectionCard
+              icon={<BookOpen size={18} />}
+              iconVariant="light"
+              title={locale === "de" ? "Quellen" : "Sources"}
+              subtitle={locale === "de"
+                ? `${b.references.length} authoritative Referenzen`
+                : `${b.references.length} authoritative references`}
+            >
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {b.followUpQuestions.map((q: string, i: number) => (
-                  <VoltButton key={i} variant="outline" size="sm" onClick={() => onFollowUp?.(q)}>
-                    → {q}
-                  </VoltButton>
+                {b.references.map((ref: { title: string; url: string; relevance?: string }, i: number) => (
+                  <VoltReferencePill
+                    key={i}
+                    href={ref.url}
+                    title={ref.title}
+                    externalTitle={ref.relevance}
+                  />
                 ))}
               </div>
-            </div>
+            </VoltSectionCard>
           )}
 
-          {/* 12. Expandable details (extra insights + regulation) */}
-          {(briefing.regulatoryContext?.length > 0 || briefing.keyInsights?.length > 3) && (
+          {/* Follow-up Questions */}
+          {b.followUpQuestions?.length > 0 && (
+            <VoltSectionCard
+              icon={<MessageSquare size={18} />}
+              iconVariant="light"
+              title={locale === "de" ? "Weiterführende Fragen" : "Follow-up Questions"}
+              subtitle={locale === "de" ? "Klicke eine Frage zum Vertiefen" : "Click a question to dive deeper"}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {b.followUpQuestions.map((q: string, i: number) => (
+                  <button
+                    key={i}
+                    onClick={() => onFollowUp?.(q)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 14px",
+                      background: "var(--muted, #F7F7F7)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontFamily: "var(--font-ui)",
+                      fontSize: 13,
+                      color: "var(--foreground)",
+                      transition: "all 0.15s",
+                      lineHeight: 1.45,
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "var(--card)";
+                      e.currentTarget.style.borderColor = "var(--foreground)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "var(--muted, #F7F7F7)";
+                      e.currentTarget.style.borderColor = "var(--color-border)";
+                    }}
+                  >
+                    <VoltIconBox
+                      icon={<ArrowRight size={14} />}
+                      variant="light"
+                      size={28}
+                      rounded="full"
+                    />
+                    <span style={{ flex: 1 }}>{q}</span>
+                  </button>
+                ))}
+              </div>
+            </VoltSectionCard>
+          )}
+
+          {/* Live Signals as Activity-List inside Section Card */}
+          {b.usedSignals?.length > 0 && (
+            <VoltSectionCard
+              icon={<Radio size={18} />}
+              iconVariant="mint"
+              title={locale === "de" ? "Live-Signale" : "Live Signals"}
+              subtitle={locale === "de"
+                ? `${b.usedSignals.length} aggregierte Signale`
+                : `${b.usedSignals.length} aggregated signals`}
+              action={
+                <button
+                  onClick={() => setShowSignals((v) => !v)}
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--muted-foreground)",
+                    cursor: "pointer",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {showSignals ? (locale === "de" ? "Einklappen" : "Collapse") : (locale === "de" ? "Ausklappen" : "Expand")}
+                </button>
+              }
+            >
+              {showSignals && (
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {b.usedSignals.map((s: { source: string; title: string; url: string | null; strength: number | null; date: string }, i: number) => {
+                    const sourceIconVariant: "blue" | "mint" | "orchid" | "peach" | "butter" | "rose" =
+                      s.source.toLowerCase().includes("arxiv") || s.source.toLowerCase().includes("crossref") ? "orchid"
+                      : s.source.toLowerCase().includes("github") ? "light" as any
+                      : s.source.toLowerCase().includes("news") || s.source.toLowerCase().includes("guardian") ? "rose"
+                      : s.source.toLowerCase().includes("reddit") || s.source.toLowerCase().includes("social") ? "peach"
+                      : s.source.toLowerCase().includes("gdelt") || s.source.toLowerCase().includes("acled") ? "butter"
+                      : "mint";
+                    const SourceIcon = s.source.toLowerCase().includes("arxiv") || s.source.toLowerCase().includes("crossref") || s.source.toLowerCase().includes("openalex") ? DocIcon
+                      : s.source.toLowerCase().includes("news") || s.source.toLowerCase().includes("guardian") || s.source.toLowerCase().includes("nyt") ? Newspaper
+                      : Radio;
+                    return (
+                      <a
+                        key={i}
+                        href={s.url || undefined}
+                        target={s.url ? "_blank" : undefined}
+                        rel={s.url ? "noopener noreferrer" : undefined}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "12px 0",
+                          borderBottom: i < b.usedSignals.length - 1 ? "1px solid var(--color-border)" : "none",
+                          textDecoration: "none",
+                          color: "inherit",
+                        }}
+                      >
+                        <VoltIconBox
+                          icon={<SourceIcon size={14} />}
+                          variant={sourceIconVariant as any}
+                          size={32}
+                          rounded="full"
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-ui)",
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "var(--foreground)",
+                              lineHeight: 1.4,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {s.title}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                              color: "var(--muted-foreground)",
+                              marginTop: 3,
+                            }}
+                          >
+                            {s.source}
+                          </div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </VoltSectionCard>
+          )}
+
+          {/* Regulatory context in expandable details */}
+          {briefing.regulatoryContext?.length > 0 && (
             <details>
               <summary style={{
-                fontSize: 12, color: "var(--color-text-muted)", cursor: "pointer",
-                listStyle: "none", display: "flex", alignItems: "center", gap: 6, userSelect: "none",
+                fontSize: 11, color: "var(--muted-foreground)", cursor: "pointer",
+                listStyle: "none", display: "flex", alignItems: "center", gap: 8, userSelect: "none",
+                fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
+                padding: "8px 0",
               }}>
-                <span>▸</span>
-                <span>{locale === "de" ? "Details" : "Details"}</span>
-                {briefing.keyInsights?.length > 3 && <span>+{briefing.keyInsights.length - 3}</span>}
+                <Scale size={14} />
+                <span>{locale === "de" ? "Regulierung" : "Regulation"}</span>
+                <span style={{ opacity: 0.6 }}>({briefing.regulatoryContext.length})</span>
               </summary>
-              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                {briefing.keyInsights?.length > 3 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {briefing.keyInsights.slice(3).map((insight: string, i: number) => (
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                        <span style={{ color: "var(--color-warning)", flexShrink: 0, marginTop: 2 }}>→</span>
-                        <span style={{ fontSize: 14, color: "var(--color-text-subtle)", lineHeight: 1.55 }}>{insight}</span>
-                      </div>
-                    ))}
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 22 }}>
+                {briefing.regulatoryContext.map((reg: string, i: number) => (
+                  <div key={i} style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.55 }}>
+                    {reg}
                   </div>
-                )}
-                {briefing.regulatoryContext?.length > 0 && (
-                  <div>
-                    <div className="section-label" style={{ marginBottom: 6 }}>
-                      {locale === "de" ? "Regulierung" : "Regulation"}
-                    </div>
-                    {briefing.regulatoryContext.map((reg: string, i: number) => (
-                      <div key={i} style={{ fontSize: 13, color: "var(--color-text-subtle)", marginBottom: 4 }}>⚖ {reg}</div>
-                    ))}
+                ))}
+                {briefing.keyInsights?.length > 3 && briefing.keyInsights.slice(3).map((insight: string, i: number) => (
+                  <div key={`ki-${i}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4 }}>
+                    <Sparkles size={12} style={{ color: "var(--muted-foreground)", flexShrink: 0, marginTop: 3 }} />
+                    <span style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.55 }}>{insight}</span>
                   </div>
-                )}
+                ))}
               </div>
             </details>
           )}
 
-          {/* 13. Live Signals */}
-          {b.usedSignals?.length > 0 && (
-            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 12 }}>
-              <button
-                onClick={() => setShowSignals((v) => !v)}
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-              >
-                <span style={{ fontSize: 9, display: "inline-block", transform: showSignals ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>▶</span>
-                <span>{locale === "de" ? "Live-Signale" : "Live signals"}</span>
-                <Badge variant="secondary" className="text-[11px] h-5 px-2">{b.usedSignals.length}</Badge>
-              </button>
-              {showSignals && (
-                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 16, borderLeft: "2px solid var(--color-border)" }}>
-                  {b.usedSignals.map((s: { source: string; title: string; url: string | null; strength: number | null; date: string }, i: number) => (
-                    <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", color: "var(--color-text-muted)", flexShrink: 0, width: 72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {s.source}
-                      </span>
-                      {s.url ? (
-                        <a
-                          href={s.url} target="_blank" rel="noopener noreferrer"
-                          style={{ fontSize: 12, color: "var(--color-brand)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}
-                        >
-                          {s.title}
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: 12, color: "var(--color-text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {s.title}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 14. Eigener Gedanke */}
+          {/* Eigener Gedanke */}
           {!isHelp && briefing.synthesis && (
             <EigenerGedanke
               locale={locale}

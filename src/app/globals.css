@@ -465,12 +465,11 @@ h1, h2, h3, h4, h5, h6 {
   padding: 14px 16px;
   border-radius: var(--radius-lg);
   border: 1px solid;
-  border-left-width: 3px;
 }
 
-.info-block-brand   { background: var(--color-lime-light); border-color: var(--color-lime-deep); border-left-color: #0A0A0A; }
-.info-block-warning { background: var(--pastel-butter);  border-color: var(--pastel-butter-border);  border-left-color: var(--color-warning); }
-.info-block-success { background: var(--pastel-mint);    border-color: var(--pastel-mint-border);    border-left-color: var(--color-success); }
+.info-block-brand   { background: var(--color-lime-light); border-color: var(--color-lime-deep); }
+.info-block-warning { background: var(--pastel-butter);  border-color: var(--pastel-butter-border); }
+.info-block-success { background: var(--pastel-mint);    border-color: var(--pastel-mint-border); }
 
 /* ═══════════════════════════════════════════════════════
    INPUT

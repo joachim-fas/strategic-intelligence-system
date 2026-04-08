@@ -4,9 +4,18 @@ import { useState, useEffect } from "react";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
+// Brutally minimal main navigation, ordered by mental model:
+// — "Sessions" (first) is the strategic working area where work happens:
+//   list of past canvases, each resolving to /canvas/[id].
+// — "Knowledge Cockpit" (second) is the data/reference landscape: radar,
+//   network, signals, sources, methodology.
+//
+// Frameworks are reached from the Home page (hero cards), Node Canvas is reached
+// from within a Session — neither needs its own nav slot.
+// Labels are English-only by user choice.
 const NAV_ITEMS = [
-  { href: "/verstehen",  labelDe: "Verstehen",  labelEn: "Understand" },
-  { href: "/workspace",  labelDe: "Workspace",  labelEn: "Workspace"  },
+  { href: "/sessions",  labelDe: "Sessions",          labelEn: "Sessions"          },
+  { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
 ];
 
 /**
@@ -68,7 +77,12 @@ export function AppHeader() {
         <nav className="sis-nav-desktop" style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {NAV_ITEMS.map(({ href, labelDe, labelEn }) => {
             const label = locale === "de" ? labelDe : labelEn;
-            const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+            // "Sessions" also owns /canvas routes — drilling into a session
+            // from the list must keep the nav item highlighted.
+            const isActive =
+              pathname === href
+              || (href !== "/" && pathname.startsWith(href))
+              || (href === "/sessions" && pathname.startsWith("/canvas"));
             return (
               <a key={href} href={href}
                 style={{

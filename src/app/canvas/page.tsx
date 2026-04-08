@@ -11,6 +11,8 @@ import { BOARD_COLUMNS, NODE_COLORS } from "@/lib/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
+import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
+import { GitBranch } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -2122,7 +2124,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-butter)",
           border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-          borderLeft: "3px solid #F9A825", borderRadius: 6,
+          borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
           opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
@@ -2205,7 +2207,7 @@ function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-peach)",
           border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-          borderLeft: "3px solid #FF9800", borderRadius: 6,
+          borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
           opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
@@ -2293,7 +2295,7 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-mint)",
           border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-          borderLeft: "3px solid #2E7D32", borderRadius: 6,
+          borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
           opacity: dimmed ? 0.18 : 1, transition: "opacity 0.2s",
@@ -2407,7 +2409,7 @@ function FileNodeCard({
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-blue)",
           border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
-          borderLeft: "3px solid #4A6CF7", borderRadius: 6,
+          borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
           opacity: dimmed ? 0.18 : node.loading ? 0.6 : 1, transition: "opacity 0.2s",
@@ -3376,7 +3378,7 @@ function DetailPanel({
           {(r?.newsContext || (r?.usedSignals && r.usedSignals.length > 0)) && (
             <CollapsibleSection title={`${de ? "Live-Signale & Kontext" : "Live Signals & Context"}${r?.usedSignals?.length ? ` (${r.usedSignals.length})` : ""}`} accent="#2563EB">
               {r?.newsContext && (
-                <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: "0 0 12px", padding: "8px 12px", background: "#EFF6FF", borderRadius: 7, borderLeft: "3px solid #2563EB" }}>
+                <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: "0 0 12px", padding: "8px 12px", background: "#EFF6FF", borderRadius: 7 }}>
                   {r.newsContext}
                 </p>
               )}
@@ -3488,7 +3490,7 @@ function DetailPanel({
               {r?.causalAnalysis && r.causalAnalysis.length > 0 && (
                 <div style={{ marginTop: 10 }}>
                   {r.causalAnalysis.map((chain, i) => (
-                    <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8, borderLeft: "2px solid #1A9E5A44" }}>{chain}</div>
+                    <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8 }}>{chain}</div>
                   ))}
                 </div>
               )}
@@ -3513,7 +3515,7 @@ function DetailPanel({
               {r.scenarios.map((s, i) => {
                 const sc = SCEN[s.type ?? "baseline"] ?? SCEN.baseline;
                 return (
-                  <div key={i} style={{ marginBottom: 8, padding: "10px 12px", background: sc.bg, borderRadius: 8, borderLeft: `3px solid ${sc.color}` }}>
+                  <div key={i} style={{ marginBottom: 8, padding: "10px 12px", background: sc.bg, borderRadius: 8, border: `1px solid ${sc.color}30` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 9, fontWeight: 700, color: sc.color, letterSpacing: "0.05em" }}>{de ? sc.label.toUpperCase() : sc.labelEn.toUpperCase()}</span>
                       {s.timeframe && <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{s.timeframe}</span>}
@@ -3566,7 +3568,7 @@ function DetailPanel({
           {/* ── Strategische Interpretation ───────────────────────── */}
           {r?.interpretation && (
             <CollapsibleSection title={de ? "Strategische Interpretation" : "Strategic Interpretation"} accent="#0A3A20">
-              <div style={{ padding: "10px 14px", background: "#F4FBF7", borderRadius: 8, borderLeft: "3px solid #1A9E5A" }}>
+              <div style={{ padding: "10px 14px", background: "#F4FBF7", borderRadius: 8 }}>
                 <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--color-text-secondary)", margin: 0 }}>{r.interpretation}</p>
               </div>
             </CollapsibleSection>
@@ -3575,7 +3577,7 @@ function DetailPanel({
           {/* ── Entscheidungshilfe ────────────────────────────────── */}
           {r?.decisionFramework && (
             <CollapsibleSection title={de ? "Entscheidungshilfe" : "Decision Framework"} accent="#1D4ED8">
-              <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 8, borderLeft: "3px solid #2563EB" }}>
+              <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 8 }}>
                 {r.decisionFramework.replace(/\.\s+(?=\d+\.)/g, ".\n").split("\n").filter(Boolean).map((step, i, arr) => (
                   <div key={i} style={{ display: "flex", gap: 8, marginBottom: i < arr.length - 1 ? 8 : 0 }}>
                     <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>{i + 1}</span>
@@ -3590,7 +3592,7 @@ function DetailPanel({
           {r?.regulatoryContext && r.regulatoryContext.length > 0 && (
             <CollapsibleSection title={de ? "Regulierung" : "Regulatory Context"} defaultOpen={false}>
               {r.regulatoryContext.map((reg, i) => (
-                <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8, borderLeft: "2px solid #F5A62344" }}>{reg}</div>
+                <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8 }}>{reg}</div>
               ))}
             </CollapsibleSection>
           )}
@@ -5322,13 +5324,36 @@ export default function CanvasPage() {
       {/* ── Global Header (hidden when embedded) ────────── */}
       {!embedded && hydrated && <AppHeader />}
 
-      {/* ── Canvas Toolbar (project management + tools) ────────── */}
+      {/* ── Canvas Toolbar (Volt UI Node Canvas style) ────────── */}
       {!embedded && hydrated && (
-      <div style={{ height: 42, flexShrink: 0, zIndex: 190, display: "flex", alignItems: "center", padding: "0 20px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface, rgba(255,255,255,0.92))" }}>
+      <div style={{ height: 48, flexShrink: 0, zIndex: 190, display: "flex", alignItems: "center", padding: "0 20px", gap: 12, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface, rgba(255,255,255,0.95))", backdropFilter: "blur(12px) saturate(160%)" }}>
 
-        {/* Canvas label */}
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", letterSpacing: "-0.01em", flexShrink: 0 }}>Canvas</span>
-        <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+        {/* Node Canvas brand label with icon */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <VoltIconBox icon={<GitBranch size={14} />} variant="lime" size={28} rounded="md" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, lineHeight: 1.1 }}>
+            <span style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              color: "var(--foreground, #0A0A0A)",
+            }}>
+              Node Canvas
+            </span>
+            <span style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 8,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "var(--muted-foreground, #6B6B6B)",
+            }}>
+              {de ? "Workflow-System" : "Workflow System"}
+            </span>
+          </div>
+        </div>
+        <span style={{ color: "var(--color-border)", fontSize: 14, margin: "0 4px" }}>|</span>
 
         {/* ── Project management ─────────────────────────────── */}
         <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, zIndex: 200 }}>
@@ -5483,30 +5508,52 @@ export default function CanvasPage() {
           ))}
 
           <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-          {(["canvas","board","timeline","orbit"] as ViewMode[]).map(mode => {
-            const icons: Record<ViewMode, string> = { canvas: "⊞", board: "☰", timeline: "⏱", orbit: "⬡" };
-            const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: de ? "Zeitlinie" : "Timeline", orbit: "Orbit" };
-            const tips: Record<ViewMode, string> = {
-              canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
-              board: de ? "Strukturierte Spalten-Ansicht nach Node-Typ" : "Structured column view by node type",
-              timeline: de ? "Chronologische Ansicht aller Analysen" : "Chronological view of all analyses",
-              orbit: de ? "Kausal-Orbit: Alle Trends als verbundenes Netzwerk" : "Causal Orbit: All trends as connected network",
-            };
-            return (
-              <Tooltip key={mode} content={tips[mode]} placement="bottom">
-                <button
-                  onClick={() => setViewMode(mode)}
-                  style={{
-                    fontSize: 10, padding: "2px 8px", borderRadius: 20,
-                    border: `1px solid ${viewMode === mode ? "#0A0A0A" : "var(--color-border)"}`,
-                    background: viewMode === mode ? "#0A0A0A" : "transparent",
-                    color: viewMode === mode ? "#fff" : "var(--color-text-muted)",
-                    cursor: "pointer", fontWeight: 600,
-                  }}
-                >{icons[mode]} {labels[mode]}</button>
-              </Tooltip>
-            );
-          })}
+          {/* Volt UI boxed-tab pattern: gray container with white active tab */}
+          <div style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 1,
+            padding: 3,
+            background: "var(--muted, #F7F7F7)",
+            borderRadius: 8,
+            border: "1px solid var(--color-border)",
+          }}>
+            {(["canvas","board","timeline","orbit"] as ViewMode[]).map(mode => {
+              const icons: Record<ViewMode, string> = { canvas: "⊞", board: "☰", timeline: "⏱", orbit: "⬡" };
+              const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: de ? "Zeitlinie" : "Timeline", orbit: "Orbit" };
+              const tips: Record<ViewMode, string> = {
+                canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
+                board: de ? "Strukturierte Spalten-Ansicht nach Node-Typ" : "Structured column view by node type",
+                timeline: de ? "Chronologische Ansicht aller Analysen" : "Chronological view of all analyses",
+                orbit: de ? "Kausal-Orbit: Alle Trends als verbundenes Netzwerk" : "Causal Orbit: All trends as connected network",
+              };
+              const isActive = viewMode === mode;
+              return (
+                <Tooltip key={mode} content={tips[mode]} placement="bottom">
+                  <button
+                    onClick={() => setViewMode(mode)}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      fontSize: 11, padding: "5px 11px",
+                      borderRadius: 6, border: "none",
+                      background: isActive ? "var(--card, #fff)" : "transparent",
+                      color: isActive ? "var(--foreground, #0A0A0A)" : "var(--muted-foreground, #6B6B6B)",
+                      cursor: "pointer",
+                      fontWeight: isActive ? 700 : 500,
+                      fontFamily: "var(--font-ui)",
+                      boxShadow: isActive ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                      transition: "all 0.12s",
+                    }}
+                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--foreground)"; }}
+                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--muted-foreground)"; }}
+                  >
+                    <span style={{ fontSize: 11, lineHeight: 1 }}>{icons[mode]}</span>
+                    <span>{labels[mode]}</span>
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
 
           {nodes.length >= 2 && (
             <>
@@ -5523,13 +5570,6 @@ export default function CanvasPage() {
             </>
           )}
 
-          <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right" }}>{Math.round(zoom * 100)}%</span>
-          <Tooltip content={de ? "Zoom zurücksetzen und Canvas zentrieren" : "Reset zoom and center canvas"} placement="bottom">
-            <button
-              onClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
-              style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer" }}
-            >⊙</button>
-          </Tooltip>
           {nodes.length > 0 && (
             <>
               <Tooltip content={de ? "Canvas als Markdown exportieren" : "Export canvas as Markdown"} placement="bottom">
@@ -5593,88 +5633,355 @@ export default function CanvasPage() {
         </div>
       )}
 
-      {/* ── Template Picker Modal ─────────────────────────────── */}
+      {/* ── Template Picker Modal (Volt UI Node Canvas style) ────── */}
       {showTemplatePicker && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
           onClick={() => setShowTemplatePicker(false)}
         >
-          <div style={{ background: "var(--color-surface)", borderRadius: 16, padding: "28px 32px", width: "min(680px, 90vw)", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}
+          <div style={{
+            background: "var(--color-surface, #fff)",
+            borderRadius: 20,
+            padding: 0,
+            width: "min(880px, 92vw)",
+            maxHeight: "90vh",
+            overflow: "hidden",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+            border: "1px solid var(--color-border)",
+            display: "flex",
+            flexDirection: "column",
+          }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-heading)", margin: "0 0 4px" }}>
-              {de ? "Wie möchtest du starten?" : "How would you like to start?"}
-            </h2>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 20px" }}>
-              {de ? "Wähle ein Analyse-Framework oder starte mit einem leeren Canvas." : "Choose an analysis framework or start with an empty canvas."}
-            </p>
-
-            {/* Template Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
-              {TEMPLATES.map(t => (
-                <button key={t.id}
-                  onClick={() => {
-                    if (t.id === "empty") {
-                      setShowTemplatePicker(false);
-                      return;
-                    }
-                    const topic = window.prompt(de ? "Thema eingeben:" : "Enter topic:", "");
-                    if (!topic?.trim()) return;
-
-                    // Find the framework definition for workflow mode
-                    const fw = FRAMEWORKS.find(f => f.id === t.id);
-                    if (fw) {
-                      // Start guided workflow
-                      const steps: WorkflowStep[] = fw.steps.map((s, i) => ({
-                        id: `step-${i}`,
-                        title: s.title,
-                        description: s.description,
-                        status: (i === 0 ? "pending" : s.dependsOn.every(d => false) ? "pending" : "locked") as "pending" | "locked",
-                        queryTemplate: s.queryTemplate,
-                        dependsOn: s.dependsOn,
-                        userInputPrompt: s.userInputPrompt,
-                      }));
-                      // Unlock steps that have no dependencies
-                      steps.forEach((s, i) => {
-                        if (fw.steps[i].dependsOn.length === 0) s.status = "pending";
-                        else s.status = "locked";
-                      });
-                      setActiveWorkflow({
-                        frameworkId: fw.id,
-                        frameworkName: de ? fw.name : fw.nameEn,
-                        methodology: de ? fw.methodology : fw.methodologyEn,
-                        topic: topic.trim(),
-                        steps,
-                        currentStepIndex: 0,
-                      });
-                      setShowTemplatePicker(false);
-                      return;
-                    }
-
-                    // Fallback: static template
-                    const result = t.build(topic.trim());
-                    setNodes(result.nodes as any[]);
-                    setConnections(result.conns as any[]);
-                    setZoom(0.7);
-                    setShowTemplatePicker(false);
-                  }}
+            {/* ── Modal Header (Volt UI Page-Header pattern) ── */}
+            <div style={{ padding: "28px 32px 20px", borderBottom: "1px solid var(--color-border)" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <VoltIconBox icon={<GitBranch size={22} />} variant="lime" size={44} rounded="lg" />
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase" as const,
+                    color: "var(--muted-foreground, #6B6B6B)",
+                    marginBottom: 6,
+                  }}>
+                    {de ? "Workflow-System" : "Workflow System"}
+                  </div>
+                  <h2 style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 28,
+                    fontWeight: 700,
+                    letterSpacing: "-0.025em",
+                    color: "var(--foreground, #0A0A0A)",
+                    margin: 0,
+                    lineHeight: 1.15,
+                  }}>
+                    Node Canvas
+                  </h2>
+                  <p style={{
+                    fontFamily: "var(--font-ui)",
+                    fontSize: 13,
+                    color: "var(--muted-foreground, #6B6B6B)",
+                    margin: "8px 0 0",
+                    lineHeight: 1.55,
+                    maxWidth: 600,
+                  }}>
+                    {de
+                      ? "Ein interaktives Canvas-System für visuelle Workflows, KI-Pipelines und strategische Analysen. Wähle ein Framework zum Start oder beginne mit einem leeren Canvas."
+                      : "An interactive canvas system for visual workflows, AI pipelines and strategic analyses. Pick a framework to start or begin with an empty canvas."}
+                  </p>
+                </div>
+                <button onClick={() => setShowTemplatePicker(false)}
                   style={{
-                    padding: "16px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)",
-                    background: "white", cursor: "pointer", textAlign: "left",
-                    transition: "all 0.12s",
+                    background: "none",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    width: 32,
+                    height: 32,
+                    cursor: "pointer",
+                    color: "var(--muted-foreground)",
+                    fontSize: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#E4FF97"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.boxShadow = "none"; }}
-                >
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>{t.icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 3 }}>{de ? t.labelDe : t.labelEn}</div>
-                  <div style={{ fontSize: 10, color: "var(--color-text-muted)", lineHeight: 1.4 }}>{de ? t.descDe : t.descEn}</div>
-                </button>
-              ))}
+                >✕</button>
+              </div>
             </div>
 
-            <button onClick={() => setShowTemplatePicker(false)}
-              style={{ fontSize: 12, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
-            >{de ? "Abbrechen" : "Cancel"}</button>
+            {/* ── Scrollable content ── */}
+            <div style={{ flex: 1, overflow: "auto", padding: "20px 32px 28px" }}>
+
+              {/* Section label: Pipeline-Templates */}
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "var(--muted-foreground)",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}>
+                <span>{de ? "Pipeline-Templates" : "Pipeline Templates"}</span>
+                <span style={{ opacity: 0.7 }}>({TEMPLATES.length})</span>
+              </div>
+
+              {/* Template Grid — Volt UI Node Canvas card style */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginBottom: 24 }}>
+                {TEMPLATES.map(t => {
+                  // Volt UI Node Canvas prefix pill: AI/ETL/LOGIC/MM/CRON style
+                  const prefixMap: Record<string, { prefix: string; variant: "lime" | "mint" | "blue" | "orchid" | "butter" | "rose" | "peach" | "light" }> = {
+                    "empty":              { prefix: "NEW",  variant: "light"  },
+                    "market-analysis":    { prefix: "MKT",  variant: "blue"   },
+                    "war-gaming":         { prefix: "WAR",  variant: "rose"   },
+                    "pre-mortem":         { prefix: "PRE",  variant: "peach"  },
+                    "post-mortem":        { prefix: "POST", variant: "mint"   },
+                    "trend-deep-dive":    { prefix: "TRND", variant: "orchid" },
+                    "stakeholder-mapping":{ prefix: "STKH", variant: "butter" },
+                  };
+                  const meta = prefixMap[t.id] || { prefix: "FW", variant: "light" as const };
+                  const prefixStyles = {
+                    lime:   { bg: "var(--volt-lime, #E4FF97)", text: "#0A0A0A" },
+                    light:  { bg: "var(--muted, #F7F7F7)", text: "#6B6B6B" },
+                    mint:   { bg: "var(--pastel-mint, #C3F4D3)", text: "#0F6038" },
+                    blue:   { bg: "var(--pastel-blue, #D4E8FF)", text: "#1A4A8A" },
+                    rose:   { bg: "var(--pastel-rose, #FFD6E0)", text: "#A0244A" },
+                    butter: { bg: "var(--pastel-butter, #FFF5BA)", text: "#7A5C00" },
+                    orchid: { bg: "var(--pastel-orchid, #FDE2FF)", text: "#7C1A9E" },
+                    peach:  { bg: "var(--pastel-peach, #FFECD2)", text: "#955A20" },
+                  };
+                  const ps = prefixStyles[meta.variant];
+                  return (
+                    <button key={t.id}
+                      onClick={() => {
+                        if (t.id === "empty") {
+                          setShowTemplatePicker(false);
+                          return;
+                        }
+                        const topic = window.prompt(de ? "Thema eingeben:" : "Enter topic:", "");
+                        if (!topic?.trim()) return;
+                        const fw = FRAMEWORKS.find(f => f.id === t.id);
+                        if (fw) {
+                          const steps: WorkflowStep[] = fw.steps.map((s, i) => ({
+                            id: `step-${i}`,
+                            title: s.title,
+                            description: s.description,
+                            status: (i === 0 ? "pending" : s.dependsOn.every(d => false) ? "pending" : "locked") as "pending" | "locked",
+                            queryTemplate: s.queryTemplate,
+                            dependsOn: s.dependsOn,
+                            userInputPrompt: s.userInputPrompt,
+                          }));
+                          steps.forEach((s, i) => {
+                            if (fw.steps[i].dependsOn.length === 0) s.status = "pending";
+                            else s.status = "locked";
+                          });
+                          setActiveWorkflow({
+                            frameworkId: fw.id,
+                            frameworkName: de ? fw.name : fw.nameEn,
+                            methodology: de ? fw.methodology : fw.methodologyEn,
+                            topic: topic.trim(),
+                            steps,
+                            currentStepIndex: 0,
+                          });
+                          setShowTemplatePicker(false);
+                          return;
+                        }
+                        const result = t.build(topic.trim());
+                        setNodes(result.nodes as any[]);
+                        setConnections(result.conns as any[]);
+                        setZoom(0.7);
+                        setShowTemplatePicker(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        padding: "14px 16px",
+                        borderRadius: 12,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--card, #fff)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all 0.15s",
+                        fontFamily: "var(--font-ui)",
+                        minHeight: 102,
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = "var(--foreground, #0A0A0A)";
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = "var(--color-border)";
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }}
+                    >
+                      {/* Prefix pill + title row */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "3px 7px",
+                          borderRadius: 4,
+                          background: ps.bg,
+                          color: ps.text,
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          lineHeight: 1.2,
+                          flexShrink: 0,
+                        }}>
+                          {meta.prefix}
+                        </span>
+                        <span style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "var(--foreground, #0A0A0A)",
+                          letterSpacing: "-0.01em",
+                          lineHeight: 1.2,
+                          flex: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {de ? t.labelDe : t.labelEn}
+                        </span>
+                      </div>
+                      {/* Description */}
+                      <div style={{
+                        fontSize: 11,
+                        color: "var(--muted-foreground, #6B6B6B)",
+                        lineHeight: 1.5,
+                        fontFamily: "var(--font-ui)",
+                        flex: 1,
+                      }}>
+                        {de ? t.descDe : t.descEn}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ── Node Canvas Features (Volt UI spec summary) ── */}
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "var(--muted-foreground)",
+                marginBottom: 12,
+              }}>
+                {de ? "Was drin ist" : "What's inside"}
+              </div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 10,
+                marginBottom: 20,
+              }}>
+                {[
+                  { label: de ? "Node-Typen" : "Node Types", value: "12", hint: de ? "Query, Insight, Scenario…" : "Query, Insight, Scenario…" },
+                  { label: de ? "Edge-Stile" : "Edge Styles", value: "4", hint: "Bezier · Step · Straight · Smooth" },
+                  { label: de ? "Status-Zustände" : "Status States", value: "6", hint: de ? "Idle · Running · Done · Error…" : "Idle · Running · Done · Error…" },
+                  { label: de ? "Ansichten" : "Views", value: "4", hint: "Canvas · Board · Timeline · Orbit" },
+                ].map((item, i) => (
+                  <div key={i} style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "var(--muted, #F7F7F7)",
+                    border: "1px solid var(--color-border)",
+                  }}>
+                    <div style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase" as const,
+                      color: "var(--muted-foreground)",
+                      marginBottom: 4,
+                    }}>
+                      {item.label}
+                    </div>
+                    <div style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: "var(--foreground)",
+                      letterSpacing: "-0.02em",
+                      lineHeight: 1,
+                      marginBottom: 4,
+                    }}>
+                      {item.value}
+                    </div>
+                    <div style={{
+                      fontSize: 10,
+                      color: "var(--muted-foreground)",
+                      lineHeight: 1.4,
+                      fontFamily: "var(--font-ui)",
+                    }}>
+                      {item.hint}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Node-Status Legend (Volt UI Node-Status spec) ── */}
+              <div style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase" as const,
+                color: "var(--muted-foreground)",
+                marginBottom: 10,
+              }}>
+                {de ? "Node-Status" : "Node Status"}
+              </div>
+              <div style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+              }}>
+                {[
+                  { dot: "#9CA3AF", label: de ? "Idle" : "Idle" },
+                  { dot: "var(--volt-lime, #E4FF97)", label: de ? "Running" : "Running" },
+                  { dot: "#1A9E5A", label: de ? "Success" : "Success" },
+                  { dot: "#E8402A", label: de ? "Error" : "Error" },
+                  { dot: "#F5A623", label: de ? "Warning" : "Warning" },
+                  { dot: "#D1D5DB", label: de ? "Disabled" : "Disabled" },
+                ].map((s, i) => (
+                  <span key={i} style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 10px",
+                    borderRadius: 9999,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--card, #fff)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: "var(--muted-foreground)",
+                  }}>
+                    <span style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: s.dot,
+                      border: s.dot.includes("E4FF97") ? "1px solid #C8E873" : "none",
+                    }} />
+                    {s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -6258,6 +6565,108 @@ export default function CanvasPage() {
             onNavigate={(px, py) => { setPanX(px); setPanY(py); }}
             rightOffset={16}
           />
+        )}
+
+        {/* ── Volt UI Node Canvas: Zoom Controls (bottom-right) ─────── */}
+        {viewMode === "canvas" && !embedded && hydrated && (
+          <div style={{
+            position: "absolute",
+            bottom: 16, right: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            padding: "4px",
+            background: "var(--color-surface, rgba(255,255,255,0.96))",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            backdropFilter: "blur(12px) saturate(160%)",
+            zIndex: 50,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+          }}>
+            <button
+              onClick={() => setZoom(prev => Math.max(0.2, prev * 0.85))}
+              title={de ? "Verkleinern" : "Zoom out"}
+              style={{
+                width: 32, height: 32, borderRadius: 7, border: "none",
+                background: "transparent", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--foreground)", fontSize: 16, fontWeight: 500,
+                transition: "background 0.12s",
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--muted, #F7F7F7)"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+            >−</button>
+            <button
+              onClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
+              title={de ? "Zurücksetzen" : "Reset"}
+              style={{
+                minWidth: 56, height: 32, borderRadius: 7, border: "none",
+                background: "transparent", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--muted-foreground)", fontSize: 11,
+                fontFamily: "var(--font-mono)",
+                fontWeight: 600, letterSpacing: "0.02em",
+                transition: "background 0.12s",
+                fontVariantNumeric: "tabular-nums",
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--muted, #F7F7F7)"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+            >{Math.round(zoom * 100)}%</button>
+            <button
+              onClick={() => setZoom(prev => Math.min(2.5, prev * 1.18))}
+              title={de ? "Vergrößern" : "Zoom in"}
+              style={{
+                width: 32, height: 32, borderRadius: 7, border: "none",
+                background: "transparent", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "var(--foreground)", fontSize: 16, fontWeight: 500,
+                transition: "background 0.12s",
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--muted, #F7F7F7)"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+            >+</button>
+          </div>
+        )}
+
+        {/* ── Volt UI Node Canvas: Node-Status Legend (bottom-left) ─── */}
+        {viewMode === "canvas" && !embedded && hydrated && nodes.length > 0 && (
+          <div style={{
+            position: "absolute",
+            bottom: 16, left: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 14px",
+            background: "var(--color-surface, rgba(255,255,255,0.96))",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            backdropFilter: "blur(12px) saturate(160%)",
+            zIndex: 50,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 600,
+            color: "var(--muted-foreground)",
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase" as const, color: "var(--muted-foreground)",
+              marginRight: 2,
+            }}>
+              {de ? "Status" : "Status"}
+            </span>
+            {[
+              { dot: "#1A9E5A", label: de ? "Fertig" : "Done" },
+              { dot: "#F5A623", label: de ? "Läuft" : "Running" },
+              { dot: "#E8402A", label: de ? "Fehler" : "Error" },
+              { dot: "#9CA3AF", label: de ? "Offen" : "Idle" },
+            ].map((s, i) => (
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot }} />
+                <span>{s.label}</span>
+              </span>
+            ))}
+          </div>
         )}
       </div>
 

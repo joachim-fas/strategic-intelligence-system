@@ -13,33 +13,64 @@ import path from "path";
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
   d.pragma("journal_mode = WAL");
-  // Ensure canvas_state column exists (idempotent)
+  // Idempotent schema upgrades
   try { d.exec("ALTER TABLE radars ADD COLUMN canvas_state TEXT"); } catch {}
+  try { d.exec("ALTER TABLE radars ADD COLUMN archived_at TEXT"); } catch {}
   return d;
 }
 
-// GET — list all canvas projects (newest first)
-export async function GET() {
+// GET — list canvas projects
+//   /api/v1/canvas                 → active only (archived_at IS NULL)
+//   /api/v1/canvas?archived=true   → archived only (archived_at IS NOT NULL)
+//   /api/v1/canvas?archived=all    → everything
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const archived = url.searchParams.get("archived"); // null | "true" | "all"
+
+  let where = "WHERE archived_at IS NULL";
+  if (archived === "true") where = "WHERE archived_at IS NOT NULL";
+  else if (archived === "all") where = "";
+
   const d = db();
   const rows = d.prepare(`
-    SELECT id, name, description, canvas_state, created_at, updated_at
+    SELECT id, name, description, canvas_state, created_at, updated_at, archived_at
     FROM radars
-    ORDER BY updated_at DESC
+    ${where}
+    ORDER BY
+      CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,
+      COALESCE(archived_at, updated_at) DESC
   `).all() as Array<{
     id: string; name: string; description: string | null;
     canvas_state: string | null; created_at: string; updated_at: string;
+    archived_at: string | null;
   }>;
   d.close();
 
-  // Return lightweight list (no full canvas_state payload)
-  const canvases = rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    hasState: !!r.canvas_state,
-    created_at: r.created_at,
-    updated_at: r.updated_at,
-  }));
+  // Return lightweight list (with node count for session picker UX)
+  const canvases = rows.map(r => {
+    let nodeCount = 0;
+    let queryCount = 0;
+    if (r.canvas_state) {
+      try {
+        const state = JSON.parse(r.canvas_state);
+        if (Array.isArray(state?.nodes)) {
+          nodeCount = state.nodes.length;
+          queryCount = state.nodes.filter((n: any) => n.nodeType === "query").length;
+        }
+      } catch {}
+    }
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      hasState: !!r.canvas_state,
+      nodeCount,
+      queryCount,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      archived_at: r.archived_at,
+    };
+  });
 
   return NextResponse.json({ canvases });
 }

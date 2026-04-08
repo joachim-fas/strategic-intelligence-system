@@ -183,7 +183,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
                       onMouseLeave={() => setHoveredTrend(null)}
                       style={{
                         padding: "8px 10px", borderRadius: 8, cursor: "pointer",
-                        background: ring.bg, borderLeft: `3px solid ${ring.border}`,
+                        background: ring.bg, border: `1px solid ${ring.border}`,
                         transition: "box-shadow 0.12s",
                       }}
                       onMouseOver={e => (e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)")}
@@ -269,7 +269,7 @@ export default function SignalRadar({ locale, onTrendClick }: Props) {
             left: Math.min(tooltipPos.x, typeof window !== "undefined" ? window.innerWidth - 290 : 500),
             bottom: typeof window !== "undefined" ? window.innerHeight - tooltipPos.y + 8 : 100,
             zIndex: 50, width: 270, background: "var(--volt-surface, #fff)", border: `1px solid ${ring.border}`,
-            borderLeft: `3px solid ${ring.color}`, borderRadius: 10,
+            borderRadius: 10,
             boxShadow: "0 8px 24px rgba(0,0,0,0.14)", padding: "12px 14px", pointerEvents: "none",
           }}>
             {/* Name + Type */}

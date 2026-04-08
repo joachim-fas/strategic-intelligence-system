@@ -23,7 +23,8 @@ export async function middleware(request: NextRequest) {
   // Public paths that do not require authentication
   const publicPaths = [
     "/",              // FRAGEN — main intelligence terminal
-    "/verstehen",     // VERSTEHEN — radar, network, signals, sources, methodology
+    "/verstehen",     // KNOWLEDGE COCKPIT (labelled, URL kept) — radar, network, signals, sources, methodology
+    "/sessions",      // SESSIONS — list of past canvases / strategic threads
     "/workspace",     // WORKSPACE — canvas, board, nodes, kanban
     "/canvas",        // CANVAS — workspace canvas (direct access)
     "/cockpit",       // Legacy redirect → /verstehen

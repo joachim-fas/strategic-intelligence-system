@@ -11,7 +11,9 @@ import path from "path";
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
   d.pragma("journal_mode = WAL");
+  // Idempotent schema upgrades (must match /api/v1/canvas/route.ts)
   try { d.exec("ALTER TABLE radars ADD COLUMN canvas_state TEXT"); } catch {}
+  try { d.exec("ALTER TABLE radars ADD COLUMN archived_at TEXT"); } catch {}
   return d;
 }
 
@@ -22,15 +24,19 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const d = db();
   const row = d.prepare(
-    "SELECT id, name, description, canvas_state, created_at, updated_at FROM radars WHERE id = ?"
-  ).get(id) as { id: string; name: string; description: string | null; canvas_state: string | null; created_at: string; updated_at: string } | undefined;
+    "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
+  ).get(id) as { id: string; name: string; description: string | null; canvas_state: string | null; created_at: string; updated_at: string; archived_at: string | null } | undefined;
   d.close();
 
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ canvas: row });
 }
 
-// PATCH — save canvas state and/or rename project
+// PATCH — save canvas state, rename, or archive/restore
+//   Body can contain any subset of:
+//   - canvasState: serialized canvas JSON (null to clear)
+//   - name: string
+//   - archived: boolean (true → archive now, false → restore from archive)
 export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
@@ -47,6 +53,13 @@ export async function PATCH(req: Request, { params }: Params) {
     sets.push("name = ?");
     values.push(body.name);
   }
+  if (typeof body.archived === "boolean") {
+    if (body.archived) {
+      sets.push("archived_at = datetime('now')");
+    } else {
+      sets.push("archived_at = NULL");
+    }
+  }
 
   if (sets.length > 0) {
     values.push(id);
@@ -54,7 +67,7 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const updated = d.prepare(
-    "SELECT id, name, description, canvas_state, created_at, updated_at FROM radars WHERE id = ?"
+    "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
   ).get(id);
   d.close();
   return NextResponse.json({ canvas: updated });

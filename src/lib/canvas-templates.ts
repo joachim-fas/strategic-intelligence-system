@@ -16,6 +16,41 @@ export interface FrameworkStep {
   userInputPrompt?: string; // Optional: Frage an den User für spezifischen Kontext
 }
 
+/**
+ * Optional structured field shown in the Framework Modal as a secondary input
+ * below the main topic line. The collected values are appended to the topic
+ * string so the existing queryTemplates receive richer context without schema
+ * changes to the canvas state.
+ */
+export interface FrameworkField {
+  key: string;            // stable identifier (not shown to user)
+  labelDe: string;
+  labelEn: string;
+  placeholderDe: string;
+  placeholderEn: string;
+  type?: "text" | "textarea"; // default "text"
+}
+
+/**
+ * User-facing guidance about what a good framework input looks like.
+ * Rendered by the Framework Modal on the Home page. All fields are optional
+ * so frameworks without explicit guidance still work.
+ */
+export interface FrameworkGuidance {
+  /** One to two sentences describing the SHAPE of a good input. */
+  questionShape: { de: string; en: string };
+  /**
+   * Reference topics that illustrate the shape — NOT rendered as clickable
+   * copy-paste chips (per UX decision). Kept on the definition for potential
+   * future use (dev docs, admin preview, prompt-tuning).
+   */
+  examples?: Array<{ de: string; en: string }>;
+  /** Optional short warning about common bad inputs ("so NICHT"). */
+  antiExample?: { de: string; en: string };
+  /** Optional secondary input fields for required context. */
+  fields?: FrameworkField[];
+}
+
 export interface FrameworkDefinition {
   id: string;
   icon: string;
@@ -26,6 +61,8 @@ export interface FrameworkDefinition {
   description: string;
   descriptionEn: string;
   steps: FrameworkStep[];
+  /** User-facing guidance for the creation modal. Optional for backwards compat. */
+  guidance?: FrameworkGuidance;
 }
 
 // ─── Legacy compat: TemplateResult for static node generation ────────────────
@@ -98,6 +135,24 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Strategische Optionen", description: "3-5 konkrete Handlungsoptionen ableiten", queryTemplate: "{context}\n\nLeite 3-5 strategische Optionen für '{topic}' ab. Für jede: Beschreibung, benötigte Ressourcen, Zeitrahmen, erwarteter ROI, Hauptrisiko. Kategorisiere: Offensiv / Defensiv / Korrigierend.", dependsOn: [1, 2], userInputPrompt: "Gibt es Optionen die du besonders interessant findest?" },
       { title: "Priorisierung", description: "Optionen nach Aufwand × Wirkung ordnen", queryTemplate: "{context}\n\nPriorisiere die strategischen Optionen für '{topic}' in einer Aufwand-Wirkung-Matrix: Quick Wins (sofort) / Strategische Projekte (planen) / Nicht tun. Konkrete Empfehlung für die nächsten 90 Tage.", dependsOn: [3] },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete Frage zu einem abgegrenzten Markt oder einer Produktkategorie — mit Region, Zeithorizont und idealerweise deiner eigenen Position. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete question about a defined market or product category — with region, time horizon and ideally your own position. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Elektroauto-Markt in DACH bis 2027", en: "Electric vehicle market in DACH by 2027" },
+        { de: "Mikro-Mobilität (E-Scooter, E-Bikes) in deutschen Großstädten", en: "Micro-mobility (e-scooters, e-bikes) in major German cities" },
+        { de: "B2B-SaaS für Supply-Chain-Visibility in Europa", en: "B2B SaaS for supply chain visibility in Europe" },
+      ],
+      antiExample: {
+        de: "Zu generisch (\"Automotive\") oder zu eng (\"Firma XY\") — beides liefert schwache Ergebnisse.",
+        en: "Too generic (\"Automotive\") or too narrow (\"Company XY\") — both produce weak results.",
+      },
+      fields: [
+        { key: "position", labelDe: "Eigene Position (optional)", labelEn: "Your position (optional)", placeholderDe: "z.B. Tier-1-Zulieferer mit Sitz in Stuttgart", placeholderEn: "e.g. Tier-1 supplier based in Stuttgart", type: "text" },
+      ],
+    },
   },
 
   // ═══ 2. WAR-GAMING ═══
@@ -115,6 +170,25 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Pessimistisches Szenario", description: "Worst Case: Was passiert wenn es schiefgeht?", queryTemplate: "{context}\n\nBeschreibe ein PESSIMISTISCHES Szenario für '{topic}': Welcher Kipppunkt könnte es auslösen? Kaskadeneffekte? Wer verliert am meisten? Frühwarnsignale? Point of No Return?", dependsOn: [0] },
       { title: "Robuste Strategie", description: "Maßnahmen die in allen Szenarien funktionieren", queryTemplate: "{context}\n\nGegeben die drei Szenarien zu '{topic}': 1) No-Regret-Moves (in ALLEN Szenarien sinnvoll)? 2) Real Options (Flexibilität schaffen)? 3) Signposts (Frühwarnindikatoren überwachen)? Priorisiere: Sofort / Kurzfristig / Mittelfristig. Top 3 Entscheidungen der nächsten 90 Tage.", dependsOn: [1, 2, 3] },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete strategische Frage mit benannten Akteuren, bei der die Zukunft wirklich offen ist. Eine Wie-reagieren-wir-auf-X-Frage mit klarem Gegner funktioniert am besten. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete strategic question with named actors where the future is genuinely open. A How-do-we-respond-to-X question with a clear opponent works best. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Wie reagieren wir auf die Preiskampfstrategie von Temu im DACH-E-Commerce?", en: "How do we respond to Temu's pricing attack in DACH e-commerce?" },
+        { de: "Europäische Cloud-Souveränität: SAP + Deutsche Telekom gegen AWS", en: "European cloud sovereignty: SAP + Deutsche Telekom vs AWS" },
+        { de: "Zukunft der deutschen Stahlindustrie: grüner Wasserstoff vs. chinesische Importe", en: "Future of German steel: green hydrogen vs Chinese imports" },
+      ],
+      antiExample: {
+        de: "Keine offenen Fragen ohne Akteure (\"Wie wird KI die Welt verändern?\") — dafür ist Trend Deep-Dive besser.",
+        en: "Not open questions without actors (\"How will AI change the world?\") — use Trend Deep-Dive for that.",
+      },
+      fields: [
+        { key: "antagonist", labelDe: "Wer ist der Gegner / Wettbewerber?", labelEn: "Who is the opponent / competitor?", placeholderDe: "z.B. Temu, chinesische Stahlproduzenten, BYD", placeholderEn: "e.g. Temu, Chinese steel producers, BYD", type: "text" },
+        { key: "horizon", labelDe: "Zeithorizont (optional)", labelEn: "Time horizon (optional)", placeholderDe: "z.B. 24 Monate, bis Q4 2027", placeholderEn: "e.g. 24 months, by Q4 2027", type: "text" },
+      ],
+    },
   },
 
   // ═══ 3. PRE-MORTEM ═══
@@ -130,6 +204,25 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Risiko-Bewertung", description: "Risiken nach Wahrscheinlichkeit × Schaden ordnen", queryTemplate: "{context}\n\nBewerte jedes identifizierte Risiko für '{topic}': Wahrscheinlichkeit (1-5), Schadensausmaß (1-5), Risiko-Score, Frühwarnsignale, erste Gegenidee. Sortiere nach Score (höchste zuerst).", dependsOn: [0] },
       { title: "Risiko-Mitigation", description: "Konkrete Gegenmaßnahmen für die Top-3 Risiken", queryTemplate: "{context}\n\nErstelle einen Mitigationsplan für die Top-3 Risiken bei '{topic}': Für jedes: Prävention (VOR Eintritt), Notfallplan (WENN Eintritt), Verantwortlicher, Frühwarnsignal + Trigger-Punkt. Kosten der Gegenmaßnahmen vs. Kosten des Risikos.", dependsOn: [1] },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete Frage zu einem Vorhaben, das noch NICHT gestartet ist — mit Zielzeitpunkt und Erfolgskriterium. Ohne greifbares Ziel kann auch kein prospektives Scheitern gedacht werden. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete question about an initiative that hasn't started yet — with target date and success criterion. Without a tangible goal, no prospective failure can be imagined. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Markteintritt in den USA mit unserer B2B-SaaS bis Q4 2026", en: "US market entry with our B2B SaaS by Q4 2026" },
+        { de: "Migration unserer Kern-IT zu SAP S/4HANA innerhalb von 18 Monaten", en: "Migration of our core IT to SAP S/4HANA within 18 months" },
+        { de: "Umstellung der gesamten Dienstwagenflotte auf vollelektrisch bis 2028", en: "Full electrification of our company fleet by 2028" },
+      ],
+      antiExample: {
+        de: "Keine vergangenen Ereignisse (dafür Post-Mortem) und keine schwammigen Absichten (\"Irgendwas mit KI machen\").",
+        en: "No past events (use Post-Mortem) and no vague intentions (\"Do something with AI\").",
+      },
+      fields: [
+        { key: "targetDate", labelDe: "Zielzeitpunkt", labelEn: "Target date", placeholderDe: "z.B. Q4 2026, März 2027, in 18 Monaten", placeholderEn: "e.g. Q4 2026, March 2027, in 18 months", type: "text" },
+        { key: "successCriterion", labelDe: "Was bedeutet Erfolg konkret?", labelEn: "What does \"success\" mean concretely?", placeholderDe: "z.B. 100 Kunden, 10M € ARR, Go-Live ohne Downtime", placeholderEn: "e.g. 100 customers, €10M ARR, go-live without downtime", type: "text" },
+      ],
+    },
   },
 
   // ═══ 4. POST-MORTEM ═══
@@ -145,6 +238,24 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Ursachen auf 3 Ebenen", description: "Strukturell × Konjunkturell × Situativ", queryTemplate: "{context}\n\nAnalysiere die Ursachen von '{topic}' auf drei Ebenen: STRUKTURELL (langfristig, systemisch — Megatrends, Regulierung), KONJUNKTURELL (mittelfristig — Wirtschaftszyklen, Politik), SITUATIV (kurzfristig — Entscheidungen, Personen, Zufall). Zeige Kausalketten.", dependsOn: [0] },
       { title: "Lessons Learned", description: "Was lernen wir daraus? Was ändern wir?", queryTemplate: "{context}\n\nLessons Learned aus '{topic}': 1) Was hätte man WISSEN können? 2) Was hätte man ANDERS machen können? 3) Was bedeutet das für ÄHNLICHE SITUATIONEN? 4) Welche SYSTEMISCHEN VERÄNDERUNGEN sind nötig? 3-5 konkrete Empfehlungen.", dependsOn: [1] },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete Frage zu einem abgeschlossenen Ereignis oder Projekt mit bekanntem Outcome — meistens einem Scheitern. Die Faktenlage sollte öffentlich oder dir zugänglich sein. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete question about a completed event or project with a known outcome — usually a failure. The facts should be public or accessible to you. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Scheitern der Opel-Übernahme durch PSA im Kontext der Elektro-Strategie", en: "Failure of PSA's Opel takeover in the context of electric strategy" },
+        { de: "Wirecard-Kollaps: Was ist strukturell bei der BaFin schiefgelaufen?", en: "Wirecard collapse: What went structurally wrong at BaFin?" },
+        { de: "Warum Volkswagens Software-Einheit CARIAD die Termine reißt", en: "Why VW's software unit CARIAD keeps missing deadlines" },
+      ],
+      antiExample: {
+        de: "Keine laufenden oder prospektiven Situationen — dafür gibt es Pre-Mortem oder War-Gaming.",
+        en: "No ongoing or prospective situations — use Pre-Mortem or War-Gaming for those.",
+      },
+      fields: [
+        { key: "timeframe", labelDe: "Zeitraum des Ereignisses (optional)", labelEn: "Timeframe of the event (optional)", placeholderDe: "z.B. 2019–2022, März 2024", placeholderEn: "e.g. 2019–2022, March 2024", type: "text" },
+      ],
+    },
   },
 
   // ═══ 5. TREND DEEP-DIVE ═══
@@ -162,6 +273,24 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Impact-Analyse", description: "Wer gewinnt, wer verliert? Zeitrahmen?", queryTemplate: "{context}\n\nImpact von '{topic}': Wirtschaft (Branchen), Gesellschaft (Gewinner/Verlierer), Geopolitik (Machtverschiebung), Technologie (Folgeinnovationen), Umwelt. Zeitrahmen: kurz/mittel/lang.", dependsOn: [2] },
       { title: "Handlungsoptionen", description: "Was tun? Sofort / Vorbereiten / Beobachten", queryTemplate: "{context}\n\nHandlungsoptionen für '{topic}': Für Unternehmen (Positionierung, Investitionen), Politik (Regulierung, Förderung), Forschung (offene Fragen). Priorisiert: 🔴 SOFORT (90 Tage) / 🟡 VORBEREITEN (6-12 Monate) / 🟢 BEOBACHTEN (Monitoring).", dependsOn: [3], userInputPrompt: "Für welchen Kontext sollen die Handlungsoptionen sein? (Unternehmen, Branche, Rolle)" },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete Frage zu einem benannten Trend, einer Technologie oder Entwicklung. Je präziser die Eingrenzung, desto tiefer die Analyse. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete question about a named trend, technology, or development. The more precise the scope, the deeper the analysis. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Agentic AI im Enterprise-Software-Markt", en: "Agentic AI in the enterprise software market" },
+        { de: "Rückbau der EU-Solarindustrie durch chinesische Überproduktion", en: "Decline of the EU solar industry due to Chinese overproduction" },
+        { de: "MiCA-Regulierung und tokenisierte Assets in der EU", en: "MiCA regulation and tokenized assets in the EU" },
+      ],
+      antiExample: {
+        de: "Zu breit (\"Digitalisierung\") oder zu normativ (\"Warum KI gefährlich ist\") — beides erzeugt Schlagwort-Salat.",
+        en: "Too broad (\"digitalization\") or too normative (\"Why AI is dangerous\") — both produce buzzword salad.",
+      },
+      fields: [
+        { key: "industryLens", labelDe: "Branchen-Linse (optional)", labelEn: "Industry lens (optional)", placeholderDe: "z.B. aus Sicht eines deutschen Mittelständlers im Maschinenbau", placeholderEn: "e.g. from the perspective of a German machinery SME", type: "text" },
+      ],
+    },
   },
 
   // ═══ 6. STAKEHOLDER-MAPPING ═══
@@ -178,6 +307,25 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       { title: "Dynamiken & Koalitionen", description: "Wer beeinflusst wen? Welche Bündnisse?", queryTemplate: "{context}\n\nAnalysiere Beziehungen zwischen Stakeholdern bei '{topic}': Bestehende Allianzen, mögliche neue Koalitionen, Konflikte, Einflussketten (A→B→C), mögliche Positionswechsel.", dependsOn: [1] },
       { title: "Engagement-Strategie", description: "Wer zuerst? Welche Botschaft? Timing?", queryTemplate: "{context}\n\nEngagement-Strategie für '{topic}': Für jeden Key Stakeholder: Kommunikationsansatz, Timing, Kernbotschaft, Risiko bei Widerstand. Gesamtplan: Sequenzierung, Quick Wins, Umgang mit Gegnern. Konkreter 4-Wochen-Plan.", dependsOn: [2] },
     ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine konkrete Frage zu einer Initiative, Entscheidung oder Veränderung mit identifizierbarem Kreis von Interessengruppen und klarem Entscheidungshorizont. Ein einzelnes Stichwort reicht nicht.",
+        en: "Ask a concrete question about an initiative, decision, or change with an identifiable group of stakeholders and a clear decision horizon. A single keyword is not enough.",
+      },
+      examples: [
+        { de: "Genehmigung für einen Offshore-Windpark in der Nordsee vor Rügen", en: "Permitting an offshore wind farm in the North Sea near Rügen" },
+        { de: "Umstellung der Innenstadt München auf Null-Emissions-Zone bis 2028", en: "Converting Munich's city center to a zero-emission zone by 2028" },
+        { de: "Fusion zweier mittelständischer Familienunternehmen in DACH", en: "Merger of two mid-sized family businesses in DACH" },
+      ],
+      antiExample: {
+        de: "Keine reinen Marktanalysen oder Trendthemen — dafür sind Marktanalyse und Trend Deep-Dive besser.",
+        en: "Not pure market analyses or trend topics — use Market Analysis or Trend Deep-Dive for those.",
+      },
+      fields: [
+        { key: "decisionType", labelDe: "Art der Entscheidung (optional)", labelEn: "Type of decision (optional)", placeholderDe: "z.B. regulatorische Genehmigung, politische Mehrheit, Vorstandsentscheidung", placeholderEn: "e.g. regulatory approval, political majority, board decision", type: "text" },
+        { key: "horizon", labelDe: "Entscheidungshorizont (optional)", labelEn: "Decision horizon (optional)", placeholderDe: "z.B. nächste 6 Monate, bis Herbst 2026", placeholderEn: "e.g. next 6 months, by fall 2026", type: "text" },
+      ],
+    },
   },
 ];
 

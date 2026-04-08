@@ -1,0 +1,104 @@
+/**
+ * Framework Types — Shared types for all 6 SIS analysis frameworks.
+ */
+
+export type FrameworkId =
+  | "marktanalyse"
+  | "war-gaming"
+  | "pre-mortem"
+  | "post-mortem"
+  | "trend-deep-dive"
+  | "stakeholder";
+
+export interface FrameworkMeta {
+  id: FrameworkId;
+  slug: string;
+  icon: string;
+  iconSvg: string;
+  name: { de: string; en: string };
+  subtitle: { de: string; en: string };
+  color: { card: string; icon: string; border: string; accent: string };
+  llmIntensity: "low" | "medium" | "high" | "very-high";
+  timeHorizon: { de: string; en: string };
+}
+
+export const FRAMEWORK_META: FrameworkMeta[] = [
+  {
+    id: "marktanalyse", slug: "marktanalyse",
+    icon: "◈", iconSvg: "/icons/methoden/marktanalyse/marktanalyse-layout-grid.svg",
+    name: { de: "Marktanalyse", en: "Market Analysis" },
+    subtitle: { de: "Marktposition · Wettbewerbsdynamik", en: "Market Position · Competitive Dynamics" },
+    color: { card: "#EEF5FF", icon: "#D4E8FF", border: "#C0D8F4", accent: "#1A4A8A" },
+    llmIntensity: "medium", timeHorizon: { de: "Gegenwart + 1–5 Jahre", en: "Present + 1–5 years" },
+  },
+  {
+    id: "war-gaming", slug: "war-gaming",
+    icon: "⚔", iconSvg: "/icons/methoden/war-gaming/war-gaming-swords.svg",
+    name: { de: "War-Gaming", en: "War Gaming" },
+    subtitle: { de: "Gegnermodelle · Strategische Reaktion", en: "Opponent Models · Strategic Response" },
+    color: { card: "#FFF0F4", icon: "#FFD6E0", border: "#F4B8C8", accent: "#A0244A" },
+    llmIntensity: "high", timeHorizon: { de: "Kurzfristig (0–12 Monate)", en: "Short-term (0–12 months)" },
+  },
+  {
+    id: "pre-mortem", slug: "pre-mortem",
+    icon: "⚠", iconSvg: "/icons/methoden/pre-mortem/pre-mortem-triangle-alert.svg",
+    name: { de: "Pre-Mortem", en: "Pre-Mortem" },
+    subtitle: { de: "Risiken · Proaktive Risikoanalyse", en: "Risks · Proactive Risk Analysis" },
+    color: { card: "#FFF8F0", icon: "#FFECD2", border: "#F0D4A8", accent: "#955A20" },
+    llmIntensity: "high", timeHorizon: { de: "Zukunft (proaktiv)", en: "Future (proactive)" },
+  },
+  {
+    id: "post-mortem", slug: "post-mortem",
+    icon: "🔍", iconSvg: "/icons/methoden/post-mortem/post-mortem-search.svg",
+    name: { de: "Post-Mortem", en: "Post-Mortem" },
+    subtitle: { de: "Ursachen · Systematische Lernschleifen", en: "Root Causes · Systematic Learning" },
+    color: { card: "#EEFAF4", icon: "#C3F4D3", border: "#90DCA8", accent: "#0F6038" },
+    llmIntensity: "medium", timeHorizon: { de: "Vergangenheit (reaktiv)", en: "Past (reactive)" },
+  },
+  {
+    id: "trend-deep-dive", slug: "trend-deep-dive",
+    icon: "🔬", iconSvg: "/icons/methoden/trend-deep-dive/trend-deep-dive-microscope.svg",
+    name: { de: "Trend Deep-Dive", en: "Trend Deep-Dive" },
+    subtitle: { de: "Treiber · Systemische Trendanalyse", en: "Drivers · Systemic Trend Analysis" },
+    color: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", accent: "#7C1A9E" },
+    llmIntensity: "very-high", timeHorizon: { de: "Alle Horizonte", en: "All horizons" },
+  },
+  {
+    id: "stakeholder", slug: "stakeholder",
+    icon: "👥", iconSvg: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+    name: { de: "Stakeholder", en: "Stakeholder" },
+    subtitle: { de: "Akteure · Koalitionen · Dynamiken", en: "Actors · Coalitions · Dynamics" },
+    color: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", accent: "#7A5C00" },
+    llmIntensity: "medium", timeHorizon: { de: "Gegenwart + Entwicklung", en: "Present + Evolution" },
+  },
+];
+
+export function getFrameworkMeta(id: FrameworkId): FrameworkMeta {
+  return FRAMEWORK_META.find(f => f.id === id)!;
+}
+
+/** A single step in a framework analysis */
+export interface FrameworkStep {
+  id: string;
+  title: { de: string; en: string };
+  description: { de: string; en: string };
+  status: "pending" | "running" | "done" | "error";
+  result?: FrameworkStepResult;
+}
+
+export interface FrameworkStepResult {
+  synthesis: string;
+  structured?: Record<string, unknown>;
+  confidence: number;
+}
+
+/** Analysis session state */
+export interface FrameworkSession {
+  id: string;
+  frameworkId: FrameworkId;
+  topic: string;
+  context?: string;
+  steps: FrameworkStep[];
+  createdAt: number;
+  scenario: "optimistic" | "probable" | "pessimistic";
+}

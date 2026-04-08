@@ -137,7 +137,6 @@ function PerspectiveCard({
       style={{
         borderRadius: "var(--radius-md)",
         border: "1px solid var(--color-border)",
-        borderLeft: `3px solid ${color}`,
         background: "var(--color-surface)",
         padding: "12px 14px",
         cursor: "pointer",
