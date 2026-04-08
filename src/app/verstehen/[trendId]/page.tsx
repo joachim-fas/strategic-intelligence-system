@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { useParams } from "next/navigation";
 import { useLocale } from "@/lib/locale-context";
 import { megaTrends } from "@/lib/mega-trends";
 import { TrendDot } from "@/types";
@@ -42,7 +42,7 @@ export default function TrendDetailPage() {
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", background: "transparent" }}>
-        <AppHeader />
+      <AppHeader />
         <main className="volt-container" style={{ padding: "32px 24px 80px", textAlign: "center" }}>
           <div style={{ padding: 60, color: "var(--color-text-muted)" }}>
             {de ? "Lade Trend-Details..." : "Loading trend details..."}
@@ -55,7 +55,7 @@ export default function TrendDetailPage() {
   if (!trend) {
     return (
       <div style={{ minHeight: "100vh", background: "transparent" }}>
-        <AppHeader />
+      <AppHeader />
         <main className="volt-container" style={{ padding: "32px 24px 80px", textAlign: "center" }}>
           <div style={{ padding: 60 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>

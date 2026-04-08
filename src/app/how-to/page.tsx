@@ -1,7 +1,7 @@
 "use client";
 
-import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import { AppHeader } from "@/components/AppHeader";
 
 export default function HowTo() {
   const { locale } = useLocale();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
 import { queryIntelligenceAsync } from "@/lib/intelligence-engine";
@@ -486,39 +487,18 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <AppHeader />
 
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 20,
-        background: "var(--volt-surface-raised, var(--color-surface))",
-        borderBottom: "1px solid var(--volt-border, var(--color-border))",
-        backdropFilter: "blur(12px) saturate(160%)",
-        WebkitBackdropFilter: "blur(12px) saturate(160%)",
+      {/* ── View Toggle + Session controls (below global header) ─── */}
+      {!isFirstVisit && (
+      <div style={{
+        borderBottom: "1px solid var(--color-border)",
+        background: "var(--color-surface)",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 28, height: 18 }} />
-            <span className="sis-title-long" style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 14, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--color-text-heading)" }}>Strategic Intelligence System</span>
-            {contextProfile && (
-              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: "var(--radius-full)", background: "var(--pastel-orchid)", color: "var(--pastel-orchid-text)", border: "1px solid var(--pastel-orchid-border)" }}>
-                {contextProfile.role} · {contextProfile.industry}
-              </span>
-            )}
-          </div>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 40, display: "flex", alignItems: "center", gap: 16 }}>
 
-          {/* Hamburger — Mobile only */}
-          <button className="sis-nav-mobile" onClick={() => setMobileMenuOpen(v => !v)}
-            style={{ display: "none", alignItems: "center", justifyContent: "center", marginLeft: "auto",
-              width: 36, height: 36, border: "1px solid var(--color-border)",
-              borderRadius: "var(--radius-md)", background: "transparent",
-              cursor: "pointer", fontSize: 20, color: "var(--color-text-primary)", flexShrink: 0 }}
-          >{mobileMenuOpen ? "✕" : "≡"}</button>
-
-          {/* View Toggle — hidden on first visit (no content to view yet) */}
-          {!isFirstVisit && (<>
-          <div className="sis-nav-desktop" style={{ display: "flex", alignItems: "center", gap: 2, background: "var(--color-surface-2, #f5f5f5)", borderRadius: "var(--radius-md)", padding: 2 }}>
+          {/* View Toggle: Standard / Canvas / Board */}
+          <div style={{ display: "flex", alignItems: "center", gap: 2, background: "var(--color-surface-2, #f5f5f5)", borderRadius: "var(--radius-md)", padding: 2 }}>
             {([
               { key: "standard" as ProjectView, icon: "●", label: "Standard" },
               { key: "canvas" as ProjectView, icon: "⊞", label: "Canvas" },
@@ -541,114 +521,30 @@ export default function Home() {
             })}
           </div>
 
-          <div style={{ width: 1, height: 20, background: "var(--color-border)", margin: "0 4px" }} />
-          </>)}
-
-          {/* Nav — Desktop only */}
-          <nav className="sis-nav-desktop" style={{ display: "flex", alignItems: "center", gap: 2 }}>
-            {[
-              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
-              { href: "/workspace", label: "Workspace" },
-            ].map(({ href, label }) => (
-              <a key={href} href={href}
-                style={{ fontSize: 13, fontWeight: 400, color: "var(--color-text-subtle)", textDecoration: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", transition: "all 0.15s", whiteSpace: "nowrap" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; }}
-              >{label}</a>
-            ))}
-            <div style={{ width: 1, height: 20, background: "var(--color-border)", margin: "0 4px" }} />
+          {/* Session controls */}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             {history.length > 0 && (
               <>
                 <button
                   onClick={() => { downloadSessionMarkdown(history, locale); setSessionExported(true); setTimeout(() => setSessionExported(false), 2500); }}
-                  title={locale === "de" ? `${history.length} Analysen als Markdown exportieren` : `Export ${history.length} analyses as Markdown`}
-                  style={{ fontSize: 12, fontWeight: 400, color: sessionExported ? "var(--signal-positive)" : "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", cursor: "pointer", transition: "all 0.15s" }}
-                  onMouseEnter={e => { if (!sessionExported) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; } }}
-                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = sessionExported ? "var(--signal-positive)" : "var(--color-text-subtle)"; el.style.background = "transparent"; }}
-                >
-                  {sessionExported ? "✓" : "↑"} {locale === "de" ? "Session" : "Session"}
-                </button>
+                  style={{ fontSize: 12, color: sessionExported ? "var(--signal-positive)" : "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", cursor: "pointer" }}
+                >{sessionExported ? "✓" : "↑"} Session</button>
                 <button
                   onClick={() => {
-                    if (window.confirm(locale === "de" ? "Gesamte Session löschen? Alle Analysen gehen verloren." : "Clear entire session? All analyses will be lost.")) {
-                      setHistory([]);
-                      clearHistoryStorage();
-                      // Also clear canvas DB so Canvas/Board views are empty too
-                      const canvasId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
-                      if (canvasId) {
-                        fetch(`/api/v1/canvas/${canvasId}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ canvasState: JSON.stringify({ nodes: [], conns: [], pan: { x: 0, y: 0 }, zoom: 1, v: 2 }) }),
-                        }).catch(() => {});
-                      }
+                    if (window.confirm(locale === "de" ? "Session loeschen?" : "Clear session?")) {
+                      setHistory([]); setQuery("");
+                      try { localStorage.removeItem("sis-history"); const cid = localStorage.getItem("sis-active-canvas"); if (cid) { fetch("/api/v1/canvas/" + cid, { method: "DELETE" }).catch(() => {}); localStorage.removeItem("sis-active-canvas"); } } catch {}
                     }
                   }}
-                  title={locale === "de" ? "Session löschen und neu starten" : "Clear session and start fresh"}
-                  style={{ fontSize: 12, fontWeight: 400, color: "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", cursor: "pointer", transition: "all 0.15s" }}
-                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--signal-negative)"; el.style.background = "#FEF2F2"; }}
-                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; }}
-                >✕ {locale === "de" ? "Löschen" : "Clear"}</button>
+                  style={{ fontSize: 12, color: "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", cursor: "pointer" }}
+                >✕ {locale === "de" ? "Loeschen" : "Clear"}</button>
               </>
             )}
-            <button onClick={toggleDark}
-              title={darkMode ? "Light Mode" : "Dark Mode"}
-              style={{ fontSize: 14, padding: "2px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
-            >{darkMode ? "☀" : "☾"}</button>
-            <button onClick={toggleLocale}
-              style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-subtle)", background: "transparent", border: "none", padding: "4px 10px", borderRadius: "var(--radius-md)", cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; }}
-            >{locale.toUpperCase()}</button>
-            {/* Radar button removed — Radar is now in /wissen */}
-          </nav>
-        </div>
-      </header>
-
-      {/* ── Mobile Nav Overlay ──────────────────────────────────── */}
-      {mobileMenuOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 30 }}>
-          <div onClick={() => setMobileMenuOpen(false)}
-            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.25)" }} />
-          <div style={{
-            position: "absolute", top: 52, left: 0, right: 0,
-            background: "var(--color-surface)", borderBottom: "1px solid var(--color-border)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)", padding: "8px 0",
-          }}>
-            {/* View toggles — hidden on first visit */}
-            {!isFirstVisit && (<>
-            {(["standard", "canvas", "board"] as ProjectView[]).map(v => {
-              const icons: Record<ProjectView, string> = { standard: "●", canvas: "⊞", board: "☰" };
-              return (
-                <button key={v} onClick={() => { setProjectView(v); setMobileMenuOpen(false); }}
-                  style={{ display: "block", width: "100%", textAlign: "left", fontSize: 15, fontWeight: projectView === v ? 700 : 500, color: projectView === v ? "var(--color-text-heading)" : "var(--color-text-primary)", background: projectView === v ? "var(--color-surface-2)" : "transparent", border: "none", padding: "11px 24px", cursor: "pointer" }}
-                >{icons[v]} {v.charAt(0).toUpperCase() + v.slice(1)}</button>
-              );
-            })}
-            <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
-            </>)}
-            {[
-              { href: "/verstehen", label: locale === "de" ? "Verstehen" : "Understand" },
-              { href: "/workspace", label: "Workspace" },
-            ].map(({ href, label }) => (
-              <a key={href} href={href} onClick={() => setMobileMenuOpen(false)}
-                style={{ display: "block", fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)", textDecoration: "none", padding: "11px 24px" }}
-              >{label} ↗</a>
-            ))}
-            <div style={{ borderTop: "1px solid var(--color-border)", margin: "6px 0" }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px" }}>
-              <button onClick={() => { toggleLocale(); setMobileMenuOpen(false); }}
-                style={{ fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: "var(--radius-full)", border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-primary)", cursor: "pointer" }}
-              >{locale === "de" ? "EN" : "DE"}</button>
-              <button onClick={() => { setShowFullRadar(v => !v); setMobileMenuOpen(false); }}
-                style={{ fontSize: 13, fontWeight: 600, padding: "5px 14px", borderRadius: "var(--radius-md)", background: "var(--color-text-primary)", color: "white", border: "none", cursor: "pointer" }}
-              >Radar</button>
-            </div>
           </div>
         </div>
+      </div>
       )}
 
-      {/* ── Overlay Panels ──────────────────────────────────────── */}
 
 
       {/* ── Full Radar / Graph ───────────────────────────────────── */}
