@@ -42,6 +42,7 @@ import {
   Compass,
   FileText as DocIcon,
   MessageSquare,
+  LayoutGrid,
 } from "lucide-react";
 
 const MiniRadar = dynamic(() => import("@/components/radar/MiniRadar"), { ssr: false });
@@ -108,6 +109,51 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
     setSaving(false);
   };
 
+  /**
+   * Open this briefing in the Node-Canvas.
+   *
+   * Hands the briefing off via localStorage under `sis-transfer-to-canvas`
+   * — `/canvas` already has a receiver that picks this up on mount,
+   * builds a QueryNode at (80, 80), runs it through `computeDerivedNodes`
+   * (which produces the insight / scenario / decision / follow-up cards),
+   * and renders the whole tree as nodes. The receiver removes the key
+   * after reading, so this is a one-shot transfer — refreshing the
+   * canvas afterward falls back to the user's normal active canvas.
+   *
+   * Field names are mapped to the canvas's `QueryResult` interface:
+   *   briefing.causalChain → result.causalAnalysis
+   * Shape-incompatible fields (matchedTrends uses {trend, ...} here vs.
+   * the canvas's flat {id, name, ...}) are simply omitted — the canvas's
+   * dimensions/causalgraph cards render conditionally on those arrays
+   * and gracefully skip when absent.
+   */
+  const openInCanvas = () => {
+    try {
+      const result = {
+        synthesis: briefing.synthesis,
+        reasoningChains: briefing.reasoningChains,
+        keyInsights: briefing.keyInsights,
+        scenarios: b.scenarios,
+        decisionFramework: b.decisionFramework,
+        references: b.references,
+        followUpQuestions: b.followUpQuestions,
+        confidence: briefing.confidence,
+        interpretation: b.interpretation,
+        newsContext: b.newsContext,
+        regulatoryContext: briefing.regulatoryContext,
+        causalAnalysis: briefing.causalChain,
+        usedSignals: b.usedSignals ?? briefing.usedSignals,
+      };
+      localStorage.setItem(
+        "sis-transfer-to-canvas",
+        JSON.stringify({ query: entry.query, result }),
+      );
+      window.location.href = "/canvas";
+    } catch (e) {
+      console.error("[openInCanvas]", e);
+    }
+  };
+
   return (
     <article className="card volt-texture">
 
@@ -140,6 +186,19 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             className={cn("text-[12px] px-3 h-7", saved ? "text-[#1A9E5A]" : "text-[#9B9B9B]")}
           >
             {saved ? "✓ Gespeichert" : saving ? "…" : "Speichern"}
+          </Button>
+        )}
+        {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={openInCanvas}
+            className="text-[12px] px-3 h-7 text-[#9B9B9B] hover:text-[#4A6CF7] gap-1.5"
+            title={locale === "de"
+              ? "Dieses Briefing als Node-Canvas öffnen"
+              : "Open this briefing in the Node Canvas"}
+          >
+            <LayoutGrid size={13} />
+            Canvas
           </Button>
         )}
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
