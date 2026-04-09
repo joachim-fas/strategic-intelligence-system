@@ -255,6 +255,22 @@ const statements = [
     dismissed_at TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS sa_canvas_node ON scenario_alerts(canvas_node_id, dismissed_at)`,
+
+  // ─── OG Image Cache ──────────────────────────────────────────────────────
+  // Caches Open-Graph image URLs extracted from signal target pages so the
+  // Signale-Tab card grid can render image previews without re-hitting the
+  // target site on every mount. Entry per URL. `status` tracks whether the
+  // lookup succeeded — "ok" (image found), "no-image" (page had no og:image
+  // or twitter:image), or "error" (fetch failed / blocked). `expires_at`
+  // drives TTL-based refresh: 7 days for successes, 1 day for failures.
+  `CREATE TABLE IF NOT EXISTS og_image_cache (
+    url TEXT PRIMARY KEY,
+    image_url TEXT,
+    status TEXT NOT NULL,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS og_image_cache_expires ON og_image_cache(expires_at)`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);

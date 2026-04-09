@@ -3,25 +3,30 @@
 /**
  * LiveSignalStream — Raw signal feed for the Knowledge Cockpit "Signale" tab.
  *
- * Replaces the old TrendOverview grid that duplicated the Radar sidebar. This
- * component shows the ACTUAL raw signals streaming in from /api/v1/feed/ticker
- * — Hacker News posts, arXiv preprints, GDELT events, etc. — not aggregated
- * trend cards.
+ * Renders the live signals streaming in from /api/v1/feed/ticker as a
+ * responsive card grid with Open-Graph image previews fetched on demand
+ * via /api/v1/og-image (SQLite-cached, 7-day TTL on success).
  *
- * Layout:
- *   [Filter row: Source filter · Topic filter · Time window · Sort]
- *   [Signal list: one row per signal]
- *     Each row: Source chip · Time ago · Title (link) · Topic badge
+ * Card anatomy:
+ *   [────────  16:9 image or source-colour gradient placeholder  ────────]
+ *   [ SOURCE · 2h ago                                        95 strength ]
+ *   [ Title (3-line clamp, links to source URL in new tab)               ]
+ *   [ Topic-Badge → Radar                                                ]
  *
- * Click behaviors:
- *   — Title → opens the original URL in a new tab
- *   — Topic badge → calls onTrendClick(topic) which jumps to the Radar tab
- *     and highlights the matched trend
+ * Image loading strategy:
+ *   - IntersectionObserver watches each card; only cards that enter the
+ *     viewport fire the OG-image fetch (avoid 200 network calls on mount)
+ *   - /api/v1/og-image returns cached results from SQLite on hit, so a
+ *     second visit to the tab is effectively instant
+ *   - Failed lookups or signals without a URL fall through to the
+ *     source-coloured gradient placeholder
  *
- * Auto-refreshes every 2 minutes.
+ * Signals from /api/v1/feed/ticker arrive in a source-balanced round-
+ * robin order (SQL window function); the default "Gemischt" sort mode
+ * preserves that interleave.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { TrendDot } from "@/types";
 
 interface RawSignal {
@@ -88,6 +93,12 @@ const TIME_WINDOWS = [
 
 type TimeWindowKey = typeof TIME_WINDOWS[number]["key"];
 
+// Cache og-image lookups per render session so switching filters
+// doesn't re-request the same URLs. The endpoint also caches in SQLite,
+// but this saves the round-trip entirely.
+type OgCacheState = "pending" | "ok" | "fail";
+interface OgCacheEntry { state: OgCacheState; imageUrl: string | null }
+
 export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
   const [signals, setSignals] = useState<RawSignal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +110,15 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
   // first thing a user sees is a diverse cross-source feed, not 10 reddits.
   const [sortKey, setSortKey] = useState<SortKey>("mixed");
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Per-URL og-image cache (session scope). Key = signal URL. Re-render
+  // target: we want cards to re-render when their entry flips from
+  // "pending" to "ok"/"fail", hence a map held in state.
+  const [ogMap, setOgMap] = useState<Map<string, OgCacheEntry>>(new Map());
+  // Imperative mirror so event handlers (IO callback, fetch .then) can
+  // check "have we already asked for this URL?" without closure staleness.
+  const ogMapRef = useRef(ogMap);
+  ogMapRef.current = ogMap;
 
   const load = () => {
     const window = TIME_WINDOWS.find(w => w.key === timeWindow)!;
@@ -174,6 +194,64 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
     for (const t of trends) map.set(t.name.toLowerCase(), t.name);
     return map;
   }, [trends]);
+
+  // Above-the-fold priority load: after displaySignals changes, kick off
+  // og-image fetches for the first 12 entries immediately. Two reasons:
+  //   1) Guarantees visible cards show real previews without waiting for
+  //      IntersectionObserver — which some automated/headless contexts
+  //      never fire at all.
+  //   2) Parallelises the most-important fetches; the endpoint is
+  //      SQLite-cached so subsequent visits are effectively free.
+  // The rest of the grid is still lazy-loaded via IO (see SignalCard).
+  const PRIORITY_COUNT = 12;
+
+  /**
+   * Fires an og-image lookup for a single URL if not already cached/
+   * in-flight. Writes the result back into ogMap state so the
+   * corresponding card re-renders.
+   */
+  const requestOgImage = useCallback(async (url: string) => {
+    if (ogMapRef.current.has(url)) return;
+    // Reserve the slot first so rapid IO bursts don't double-fetch.
+    setOgMap((prev) => {
+      if (prev.has(url)) return prev;
+      const next = new Map(prev);
+      next.set(url, { state: "pending", imageUrl: null });
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/v1/og-image?url=${encodeURIComponent(url)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { imageUrl: string | null; status: string };
+      const ok = data.status === "ok" && data.imageUrl;
+      setOgMap((prev) => {
+        const next = new Map(prev);
+        next.set(url, {
+          state: ok ? "ok" : "fail",
+          imageUrl: ok ? data.imageUrl : null,
+        });
+        return next;
+      });
+    } catch {
+      setOgMap((prev) => {
+        const next = new Map(prev);
+        next.set(url, { state: "fail", imageUrl: null });
+        return next;
+      });
+    }
+  }, []);
+
+  // Priority-load the first N visible signals' OG images. Runs whenever
+  // the filtered/sorted list changes — if the user flips filters and a
+  // fresh set of top cards appears, those get a proactive fetch too.
+  useEffect(() => {
+    const urls = displaySignals
+      .slice(0, PRIORITY_COUNT)
+      .map((s) => s.url)
+      .filter((u): u is string => !!u);
+    for (const u of urls) requestOgImage(u);
+  }, [displaySignals, requestOgImage]);
 
   return (
     <div style={{ padding: "20px 24px 40px", maxWidth: 1360, margin: "0 auto" }}>
@@ -308,7 +386,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         </div>
       </div>
 
-      {/* Signal list */}
+      {/* Empty state */}
       {displaySignals.length === 0 && !loading && (
         <div style={{
           padding: "48px 24px",
@@ -322,140 +400,35 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         </div>
       )}
 
+      {/* Card grid */}
       {displaySignals.length > 0 && (
         <div style={{
-          border: "1px solid var(--volt-border, #E8E8E8)",
-          borderRadius: "var(--volt-radius-lg, 14px)",
-          overflow: "hidden",
-          background: "var(--volt-surface-raised, #fff)",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          gap: 16,
         }}>
-          {displaySignals.map((s, idx) => {
+          {displaySignals.map((s) => {
             const color = sourceColor(s.source);
-            const isLast = idx === displaySignals.length - 1;
             const matchingTrend = s.topic
               ? trendNameByLower.get(s.topic.toLowerCase())
               : undefined;
+            const og = s.url ? ogMap.get(s.url) : undefined;
             return (
-              <div
+              <SignalCard
                 key={s.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "72px 96px 1fr auto",
-                  gap: 14,
-                  padding: "14px 20px",
-                  borderBottom: isLast ? "none" : "1px solid var(--volt-border, #EEE)",
-                  alignItems: "center",
-                  transition: "background 120ms ease",
+                signal={s}
+                color={color}
+                ageText={ageLabel(s.hoursAgo, de)}
+                og={og}
+                onVisible={() => {
+                  if (s.url) requestOgImage(s.url);
                 }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = "var(--volt-surface, #FAFAFA)";
+                onTopicClick={() => {
+                  if (s.topic) onTrendClick(s.topic);
                 }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = "transparent";
-                }}
-              >
-                {/* Source chip */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  <span style={{
-                    width: 6, height: 6, borderRadius: "50%",
-                    background: color, flexShrink: 0,
-                  }} />
-                  <span style={{
-                    fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                    fontSize: 10, fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {s.source}
-                  </span>
-                </div>
-
-                {/* Time ago */}
-                <div style={{
-                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: 10,
-                  color: "var(--volt-text-faint, #A8A8A8)",
-                  whiteSpace: "nowrap",
-                }}>
-                  {ageLabel(s.hoursAgo, de)}
-                </div>
-
-                {/* Title + topic badge */}
-                <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                  {s.url ? (
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: 13,
-                        color: "var(--volt-text, #0A0A0A)",
-                        textDecoration: "none",
-                        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                        lineHeight: 1.4,
-                        overflow: "hidden",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical" as const,
-                      }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}
-                    >
-                      {s.title}
-                    </a>
-                  ) : (
-                    <span style={{
-                      fontSize: 13,
-                      color: "var(--volt-text, #0A0A0A)",
-                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                      lineHeight: 1.4,
-                    }}>
-                      {s.title}
-                    </span>
-                  )}
-                  {s.topic && (
-                    <button
-                      type="button"
-                      onClick={() => onTrendClick(s.topic!)}
-                      disabled={!matchingTrend}
-                      title={matchingTrend
-                        ? (de ? "Im Radar anzeigen" : "Show in Radar")
-                        : (de ? "Kein passender Trend im Radar" : "No matching trend in Radar")}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 4,
-                        alignSelf: "flex-start",
-                        fontSize: 10, fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        border: `1px solid ${matchingTrend ? "rgba(228,255,151,0.7)" : "var(--volt-border, #E8E8E8)"}`,
-                        background: matchingTrend ? "rgba(228,255,151,0.3)" : "var(--volt-surface, #FAFAFA)",
-                        color: matchingTrend ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #AAA)",
-                        cursor: matchingTrend ? "pointer" : "default",
-                        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                        transition: "all 120ms ease",
-                      }}
-                    >
-                      {s.topic}
-                      {matchingTrend && <span style={{ fontSize: 9 }}>→</span>}
-                    </button>
-                  )}
-                </div>
-
-                {/* Strength indicator */}
-                <div style={{
-                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: 10,
-                  color: "var(--volt-text-faint, #A8A8A8)",
-                  textAlign: "right",
-                  minWidth: 40,
-                }}>
-                  {s.strength > 0 ? `${Math.round(s.strength * 100)}` : "—"}
-                </div>
-              </div>
+                topicHasTrend={!!matchingTrend}
+                de={de}
+              />
             );
           })}
         </div>
@@ -465,6 +438,277 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         @keyframes sis-signal-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%      { opacity: 0.5; transform: scale(0.85); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Signal Card ─────────────────────────────────────────────────────────
+interface SignalCardProps {
+  signal: RawSignal;
+  color: string;
+  ageText: string;
+  og: OgCacheEntry | undefined;
+  onVisible: () => void;
+  onTopicClick: () => void;
+  topicHasTrend: boolean;
+  de: boolean;
+}
+
+function SignalCard({
+  signal: s,
+  color,
+  ageText,
+  og,
+  onVisible,
+  onTopicClick,
+  topicHasTrend,
+  de,
+}: SignalCardProps) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // IntersectionObserver → only fetch the OG image once this card
+  // actually enters the viewport. The observer disconnects after the
+  // first trigger because we never need to re-fetch.
+  useEffect(() => {
+    if (!s.url) return;
+    const el = cardRef.current;
+    if (!el) return;
+    if (og) return; // already cached / in-flight
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            onVisible();
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px" }, // start fetching slightly before card enters viewport
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [s.url, og, onVisible]);
+
+  const hasImage = og?.state === "ok" && !!og.imageUrl;
+  const showPlaceholder = !hasImage;
+
+  return (
+    <div
+      ref={cardRef}
+      className="sis-signal-card"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        border: "1px solid var(--volt-border, #E8E8E8)",
+        borderRadius: "var(--volt-radius-lg, 14px)",
+        overflow: "hidden",
+        background: "var(--volt-surface-raised, #fff)",
+        transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
+        cursor: s.url ? "pointer" : "default",
+      }}
+      onClick={(e) => {
+        if (!s.url) return;
+        // Ignore clicks that originated on interactive children (topic button)
+        const target = e.target as HTMLElement;
+        if (target.closest("button")) return;
+        window.open(s.url, "_blank", "noopener,noreferrer");
+      }}
+    >
+      {/* Image / placeholder — 16:9 aspect ratio */}
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "16 / 9",
+          background: showPlaceholder
+            ? `linear-gradient(135deg, ${color}22 0%, ${color}11 50%, #FAFAFA 100%)`
+            : "var(--volt-surface, #FAFAFA)",
+          overflow: "hidden",
+          borderBottom: "1px solid var(--volt-border, #EEE)",
+        }}
+      >
+        {hasImage && og?.imageUrl && (
+          <img
+            src={og.imageUrl}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+            onError={(e) => {
+              // Hide the <img> on network-level failures so the
+              // placeholder gradient shows through. We can't retroactively
+              // update ogMap from here without a callback chain, but
+              // swapping display is enough for visual fallback.
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
+        {showPlaceholder && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 32,
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+              color: `${color}`,
+              opacity: 0.45,
+              textTransform: "uppercase",
+            }}
+          >
+            {s.source.slice(0, 3)}
+          </div>
+        )}
+        {/* Strength pill (top-right on the image) */}
+        {s.strength > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              background: "rgba(10,10,10,0.78)",
+              color: "#fff",
+              padding: "3px 8px",
+              borderRadius: 999,
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {Math.round(s.strength * 100)}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: "14px 16px 16px",
+          flex: 1,
+        }}
+      >
+        {/* Source + time row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: color,
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {s.source}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 10,
+              color: "var(--volt-text-faint, #A8A8A8)",
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {ageText}
+          </span>
+        </div>
+
+        {/* Title */}
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            lineHeight: 1.35,
+            color: "var(--volt-text, #0A0A0A)",
+            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical" as const,
+            overflow: "hidden",
+            flex: 1,
+          }}
+        >
+          {s.title}
+        </div>
+
+        {/* Topic badge (pinned to bottom) */}
+        {s.topic && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTopicClick();
+            }}
+            disabled={!topicHasTrend}
+            title={topicHasTrend
+              ? (de ? "Im Radar anzeigen" : "Show in Radar")
+              : (de ? "Kein passender Trend im Radar" : "No matching trend in Radar")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              alignSelf: "flex-start",
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "3px 9px",
+              borderRadius: 999,
+              border: `1px solid ${topicHasTrend ? "rgba(228,255,151,0.7)" : "var(--volt-border, #E8E8E8)"}`,
+              background: topicHasTrend ? "rgba(228,255,151,0.3)" : "var(--volt-surface, #FAFAFA)",
+              color: topicHasTrend ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #AAA)",
+              cursor: topicHasTrend ? "pointer" : "default",
+              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              transition: "all 120ms ease",
+              marginTop: "auto",
+            }}
+          >
+            {s.topic}
+            {topicHasTrend && <span style={{ fontSize: 9 }}>→</span>}
+          </button>
+        )}
+      </div>
+
+      <style jsx>{`
+        .sis-signal-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px -12px rgba(10, 10, 10, 0.18);
+          border-color: var(--volt-border-strong, #D0D0D0);
         }
       `}</style>
     </div>
