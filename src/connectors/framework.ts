@@ -56,6 +56,20 @@ export interface DeclarativeConnectorConfig<Row = unknown> {
    *   "data.studies"   → response.data.studies is the array
    */
   rowsPath?: string;
+  /**
+   * Optional pre-processing hook applied to the parsed JSON BEFORE
+   * `rowsPath` lookup. Use this when an upstream API returns data in
+   * a shape that `extractRows` can't walk — most commonly:
+   *
+   *   - an object keyed by ID (SteamSpy: `{ "730": {...}, "440": {...} }`)
+   *     → `transformResponse: (data) => Object.values(data as object)`
+   *   - a payload wrapped in an envelope you want to unwrap manually
+   *
+   * Keep this trivial: the hook should be pure and synchronous. If you
+   * need fetching, pagination, or real branching logic, write a
+   * hand-coded connector instead.
+   */
+  transformResponse?: (data: unknown) => unknown;
   /** Hard cap on rows processed per fetch. Default: 100. */
   limit?: number;
   /** Fetch timeout in ms. Default: 15000. */
@@ -175,7 +189,18 @@ export function buildDeclarativeConnector<Row = unknown>(
           return [];
         }
 
-        const data = await res.json();
+        const raw = await res.json();
+        // Apply the optional pre-processing hook, catching any throw so
+        // a bad transform can't kill the connector silently at runtime.
+        let data: unknown = raw;
+        if (config.transformResponse) {
+          try {
+            data = config.transformResponse(raw);
+          } catch (err) {
+            console.warn(`[${config.name}] transformResponse threw:`, err);
+            return [];
+          }
+        }
         const rows = extractRows<Row>(data, config.rowsPath);
         if (rows.length === 0) return [];
 

@@ -64,6 +64,13 @@ import { nextstrainConnector } from "./nextstrain";
 // that the IDMC Helix API requires client registration ("Client is not
 // registered." on every public-looking endpoint). IDMC is back in the
 // planned-connectors list with needsKey: true until someone registers.
+// Bonus sprint (2026-04): Gaming pulse, cultural macro-trends, seismic hazard.
+// FAOSTAT was planned as the third bonus but all public JSON endpoints are
+// either gated (Missing Authorization Header) or bulk-only (CSV zip). USGS
+// Earthquake took its slot and also closes the seismic gap vs NASA EONET.
+import { steamspyConnector } from "./steamspy";
+import { googleNgramConnector } from "./google-ngram";
+import { usgsEarthquakeConnector } from "./usgs-earthquake";
 
 export const connectors: SourceConnector[] = [
   // Tech & Developer signals
@@ -143,6 +150,10 @@ export const connectors: SourceConnector[] = [
   nextstrainConnector,
   // Batch 5: Migration & displacement
   unhcrConnector,
+  // Bonus sprint: Gaming, cultural macro, seismic hazard
+  steamspyConnector,
+  googleNgramConnector,
+  usgsEarthquakeConnector,
 ];
 
 export function getConnector(name: string): SourceConnector | undefined {

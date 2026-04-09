@@ -88,13 +88,19 @@ Der User will alle vier Ebenen gleichzeitig. Das ist ein eigenes kleines Projekt
 
 Nach dem Phase-C-Success mit CoinGecko, DeFi Llama, ClinicalTrials, OpenFDA, UNHCR, Nextstrain stehen diese Kandidaten für die nächste Welle bereit. Alle No-Auth, über das declarative Framework baubar:
 
+**Bonus-Sprint 2026-04-09 — geliefert:**
+
+- **[✅] SteamSpy** — Gaming-Adoption-Puls. Top 100 Games nach 2-Wochen-Spielzeit, Framework um `transformResponse` erweitert für object-keyed-by-appid Shape. → `src/connectors/steamspy.ts`
+- **[✅] Google Books Ngram Viewer** — Kulturelle Makro-Trends 2015-2019. 30 kuratierte Seed-Phrases mit STEEP+V-Topic-Mapping, log2-Ratio als Signal-Stärke. → `src/connectors/google-ngram.ts`
+- **[✅] USGS Earthquake Hazards** — Seismische Ereignisse M4.5+ der letzten 30 Tage. GeoJSON-Feed, live (~5 min Update), nutzt USGS `sig`-Score als Signal-Stärke. Schließt die seismische Lücke von NASA EONET. → `src/connectors/usgs-earthquake.ts` (**ersetzt FAOSTAT im Bonus-Sprint** — siehe Blocker unten)
+
+**Noch offen:**
+
 - **[🔴] EUR-Lex / CELLAR** — EU-Gesetzgebung in Echtzeit. SPARQL-Endpoint, komplexer als REST. Aufwand: ~60 Min
-- **[🔴] FAO FAOSTAT** — globale Nahrungsmittelpreise. Aufwand: ~45 Min
-- **[🔴] Google Books Ngram Viewer** — kulturelle Makro-Trends über Jahrzehnte. Braucht Input-Keyword-Liste. Aufwand: ~45 Min
+- **[⛔ BLOCKIERT] FAO FAOSTAT** — globale Nahrungsmittelpreise. Alle öffentlichen JSON-Endpoints erfordern Authorization-Header (`faostatservices.fao.org`), timen aus (`fenixservices.fao.org` >10s) oder redirecten auf HTML (`www.fao.org/faostat/api/...`). Nur Bulk-CSV-Download (multi-MB zips) ist öffentlich zugänglich. Braucht entweder FAO-Registration oder einen Bulk-CSV-Ingester. **Status: needsKey oder bulk-only** — aus der No-Auth-Welle-2 entfernt.
 - **[🔴] Tor Metrics** — Anonymitäts-Netzwerk-Traffic. CSV-Format statt JSON, Framework braucht CSV-Parser. Aufwand: ~60 Min (Framework-Erweiterung + Connector)
-- **[🔴] SteamSpy** — Gaming-Adoption ohne Auth, einfachste Shape. Aufwand: ~30 Min
-- **[🟡] Ember Climate** — Stromsektor-Dekarbonisierung. CSV-Download. Aufwand: ~45 Min
-- **[🟡] ECDC Surveillance Atlas** — EU-Infektionskrankheiten. Aufwand: ~45 Min
+- **[⛔ BLOCKIERT] Ember Climate** — API gibt "No API key set" zurück, also nicht mehr No-Auth. Zurück nach Ebene-2.
+- **[⛔ BLOCKIERT] ECDC Surveillance Atlas** — alle öffentlichen Feeds liefern veraltete 2020/2022-Daten (WHO hat Covid-Reporting übernommen), Influenza-Endpoint ist 404. Zurückgestuft.
 - **[🟡] WFP VAM** — Hungerkrisen-Monitor. Aufwand: ~45 Min
 - **[🟢] EU JRC Megatrends Hub** — Foresight-Referenzen. Aufwand: ~30 Min
 - **[🟢] OpenStreetMap Overpass** — Query-Language komplex. Aufwand: ~90 Min
