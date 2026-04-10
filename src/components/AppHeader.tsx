@@ -6,17 +6,21 @@ import Image from "next/image";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
-// Brutally minimal main navigation, ordered by mental model:
-// — "Sessions" (first) is the strategic working area where work happens:
-//   list of past canvases, each resolving to /canvas/[id].
-// — "Knowledge Cockpit" (second) is the data/reference landscape: radar,
-//   network, signals, sources, methodology.
+// Main navigation — ordered by workflow progression:
+// 1. "Sessions" — list of strategic working threads.
+// 2. "Canvas" — the active workspace (node canvas).
+// 3. "Knowledge Cockpit" — data/reference landscape.
 //
-// Frameworks are reached from the Home page (hero cards), Node Canvas is reached
-// from within a Session — neither needs its own nav slot.
-// Labels are English-only by user choice.
-const NAV_ITEMS = [
+// Each item can optionally define `matchAlso` prefixes so that child routes
+// (e.g. /verstehen/abc) also highlight the parent nav item.
+const NAV_ITEMS: Array<{
+  href: string;
+  labelDe: string;
+  labelEn: string;
+  matchAlso?: string[];
+}> = [
   { href: "/sessions",  labelDe: "Sessions",          labelEn: "Sessions"          },
+  { href: "/canvas",    labelDe: "Canvas",             labelEn: "Canvas"             },
   { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
 ];
 
@@ -84,12 +88,10 @@ export function AppHeader() {
         <nav className="sis-nav-desktop" aria-label={locale === "de" ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {NAV_ITEMS.map(({ href, labelDe, labelEn }) => {
             const label = locale === "de" ? labelDe : labelEn;
-            // "Sessions" also owns /canvas routes — drilling into a session
-            // from the list must keep the nav item highlighted.
+            // Match exact path OR any sub-path (e.g. /verstehen/abc).
             const isActive =
               pathname === href
-              || (href !== "/" && pathname.startsWith(href))
-              || (href === "/sessions" && pathname.startsWith("/canvas"));
+              || (href !== "/" && pathname.startsWith(href));
             return (
               <Link key={href} href={href}
                 aria-current={isActive ? "page" : undefined}
@@ -98,6 +100,7 @@ export function AppHeader() {
                   color: isActive ? "var(--color-text-heading)" : "var(--color-text-subtle)",
                   textDecoration: "none", padding: "4px 10px",
                   borderRadius: "var(--radius-md)", transition: "all 0.15s", whiteSpace: "nowrap",
+                  borderBottom: isActive ? "2px solid var(--color-text-heading)" : "2px solid transparent",
                 }}
                 onMouseEnter={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; } }}
                 onMouseLeave={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; } }}

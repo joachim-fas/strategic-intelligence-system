@@ -28,6 +28,7 @@ import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_EDGES } from "@/lib/causal-graph";
 import { VoltTabs } from "@/components/volt";
+import { connectors } from "@/connectors";
 import dynamic from "next/dynamic";
 
 // ── Lazy-load heavy visualization components ────────────────────────────────
@@ -166,7 +167,9 @@ export default function VerstehenPage() {
   // Derived stats for the mono stats line
   const activeEdges = TREND_EDGES.length;
   const adoptCount = trends.filter(t => t.ring === "adopt").length;
-  const effectiveSourcesCount = sourcesCount ?? 48; // fallback while loading
+  // Use live API count when available, fall back to static connector count,
+  // never use a hardcoded number.
+  const effectiveSourcesCount = sourcesCount ?? connectors.length;
 
   return (
     <div style={{ minHeight: "100vh", background: "transparent", color: "var(--color-text-primary)", display: "flex", flexDirection: "column" }}>

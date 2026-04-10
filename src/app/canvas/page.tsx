@@ -4469,6 +4469,7 @@ export default function CanvasPage() {
       setSelectedId(null); setCmdVisible(false);
       setSaveStatus(null);
       try { localStorage.setItem("sis-active-canvas", newCanvas.id); } catch {}
+      try { window.history.replaceState(null, "", `/canvas?project=${newCanvas.id}`); } catch {}
       await loadProjects();
       // Show template picker for the new project
       setShowTemplatePicker(true);
@@ -4505,6 +4506,8 @@ export default function CanvasPage() {
         setNodes([]); setConnections([]);
         setPanX(0); setPanY(0); setZoom(1);
         setProjects(prev => prev.filter(p => p.id !== id));
+        // Clear stale ?project= from URL so reload doesn't retry a dead ID
+        try { window.history.replaceState(null, "", "/canvas"); } catch {}
         showProjectError(de ? "Projekt existiert nicht mehr." : "Project no longer exists.");
         setProjectOp(null);
         return;
@@ -4517,6 +4520,8 @@ export default function CanvasPage() {
       setProjectName(canvas.name);
       setSaveStatus(null);
       try { localStorage.setItem("sis-active-canvas", id); } catch {}
+      // Keep URL in sync so bookmarks / refresh / back-button all work
+      try { window.history.replaceState(null, "", `/canvas?project=${id}`); } catch {}
       const canvasState = canvas.canvas_state;
       if (!canvasState || canvasState === 'null' || canvasState === '{}' || canvasState.trim() === '') {
         setNodes([]); setConnections([]);
@@ -4580,6 +4585,8 @@ export default function CanvasPage() {
         setProjectId(null); setProjectName(""); setSaveStatus(null);
         setNodes([]); setConnections([]);
         try { localStorage.removeItem("sis-active-canvas"); } catch {}
+        // Clear ?project= from URL so refresh shows empty state, not a dead ID
+        try { window.history.replaceState(null, "", "/canvas"); } catch {}
       }
     } catch (e) {
       showProjectError(de ? `Löschen fehlgeschlagen: ${(e as Error).message}` : `Delete failed: ${(e as Error).message}`);
@@ -4618,75 +4625,24 @@ export default function CanvasPage() {
       } catch { /* ignore malformed transfer data */ }
     }
 
-    // Check URL param first (e.g. from Werkstatt embed), then localStorage
+    // Resolve which project to load: URL param > one-shot localStorage > persisted active canvas
     const urlProjectId = (() => { try { return new URLSearchParams(window.location.search).get("project"); } catch { return null; } })();
     const fromProjects = (() => { try { const v = localStorage.getItem("sis-canvas-project"); localStorage.removeItem("sis-canvas-project"); return v; } catch { return null; } })();
     const activeId = urlProjectId ?? fromProjects ?? (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
 
     if (activeId) {
-      fetch(`/api/v1/canvas/${activeId}`)
-        .then(r => {
-          if (!r.ok) {
-            // Project no longer exists in DB (404) — clear stale localStorage
-            clearStaleLocalStorage();
-            return;
-          }
-          return r.json();
-        })
-        .then(json => {
-          if (!json) return; // already handled above (404 case)
-          const canvas = json.canvas;
-          if (!canvas) {
-            // API returned OK but no canvas object — clear stale cache
-            clearStaleLocalStorage();
-            return;
-          }
-          setProjectId(activeId);
-          setProjectName(canvas.name);
-          const initState = canvas.canvas_state;
-          if (initState && initState !== 'null' && initState !== '{}' && initState.trim() !== '') {
-            try {
-              const state = JSON.parse(initState);
-              if (state && typeof state === "object") {
-                if (Array.isArray(state.nodes)) setNodes(state.nodes);
-                if (Array.isArray(state.conns)) setConnections(state.conns);
-                if (state.pan)  { setPanX(state.pan.x); setPanY(state.pan.y); }
-                if (state.zoom) setZoom(state.zoom);
-              }
-            } catch (parseErr) {
-              console.error("[SIS Canvas] Failed to parse canvas_state on init:", parseErr);
-            }
-          }
-        })
-        .catch(() => {
-          // Network error or unexpected failure — clear stale cache
-          clearStaleLocalStorage();
-        });
+      // Persist immediately so localStorage is in sync with the URL param
+      try { localStorage.setItem("sis-active-canvas", activeId); } catch {}
+      // Use the proper loadProject function which handles schema versions,
+      // error states, 404 cleanup, and localStorage persistence correctly.
+      loadProject(activeId);
     } else {
-      fallbackLocalStorage();
-    }
-
-    function clearStaleLocalStorage() {
-      // DB is source of truth — if the project is gone, purge all cached state
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
-      try { localStorage.removeItem("sis-active-canvas"); } catch {}
-      try { localStorage.removeItem("sis-history-v2"); } catch {}
-      try { localStorage.removeItem("sis-canvas-project"); } catch {}
-      setProjectId(null);
-      setProjectName("");
-      setNodes([]);
-      setConnections([]);
-      setPanX(0); setPanY(0); setZoom(1);
-      setSaveStatus(null);
-    }
-
-    function fallbackLocalStorage() {
+      // No project to load — try localStorage node cache or show empty state
       const saved = loadFromStorage();
       if (saved && saved.nodes.length > 0) {
         setNodes(saved.nodes); setConnections(saved.conns);
         setPanX(saved.pan.x); setPanY(saved.pan.y); setZoom(saved.zoom);
       } else {
-        // No saved state → show empty canvas (welcome state)
         setNodes([]);
         setConnections([]);
         setZoom(1);

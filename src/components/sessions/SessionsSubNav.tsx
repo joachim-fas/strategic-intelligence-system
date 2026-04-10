@@ -3,6 +3,9 @@
 /**
  * Sub-navigation for the Sessions area: Aktiv | Archiv.
  * Used on /sessions and /sessions/archiv.
+ *
+ * Active tab gets a solid bottom border + bolder weight + darker text.
+ * Inactive tab has a subtle hover state with background tint.
  */
 
 interface Props {
@@ -32,23 +35,33 @@ export function SessionsSubNav({ active, de }: Props) {
           <a
             key={t.key}
             href={t.href}
+            aria-current={isActive ? "page" : undefined}
             style={{
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
               fontSize: 13,
               fontWeight: isActive ? 700 : 500,
               color: isActive ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-muted, #6B6B6B)",
               textDecoration: "none",
-              padding: "12px 18px",
+              padding: "10px 18px",
               borderBottom: isActive ? "2px solid var(--volt-text, #0A0A0A)" : "2px solid transparent",
-              transition: "color 140ms ease, border-color 140ms ease",
+              borderRadius: isActive ? "0" : "var(--volt-radius-sm, 6px) var(--volt-radius-sm, 6px) 0 0",
+              background: isActive ? "transparent" : "transparent",
+              transition: "color 140ms ease, border-color 140ms ease, background 140ms ease",
+              letterSpacing: isActive ? "-0.01em" : "0",
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLAnchorElement;
-              if (!isActive) el.style.color = "var(--volt-text, #0A0A0A)";
+              if (!isActive) {
+                el.style.color = "var(--volt-text, #0A0A0A)";
+                el.style.background = "var(--volt-surface, #F4F4F4)";
+              }
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget as HTMLAnchorElement;
-              if (!isActive) el.style.color = "var(--volt-text-muted, #6B6B6B)";
+              if (!isActive) {
+                el.style.color = "var(--volt-text-muted, #6B6B6B)";
+                el.style.background = "transparent";
+              }
             }}
           >
             {t.label}

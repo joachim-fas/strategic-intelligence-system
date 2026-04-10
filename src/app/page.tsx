@@ -63,6 +63,17 @@ export default function Home() {
   // Phase 5: Past sessions for the picker dropdown
   const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; updatedAt?: string }>>([]);
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
+  // Live stats for the hero mono line — fetched on mount, loading state until ready
+  const [liveStats, setLiveStats] = useState<{ sources: number; trends: number; sessions: number } | null>(null);
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
+      fetch("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? d.projects ?? []).length).catch(() => 0),
+    ]).then(([trendCount, sessionCount]) => {
+      setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
+    });
+  }, []);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   // FE-09: Dark mode toggle consolidated into AppHeader — removed duplicate
@@ -897,13 +908,15 @@ export default function Home() {
                         </p>
                       )}
 
-                      {!guidance && (
-                        <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "10px 0 0", lineHeight: 1.5 }}>
+                      {/* Workflow explanation — always visible so users know what happens next */}
+                      <p style={{ fontSize: 11, color: "var(--volt-text-muted, #6B6B6B)", margin: "14px 0 0", lineHeight: 1.6, display: "flex", alignItems: "flex-start", gap: 6 }}>
+                        <span style={{ flexShrink: 0, fontSize: 12, opacity: 0.5 }}>→</span>
+                        <span>
                           {locale === "de"
-                            ? "Das Framework erstellt eine strukturierte Analyse im Canvas mit geführtem Workflow."
-                            : "The framework creates a structured analysis in the Canvas with a guided workflow."}
-                        </p>
-                      )}
+                            ? "Erstellt eine strukturierte Analyse im Canvas: Frage, Insights, Szenarien und Handlungsempfehlung — in einem geführten Workflow."
+                            : "Creates a structured analysis in the Canvas: question, insights, scenarios, and recommendations — in a guided workflow."}
+                        </span>
+                      </p>
 
                       {/* ── Absolute bottom: Submit button row ──────────
                            Divider + right-aligned Analyse button. Button is
@@ -986,8 +999,8 @@ export default function Home() {
                           }}
                         >
                           {frameworkLoading
-                            ? (locale === "de" ? "Erstelle…" : "Creating…")
-                            : (locale === "de" ? "Analysieren →" : "Analyze →")}
+                            ? (locale === "de" ? "Session wird erstellt…" : "Creating session…")
+                            : (locale === "de" ? "Analyse starten →" : "Start analysis →")}
                         </button>
                       </div>
                     </>
@@ -1009,8 +1022,7 @@ export default function Home() {
               color: "var(--volt-text-faint, #AAA)",
               textAlign: "center", marginBottom: 28,
             }}>
-              {/* TODO: fetch real stats */}
-              — {locale === "de" ? "Quellen" : "Sources"} · — Trends · STEEP+V · EU-Fokus
+              {liveStats ? liveStats.sources : "…"} {locale === "de" ? "Quellen" : "Sources"} · {liveStats ? liveStats.trends : "…"} Trends · STEEP+V · EU-Fokus
             </div>
             <div style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
