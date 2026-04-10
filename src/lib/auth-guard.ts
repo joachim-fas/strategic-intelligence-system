@@ -44,6 +44,16 @@ export type AuthResult = AuthSuccess | AuthFailure;
  * - Minimal error information — no session details leaked to unauthenticated users.
  */
 export async function requireAuth(): Promise<AuthResult> {
+  // DEV MODE: Skip auth — no email server for magic links in development
+  if (process.env.NODE_ENV === "development") {
+    return {
+      authorized: true,
+      userId: "dev-user",
+      email: "dev@localhost",
+      role: "admin",
+    };
+  }
+
   try {
     const session = await auth();
 

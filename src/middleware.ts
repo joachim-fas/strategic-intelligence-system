@@ -150,15 +150,19 @@ function hasSessionCookie(request: NextRequest): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ── Development mode — skip auth (no email server for magic links) ─────
+  // SECURITY: Only active when NODE_ENV=development. Production always enforces auth.
+  const isDev = process.env.NODE_ENV === "development";
+
   // ── CSRF check (before auth, to reject forged requests early) ──────────
-  if (!validateCsrfOrigin(request)) {
+  // CSRF is enforced even in dev mode to catch issues early.
+  if (!isDev && !validateCsrfOrigin(request)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { error: "Forbidden: origin mismatch" },
         { status: 403 }
       );
     }
-    // For page requests, redirect to home (unusual — likely a crafted form)
     return NextResponse.redirect(new URL("/", request.url));
   }
 
@@ -167,21 +171,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── Session check ──────────────────────────────────────────────────────
+  // ── Dev mode bypass — all paths accessible without auth ────────────────
+  if (isDev) {
+    return NextResponse.next();
+  }
+
+  // ── Session check (production only) ────────────────────────────────────
   // SECURITY: Checks session cookie presence. This is a first-pass filter;
   // full DB-backed session validation happens in API route handlers via auth().
-  // An expired/invalid cookie will pass here but fail at the route handler level.
   const isAuthenticated = hasSessionCookie(request);
 
   if (!isAuthenticated) {
-    // API routes return 401 JSON
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
-    // Page routes redirect to sign-in
     const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("callbackUrl", request.url);
     return NextResponse.redirect(signInUrl);

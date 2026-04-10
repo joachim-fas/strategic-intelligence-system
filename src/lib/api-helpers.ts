@@ -44,6 +44,14 @@ import { z } from "zod";
  * Require an authenticated session. Returns the session or a 401 response.
  */
 export async function requireAuth() {
+  // DEV MODE: Skip auth — no email server for magic links in development
+  if (process.env.NODE_ENV === "development") {
+    return {
+      session: { user: { id: "dev-user", email: "dev@localhost", role: "admin" } },
+      errorResponse: null,
+    };
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return {
