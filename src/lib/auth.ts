@@ -1,5 +1,9 @@
 /**
- * NextAuth v5 (Auth.js) configuration.
+ * NextAuth v5 (Auth.js) — full configuration (Node.js runtime only).
+ *
+ * This file imports EmailProvider (nodemailer) and the DB adapter, so it
+ * MUST NOT be imported by middleware.ts (Edge Runtime).
+ * Middleware uses auth.config.ts instead.
  *
  * - Email magic-link authentication (no passwords)
  * - Email allowlist via ALLOWED_EMAILS env var
@@ -11,22 +15,7 @@ import NextAuth from "next-auth";
 import type { NextAuthConfig } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Parse the comma-separated allowlist from env */
-function getAllowedEmails(): Set<string> {
-  const raw = process.env.ALLOWED_EMAILS ?? "";
-  if (!raw) return new Set(); // empty = everyone allowed (dev mode)
-  return new Set(
-    raw
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
+import { authConfig } from "./auth.config";
 
 /** Build the Drizzle adapter lazily so we avoid top-level side-effects */
 function buildAdapter() {
@@ -224,10 +213,11 @@ function mapUser(row: any) {
 }
 
 // ---------------------------------------------------------------------------
-// Auth configuration
+// Full auth configuration (Node.js only — spreads edge-safe config)
 // ---------------------------------------------------------------------------
 
-const authConfig: NextAuthConfig = {
+const fullAuthConfig: NextAuthConfig = {
+  ...authConfig,
   adapter: buildAdapter() as NextAuthConfig["adapter"],
   session: {
     strategy: "database",
@@ -246,31 +236,6 @@ const authConfig: NextAuthConfig = {
       from: process.env.EMAIL_FROM ?? "noreply@sis.app",
     }),
   ],
-  callbacks: {
-    async signIn({ user }) {
-      const allowed = getAllowedEmails();
-      // If no allowlist configured, allow everyone (dev mode)
-      if (allowed.size === 0) return true;
-      const email = user.email?.toLowerCase();
-      if (!email) return false;
-      return allowed.has(email);
-    },
-    async session({ session, user }) {
-      // Attach user id and role to session
-      if (session.user) {
-        session.user.id = user.id;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (session.user as any).role = (user as any).role ?? "member";
-      }
-      return session;
-    },
-  },
-  pages: {
-    signIn: "/auth/signin",
-    verifyRequest: "/auth/verify",
-    error: "/auth/error",
-  },
-  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
 };
 
 export const {
@@ -278,4 +243,4 @@ export const {
   auth,
   signIn,
   signOut,
-} = NextAuth(authConfig);
+} = NextAuth(fullAuthConfig);

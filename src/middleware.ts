@@ -2,17 +2,21 @@
  * Next.js middleware — security-hardened authentication and CSRF protection.
  *
  * SECURITY CONTROLS:
- * 1. Session validation via NextAuth v5 `auth()` (database-backed, not cookie-presence)
+ * 1. Session check via NextAuth session cookie presence
+ *    (full DB-backed validation happens in API route handlers via auth())
  * 2. All /api/v1/* routes require authentication by default
  * 3. CSRF origin validation for state-changing requests (POST, PUT, PATCH, DELETE)
  * 4. No Host-header-based auth bypass — auth enforced regardless of hostname
+ *
+ * NOTE: Middleware runs in Edge Runtime — cannot import auth.ts (uses nodemailer/
+ * better-sqlite3). Session cookie presence is checked here; full DB validation
+ * happens server-side in route handlers.
  *
  * Only explicitly allowlisted paths are public.
  */
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
 // Path classification
@@ -117,10 +121,33 @@ function validateCsrfOrigin(request: NextRequest): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware handler — wrapped with NextAuth v5 `auth()` for session validation
+// Session cookie detection (Edge-safe — no DB access)
 // ---------------------------------------------------------------------------
 
-export default auth((request) => {
+/**
+ * Check for NextAuth session cookie.
+ *
+ * NOTE: This checks cookie PRESENCE, not validity. Full DB-backed session
+ * validation happens in API route handlers via auth() from src/lib/auth.ts
+ * (Node.js runtime). This is the standard Auth.js v5 pattern for Edge middleware
+ * with database sessions.
+ */
+function hasSessionCookie(request: NextRequest): boolean {
+  // NextAuth v5 uses these cookie names depending on HTTPS vs HTTP
+  const secureCookie = request.cookies.get("__Secure-authjs.session-token");
+  const devCookie = request.cookies.get("authjs.session-token");
+  // NextAuth v4 fallback names
+  const secureV4 = request.cookies.get("__Secure-next-auth.session-token");
+  const devV4 = request.cookies.get("next-auth.session-token");
+
+  return !!(secureCookie?.value || devCookie?.value || secureV4?.value || devV4?.value);
+}
+
+// ---------------------------------------------------------------------------
+// Middleware handler
+// ---------------------------------------------------------------------------
+
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── CSRF check (before auth, to reject forged requests early) ──────────
@@ -140,13 +167,13 @@ export default auth((request) => {
     return NextResponse.next();
   }
 
-  // ── Session validation ─────────────────────────────────────────────────
-  // SECURITY: `request.auth` is populated by NextAuth v5's `auth()` wrapper.
-  // It validates the session token against the database — not just cookie presence.
-  // A garbage or expired token will result in `request.auth` being null.
-  const session = request.auth;
+  // ── Session check ──────────────────────────────────────────────────────
+  // SECURITY: Checks session cookie presence. This is a first-pass filter;
+  // full DB-backed session validation happens in API route handlers via auth().
+  // An expired/invalid cookie will pass here but fail at the route handler level.
+  const isAuthenticated = hasSessionCookie(request);
 
-  if (!session?.user) {
+  if (!isAuthenticated) {
     // API routes return 401 JSON
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
@@ -170,7 +197,7 @@ export default auth((request) => {
   }
 
   return response;
-});
+}
 
 // ---------------------------------------------------------------------------
 // Matcher — determines which paths this middleware runs on
