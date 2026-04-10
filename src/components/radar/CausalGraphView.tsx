@@ -495,16 +495,21 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         event.stopPropagation();
         return;
       }
-      // Plain click: toggle focus and clear any active path
+      // Plain click: toggle focus, clear any active path, AND open detail panel
       if (pathIds || pathAnchor) {
         setPathAnchor(null);
         setPathIds(null);
       }
-      if (focusedNode === d.id) setFocusedNode(null);
-      else setFocusedNode(d.id);
+      if (focusedNode === d.id) {
+        setFocusedNode(null);
+      } else {
+        setFocusedNode(d.id);
+        // Also open the detail panel — consistent with Radar's single-click UX
+        onTrendClick(d.trend);
+      }
     });
 
-    // Double-click: open detail panel
+    // Double-click: also open detail panel (kept for discoverability)
     node.on("dblclick", (_event, d) => {
       onTrendClick(d.trend);
     });
@@ -792,8 +797,8 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
       }}>
         <span>
           {locale === "de"
-            ? "Klick = Fokus · Doppelklick = Details · Shift+Klick zwei Knoten = Kürzester Pfad"
-            : "Click = Focus · Double-click = Details · Shift+Click two nodes = Shortest path"}
+            ? "Klick = Fokus + Details · Shift+Klick zwei Knoten = Kürzester Pfad"
+            : "Click = Focus + Details · Shift+Click two nodes = Shortest path"}
         </span>
 
         {pathAnchor && !pathIds && (

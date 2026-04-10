@@ -108,6 +108,15 @@ export default function VerstehenPage() {
       .catch(() => {});
   }, []);
 
+  // Responsive: detect mobile for detail panel layout
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   // View state — tab + selected trend, synced with URL params for shareable links.
   const [activeTab, setActiveTabState] = useState<Tab>("radar");
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
@@ -291,9 +300,18 @@ export default function VerstehenPage() {
           )}
         </div>
 
-        {/* Right: Detail Panel — only shown on radar/netzwerk where it makes sense */}
+        {/* Right: Detail Panel — only shown on radar/netzwerk where it makes sense.
+             On narrow viewports (< 768px) the panel overlays full-width as a
+             fixed sheet; on wider screens it sits as a sticky sidebar. */}
         {selectedTrend && (activeTab === "radar" || activeTab === "netzwerk") && (
-          <div style={{
+          <div style={isMobile ? {
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 50,
+            overflowY: "auto",
+            display: "flex", flexDirection: "column",
+            background: "var(--volt-surface-raised, #fff)",
+            boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+          } : {
             width: 440, flexShrink: 0,
             borderLeft: "1px solid var(--volt-border, #E8E8E8)",
             overflowY: "auto",
