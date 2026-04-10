@@ -323,8 +323,8 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
 
   return (
     <div
-      className="fixed right-0 top-0 h-full w-[440px] border-l shadow-xl z-40 overflow-y-auto"
-      style={{ background: "var(--color-surface, #FAFAFA)", borderColor: "var(--volt-border, #E8E8E8)" }}
+      className="h-full w-full overflow-y-auto"
+      style={{ background: "var(--color-surface, #FAFAFA)" }}
     >
       {/* ── Sticky Header ── */}
       <div
@@ -339,12 +339,19 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           >
             ← {t(locale, "back")}
           </button>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 items-center">
             <button className="px-3 py-1 text-xs rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] transition-colors bg-white">
               {t(locale, "edit")}
             </button>
             <button className="px-3 py-1 text-xs rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] transition-colors bg-white">
               {t(locale, "pin")}
+            </button>
+            <button
+              onClick={onClose}
+              title={t(locale, "back")}
+              className="ml-1 w-7 h-7 flex items-center justify-center rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] hover:bg-[rgba(0,0,0,0.04)] transition-colors bg-white text-sm font-medium"
+            >
+              ✕
             </button>
           </div>
         </div>

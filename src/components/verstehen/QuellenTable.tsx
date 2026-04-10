@@ -205,11 +205,13 @@ export default function QuellenTable({ de }: QuellenTableProps) {
     const liveRows: UnifiedRow[] = connectors.map((c) => {
       const stat = statusMap[c.name] || {};
       let isActive = false;
-      if (stat.status === "active" || stat.status === "ok" || stat.status === "fresh") {
+      if (stat.status === "active" || stat.status === "ok" || stat.status === "fresh" || stat.status === "stale") {
+        // "stale" = data exists but > 12h old. Still counts as active since
+        // the connector works — it just hasn't run recently.
         isActive = true;
       } else if (stat.lastRunAt) {
         const age = Date.now() - new Date(stat.lastRunAt).getTime();
-        isActive = age < 24 * 60 * 60 * 1000;
+        isActive = age < 7 * 24 * 60 * 60 * 1000; // 7 days — generous for batch connectors
       }
       const category = (CONNECTOR_CATEGORY[c.name] || "tech") as CategoryKey;
       const type = (CONNECTOR_TYPE[c.name] || "live-signal") as TypeBadgeKind;
@@ -441,17 +443,17 @@ export default function QuellenTable({ de }: QuellenTableProps) {
            When a macro chip is active, only the fine categories
            belonging to that macro render here. "Alle" and "Forschung"
            are always visible so the user can leave scoped mode cleanly. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         <span style={{
           fontFamily: "var(--font-mono)",
           fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
           textTransform: "uppercase",
           color: "var(--volt-text-faint, #999)",
-          marginRight: 4,
+          marginRight: 2,
         }}>
           {de ? "Kategorie" : "Category"}
         </span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
           {(Object.keys(CATEGORIES) as CategoryKey[]).map((key) => {
             // Always show "all" and "forschung" regardless of macro scope.
             if (key !== "all" && key !== "forschung") {
@@ -465,6 +467,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                 key={key}
                 active={activeFilter === key}
                 onClick={() => setActiveFilter(key)}
+                size="sm"
               >
                 {de ? CATEGORIES[key].de : CATEGORIES[key].en}
               </VoltFilterPill>

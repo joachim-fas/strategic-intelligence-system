@@ -166,21 +166,24 @@ export function VoltFilterPill({
   active,
   onClick,
   dotColor,
+  size = "md",
   children,
 }: {
   active: boolean;
   onClick: () => void;
   dotColor?: string;
+  size?: "sm" | "md";
   children: React.ReactNode;
 }) {
+  const isSmall = size === "sm";
   return (
     <button
       onClick={onClick}
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 6,
-        padding: "6px 14px",
+        gap: isSmall ? 4 : 6,
+        padding: isSmall ? "3px 10px" : "6px 14px",
         borderRadius: 9999,
         border: active
           ? "1px solid var(--foreground, #0A0A0A)"
@@ -188,7 +191,7 @@ export function VoltFilterPill({
         background: active ? "var(--foreground, #0A0A0A)" : "transparent",
         color: active ? "var(--background, #fff)" : "var(--muted-foreground, #6B6B6B)",
         fontFamily: "var(--font-ui)",
-        fontSize: 12,
+        fontSize: isSmall ? 11 : 12,
         fontWeight: 500,
         cursor: "pointer",
         transition: "all 0.15s",

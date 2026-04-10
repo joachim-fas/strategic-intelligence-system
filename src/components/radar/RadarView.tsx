@@ -286,12 +286,16 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
               fontSize: 12, fontWeight: 600,
               color: "var(--volt-text, #0A0A0A)",
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              wordBreak: "break-word",
+              hyphens: "auto" as const,
             }}>
               {label}
             </div>
             <div style={{
               fontSize: 10, color: "var(--volt-text-muted, #6B6B6B)",
               marginTop: 2, lineHeight: 1.3,
+              wordBreak: "break-word",
+              overflow: "hidden",
             }}>
               {quadrantDescriptions[idx as 0 | 1 | 2 | 3]}
             </div>
