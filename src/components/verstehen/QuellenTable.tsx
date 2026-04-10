@@ -97,65 +97,60 @@ const CONNECTOR_TYPE: Record<string, TypeBadgeKind> = {
   nextstrain:      "live-signal",
 };
 
-// Short descriptions per connector (derived from Volt UI sample)
-const DESCRIPTIONS: Record<string, { de: string; en: string }> = {
-  hackernews:      { de: "Tech-Community Headlines, Diskussionen, Upvotes", en: "Tech community headlines, discussions, upvotes" },
-  github:          { de: "Trending Repos, Stars, Forks — Tech-Adoption", en: "Trending repos, stars, forks — tech adoption" },
-  reddit:          { de: "Diskussionen aus 16 Tech-Subreddits", en: "Discussions from 16 tech subreddits" },
-  "stackoverflow": { de: "Tag-Volumen als Developer-Aktivitäts-Indikator", en: "Tag volume as developer activity indicator" },
-  "npm-pypi":      { de: "Download-Trends für JS/Python-Pakete", en: "Download trends for JS/Python packages" },
-  producthunt:    { de: "Neue Tech-Produkte und Startups täglich", en: "New tech products and startups daily" },
-  "docker-hub":    { de: "Container Pull-Zahlen als Adoption-Signal", en: "Container pull counts as adoption signal" },
-  bluesky:         { de: "Dezentrales Social, Tech-Community", en: "Decentralized social, tech community" },
-  "mastodon-api":  { de: "Dezentrales Social, EU Tech/Wissenschaft", en: "Decentralized social, EU tech/science" },
-  wikipedia:       { de: "Pageviews als Aufmerksamkeits-Indikator", en: "Pageviews as attention indicator" },
-  arxiv:           { de: "Preprints: Physics, CS, Bio — frühestes Signal", en: "Preprints: Physics, CS, Bio — earliest signal" },
-  openalex:        { de: "250M+ Works, Zitations-Analyse, Konzept-Trends", en: "250M+ works, citation analysis, concept trends" },
-  crossref:        { de: "150M+ DOI-Metadaten, Publikationsvolumen", en: "150M+ DOI metadata, publication volume" },
-  "semantic-scholar": { de: "220M+ Papers, semantische Suche, Citations", en: "220M+ papers, semantic search, citations" },
-  patentsview:     { de: "US-Patent-Trends als Innovationsindikator", en: "US patent trends as innovation indicator" },
-  gdelt:            { de: "15-Min-Updates, 100+ Sprachen, Sentiment", en: "15-min updates, 100+ languages, sentiment" },
-  acled:            { de: "Konflikte & politische Gewalt weltweit", en: "Conflicts & political violence worldwide" },
-  ucdp:             { de: "Uppsala Conflict Data Program — Kriegsdaten", en: "Uppsala Conflict Data Program — war data" },
-  vdem:             { de: "Democracy index, Demokratie-Qualität", en: "Democracy index, democracy quality" },
+// Short descriptions + doc URLs per connector
+const DESCRIPTIONS: Record<string, { de: string; en: string; url?: string }> = {
+  hackernews:      { de: "Tech-Community Headlines, Diskussionen, Upvotes", en: "Tech community headlines, discussions, upvotes", url: "https://news.ycombinator.com/" },
+  github:          { de: "Trending Repos, Stars, Forks — Tech-Adoption", en: "Trending repos, stars, forks — tech adoption", url: "https://docs.github.com/en/rest" },
+  reddit:          { de: "Diskussionen aus 16 Tech-Subreddits", en: "Discussions from 16 tech subreddits", url: "https://www.reddit.com/dev/api/" },
+  "stackoverflow": { de: "Tag-Volumen als Developer-Aktivitäts-Indikator", en: "Tag volume as developer activity indicator", url: "https://api.stackexchange.com/docs" },
+  "npm-pypi":      { de: "Download-Trends für JS/Python-Pakete", en: "Download trends for JS/Python packages", url: "https://github.com/npm/registry/blob/main/docs/download-counts.md" },
+  producthunt:    { de: "Neue Tech-Produkte und Startups täglich", en: "New tech products and startups daily", url: "https://www.producthunt.com/" },
+  "docker-hub":    { de: "Container Pull-Zahlen als Adoption-Signal", en: "Container pull counts as adoption signal", url: "https://docs.docker.com/docker-hub/api/latest/" },
+  bluesky:         { de: "Dezentrales Social, Tech-Community", en: "Decentralized social, tech community", url: "https://docs.bsky.app/" },
+  "mastodon-api":  { de: "Dezentrales Social, EU Tech/Wissenschaft", en: "Decentralized social, EU tech/science", url: "https://docs.joinmastodon.org/api/" },
+  wikipedia:       { de: "Pageviews als Aufmerksamkeits-Indikator", en: "Pageviews as attention indicator", url: "https://wikimedia.org/api/rest_v1/" },
+  arxiv:           { de: "Preprints: Physics, CS, Bio — frühestes Signal", en: "Preprints: Physics, CS, Bio — earliest signal", url: "https://info.arxiv.org/help/api/index.html" },
+  openalex:        { de: "250M+ Works, Zitations-Analyse, Konzept-Trends", en: "250M+ works, citation analysis, concept trends", url: "https://docs.openalex.org/" },
+  crossref:        { de: "150M+ DOI-Metadaten, Publikationsvolumen", en: "150M+ DOI metadata, publication volume", url: "https://api.crossref.org/" },
+  "semantic-scholar": { de: "220M+ Papers, semantische Suche, Citations", en: "220M+ papers, semantic search, citations", url: "https://api.semanticscholar.org/" },
+  patentsview:     { de: "US-Patent-Trends als Innovationsindikator", en: "US patent trends as innovation indicator", url: "https://patentsview.org/apis/api-endpoints" },
+  gdelt:            { de: "15-Min-Updates, 100+ Sprachen, Sentiment", en: "15-min updates, 100+ languages, sentiment", url: "https://blog.gdeltproject.org/gdelt-2-0-our-global-world-in-realtime/" },
+  acled:            { de: "Konflikte & politische Gewalt weltweit", en: "Conflicts & political violence worldwide", url: "https://acleddata.com/acleddatanew/wp-content/uploads/dlm_uploads/2023/01/API-User-Guide_2023.pdf" },
+  ucdp:             { de: "Uppsala Conflict Data Program — Kriegsdaten", en: "Uppsala Conflict Data Program — war data", url: "https://ucdp.uu.se/apidocs/" },
+  vdem:             { de: "Democracy index, Demokratie-Qualität", en: "Democracy index, democracy quality", url: "https://www.v-dem.net/data/" },
   worldmonitor:     { de: "22 globale Domains: Geopolitik-Monitor", en: "22 global domains: geopolitical monitor" },
-  worldbank:       { de: "Wirtschaftsindikatoren, 200+ Länder", en: "Economic indicators, 200+ countries" },
-  eurostat:        { de: "EU-Wirtschafts- und Sozialstatistiken", en: "EU economic and social statistics" },
-  fred:            { de: "US Federal Reserve Economic Data", en: "US Federal Reserve economic data" },
-  oecd:            { de: "OECD-Länder Wirtschaftsdaten", en: "OECD country economic data" },
-  owid:            { de: "Our World in Data — globale Stats", en: "Our World in Data — global stats" },
-  destatis:        { de: "Statistisches Bundesamt Deutschland", en: "German Federal Statistical Office" },
-  bls:             { de: "US Bureau of Labor Statistics", en: "US Bureau of Labor Statistics" },
-  imf:             { de: "IMF Finanz- und Wirtschaftsdaten", en: "IMF financial and economic data" },
-  finnhub:         { de: "Börse, Aktien, Finanznachrichten in Echtzeit", en: "Stock market and financial news in real time" },
-  "open-exchange": { de: "Währungskurse, Wechselkurse", en: "Currency rates, exchange rates" },
+  worldbank:       { de: "Wirtschaftsindikatoren, 200+ Länder", en: "Economic indicators, 200+ countries", url: "https://datahelpdesk.worldbank.org/knowledgebase/articles/898581" },
+  eurostat:        { de: "EU-Wirtschafts- und Sozialstatistiken", en: "EU economic and social statistics", url: "https://ec.europa.eu/eurostat/web/main/data/database" },
+  fred:            { de: "US Federal Reserve Economic Data", en: "US Federal Reserve economic data", url: "https://fred.stlouisfed.org/docs/api/fred/" },
+  oecd:            { de: "OECD-Länder Wirtschaftsdaten", en: "OECD country economic data", url: "https://data.oecd.org/" },
+  owid:            { de: "Our World in Data — globale Stats", en: "Our World in Data — global stats", url: "https://docs.owid.io/projects/etl/" },
+  destatis:        { de: "Statistisches Bundesamt Deutschland", en: "German Federal Statistical Office", url: "https://www-genesis.destatis.de/genesis/online" },
+  bls:             { de: "US Bureau of Labor Statistics", en: "US Bureau of Labor Statistics", url: "https://www.bls.gov/developers/" },
+  imf:             { de: "IMF Finanz- und Wirtschaftsdaten", en: "IMF financial and economic data", url: "https://datahelp.imf.org/knowledgebase/articles/667681" },
+  finnhub:         { de: "Börse, Aktien, Finanznachrichten in Echtzeit", en: "Stock market and financial news in real time", url: "https://finnhub.io/docs/api" },
+  "open-exchange": { de: "Währungskurse, Wechselkurse", en: "Currency rates, exchange rates", url: "https://openexchangerates.org/api" },
   news:            { de: "Allgemeine Nachrichten aus 100+ Quellen", en: "General news from 100+ sources" },
-  nyt:             { de: "New York Times Top Stories API", en: "New York Times top stories API" },
-  newsdata:        { de: "Multi-Sprachen Nachrichten-Feed", en: "Multi-language news feed" },
-  guardian:        { de: "The Guardian Content API", en: "The Guardian content API" },
-  "media-cloud":   { de: "Media Cloud — Medien-Analyse", en: "Media Cloud — media analysis" },
+  nyt:             { de: "New York Times Top Stories API", en: "New York Times top stories API", url: "https://developer.nytimes.com/apis" },
+  newsdata:        { de: "Multi-Sprachen Nachrichten-Feed", en: "Multi-language news feed", url: "https://newsdata.io/documentation" },
+  guardian:        { de: "The Guardian Content API", en: "The Guardian content API", url: "https://open-platform.theguardian.com/documentation/" },
+  "media-cloud":   { de: "Media Cloud — Medien-Analyse", en: "Media Cloud — media analysis", url: "https://mediacloud.org/" },
   sentiment:       { de: "Sentiment-Analyse aus News und Social", en: "Sentiment analysis from news and social" },
-  "nasa-eonet":    { de: "NASA Earth Observatory: Naturereignisse", en: "NASA Earth Observatory: natural events" },
-  "open-meteo":    { de: "Wetter- und Klimadaten global", en: "Weather and climate data globally" },
-  "who-gho":       { de: "WHO Global Health Observatory", en: "WHO Global Health Observatory" },
-  ilo:             { de: "International Labour Organization", en: "International Labour Organization" },
-  polymarket:      { de: "Prediction Markets — DeFi Basis", en: "Prediction markets — DeFi-based" },
-  manifold:        { de: "Prediction Markets — Community", en: "Prediction markets — community-driven" },
-  metaculus:       { de: "Expert Forecasting Platform", en: "Expert forecasting platform" },
-  kalshi:          { de: "Regulierte US-Event-Märkte", en: "Regulated US event markets" },
-  "google-trends": { de: "Google-Suchtrends als Attention-Indikator", en: "Google search trends as attention indicator" },
-  "un-data":       { de: "UN Statistical Division Daten", en: "UN Statistical Division data" },
-  "un-sdg":        { de: "UN Sustainable Development Goals Tracker", en: "UN Sustainable Development Goals tracker" },
+  "nasa-eonet":    { de: "NASA Earth Observatory: Naturereignisse", en: "NASA Earth Observatory: natural events", url: "https://eonet.gsfc.nasa.gov/docs/v3" },
+  "open-meteo":    { de: "Wetter- und Klimadaten global", en: "Weather and climate data globally", url: "https://open-meteo.com/en/docs" },
+  "who-gho":       { de: "WHO Global Health Observatory", en: "WHO Global Health Observatory", url: "https://www.who.int/data/gho/info/gho-odata-api" },
+  ilo:             { de: "International Labour Organization", en: "International Labour Organization", url: "https://www.ilo.org/ilostat-files/Documents/SDMX_User_Guide.pdf" },
+  polymarket:      { de: "Prediction Markets — DeFi Basis", en: "Prediction markets — DeFi-based", url: "https://docs.polymarket.com/" },
+  manifold:        { de: "Prediction Markets — Community", en: "Prediction markets — community-driven", url: "https://docs.manifold.markets/api" },
+  metaculus:       { de: "Expert Forecasting Platform", en: "Expert forecasting platform", url: "https://www.metaculus.com/api/" },
+  kalshi:          { de: "Regulierte US-Event-Märkte", en: "Regulated US event markets", url: "https://trading-api.readme.io/reference/getevents" },
+  "google-trends": { de: "Google-Suchtrends als Attention-Indikator", en: "Google search trends as attention indicator", url: "https://trends.google.com/" },
+  "un-data":       { de: "UN Statistical Division Daten", en: "UN Statistical Division data", url: "https://data.un.org/" },
+  "un-sdg":        { de: "UN Sustainable Development Goals Tracker", en: "UN Sustainable Development Goals tracker", url: "https://unstats.un.org/sdgs/dataportal" },
 };
 
 // Grid column template shared by the header row and every data row.
-// Widths tuned for a ~1320px content area:
-//   Quelle    : minmax(240, 1fr)    — fills remainder
-//   Kategorie : 220                 — icon + longest label ("Nahrungsmittel & Agrar")
-//   Typ       : 140                 — VoltTypeBadge widest label "LIVE-SIGNAL"
-//   Beschreibung : minmax(260, 1.4fr) — ellipsis overflow handles the rest
-//   Status    : 120                 — VoltStatusBadge "Backlog" in italic
-const GRID_COLS = "minmax(240px, 1fr) 220px 140px minmax(260px, 1.4fr) 120px";
+// Responsive: 3 essential columns on narrow viewports, all 5 on wide.
+const GRID_COLS = "minmax(200px, 1.4fr) minmax(140px, 0.7fr) 100px";
 
 interface QuellenTableProps {
   de: boolean;
@@ -227,6 +222,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         type,
         descDe: desc.de,
         descEn: desc.en,
+        docUrl: desc.url,
         status: isActive ? "aktiv" : "inaktiv",
       } as UnifiedRow;
     });
@@ -531,11 +527,9 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         </div>
       )}
 
-      {/* Connectors grid — Sessions-style layout (SessionList.tsx:525+).
-           Custom CSS Grid rather than <table> so the row hover, the 3px
-           left-border "active" indicator, and the macro icon column all
-           compose cleanly. gridTemplateColumns is repeated on the
-           header row and every data row. */}
+      {/* Connectors grid — responsive card-row layout.
+           Each row shows: name/slug, category, type, FULL description
+           (no ellipsis), status, and a clickable link to documentation. */}
       {!showResearch && (
         <div
           style={{
@@ -545,12 +539,12 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             background: "var(--card)",
           }}
         >
-          {/* Header row — mono uppercase column labels */}
+          {/* Header row */}
           <div
             style={{
               display: "grid",
               gridTemplateColumns: GRID_COLS,
-              gap: 16,
+              gap: 12,
               padding: "10px 20px",
               background: "var(--volt-surface, #FAFAFA)",
               borderBottom: "1px solid var(--volt-border, #EEE)",
@@ -564,8 +558,6 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           >
             <div>{de ? "Quelle" : "Source"}</div>
             <div>{de ? "Kategorie" : "Category"}</div>
-            <div>{de ? "Typ" : "Type"}</div>
-            <div>{de ? "Beschreibung" : "Description"}</div>
             <div>Status</div>
           </div>
 
@@ -573,22 +565,17 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           {sorted.map((r, idx) => {
             const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
             const isActiveRow = r.status === "aktiv";
-            // "all" never appears as a row category in practice (no connector
-            // carries it), but narrowing it out here makes CATEGORY_TO_MACRO
-            // indexable for the rest of this block.
             const macroKey =
               r.category !== "forschung" && r.category !== "all"
                 ? CATEGORY_TO_MACRO[r.category]
                 : undefined;
             const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
             const MacroIcon = macroMeta?.icon;
+            const desc = de ? r.descDe : r.descEn;
             return (
               <div
                 key={r.key}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: GRID_COLS,
-                  gap: 16,
                   padding: "14px 20px",
                   borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
                   transition: "background-color 120ms ease",
@@ -596,7 +583,6 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   borderLeft: isActiveRow
                     ? "3px solid var(--signal-positive, #1A9E5A)"
                     : "3px solid transparent",
-                  alignItems: "center",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "rgba(79,99,138,0.07)";
@@ -605,84 +591,109 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                {/* Col 1: Source name + slug */}
-                <div style={{ minWidth: 0 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    fontFamily: "var(--font-display)",
-                    fontSize: 14, fontWeight: 600,
-                    color: "var(--foreground)",
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  }}>
-                    {r.displayName}
-                    {isPlanned && r.priority === "high" && (
+                {/* Top row: name | category | status */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: GRID_COLS,
+                  gap: 12,
+                  alignItems: "center",
+                }}>
+                  {/* Col 1: Source name + slug */}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontFamily: "var(--font-display)",
+                      fontSize: 14, fontWeight: 600,
+                      color: "var(--foreground)",
+                    }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.displayName}
+                      </span>
+                      {isPlanned && r.priority === "high" && (
+                        <span
+                          title={de ? "Hohe Priorität" : "High priority"}
+                          style={{ fontSize: 9, color: "#C8102E", fontWeight: 700, flexShrink: 0 }}
+                        >●</span>
+                      )}
+                    </div>
+                    <div style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      color: "var(--volt-text-faint, #A8A8A8)",
+                      marginTop: 1,
+                    }}>
+                      {r.slug}
+                    </div>
+                  </div>
+
+                  {/* Col 2: Macro icon + fine category */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    {MacroIcon && macroMeta && (
                       <span
-                        title={de ? "Hohe Priorität in der Roadmap" : "High priority on the roadmap"}
-                        style={{ fontSize: 9, color: "#C8102E", fontWeight: 700, flexShrink: 0 }}
-                      >●</span>
+                        style={{
+                          width: 22, height: 22, borderRadius: 5,
+                          background: macroMeta.bg,
+                          color: macroMeta.text,
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <MacroIcon size={12} strokeWidth={2.25} />
+                      </span>
+                    )}
+                    <span style={{
+                      fontSize: 12,
+                      color: "var(--muted-foreground)",
+                      fontFamily: "var(--font-ui)",
+                    }}>
+                      {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
+                    </span>
+                  </div>
+
+                  {/* Col 3: Status + type */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <VoltStatusBadge kind={r.status} />
+                    <VoltTypeBadge kind={r.type} />
+                  </div>
+                </div>
+
+                {/* Bottom detail row: description + doc link */}
+                {(desc || r.docUrl) && (
+                  <div style={{
+                    marginTop: 6,
+                    display: "flex", alignItems: "baseline", gap: 12,
+                    paddingLeft: 2,
+                  }}>
+                    {desc && (
+                      <span style={{
+                        fontSize: 12,
+                        color: "var(--muted-foreground)",
+                        fontFamily: "var(--font-ui)",
+                        lineHeight: 1.45,
+                        flex: 1,
+                      }}>
+                        {desc}
+                      </span>
+                    )}
+                    {r.docUrl && (
+                      <a
+                        href={r.docUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 11, fontWeight: 600,
+                          color: "var(--signal-positive, #1A9E5A)",
+                          textDecoration: "none",
+                          fontFamily: "var(--font-mono)",
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                        }}
+                      >
+                        Docs ↗
+                      </a>
                     )}
                   </div>
-                  <div style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    color: "var(--volt-text-faint, #A8A8A8)",
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                    marginTop: 2,
-                  }}>
-                    {r.slug}
-                  </div>
-                </div>
-
-                {/* Col 2: Macro icon + fine category label */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                  {MacroIcon && macroMeta && (
-                    <span
-                      style={{
-                        width: 22, height: 22, borderRadius: 5,
-                        background: macroMeta.bg,
-                        color: macroMeta.text,
-                        display: "inline-flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <MacroIcon size={12} strokeWidth={2.25} />
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize: 12,
-                    color: "var(--muted-foreground)",
-                    fontFamily: "var(--font-ui)",
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  }}>
-                    {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
-                  </span>
-                </div>
-
-                {/* Col 3: Typ badge */}
-                <div>
-                  <VoltTypeBadge kind={r.type} />
-                </div>
-
-                {/* Col 4: Description (single-line ellipsis) */}
-                <div style={{
-                  fontSize: 12,
-                  color: "var(--muted-foreground)",
-                  fontFamily: "var(--font-ui)",
-                  lineHeight: 1.4,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  minWidth: 0,
-                }}
-                title={de ? r.descDe : r.descEn}
-                >
-                  {de ? r.descDe : r.descEn}
-                </div>
-
-                {/* Col 5: Status badge */}
-                <div>
-                  <VoltStatusBadge kind={r.status} />
-                </div>
+                )}
               </div>
             );
           })}

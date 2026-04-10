@@ -105,7 +105,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [topicFilter, setTopicFilter] = useState<string>("all");
-  const [timeWindow, setTimeWindow] = useState<TimeWindowKey>("48");
+  const [timeWindow, setTimeWindow] = useState<TimeWindowKey>("168");
   // Default to "mixed" — preserves the server's round-robin interleave so the
   // first thing a user sees is a diverse cross-source feed, not 10 reddits.
   const [sortKey, setSortKey] = useState<SortKey>("mixed");
@@ -395,8 +395,34 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           borderRadius: "var(--volt-radius-md, 10px)",
           color: "var(--volt-text-muted, #6B6B6B)",
           fontSize: 13,
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
         }}>
-          {de ? "Keine Signale für diese Filter-Kombination." : "No signals for this filter combination."}
+          <span>{de ? "Keine Signale für diese Filter-Kombination." : "No signals for this filter combination."}</span>
+          {timeWindow !== "168" && (
+            <button
+              type="button"
+              onClick={() => setTimeWindow("168")}
+              style={{
+                fontSize: 12, fontWeight: 600,
+                padding: "8px 16px",
+                borderRadius: 999,
+                border: "1px solid var(--volt-border, #E8E8E8)",
+                background: "var(--volt-surface-raised, #fff)",
+                color: "var(--volt-text, #0A0A0A)",
+                cursor: "pointer",
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              }}
+            >
+              {de ? "Zeitfenster auf 7 Tage erweitern →" : "Expand to 7 days →"}
+            </button>
+          )}
+          {timeWindow === "168" && signals.length === 0 && (
+            <span style={{ fontSize: 11, color: "var(--volt-text-faint, #AAA)" }}>
+              {de
+                ? "Es wurden noch keine Konnektoren ausgeführt. Starte einen Connector-Lauf, um Live-Signale zu sehen."
+                : "No connectors have been run yet. Start a connector run to see live signals."}
+            </span>
+          )}
         </div>
       )}
 

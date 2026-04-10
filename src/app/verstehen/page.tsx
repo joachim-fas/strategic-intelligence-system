@@ -246,10 +246,10 @@ export default function VerstehenPage() {
       </div>
 
       {/* ── Main content: Visualization + Detail Panel ──────────── */}
-      <div style={{ maxWidth: 1360, margin: "0 auto", width: "100%", flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ maxWidth: 1360, margin: "0 auto", width: "100%", flex: 1, display: "flex" }}>
 
         {/* Left: Visualization */}
-        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {activeTab === "radar" && (
             <RadarView
               trends={trends}
@@ -260,15 +260,13 @@ export default function VerstehenPage() {
           )}
 
           {activeTab === "netzwerk" && (
-            <div style={{ padding: "20px 24px 40px", height: "calc(100vh - 320px)", minHeight: 520, display: "flex", flexDirection: "column" }}>
-              <div style={{ flex: 1, minHeight: 0 }}>
-                <CausalGraphView
-                  trends={trends}
-                  onTrendClick={handleTrendClick}
-                  locale={locale}
-                  highlightTrendId={selectedTrend?.id}
-                />
-              </div>
+            <div style={{ padding: "20px 24px 40px" }}>
+              <CausalGraphView
+                trends={trends}
+                onTrendClick={handleTrendClick}
+                locale={locale}
+                highlightTrendId={selectedTrend?.id}
+              />
             </div>
           )}
 
@@ -299,7 +297,8 @@ export default function VerstehenPage() {
             width: 440, flexShrink: 0,
             borderLeft: "1px solid var(--volt-border, #E8E8E8)",
             overflowY: "auto",
-            height: "calc(100vh - 260px)",
+            position: "sticky", top: 0, alignSelf: "flex-start",
+            maxHeight: "100vh",
             display: "flex", flexDirection: "column",
             background: "var(--volt-surface-raised, #fff)",
           }}>

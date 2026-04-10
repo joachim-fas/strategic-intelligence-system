@@ -299,14 +299,51 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
         ))}
       </div>
 
-      {/* ── Radar chart ──────────────────────────────────────────────────── */}
-      <RadarChart
-        trends={filteredTrends}
-        quadrants={orderedQuadrantLabels}
-        onTrendClick={onTrendClick}
-        selectedTrendId={filteredTrendIds?.[0] ?? null}
-        svgRef={svgRef}
-      />
+      {/* ── Radar chart (boxed like the Netzwerk graph) ─────────────────── */}
+      <div style={{
+        border: "1px solid var(--volt-border, #E8E8E8)",
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "var(--color-surface, #F8F8F6)",
+      }}>
+        <RadarChart
+          trends={filteredTrends}
+          quadrants={orderedQuadrantLabels}
+          onTrendClick={onTrendClick}
+          selectedTrendId={filteredTrendIds?.[0] ?? null}
+          svgRef={svgRef}
+        />
+      </div>
+
+      {/* ── Bottom legend ──────────────────────────────────────────────── */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12,
+        marginTop: 10, marginBottom: 20,
+        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+        fontSize: 9,
+        color: "var(--volt-text-faint, #AAA)",
+      }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          {de ? "Ringe" : "Rings"}
+        </span>
+        <span>Adopt → Trial → Assess → Hold ({de ? "innen → außen" : "inner → outer"})</span>
+        <span style={{ width: 1, height: 10, background: "var(--volt-border, #E8E8E8)" }} />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px dashed #1A9E5A", display: "inline-block" }} />
+          {de ? "steigt" : "rising"}
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px solid #E8402A", display: "inline-block" }} />
+          {de ? "fällt" : "falling"}
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(122,184,245,0.35)", display: "inline-block" }} />
+          {de ? "Live-Halo = Signal-Aktivität" : "Live halo = Signal activity"}
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 9 }}>
+          {de ? "Klick = Auswahl · Scroll = Zoom · Doppelklick = Reset" : "Click = Select · Scroll = Zoom · Double-click = Reset"}
+        </span>
+      </div>
     </div>
   );
 }

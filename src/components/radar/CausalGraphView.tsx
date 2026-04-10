@@ -567,6 +567,25 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
 
   return (
     <div ref={containerRef} style={{ padding: "0 4px" }}>
+      {/* Intro — explains what the network visualises and how to interact */}
+      <div style={{
+        padding: "12px 16px",
+        marginBottom: 12,
+        borderRadius: 10,
+        background: "var(--volt-surface, #FAFAFA)",
+        border: "1px solid var(--volt-border, #EEE)",
+        fontSize: 12, lineHeight: 1.55,
+        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+        color: "var(--volt-text-muted, #6B6B6B)",
+      }}>
+        <strong style={{ color: "var(--volt-text, #0A0A0A)" }}>
+          {locale === "de" ? "Kausalnetz" : "Causal Network"}
+        </strong>{" · "}
+        {locale === "de"
+          ? "Jede Kante zeigt einen kausalen Zusammenhang zwischen zwei Trends. Grüne Pfeile (treibt) verstärken die Zielrichtung, blaue (verstärkt) eskalieren Effekte, rot gestrichelte (dämpft) wirken bremsend, und gelbe (korreliert) zeigen parallele Bewegungen. Größere Knoten = höherer Impact · Goldringe = Top-Hubs mit den meisten Verbindungen · Farbige Halos = aktive Live-Signale der letzten 72 h."
+          : "Each edge shows a causal relationship between two trends. Green arrows (drives) push the target direction, blue (amplifies) escalate effects, red dashed (dampens) act as brakes, and amber (correlates) show parallel movement. Larger nodes = higher impact · Gold rings = top hubs with most connections · Colored halos = active live signals in the last 72 h."}
+      </div>
+
       {/* Row 1 — Ring filter pills */}
       <div style={{
         display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
