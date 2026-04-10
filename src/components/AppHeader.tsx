@@ -19,6 +19,7 @@ const NAV_ITEMS: Array<{
   labelEn: string;
   matchAlso?: string[];
 }> = [
+  { href: "/",          labelDe: "Start",              labelEn: "Home"               },
   { href: "/sessions",  labelDe: "Sessions",          labelEn: "Sessions"          },
   { href: "/canvas",    labelDe: "Canvas",             labelEn: "Canvas"             },
   { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
@@ -31,7 +32,10 @@ const NAV_ITEMS: Array<{
 export function AppHeader() {
   const { locale, toggleLocale } = useLocale();
   const pathname = usePathname();
+  const de = locale === "de";
   const [darkMode, setDarkMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -54,6 +58,11 @@ export function AppHeader() {
     }
   };
 
+  const isActive = (href: string) =>
+    href === "/"
+      ? pathname === "/"
+      : pathname === href || pathname.startsWith(href);
+
   return (
     <header
       role="banner"
@@ -65,7 +74,7 @@ export function AppHeader() {
         WebkitBackdropFilter: "blur(12px) saturate(160%)",
       }}
     >
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ position: "relative", maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <Link href="/" aria-label="SIS Startseite" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
@@ -76,8 +85,10 @@ export function AppHeader() {
 
         {/* Hamburger — Mobile only */}
         <button className="sis-nav-mobile"
-          aria-label={locale === "de" ? "Hauptnavigation öffnen" : "Open main navigation"}
-          title={locale === "de" ? "Menü" : "Menu"}
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label={de ? "Hauptnavigation öffnen" : "Open main navigation"}
+          aria-expanded={mobileMenuOpen}
+          title={de ? "Menü" : "Menu"}
           style={{ display: "none", alignItems: "center", justifyContent: "center", marginLeft: "auto",
             width: 36, height: 36, border: "1px solid var(--color-border)",
             borderRadius: "var(--radius-md)", background: "transparent",
@@ -85,25 +96,22 @@ export function AppHeader() {
         >&#x2261;</button>
 
         {/* Nav — Desktop only */}
-        <nav className="sis-nav-desktop" aria-label={locale === "de" ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", gap: 2 }}>
           {NAV_ITEMS.map(({ href, labelDe, labelEn }) => {
-            const label = locale === "de" ? labelDe : labelEn;
-            // Match exact path OR any sub-path (e.g. /verstehen/abc).
-            const isActive =
-              pathname === href
-              || (href !== "/" && pathname.startsWith(href));
+            const label = de ? labelDe : labelEn;
+            const active = isActive(href);
             return (
               <Link key={href} href={href}
-                aria-current={isActive ? "page" : undefined}
+                aria-current={active ? "page" : undefined}
                 style={{
-                  fontSize: 13, fontWeight: isActive ? 600 : 400,
-                  color: isActive ? "var(--color-text-heading)" : "var(--color-text-subtle)",
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? "var(--color-text-heading)" : "var(--color-text-subtle)",
                   textDecoration: "none", padding: "4px 10px",
                   borderRadius: "var(--radius-md)", transition: "all 0.15s", whiteSpace: "nowrap",
-                  borderBottom: isActive ? "2px solid var(--color-text-heading)" : "2px solid transparent",
+                  borderBottom: active ? "2px solid var(--color-text-heading)" : "2px solid transparent",
                 }}
-                onMouseEnter={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; } }}
-                onMouseLeave={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; } }}
+                onMouseEnter={e => { if (!active) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; } }}
+                onMouseLeave={e => { if (!active) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-subtle)"; el.style.background = "transparent"; } }}
               >{label}</Link>
             );
           })}
@@ -122,14 +130,67 @@ export function AppHeader() {
           >{locale.toUpperCase()}</button>
           {/* UX-13: Keyboard shortcuts help button */}
           <button
-            aria-label={locale === "de" ? "Tastenkürzel anzeigen" : "Show keyboard shortcuts"}
-            title={"Ctrl+Z: Undo, Ctrl+Y: Redo, Del: Delete, Esc: Cancel"}
+            onClick={() => setShowShortcuts(!showShortcuts)}
+            aria-label={de ? "Tastenkürzel anzeigen" : "Show keyboard shortcuts"}
+            aria-expanded={showShortcuts}
+            title={de ? "Tastenkürzel" : "Keyboard shortcuts"}
             style={{ fontSize: 11, fontWeight: 700, width: 24, height: 24, borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", marginLeft: 2, flexShrink: 0 }}
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-surface-2)"; }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
           >?</button>
+          {showShortcuts && (
+            <div style={{
+              position: "absolute", right: 24, top: 52,
+              background: "var(--volt-surface-raised, #fff)",
+              border: "1px solid var(--volt-border, #E8E8E8)",
+              borderRadius: "var(--radius-md, 8px)",
+              padding: "16px 20px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+              zIndex: 40, minWidth: 220,
+              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                {de ? "Tastenkürzel" : "Keyboard Shortcuts"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
+                <kbd>Ctrl+Z</kbd><span>{de ? "Rückgängig" : "Undo"}</span>
+                <kbd>Ctrl+Y</kbd><span>{de ? "Wiederherstellen" : "Redo"}</span>
+                <kbd>Del</kbd><span>{de ? "Node löschen" : "Delete node"}</span>
+                <kbd>Esc</kbd><span>{de ? "Abbrechen" : "Cancel"}</span>
+                <kbd>Ctrl+C</kbd><span>{de ? "Node kopieren" : "Copy node"}</span>
+                <kbd>Ctrl+V</kbd><span>{de ? "Node einfügen" : "Paste node"}</span>
+                <kbd>/</kbd><span>{de ? "Slash-Befehle" : "Slash commands"}</span>
+              </div>
+            </div>
+          )}
         </nav>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {mobileMenuOpen && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0,
+          background: "var(--volt-surface-raised, #fff)",
+          borderBottom: "1px solid var(--volt-border, #E8E8E8)",
+          padding: "8px 24px 16px",
+          zIndex: 30,
+          display: "flex", flexDirection: "column", gap: 4,
+        }}>
+          {NAV_ITEMS.map(item => (
+            <Link key={item.href} href={item.href}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                fontSize: 15, fontWeight: isActive(item.href) ? 700 : 400,
+                color: "var(--color-text-primary)",
+                textDecoration: "none", padding: "10px 0",
+                borderBottom: "1px solid var(--volt-border, #E8E8E8)",
+              }}>
+              {de ? item.labelDe : item.labelEn}
+            </Link>
+          ))}
+        </div>
+      )}
     </header>
   );
 }

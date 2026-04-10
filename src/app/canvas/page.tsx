@@ -28,6 +28,7 @@ import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/componen
 import { OrbitGraphView } from "./OrbitGraphView";
 import { OrbitEvidenzView, type EvCanvasNode } from "./OrbitEvidenzView";
 import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
+import { useLocale } from "@/lib/locale-context";
 import { GitBranch } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -4260,8 +4261,7 @@ export default function CanvasPage() {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [zoom, setZoom] = useState(1);
-  // locale fixed to "de" — language toggle deferred
-  const locale: "de" | "en" = "de";
+  const { locale } = useLocale();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [orbitSubMode, setOrbitSubMode] = useState<"netzwerk" | "evidenz">("netzwerk");
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);

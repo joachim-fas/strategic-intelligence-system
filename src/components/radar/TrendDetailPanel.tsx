@@ -705,15 +705,11 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             {/* Save to project */}
             <button
               onClick={() => {
-                const projectId = typeof window !== "undefined" ? localStorage.getItem("sis-active-project") : null;
+                const projectId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
                 if (projectId) {
-                  fetch(`/api/v1/projects/${projectId}/queries`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query: `Trend: ${trend.name}`, result: { synthesis: `${trend.name} — ${trend.category}, ${trend.ring}, Relevanz ${Math.round(trend.relevance * 100)}%` } }),
-                  });
+                  window.location.href = `/canvas?project=${projectId}`;
                 } else {
-                  window.location.href = "/workspace";
+                  window.location.href = "/canvas";
                 }
               }}
               style={{

@@ -68,7 +68,7 @@ export default function Home() {
   useEffect(() => {
     Promise.all([
       fetch("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
-      fetch("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? d.projects ?? []).length).catch(() => 0),
+      fetch("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? []).length).catch(() => 0),
     ]).then(([trendCount, sessionCount]) => {
       setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
     });
@@ -103,7 +103,7 @@ export default function Home() {
   useEffect(() => {
     const stored = loadHistoryFromStorage();
     if (stored.length > 0) setHistory(stored);
-    const storedProject = typeof window !== "undefined" ? localStorage.getItem("sis-active-project") : null;
+    const storedProject = typeof window !== "undefined" ? localStorage.getItem("sis-active-canvas") : null;
     if (storedProject) setActiveProjectId(storedProject);
     // Phase 5: Load custom session title if set
     try {
@@ -114,7 +114,7 @@ export default function Home() {
     fetch("/api/v1/canvas")
       .then(r => r.json())
       .then(data => {
-        const list = (data?.canvases || data?.projects || []) as Array<any>;
+        const list = (data?.canvases || []) as Array<any>;
         const activeCanvasId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
         const sessions = list
           .filter((c: any) => c.id !== activeCanvasId && (c.queryCount || 0) > 0)
@@ -281,7 +281,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleSubmit = useCallback((overrideQuery?: string, prevCtx?: { query: string; synthesis: string }) => {
+  const handleSubmit = useCallback(async (overrideQuery?: string, prevCtx?: { query: string; synthesis: string }) => {
     const q = (overrideQuery ?? query).trim();
     if (!q || isAnalyzing) return;
 
@@ -301,9 +301,25 @@ export default function Home() {
       window.location.href = `/verstehen?tab=signale&q=${encodeURIComponent(filter)}`;
       return;
     }
-    if (q.startsWith("SCENARIO:") || q.startsWith("scenario:")) {
-      const topic = q.slice(9).trim();
-      window.location.href = `/workspace`;
+    if (q.startsWith("SCENARIO:") || q.startsWith("scenario:") || q.startsWith("SZENARIO:") || q.startsWith("szenario:")) {
+      const topic = q.substring(q.indexOf(":") + 1).trim();
+      if (topic) {
+        try {
+          const res = await fetch("/api/v1/canvas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: `Szenario: ${topic.substring(0, 50)}` }),
+          });
+          const json = await res.json();
+          const pid = json.canvas?.id;
+          if (pid) {
+            try { localStorage.setItem("sis-active-canvas", pid); } catch {}
+            window.location.href = `/canvas?project=${pid}`;
+            return;
+          }
+        } catch {}
+      }
+      window.location.href = "/canvas";
       return;
     }
 
@@ -1182,14 +1198,15 @@ export default function Home() {
                   inputRef.current?.focus();
                 }}
                 onOpenCanvas={() => {
-                  window.location.href = "/canvas";
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+                  window.location.href = pid ? `/canvas?project=${pid}` : "/canvas";
                 }}
                 onOpenSummary={() => {
                   const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
                   if (pid) {
                     window.location.href = `/canvas/${pid}/zusammenfassung`;
                   } else {
-                    window.location.href = "/canvas?view=zusammenfassung";
+                    window.location.href = "/canvas";
                   }
                 }}
                 onTitleChange={(newTitle) => {
