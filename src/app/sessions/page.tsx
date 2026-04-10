@@ -32,7 +32,7 @@ export default function SessionsPage() {
       const id = json?.canvas?.id;
       if (id) {
         try { localStorage.setItem("sis-active-canvas", id); } catch {}
-        window.location.href = `/canvas/${id}`;
+        window.location.href = `/canvas?project=${id}`;
       }
     } catch (e) {
       console.error("[createNewSession]", e);

@@ -785,7 +785,7 @@ export default function Home() {
                           localStorage.setItem("sis-active-canvas", pid);
                           setFrameworkLoading(false);
                           setFrameworkModal(null);
-                          window.location.href = `/canvas/${pid}`;
+                          window.location.href = `/canvas?project=${pid}`;
                         } catch (err) {
                           setFrameworkLoading(false);
                           console.error(err);
@@ -952,7 +952,7 @@ export default function Home() {
                               localStorage.setItem("sis-active-canvas", pid);
                               setFrameworkLoading(false);
                               setFrameworkModal(null);
-                              window.location.href = `/canvas/${pid}`;
+                              window.location.href = `/canvas?project=${pid}`;
                             } catch (err) {
                               setFrameworkLoading(false);
                               console.error(err);
@@ -1196,9 +1196,9 @@ export default function Home() {
                 pastSessions={pastSessions}
                 onPickSession={(id) => {
                   // Switch to selected canvas project — load its name as session title
-                  // and navigate to /canvas/[id] for direct access
+                  // and navigate to /canvas?project=id for direct access
                   try { localStorage.setItem("sis-active-canvas", id); } catch {}
-                  window.location.href = `/canvas/${id}`;
+                  window.location.href = `/canvas?project=${id}`;
                 }}
                 de={locale === "de"}
               />

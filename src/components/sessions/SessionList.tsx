@@ -662,7 +662,7 @@ export function SessionList({ mode, de }: Props) {
               </div>
             ) : (
               <a
-                href={`/canvas/${s.id}`}
+                href={`/canvas?project=${s.id}`}
                 onClick={() => { try { localStorage.setItem("sis-active-canvas", s.id); } catch {} }}
                 style={{
                   minWidth: 0, overflow: "hidden",

@@ -399,7 +399,7 @@ export default function VerstehenPage() {
                       body: JSON.stringify({ canvasState: { nodes: template.nodes, conns: template.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                     });
                     localStorage.setItem("sis-active-canvas", pid);
-                    window.location.href = `/canvas/${pid}`;
+                    window.location.href = `/canvas?project=${pid}`;
                   } catch (e) { console.error(e); }
                 }}
                 style={{

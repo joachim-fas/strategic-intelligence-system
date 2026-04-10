@@ -4496,6 +4496,19 @@ export default function CanvasPage() {
     setProjectOp("loading");
     try {
       const res = await fetch(`/api/v1/canvas/${id}`);
+      if (res.status === 404) {
+        // Project was deleted — clear stale references
+        try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        try { localStorage.removeItem("sis-active-canvas"); } catch {}
+        try { localStorage.removeItem("sis-history-v2"); } catch {}
+        setProjectId(null); setProjectName(""); setSaveStatus(null);
+        setNodes([]); setConnections([]);
+        setPanX(0); setPanY(0); setZoom(1);
+        setProjects(prev => prev.filter(p => p.id !== id));
+        showProjectError(de ? "Projekt existiert nicht mehr." : "Project no longer exists.");
+        setProjectOp(null);
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const canvas = json.canvas;
@@ -4612,10 +4625,22 @@ export default function CanvasPage() {
 
     if (activeId) {
       fetch(`/api/v1/canvas/${activeId}`)
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) {
+            // Project no longer exists in DB (404) — clear stale localStorage
+            clearStaleLocalStorage();
+            return;
+          }
+          return r.json();
+        })
         .then(json => {
+          if (!json) return; // already handled above (404 case)
           const canvas = json.canvas;
-          if (!canvas) { fallbackLocalStorage(); return; }
+          if (!canvas) {
+            // API returned OK but no canvas object — clear stale cache
+            clearStaleLocalStorage();
+            return;
+          }
           setProjectId(activeId);
           setProjectName(canvas.name);
           const initState = canvas.canvas_state;
@@ -4633,9 +4658,26 @@ export default function CanvasPage() {
             }
           }
         })
-        .catch(fallbackLocalStorage);
+        .catch(() => {
+          // Network error or unexpected failure — clear stale cache
+          clearStaleLocalStorage();
+        });
     } else {
       fallbackLocalStorage();
+    }
+
+    function clearStaleLocalStorage() {
+      // DB is source of truth — if the project is gone, purge all cached state
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try { localStorage.removeItem("sis-active-canvas"); } catch {}
+      try { localStorage.removeItem("sis-history-v2"); } catch {}
+      try { localStorage.removeItem("sis-canvas-project"); } catch {}
+      setProjectId(null);
+      setProjectName("");
+      setNodes([]);
+      setConnections([]);
+      setPanX(0); setPanY(0); setZoom(1);
+      setSaveStatus(null);
     }
 
     function fallbackLocalStorage() {
@@ -4644,11 +4686,10 @@ export default function CanvasPage() {
         setNodes(saved.nodes); setConnections(saved.conns);
         setPanX(saved.pan.x); setPanY(saved.pan.y); setZoom(saved.zoom);
       } else {
-        // No saved state → load demo project as onboarding
-        const demo = buildDemoProject();
-        setNodes(demo.nodes);
-        setConnections(demo.conns);
-        setZoom(0.8);
+        // No saved state → show empty canvas (welcome state)
+        setNodes([]);
+        setConnections([]);
+        setZoom(1);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
