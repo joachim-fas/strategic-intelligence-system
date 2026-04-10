@@ -25,9 +25,17 @@ export const arxivConnector: SourceConnector = {
 
     for (const { query, topic } of SEARCH_QUERIES) {
       try {
-        const res = await fetch(
-          `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&sortBy=submittedDate&sortOrder=descending&max_results=5`
-        );
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&sortBy=submittedDate&sortOrder=descending&max_results=5`,
+            { signal: controller.signal }
+          );
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
         if (!res.ok) continue;
 
         const text = await res.text();
@@ -42,15 +50,18 @@ export const arxivConnector: SourceConnector = {
 
           if (!title) continue;
 
+          const parsedDate = new Date(published);
+          const detectedAt = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
           signals.push({
             sourceType: "arxiv",
             sourceUrl: id,
             sourceTitle: title,
             signalType: "paper",
             topic,
-            rawStrength: 0.6, // papers get moderate base strength
+            rawStrength: 0.6, // TODO: compute strength dynamically from signal data
             rawData: { query, summary },
-            detectedAt: new Date(published),
+            detectedAt,
           });
         }
 

@@ -11,35 +11,6 @@ import { SourceConnector, RawSignal } from "./types";
  * which returns relative interest over time (0-100 scale).
  */
 
-// Topics to track — each maps to a trend in our system
-const TRACKED_TOPICS: { keyword: string; topic: string }[] = [
-  // Technology
-  { keyword: "artificial intelligence", topic: "AI" },
-  { keyword: "ChatGPT", topic: "Generative AI" },
-  { keyword: "Claude AI", topic: "Generative AI" },
-  { keyword: "machine learning", topic: "Machine Learning" },
-  { keyword: "quantum computing", topic: "Quantum Computing" },
-  { keyword: "cybersecurity", topic: "Security" },
-  { keyword: "blockchain", topic: "Blockchain" },
-  { keyword: "electric vehicle", topic: "Electric Vehicles" },
-  { keyword: "autonomous driving", topic: "Autonomous Mobility" },
-  { keyword: "edge computing", topic: "Edge Computing" },
-  // Climate & Energy
-  { keyword: "climate change", topic: "Climate Change & Sustainability" },
-  { keyword: "renewable energy", topic: "Green Tech" },
-  { keyword: "solar energy", topic: "Green Tech" },
-  { keyword: "carbon neutral", topic: "Climate Change & Sustainability" },
-  { keyword: "ESG investing", topic: "Climate Change & Sustainability" },
-  // Society
-  { keyword: "remote work", topic: "Remote Work" },
-  { keyword: "inflation rate", topic: "Economic Trends" },
-  { keyword: "housing crisis", topic: "Social Instability" },
-  { keyword: "mental health", topic: "Digital Health" },
-  // Geopolitics
-  { keyword: "supply chain disruption", topic: "Geopolitical Fragmentation" },
-  { keyword: "trade war", topic: "Geopolitical Fragmentation" },
-];
-
 export const googleTrendsConnector: SourceConnector = {
   name: "google_trends",
   displayName: "Google Trends",

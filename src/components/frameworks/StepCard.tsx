@@ -53,6 +53,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
           <button
             onClick={onRun}
             disabled={disabled}
+            aria-label={de ? `${title} starten` : `Run ${title}`}
             style={{
               fontSize: 12, fontWeight: 600,
               padding: "6px 14px", borderRadius: 8,
@@ -106,13 +107,13 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
 
       {/* Error */}
       {status === "error" && (
-        <div style={{
+        <div role="alert" style={{
           padding: "14px 18px",
           fontSize: 12, color: "var(--destructive)",
           display: "flex", alignItems: "center", gap: 8,
         }}>
-          <span>⚠</span>
-          <span>{result?.error || (de ? "Fehler bei der Analyse" : "Analysis error")}</span>
+          <span aria-hidden="true">&#x26A0;</span>
+          <span>{result?.error || (de ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut." : "Data could not be loaded. Please try again.")}</span>
           <button
             onClick={onRun}
             style={{

@@ -191,8 +191,12 @@ function buildSqliteAdapter() {
     },
 
     useVerificationToken({ identifier, token }: { identifier: string; token: string }) {
+      // SEC-17: Only accept tokens that have not expired (expires > now).
+      // This prevents magic-link tokens from being used after their intended lifetime.
       const row = sqlite
-        .prepare(`SELECT * FROM verification_tokens WHERE identifier = ? AND token = ?`)
+        .prepare(
+          `SELECT * FROM verification_tokens WHERE identifier = ? AND token = ? AND expires > datetime('now')`
+        )
         .get(identifier, token) as Record<string, unknown> | undefined;
       if (!row) return null;
       sqlite

@@ -1,5 +1,8 @@
 "use client";
 
+// TODO: UX-14 — Technical error messages shown to users (SQLITE_CONSTRAINT, TypeError...).
+// FIX: Map error codes to user-friendly German messages with actionable guidance.
+
 /**
  * LiveSignalStream — Raw signal feed for the Knowledge Cockpit "Signale" tab.
  *
@@ -373,7 +376,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
                   border: "none",
                   borderRadius: 999,
                   background: active ? "var(--volt-text, #0A0A0A)" : "transparent",
-                  color: active ? "#fff" : "var(--volt-text-muted, #6B6B6B)",
+                  color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
                   cursor: "pointer",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                   transition: "all 120ms ease",
@@ -550,7 +553,7 @@ function SignalCard({
           position: "relative",
           aspectRatio: "16 / 9",
           background: showPlaceholder
-            ? `linear-gradient(135deg, ${color}22 0%, ${color}11 50%, #FAFAFA 100%)`
+            ? `linear-gradient(135deg, ${color}22 0%, ${color}11 50%, var(--volt-surface, #FAFAFA) 100%)`
             : "var(--volt-surface, #FAFAFA)",
           overflow: "hidden",
           borderBottom: "1px solid var(--volt-border, #EEE)",
@@ -605,7 +608,7 @@ function SignalCard({
               top: 10,
               right: 10,
               background: "rgba(10,10,10,0.78)",
-              color: "#fff",
+              color: "var(--background, #fff)",
               padding: "3px 8px",
               borderRadius: 999,
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",

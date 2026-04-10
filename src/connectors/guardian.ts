@@ -35,6 +35,9 @@ export const guardianConnector: SourceConnector = {
     if (!key) return signals;
 
     try {
+      // SEC-09: Guardian API requires api-key as a query param; it does not support
+      // header-based auth. See https://open-platform.theguardian.com/documentation/
+      // TODO: SEC-09 — Guardian API only supports query-param auth (api-key=...). No header alternative available.
       const url = `https://content.guardianapis.com/search?q=*&order-by=newest&show-fields=trailText,headline&page-size=20&api-key=${key}`;
 
       const res = await fetch(url, {
@@ -59,7 +62,7 @@ export const guardianConnector: SourceConnector = {
           sourceTitle: `Guardian: ${headline}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.6,
+          rawStrength: 0.6, // TODO: compute strength dynamically from signal data
           rawData: {
             section,
             headline,

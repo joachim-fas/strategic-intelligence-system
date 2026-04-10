@@ -61,6 +61,38 @@ export async function GET(req: Request) {
     );
   }
 
+  // ── SEC-08: SSRF blocklist — reject URLs targeting private/internal IPs ──
+  function isPrivateUrl(urlStr: string): boolean {
+    try {
+      const u = new URL(urlStr);
+      const hostname = u.hostname.toLowerCase();
+
+      // IPv6 loopback and private ranges
+      if (hostname === "[::1]" || hostname === "::1") return true;
+      if (hostname.startsWith("[fd") || hostname.startsWith("fd")) return true;
+      if (hostname.startsWith("[fe80") || hostname.startsWith("fe80")) return true;
+
+      // Localhost variations
+      if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+
+      // IPv4 private and reserved ranges
+      const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (ipv4Match) {
+        const [, a, b] = ipv4Match.map(Number);
+        if (a === 127) return true;                          // 127.0.0.0/8 loopback
+        if (a === 10) return true;                           // 10.0.0.0/8 private
+        if (a === 172 && b >= 16 && b <= 31) return true;    // 172.16.0.0/12 private
+        if (a === 192 && b === 168) return true;             // 192.168.0.0/16 private
+        if (a === 169 && b === 254) return true;             // 169.254.0.0/16 link-local
+        if (a === 0) return true;                            // 0.0.0.0/8
+      }
+
+      return false;
+    } catch {
+      return true; // If we can't parse it, reject it
+    }
+  }
+
   // Normalise before hashing into the cache key: protocol + host stay
   // lowercase, the path stays case-sensitive. Query string is kept —
   // many CMSs serve different previews per query param (e.g. ?amp=1).
@@ -70,6 +102,13 @@ export async function GET(req: Request) {
     if (u.protocol !== "http:" && u.protocol !== "https:") {
       return NextResponse.json(
         { error: "unsupported-protocol" },
+        { status: 400 },
+      );
+    }
+    // Block requests to private/internal addresses
+    if (isPrivateUrl(target)) {
+      return NextResponse.json(
+        { error: "url-not-allowed" },
         { status: 400 },
       );
     }

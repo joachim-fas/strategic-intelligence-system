@@ -21,6 +21,7 @@ export const openExchangeConnector: SourceConnector = {
     if (!key) return signals;
 
     try {
+      // NOTE: API key in URL - required by Open Exchange Rates API's design
       const res = await fetch(
         `https://openexchangerates.org/api/latest.json?app_id=${key}`,
         {
@@ -44,7 +45,7 @@ export const openExchangeConnector: SourceConnector = {
           sourceTitle: `FX: USD/${currency} = ${rate.toFixed(4)}`,
           signalType: "mention",
           topic: "Economic Trends",
-          rawStrength: 0.4,
+          rawStrength: 0.4, // TODO: compute strength dynamically from signal data
           rawData: {
             base: "USD",
             currency,

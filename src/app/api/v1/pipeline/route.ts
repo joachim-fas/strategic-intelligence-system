@@ -1,3 +1,9 @@
+// TODO: ARC-06 — DUAL PIPELINE IMPLEMENTATIONS
+// pipeline/route.ts: Promise.allSettled, parallel, stores in-memory
+// pipeline.ts: for-loop (now with concurrency), stores in DB
+// Completely different behavior depending on call path.
+// FIX: Consolidate into one pipeline implementation.
+
 import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
@@ -9,6 +15,7 @@ import { RawSignal } from "@/connectors/types";
 import { megaTrends } from "@/lib/mega-trends";
 import { TrendDot } from "@/types";
 
+// WARNING: In-memory state — lost on serverless cold start. Consider persisting to DB.
 let lastFetchResult: {
   trends: TrendDot[];
   signalCount: number;
@@ -17,6 +24,9 @@ let lastFetchResult: {
   errors: string[];
   duration: number;
 } | null = null;
+
+// Simple in-memory lock to prevent concurrent pipeline runs
+let isRunning = false;
 
 function mergeTrends(megaBase: TrendDot[], liveTrends: TrendDot[]): TrendDot[] {
   const merged = new Map<string, TrendDot>();
@@ -42,53 +52,65 @@ function mergeTrends(megaBase: TrendDot[], liveTrends: TrendDot[]): TrendDot[] {
 }
 
 export async function POST() {
-  const start = Date.now();
-  const allSignals: RawSignal[] = [];
-  const errors: string[] = [];
-  const activeSources: string[] = [];
-
-  const results = await Promise.allSettled(
-    connectors.map(async (connector) => {
-      try {
-        const signals = await connector.fetchSignals();
-        return { name: connector.name, signals };
-      } catch (err) {
-        throw new Error(`${connector.name}: ${err}`);
-      }
-    })
-  );
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      allSignals.push(...result.value.signals);
-      activeSources.push(result.value.name);
-    } else {
-      errors.push(String(result.reason));
-    }
+  if (isRunning) {
+    return NextResponse.json(
+      { success: false, error: { code: "CONFLICT", message: "Pipeline is already running", status: 409 } },
+      { status: 409 }
+    );
   }
 
-  const liveTrends = processSignals(allSignals);
-  const trends = mergeTrends(megaTrends, liveTrends);
-  const duration = Date.now() - start;
+  isRunning = true;
+  try {
+    const start = Date.now();
+    const allSignals: RawSignal[] = [];
+    const errors: string[] = [];
+    const activeSources: string[] = [];
 
-  lastFetchResult = {
-    trends,
-    signalCount: allSignals.length,
-    sources: activeSources,
-    fetchedAt: new Date().toISOString(),
-    errors,
-    duration,
-  };
+    const results = await Promise.allSettled(
+      connectors.map(async (connector) => {
+        try {
+          const signals = await connector.fetchSignals();
+          return { name: connector.name, signals };
+        } catch (err) {
+          throw new Error(`${connector.name}: ${err}`);
+        }
+      })
+    );
 
-  return NextResponse.json({
-    success: true,
-    trendCount: trends.length,
-    signalCount: allSignals.length,
-    sources: activeSources,
-    errors,
-    duration,
-    fetchedAt: lastFetchResult.fetchedAt,
-  });
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        allSignals.push(...result.value.signals);
+        activeSources.push(result.value.name);
+      } else {
+        errors.push(String(result.reason));
+      }
+    }
+
+    const liveTrends = processSignals(allSignals);
+    const trends = mergeTrends(megaTrends, liveTrends);
+    const duration = Date.now() - start;
+
+    lastFetchResult = {
+      trends,
+      signalCount: allSignals.length,
+      sources: activeSources,
+      fetchedAt: new Date().toISOString(),
+      errors,
+      duration,
+    };
+
+    return NextResponse.json({
+      success: true,
+      trendCount: trends.length,
+      signalCount: allSignals.length,
+      sources: activeSources,
+      errors,
+      duration,
+      fetchedAt: lastFetchResult.fetchedAt,
+    });
+  } finally {
+    isRunning = false;
+  }
 }
 
 export async function GET() {

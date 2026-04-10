@@ -1,6 +1,13 @@
 "use client";
 
+// TODO: FE-01 — Remove "use client". Extract interactive parts into Client Components.
+// This page should be a Server Component with only interactive islands as "use client".
+
+// TODO: PERF-02 — ~200KB of static data compiled into JS bundle.
+// planned-connectors.ts, causal-graph.ts edges, country lists should be JSON files loaded on demand.
+
 import { useState, useCallback, useRef, useEffect } from "react";
+import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
@@ -58,17 +65,8 @@ export default function Home() {
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  useEffect(() => {
-    const stored = (() => { try { return localStorage.getItem("sis-theme"); } catch { return null; } })();
-    if (stored === "dark") { setDarkMode(true); document.documentElement.classList.add("dark", "volt-dark"); }
-  }, []);
-  const toggleDark = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    if (next) { document.documentElement.classList.add("dark", "volt-dark"); localStorage.setItem("sis-theme", "dark"); }
-    else { document.documentElement.classList.remove("dark", "volt-dark"); localStorage.setItem("sis-theme", "light"); }
-  };
+  // FE-09: Dark mode toggle consolidated into AppHeader — removed duplicate
+  // state and effect. AppHeader handles sis-theme persistence and class toggling.
   const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string } } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
@@ -94,11 +92,11 @@ export default function Home() {
   useEffect(() => {
     const stored = loadHistoryFromStorage();
     if (stored.length > 0) setHistory(stored);
-    const storedProject = localStorage.getItem("sis-active-project");
+    const storedProject = typeof window !== "undefined" ? localStorage.getItem("sis-active-project") : null;
     if (storedProject) setActiveProjectId(storedProject);
     // Phase 5: Load custom session title if set
     try {
-      const savedTitle = localStorage.getItem("sis-session-title");
+      const savedTitle = typeof window !== "undefined" ? localStorage.getItem("sis-session-title") : null;
       if (savedTitle) setCustomSessionTitle(savedTitle);
     } catch {}
     // Phase 5: Load past sessions for the picker
@@ -652,8 +650,7 @@ export default function Home() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0,
                   }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={frameworkModal.icon} alt="" style={{ width: 22, height: 22, opacity: 0.85 }} />
+                    <Image src={frameworkModal.icon} alt="" width={22} height={22} style={{ opacity: 0.85 }} />
                   </div>
                   <div>
                     <div style={{ fontSize: 18, fontWeight: 700, color: frameworkModal.p.type }}>
@@ -1012,7 +1009,8 @@ export default function Home() {
               color: "var(--volt-text-faint, #AAA)",
               textAlign: "center", marginBottom: 28,
             }}>
-              50 {locale === "de" ? "Quellen" : "Sources"} · 39 Trends · STEEP+V · EU-Fokus
+              {/* TODO: fetch real stats */}
+              — {locale === "de" ? "Quellen" : "Sources"} · — Trends · STEEP+V · EU-Fokus
             </div>
             <div style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
@@ -1044,8 +1042,7 @@ export default function Home() {
                 >
                   <div style={{ padding: "10px 12px 12px", display: "flex", gap: 10, alignItems: "center" }}>
                     <span style={{ width: 32, height: 32, borderRadius: 8, background: t.p.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={t.icon} alt="" style={{ width: 16, height: 16, opacity: 0.8 }} />
+                      <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
                     </span>
                     <div>
                       <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "var(--volt-text, #0A0A0A)", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>

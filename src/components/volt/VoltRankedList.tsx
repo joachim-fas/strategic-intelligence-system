@@ -1,3 +1,4 @@
+// TODO: ARC-09 – VoltRankedList is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltRankedList – Kategorisierte Rangliste mit Echtzeit-Metriken
  * ─────────────────────────────────────────────────────────────────────────────

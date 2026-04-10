@@ -10,6 +10,17 @@
  * from client components or files that feed the client bundle.
  */
 
+// TODO: ARC-05 — DB ACCESS PATTERN CONSOLIDATION
+// Currently 7 routes use Drizzle ORM (radars/*), 19 routes use raw new Database() + SQL.
+// FIX: Migrate all raw SQL to Drizzle, or create a unified getDb() wrapper.
+
+// TODO: ARC-11 — resolveEnv() is duplicated in:
+// - src/lib/env.ts (canonical)
+// - src/app/api/v1/query/route.ts
+// - src/app/api/v1/frameworks/analyze/route.ts
+// - src/app/api/v1/canvas/[id]/summary/route.ts
+// FIX: Import from here everywhere. Remove local copies.
+
 import { readFileSync } from "fs";
 import path from "path";
 

@@ -35,17 +35,25 @@ export const githubConnector: SourceConnector = {
 
     for (const q of queries) {
       try {
-        const res = await fetch(
-          `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=30`,
-          {
-            headers: {
-              Accept: "application/vnd.github.v3+json",
-              ...(process.env.GITHUB_TOKEN
-                ? { Authorization: `token ${process.env.GITHUB_TOKEN}` }
-                : {}),
-            },
-          }
-        );
+        const controller = new AbortController();
+        const ghTimeout = setTimeout(() => controller.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=30`,
+            {
+              headers: {
+                Accept: "application/vnd.github.v3+json",
+                ...(process.env.GITHUB_TOKEN
+                  ? { Authorization: `token ${process.env.GITHUB_TOKEN}` }
+                  : {}),
+              },
+              signal: controller.signal,
+            }
+          );
+        } finally {
+          clearTimeout(ghTimeout);
+        }
 
         if (!res.ok) {
           console.warn(`GitHub API error: ${res.status}`);

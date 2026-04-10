@@ -1,3 +1,4 @@
+// TODO: ARC-09 – GrainStat is not imported anywhere. Consider deleting.
 /**
  * GrainStat / GrainKPI – Atmospheric Grain Design System
  * Kennzahlen-Karten für Dashboards.

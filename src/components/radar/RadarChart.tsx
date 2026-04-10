@@ -1,7 +1,14 @@
 "use client";
 
+// TODO: PERF-05 — This component removes and recreates all SVG elements on every render.
+// Causes flickering and GC pressure. FIX: Use D3 enter/update/exit pattern
+// or switch to React-based SVG rendering for declarative updates.
+
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import * as d3 from "d3";
+import { select, pointer } from "d3-selection";
+import { zoom, zoomIdentity } from "d3-zoom";
+import { drag } from "d3-drag";
+import "d3-transition";
 import {
   TrendDot,
   Ring,
@@ -148,7 +155,7 @@ export default function RadarChart({
   const drawRadar = useCallback(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
-    const svg = d3.select(svgEl);
+    const svg = select(svgEl);
     svg.selectAll("*").remove();
 
     // ── Background layer (zooms with content) ──
@@ -167,13 +174,13 @@ export default function RadarChart({
       bgG.append("line")
         .attr("x1", gx).attr("y1", -maxR)
         .attr("x2", gx).attr("y2", maxR)
-        .attr("stroke", "rgba(0,0,0,0.04)").attr("stroke-width", 0.5);
+        .attr("stroke", "var(--color-border, rgba(0,0,0,0.04))").attr("stroke-width", 0.5).attr("stroke-opacity", 0.25);
     }
     for (let gy = -maxR; gy <= maxR; gy += gridStep) {
       bgG.append("line")
         .attr("x1", -maxR).attr("y1", gy)
         .attr("x2", maxR).attr("y2", gy)
-        .attr("stroke", "rgba(0,0,0,0.04)").attr("stroke-width", 0.5);
+        .attr("stroke", "var(--color-border, rgba(0,0,0,0.04))").attr("stroke-width", 0.5).attr("stroke-opacity", 0.25);
     }
 
     // Ring backgrounds
@@ -273,7 +280,7 @@ export default function RadarChart({
       const grad = defs.append("radialGradient")
         .attr("id", gradId)
         .attr("cx", "35%").attr("cy", "30%").attr("r", "72%");
-      grad.append("stop").attr("offset", "0%").attr("stop-color", "#FFFFFF").attr("stop-opacity", "0.60");
+      grad.append("stop").attr("offset", "0%").attr("stop-color", "var(--color-surface, #FFFFFF)").attr("stop-opacity", "0.60");
       grad.append("stop").attr("offset", "40%").attr("stop-color", color + "EE").attr("stop-opacity", "0.90");
       grad.append("stop").attr("offset", "100%").attr("stop-color", color).attr("stop-opacity", "0.70");
     });
@@ -287,7 +294,7 @@ export default function RadarChart({
       .style("cursor", "pointer");
 
     dots.each(function (d, i) {
-      const dotG = d3.select(this);
+      const dotG = select(this);
       const { x, y } = positions[i];
       const size = getDotSize(d.impact);
       const opacity = getDotOpacity(d.confidence);
@@ -338,7 +345,7 @@ export default function RadarChart({
         .attr("r", size)
         .attr("fill", `url(#${gradId})`)
         .attr("fill-opacity", opacity)
-        .attr("stroke", isSelected ? "var(--volt-black, #0A0A0A)" : "rgba(0,0,0,0.12)")
+        .attr("stroke", isSelected ? "var(--foreground, #0A0A0A)" : "var(--color-border, rgba(0,0,0,0.12))")
         .attr("stroke-width", isSelected ? 2 : 1)
         .attr("stroke-opacity", isSelected ? 1 : 0.35)
         .classed("main-dot", true);
@@ -369,7 +376,7 @@ export default function RadarChart({
       const invK = 1 / k;
       dots.each(function () {
         // Counter-scale each dot group so it stays the same visual size
-        const el = d3.select(this);
+        const el = select(this);
         const currentTransform = el.attr("transform");
         // Extract translate values
         const match = currentTransform.match(/translate\(([^,]+),([^)]+)\)/);
@@ -379,16 +386,16 @@ export default function RadarChart({
       });
     }
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.8, 8])
       .on("zoom", (event) => {
         zoomG.attr("transform", event.transform.toString());
         applySemanticZoom(event.transform.k);
       });
 
-    svg.call(zoom);
+    svg.call(zoomBehavior);
     svg.on("dblclick.zoom", () => {
-      svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+      svg.transition().duration(400).call(zoomBehavior.transform, zoomIdentity);
     });
 
     // ── Interactions ──
@@ -398,11 +405,11 @@ export default function RadarChart({
       // Raise this dot to the top of the stack
       (this as SVGGElement).parentNode?.appendChild(this as SVGGElement);
 
-      const [mx, my] = d3.pointer(event, svgEl);
+      const [mx, my] = pointer(event, svgEl);
       setTooltip({ trend: d, x: mx, y: my });
 
       const size = getDotSize(d.impact);
-      d3.select(this).select(".main-dot")
+      select(this).select(".main-dot")
         .transition().duration(120)
         .attr("r", size + 2)
         .attr("stroke-width", 2)
@@ -413,7 +420,7 @@ export default function RadarChart({
       setTooltip(null);
       const size = getDotSize(d.impact);
       const isSelected = d.id === selectedTrendId;
-      d3.select(this).select(".main-dot")
+      select(this).select(".main-dot")
         .transition().duration(120)
         .attr("r", size)
         .attr("stroke-width", isSelected ? 2 : 0.8)
@@ -426,16 +433,16 @@ export default function RadarChart({
 
     // Drag to change ring
     if (onTrendDrag) {
-      const drag = d3.drag<SVGGElement, TrendDot>()
+      const dragBehavior = drag<SVGGElement, TrendDot>()
         .on("drag", function (event) {
-          d3.select(this).attr("transform", `translate(${event.x},${event.y}) scale(${1 / currentK})`);
+          select(this).attr("transform", `translate(${event.x},${event.y}) scale(${1 / currentK})`);
         })
         .on("end", function (event, d) {
           const dist = Math.sqrt(event.x ** 2 + event.y ** 2) / maxR;
           const newRing = ringFromDistance(dist);
           onTrendDrag(d.id, newRing);
         });
-      dots.call(drag);
+      dots.call(dragBehavior);
     }
 
     // Zoom hint

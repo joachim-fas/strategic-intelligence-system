@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { readFileSync } from "fs";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 
 function resolveEnv(key: string): string | undefined {
   if (process.env[key]) return process.env[key];
@@ -44,6 +45,22 @@ function extractJSON(text: string): any | null {
 }
 
 /**
+ * SEC-05: Sanitize user-provided content before interpolating into LLM prompts.
+ * Strips XML-like tags and role markers that could hijack the prompt.
+ */
+function sanitizeForPrompt(input: string): string {
+  if (!input) return "";
+  return input
+    // Strip XML-style tags (e.g. <system>, </user>, <|im_start|>)
+    .replace(/<\/?[a-zA-Z_|][^>]{0,80}>/g, "")
+    // Strip role markers used in chat prompts
+    .replace(/\b(system|user|assistant|human)\s*:/gi, "")
+    // Strip control characters (except newline/tab)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .trim();
+}
+
+/**
  * Extract all query-like nodes from a canvas state and return their
  * synthesis, insights, scenarios for the meta-synthesis input.
  */
@@ -63,18 +80,20 @@ function extractQueriesFromCanvas(canvasState: any): Array<{
     if (!node.query) continue;
     const result = node.result || {};
     queries.push({
-      query: node.query,
-      synthesis: (node.synthesis || result.synthesis || "").slice(0, 1500),
-      keyInsights: Array.isArray(result.keyInsights) ? result.keyInsights.slice(0, 5) : [],
+      query: sanitizeForPrompt(node.query),
+      synthesis: sanitizeForPrompt((node.synthesis || result.synthesis || "").slice(0, 1500)),
+      keyInsights: Array.isArray(result.keyInsights)
+        ? result.keyInsights.slice(0, 5).map((i: string) => sanitizeForPrompt(i))
+        : [],
       scenarios: Array.isArray(result.scenarios)
         ? result.scenarios.slice(0, 3).map((s: any) => ({
-            name: s.name || s.title || "",
-            description: (s.description || "").slice(0, 200),
+            name: sanitizeForPrompt(s.name || s.title || ""),
+            description: sanitizeForPrompt((s.description || "").slice(0, 200)),
             probability: s.probability,
           }))
         : [],
-      interpretation: (result.interpretation || "").slice(0, 400),
-      decisionFramework: (result.decisionFramework || "").slice(0, 400),
+      interpretation: sanitizeForPrompt((result.interpretation || "").slice(0, 400)),
+      decisionFramework: sanitizeForPrompt((result.decisionFramework || "").slice(0, 400)),
       timestamp: node.createdAt,
     });
   }
@@ -83,16 +102,17 @@ function extractQueriesFromCanvas(canvasState: any): Array<{
 }
 
 /**
- * Hash the query node IDs + their synthesis lengths so we can detect
+ * Hash the query node IDs + their synthesis content so we can detect
  * whether the session has meaningfully changed since the last summary.
+ *
+ * DAT-17: Previously used synthesis.length for hashing, which could cause
+ * false cache hits when different content had the same length.
+ * Now hashes the actual content.
  */
 function hashSession(queries: any[]): string {
-  const str = queries.map(q => `${q.query}|${q.synthesis.length}`).join("::");
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
+  // DAT-17: Hash actual content instead of just length
+  const str = queries.map(q => `${q.query}|${q.synthesis}`).join("::");
+  const hash = Array.from(str).reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
   return String(hash);
 }
 
@@ -251,9 +271,14 @@ Find the red thread. Name the patterns. Uncover the contradictions. Show the ope
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // DAT-13: Ensure DB handle is always closed
   const d = db();
-  const row = d.prepare("SELECT canvas_state FROM radars WHERE id = ?").get(id) as { canvas_state: string | null } | undefined;
-  d.close();
+  let row: { canvas_state: string | null } | undefined;
+  try {
+    row = d.prepare("SELECT canvas_state FROM radars WHERE id = ?").get(id) as { canvas_state: string | null } | undefined;
+  } finally {
+    d.close();
+  }
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let state: any = null;
@@ -281,6 +306,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // ─── POST: generate or regenerate the meta-synthesis ───
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // SEC-11: Rate limit LLM endpoints — 20 requests per IP per hour
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkRateLimit(`canvas-summary:${clientIp}`, 20, 3_600_000)) {
+    return tooManyRequests("Rate limit exceeded for summary endpoint. Try again later.");
+  }
+
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const locale = body.locale || "de";
@@ -403,6 +434,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         return;
       }
 
+      // TODO: DAT-10 — Race condition: concurrent save from Canvas page can overwrite summary. Fix: use separate summary column or row-level locking.
       // Cache it in canvas_state.summary
       try {
         const updatedState = { ...(state || {}), summary: { hash: hashSession(queries), data: result, generatedAt: Date.now(), modelUsed } };

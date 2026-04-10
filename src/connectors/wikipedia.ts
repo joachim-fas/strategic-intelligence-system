@@ -39,10 +39,17 @@ export const wikipediaConnector: SourceConnector = {
 
     for (const { article, topic } of TRACKED_ARTICLES) {
       try {
-        const res = await fetch(
-          `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/${encodeURIComponent(article)}/daily/${dateStr}/${dateStr}`,
-          { headers: { "User-Agent": "SIS/1.0 (strategic intelligence system)" } }
-        );
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/${encodeURIComponent(article)}/daily/${dateStr}/${dateStr}`,
+            { headers: { "User-Agent": "SIS/1.0 (strategic intelligence system)" }, signal: controller.signal }
+          );
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
         if (!res.ok) continue;
 
         const data = await res.json();
@@ -60,7 +67,7 @@ export const wikipediaConnector: SourceConnector = {
           topic,
           rawStrength: strength,
           rawData: { article, views, date: dateStr },
-          detectedAt: yesterday,
+          detectedAt: new Date(yesterday.getTime()),
         });
 
         await new Promise((r) => setTimeout(r, 100)); // Rate limit

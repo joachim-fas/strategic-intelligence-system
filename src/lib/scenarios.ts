@@ -1,5 +1,6 @@
 import { TrendDot, Ring } from "@/types";
-import { TREND_EDGES, calculateCascadeDepth } from "./causal-graph";
+import { TREND_EDGES, calculateCascadeDepthMap } from "./causal-graph";
+import { calculateRing } from "./scoring";
 
 /**
  * Scenario System
@@ -148,19 +149,22 @@ export function applyScenario(
     if (!trend) continue;
 
     const originalRing = trend.ring;
+    // Capture originals BEFORE clamp to avoid wrong before/after when clamping clips
+    const relevanceBefore = trend.relevance;
+    const confidenceBefore = trend.confidence;
     trend.relevance = clamp(trend.relevance + impact.relevanceShift);
     trend.confidence = clamp(trend.confidence + impact.confidenceShift);
     trend.impact = clamp(trend.impact + impact.impactShift);
-    trend.ring = calculateRing(trend.relevance, trend.confidence, trend.impact);
+    trend.ring = computeRingFromDimensions(trend.relevance, trend.confidence, trend.impact);
 
     affectedTrends.push({
       trendId: trend.id,
       trendName: trend.name,
       originalRing,
       newRing: trend.ring,
-      relevanceBefore: trend.relevance - impact.relevanceShift,
+      relevanceBefore,
       relevanceAfter: trend.relevance,
-      confidenceBefore: trend.confidence - impact.confidenceShift,
+      confidenceBefore,
       confidenceAfter: trend.confidence,
       impactType: "direct",
       cascadeDepth: 0,
@@ -168,12 +172,15 @@ export function applyScenario(
   }
 
   // Step 2: Propagate cascade effects through the causal graph
+  // ALG-20: Uses calculateCascadeDepthMap to get actual BFS depth per target,
+  // so cascadeDepth reflects the real graph distance (1, 2, ...) instead of
+  // being hardcoded to 1. Damping increases with depth.
   const directIds = new Set(scenario.directImpacts.map((i) => i.trendId));
 
   for (const impact of scenario.directImpacts) {
-    const cascadeTargets = calculateCascadeDepth(impact.trendId, 2);
+    const cascadeDepthMap = calculateCascadeDepthMap(impact.trendId, 2);
 
-    for (const targetId of cascadeTargets) {
+    for (const [targetId, depth] of cascadeDepthMap) {
       if (directIds.has(targetId)) continue; // Already handled directly
       const trend = trendMap.get(targetId);
       if (!trend) continue;
@@ -185,14 +192,16 @@ export function applyScenario(
       );
       if (!edge) continue;
 
-      // Cascade effect is dampened by edge strength and distance
-      const damping = edge.strength * 0.4; // 40% of edge strength
+      // Cascade effect is dampened by edge strength and distance (depth)
+      const damping = edge.strength * 0.4 * Math.pow(0.5, depth - 1);
       const cascadeShift = impact.relevanceShift * damping;
 
       const originalRing = trend.ring;
       const sign = edge.type === "dampens" ? -1 : 1;
+      // Capture before clamp to get correct before/after values
+      const cascadeRelevanceBefore = trend.relevance;
       trend.relevance = clamp(trend.relevance + cascadeShift * sign);
-      trend.ring = calculateRing(trend.relevance, trend.confidence, trend.impact);
+      trend.ring = computeRingFromDimensions(trend.relevance, trend.confidence, trend.impact);
 
       if (Math.abs(cascadeShift) > 0.01) {
         affectedTrends.push({
@@ -200,12 +209,12 @@ export function applyScenario(
           trendName: trend.name,
           originalRing,
           newRing: trend.ring,
-          relevanceBefore: trend.relevance - cascadeShift * sign,
+          relevanceBefore: cascadeRelevanceBefore,
           relevanceAfter: trend.relevance,
           confidenceBefore: trend.confidence,
           confidenceAfter: trend.confidence,
           impactType: "cascade",
-          cascadeDepth: 1,
+          cascadeDepth: depth,
         });
       }
     }
@@ -227,10 +236,13 @@ function clamp(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function calculateRing(relevance: number, confidence: number, impact: number): Ring {
+/**
+ * Compute the ring for a trend using the same weights as scoring.ts.
+ * Uses relevance * 0.35 + confidence * 0.25 + impact * 0.25 + relevance * 0.15
+ * as a proxy (recency unavailable here, relevance substitutes).
+ * Delegates to the shared calculateRing() for consistent thresholds.
+ */
+function computeRingFromDimensions(relevance: number, confidence: number, impact: number): Ring {
   const score = relevance * 0.35 + confidence * 0.25 + impact * 0.25 + 0.15 * relevance;
-  if (score >= 0.6) return "adopt";
-  if (score >= 0.4) return "trial";
-  if (score >= 0.2) return "assess";
-  return "hold";
+  return calculateRing(score);
 }

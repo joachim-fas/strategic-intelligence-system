@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import path from "path";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 
 function resolveEnv(key: string): string | undefined {
   if (process.env[key]) return process.env[key];
@@ -741,6 +742,12 @@ async function callAnthropicStream(
 }
 
 export async function POST(req: Request) {
+  // SEC-11: Rate limit LLM endpoints — 20 requests per IP per hour
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkRateLimit(`framework-analyze:${clientIp}`, 20, 3_600_000)) {
+    return tooManyRequests("Rate limit exceeded for analysis endpoint. Try again later.");
+  }
+
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey || apiKey.length < 10) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
@@ -758,7 +765,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unknown framework: ${frameworkId}` }, { status: 400 });
   }
 
-  const userPrompt = promptBuilder(topic, step, context || "", locale || "de");
+  // Validate step against known steps for this framework
+  const VALID_STEPS: Record<string, string[]> = {
+    "marktanalyse": ["market-structure", "competitor-radar", "trends-regulation", "benchmarking"],
+    "war-gaming": ["actors", "moves", "responses", "red-team"],
+    "pre-mortem": ["risks", "assessment", "mitigation"],
+    "post-mortem": ["timeline", "causes", "lessons"],
+    "trend-deep-dive": ["definition", "evidence", "drivers", "impact", "actions"],
+    "stakeholder": ["inventory", "power-matrix", "coalitions", "engagement"],
+  };
+  const allowedSteps = VALID_STEPS[frameworkId];
+  if (allowedSteps && !allowedSteps.includes(step)) {
+    return NextResponse.json(
+      { error: `Unknown step "${step}" for framework "${frameworkId}". Valid steps: ${allowedSteps.join(", ")}` },
+      { status: 422 }
+    );
+  }
+
+  // ── SEC-05: Sanitize user-provided inputs before prompt interpolation ──
+  // Strip XML-like tags and role markers that could hijack the LLM prompt.
+  const sanitizeForPrompt = (input: string): string => {
+    if (!input) return "";
+    return input
+      // Strip XML-style tags (e.g. <system>, </user>, <|im_start|>)
+      .replace(/<\/?[a-zA-Z_|][^>]{0,80}>/g, "")
+      // Strip role markers used in chat prompts
+      .replace(/\b(system|user|assistant|human)\s*:/gi, "")
+      // Strip control characters (except newline/tab)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      .trim();
+  };
+
+  const safeTopic = sanitizeForPrompt(topic);
+  const safeContext = sanitizeForPrompt(context || "");
+  const userPrompt = promptBuilder(safeTopic, step, safeContext, locale || "de");
 
   const systemPrompt = `Du bist ein Senior-Strategieberater im Strategic Intelligence System (SIS). Du lieferst strukturierte, datengestützte Analysen. Antworte IMMER als valides JSON — kein Markdown-Codefence, kein Fließtext davor/danach, NUR das JSON-Objekt. Sei konkret: nenne echte Unternehmen, echte Zahlen, echte Regulierungen. Sprache: ${locale === "de" ? "Deutsch" : "English"}.`;
 
@@ -808,10 +848,10 @@ export async function POST(req: Request) {
         if (parsed) {
           send({ type: "complete", result: parsed, modelUsed: result.modelUsed });
         } else if (result.fullText.trim().length > 20) {
-          // Fallback: prose response
+          // Fallback: wrap prose in JSON structure so the client always receives parseable JSON
           send({
             type: "complete",
-            result: { synthesis: result.fullText.slice(0, 6000), _raw: true },
+            result: { type: "prose", content: result.fullText.slice(0, 6000) },
             modelUsed: result.modelUsed,
           });
         } else {
@@ -819,7 +859,8 @@ export async function POST(req: Request) {
         }
         controller.close();
       } catch (err: any) {
-        send({ type: "error", error: err.message || "Unknown error" });
+        console.error("POST /api/v1/frameworks/analyze stream error:", err);
+        send({ type: "error", error: "Analysis failed. Please try again." });
         try { controller.close(); } catch {}
       }
     },

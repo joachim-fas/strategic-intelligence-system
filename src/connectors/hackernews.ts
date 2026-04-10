@@ -15,56 +15,76 @@ export const hackernewsConnector: SourceConnector = {
   displayName: "Hacker News",
 
   async fetchSignals(): Promise<RawSignal[]> {
-    // Fetch top 100 stories
-    const topRes = await fetch(
-      "https://hacker-news.firebaseio.com/v0/topstories.json"
-    );
-    const topIds: number[] = await topRes.json();
-    const top100 = topIds.slice(0, 100);
-
-    // Fetch story details in batches of 20
     const signals: RawSignal[] = [];
-    const batchSize = 20;
 
-    for (let i = 0; i < top100.length; i += batchSize) {
-      const batch = top100.slice(i, i + batchSize);
-      const stories = await Promise.all(
-        batch.map(async (id) => {
-          const res = await fetch(
-            `https://hacker-news.firebaseio.com/v0/item/${id}.json`
-          );
-          return res.json() as Promise<HNItem>;
-        })
-      );
+    try {
+      // Fetch top 100 stories
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      let topIds: number[];
+      try {
+        const topRes = await fetch(
+          "https://hacker-news.firebaseio.com/v0/topstories.json",
+          { signal: controller.signal }
+        );
+        topIds = await topRes.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+      const top100 = topIds.slice(0, 100);
 
-      for (const story of stories) {
-        if (!story || story.type !== "story") continue;
+      // Fetch story details in batches of 20
+      const batchSize = 20;
 
-        // Calculate signal strength based on points and comments
-        const strength = Math.min(
-          1,
-          (story.score * 0.3 + story.descendants * 0.7) / 500
+      for (let i = 0; i < top100.length; i += batchSize) {
+        const batch = top100.slice(i, i + batchSize);
+        const stories = await Promise.all(
+          batch.map(async (id) => {
+            const itemController = new AbortController();
+            const itemTimeout = setTimeout(() => itemController.abort(), 30000);
+            try {
+              const res = await fetch(
+                `https://hacker-news.firebaseio.com/v0/item/${id}.json`,
+                { signal: itemController.signal }
+              );
+              return res.json() as Promise<HNItem>;
+            } finally {
+              clearTimeout(itemTimeout);
+            }
+          })
         );
 
-        // Extract topic from title
-        const topic = extractTopic(story.title);
-        if (!topic) continue;
+        for (const story of stories) {
+          if (!story || story.type !== "story") continue;
 
-        signals.push({
-          sourceType: "hackernews",
-          sourceUrl: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
-          sourceTitle: story.title,
-          signalType: strength > 0.6 ? "spike" : "mention",
-          topic,
-          rawStrength: strength,
-          rawData: {
-            hnId: story.id,
-            score: story.score,
-            comments: story.descendants,
-          },
-          detectedAt: new Date(story.time * 1000),
-        });
+          // Calculate signal strength based on points and comments
+          const strength = Math.min(
+            1,
+            (story.score * 0.3 + story.descendants * 0.7) / 500
+          );
+
+          // Extract topic from title
+          const topic = extractTopic(story.title);
+          if (!topic) continue;
+
+          signals.push({
+            sourceType: "hackernews",
+            sourceUrl: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
+            sourceTitle: story.title,
+            signalType: strength > 0.6 ? "spike" : "mention",
+            topic,
+            rawStrength: strength,
+            rawData: {
+              hnId: story.id,
+              score: story.score,
+              comments: story.descendants,
+            },
+            detectedAt: new Date(story.time * 1000),
+          });
+        }
       }
+    } catch {
+      // API unavailable or timeout — return whatever we collected so far
     }
 
     return signals;

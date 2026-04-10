@@ -37,9 +37,21 @@ export const newsConnector: SourceConnector = {
 
     for (const query of queries) {
       try {
-        const res = await fetch(
-          `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=relevancy&pageSize=10&language=en&apiKey=${apiKey}`
-        );
+        // SEC-09: API key moved from URL query string to X-Api-Key header
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=relevancy&pageSize=10&language=en`,
+            {
+              headers: { "X-Api-Key": apiKey },
+              signal: controller.signal,
+            }
+          );
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
 
         if (!res.ok) continue;
 
@@ -55,7 +67,7 @@ export const newsConnector: SourceConnector = {
             sourceTitle: article.title,
             signalType: "mention",
             topic,
-            rawStrength: 0.5, // news articles get base strength, volume matters more
+            rawStrength: 0.5, // TODO: compute strength dynamically from signal data
             rawData: {
               source: article.source.name,
               description: article.description,

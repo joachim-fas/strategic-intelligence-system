@@ -9,6 +9,17 @@ import { SourceConnector, RawSignal } from "./types";
  * API: https://apidocs.acleddata.com/
  */
 
+// CON-11: Event-type-based base strength so non-fatal events (protests,
+// strategic developments, coups) are not invisible at rawStrength 0.
+const EVENT_TYPE_BASE_STRENGTH: Record<string, number> = {
+  "Battles": 0.7,
+  "Violence against civilians": 0.8,
+  "Protests": 0.5,
+  "Riots": 0.6,
+  "Strategic developments": 0.6,
+  "Explosions/Remote violence": 0.7,
+};
+
 function getLast7DaysRange(): string {
   const end = new Date();
   const start = new Date(Date.now() - 7 * 86400000);
@@ -29,6 +40,7 @@ export const acledConnector: SourceConnector = {
 
     try {
       const dateRange = getLast7DaysRange();
+      // NOTE: API key in URL - required by ACLED API's design
       const url = `https://api.acleddata.com/acled/read?event_date=${encodeURIComponent(dateRange)}&event_date_where=BETWEEN&limit=50&key=${key}&email=${encodeURIComponent(email)}`;
 
       const res = await fetch(url, {
@@ -48,13 +60,20 @@ export const acledConnector: SourceConnector = {
         const country = event.country || "Unknown";
         const eventType = event.event_type || "Event";
 
+        // CON-11: Combine event-type base strength with fatality bonus
+        const baseTypeStrength = EVENT_TYPE_BASE_STRENGTH[eventType] ?? 0.5;
+        const rawStrength = Math.min(
+          1,
+          baseTypeStrength + (fatalities > 0 ? Math.min(0.3, fatalities / 100) : 0),
+        );
+
         signals.push({
           sourceType: "acled",
           sourceUrl: "https://acleddata.com/",
           sourceTitle: `ACLED: ${eventType} in ${country} — ${truncatedNotes}`,
           signalType: fatalities > 10 ? "spike" : "mention",
           topic: "Geopolitical Fragmentation",
-          rawStrength: Math.min(1, fatalities / 50),
+          rawStrength,
           rawData: {
             eventType,
             country,

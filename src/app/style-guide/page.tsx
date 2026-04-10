@@ -1,9 +1,12 @@
 "use client";
 
+// TODO: FE-01 — Remove "use client". Extract interactive parts into Client Components.
+// This page should be a Server Component with only interactive islands as "use client".
+
 // ─────────────────────────────────────────────────────────────────
 // SIS DESIGN SYSTEM — VoltUI Style Guide
 // >_ Design System · Black + Lime · Terminal Aesthetic
-// Accessible at /style-guide during development
+// Accessible at /style-guide during development ONLY
 // ─────────────────────────────────────────────────────────────────
 
 // ── Shared helper components ────────────────────────────────────
@@ -67,6 +70,15 @@ function TokenPill({ token }: { token: string }) {
 // ── Main page ────────────────────────────────────────────────────
 
 export default function StyleGuide() {
+  // ARC-15: Only show style guide in development
+  if (process.env.NODE_ENV === "production") {
+    return (
+      <div style={{ padding: 40, textAlign: "center", fontSize: 13, color: "#999" }}>
+        Style Guide is only available in development mode.
+      </div>
+    );
+  }
+
   const navItems = [
     { label: ">_ Identity",          href: "#identity" },
     { label: "Colors",               href: "#colors" },

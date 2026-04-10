@@ -216,6 +216,7 @@ const STORAGE_KEY = "sis-history-v2";
 const MAX_STORED = 30;
 
 export function saveHistoryToStorage(history: HistoryEntry[]) {
+  if (typeof window === "undefined") return;
   try {
     const completed = history.filter(
       (e) => !e.isLoading
@@ -230,6 +231,7 @@ export function saveHistoryToStorage(history: HistoryEntry[]) {
 }
 
 export function loadHistoryFromStorage(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -242,5 +244,6 @@ export function loadHistoryFromStorage(): HistoryEntry[] {
 }
 
 export function clearHistoryStorage() {
+  if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);
 }

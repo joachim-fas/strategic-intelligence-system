@@ -60,7 +60,7 @@ export const unSdgConnector: SourceConnector = {
           sourceTitle: `UN SDG ${code}: ${title.slice(0, 120)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.4,
+          rawStrength: 0.4, // TODO: compute strength dynamically from signal data
           rawData: { code, title, description: goal.description },
           detectedAt: new Date(),
         });

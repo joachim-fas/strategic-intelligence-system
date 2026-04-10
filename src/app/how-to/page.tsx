@@ -1,5 +1,9 @@
 "use client";
 
+// TODO: FE-01 — Remove "use client". Extract interactive parts into Client Components.
+// This page should be a Server Component with only interactive islands as "use client".
+
+import Link from "next/link";
 import { useLocale } from "@/lib/locale-context";
 import { AppHeader } from "@/components/AppHeader";
 
@@ -107,13 +111,13 @@ export default function HowTo() {
               ? "Kein Dashboard. Keine Tabellen. Du stellst eine Frage — das System denkt."
               : "No dashboard. No tables. You ask a question — the system thinks."}
           </p>
-          <a href="/beispiele" className="volt-btn volt-btn-solid" style={{
+          <Link href="/beispiele" className="volt-btn volt-btn-solid" style={{
             textDecoration: "none",
             background: "var(--color-lime)", color: "var(--color-brand-text)",
             border: "1px solid rgba(0,0,0,0.08)",
           }}>
             {de ? "Beispiel-Briefings ansehen" : "View example briefings"} →
-          </a>
+          </Link>
         </div>
 
         <Section title={de ? "So funktioniert eine Abfrage" : "How a query works"}>
@@ -197,9 +201,9 @@ export default function HowTo() {
 
         {/* Canvas link */}
         <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid var(--color-border)" }}>
-          <a href="/canvas" className="volt-btn volt-btn-outline" style={{ textDecoration: "none" }}>
+          <Link href="/canvas" className="volt-btn volt-btn-outline" style={{ textDecoration: "none" }}>
             {de ? "→ Canvas öffnen" : "→ Open Canvas"}
-          </a>
+          </Link>
         </div>
 
       </main>

@@ -199,7 +199,7 @@ async function fetchNewsSentiment(): Promise<RawSignal[]> {
           sourceTitle: `[${feed.source}] ${title}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.5 + sentiment * 0.3, // Positive news = slightly stronger signal
+          rawStrength: 0.5 + Math.abs(sentiment) * 0.3, // Stronger sentiment (pos or neg) = stronger signal
           rawData: { sentiment, source: feed.source },
           detectedAt: pubDate ? new Date(pubDate) : new Date(),
         });

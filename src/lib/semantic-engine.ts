@@ -29,6 +29,17 @@ interface ConceptEntry {
  */
 let _conceptCache: ConceptEntry[] | null = null;
 
+/** Maximum cache entries before triggering eviction. */
+const CACHE_MAX_ENTRIES = 1000;
+
+/**
+ * Clear the concept vocabulary cache.
+ * Call when trends are reloaded or when memory pressure is high.
+ */
+export function clearCache(): void {
+  _conceptCache = null;
+}
+
 export function getConceptVocabulary(trends: TrendDot[]): ConceptEntry[] {
   if (_conceptCache) return _conceptCache;
 
@@ -290,16 +301,33 @@ export function getConceptVocabulary(trends: TrendDot[]): ConceptEntry[] {
     }
   }
 
-  // Deduplicate by term
+  // Deduplicate by term — merge trendIds so associations are never lost
   const deduped = new Map<string, ConceptEntry>();
   for (const c of concepts) {
     const existing = deduped.get(c.term);
-    if (!existing || c.strength > existing.strength) {
+    if (!existing) {
       deduped.set(c.term, c);
+    } else {
+      // Merge trendIds from the losing concept into the winning one
+      const mergedIds = [...new Set([...existing.trendIds, ...c.trendIds])];
+      if (c.strength > existing.strength) {
+        deduped.set(c.term, { ...c, trendIds: mergedIds });
+      } else {
+        existing.trendIds = mergedIds;
+      }
     }
   }
 
-  _conceptCache = Array.from(deduped.values());
+  let entries = Array.from(deduped.values());
+
+  // Simple LRU approximation: if cache exceeds the limit, drop the oldest
+  // half (entries are insertion-ordered, so the first half is oldest).
+  if (entries.length > CACHE_MAX_ENTRIES) {
+    const keepFrom = Math.floor(entries.length / 2);
+    entries = entries.slice(keepFrom);
+  }
+
+  _conceptCache = entries;
   console.log(`Semantic engine: ${_conceptCache.length} concepts indexed`);
   return _conceptCache;
 }
@@ -321,11 +349,34 @@ export function findConcepts(query: string, trends: TrendDot[]): {
   const chains: string[] = [];
   let totalStrength = 0;
 
+  // ALG-24: Safe substring matching that prevents false positives.
+  // Short terms (length <= 2) require exact word boundary match to avoid
+  // "ki" matching inside "skiing". Longer terms require the match to cover
+  // at least 40% of the host word's length.
+  function isValidMatch(host: string, term: string): boolean {
+    if (term.length <= 2) {
+      // Require exact word boundary match for very short terms
+      const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      return re.test(host);
+    }
+    // For longer terms used with includes(), check that the term covers a
+    // meaningful portion of the host word to prevent e.g. "ion" matching
+    // inside "migration" when "ion" is the concept term.
+    if (host.includes(term)) {
+      return term.length >= host.length * 0.4;
+    }
+    return false;
+  }
+
   // Match each query word against vocabulary
   for (const word of queryWords) {
     for (const concept of vocabulary) {
-      // Exact match
-      if (concept.term === word || concept.term.includes(word) || word.includes(concept.term)) {
+      // Exact match or validated substring match
+      const matched =
+        concept.term === word ||
+        isValidMatch(word, concept.term) ||
+        isValidMatch(concept.term, word);
+      if (matched) {
         for (const id of concept.trendIds) trendIds.add(id);
         if (concept.chain.includes("→")) chains.push(concept.chain);
         totalStrength += concept.strength;
@@ -335,7 +386,10 @@ export function findConcepts(query: string, trends: TrendDot[]): {
 
   // Also try the full query as one phrase
   for (const concept of vocabulary) {
-    if (q.includes(concept.term) || concept.term.includes(q)) {
+    const phraseMatched =
+      isValidMatch(q, concept.term) ||
+      isValidMatch(concept.term, q);
+    if (phraseMatched) {
       for (const id of concept.trendIds) trendIds.add(id);
       if (concept.chain.includes("→") && !chains.includes(concept.chain)) {
         chains.push(concept.chain);

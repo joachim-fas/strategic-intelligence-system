@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { validationError } from "@/lib/api-utils";
+import { validateStringLength, validateId } from "@/lib/validation";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -11,22 +13,47 @@ function db() {
 
 type Params = { params: Promise<{ id: string }> };
 
+// TODO: SEC-14 — Add user_id ownership check when user_id column exists on the radars table.
+// PATCH and DELETE handlers should verify the resource belongs to the authenticated user.
+
 // PATCH — rename project
 export async function PATCH(req: Request, context: Params) {
   try {
     const { id } = await context.params;
+
+    // SEC-13: Validate path param
+    const idCheck = validateId(id);
+    if (!idCheck.valid) return validationError(idCheck.error);
+
     const body = await req.json();
     const { name, description } = body;
-    if (!name?.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
+
+    // SEC-13: Input validation
+    const nameCheck = validateStringLength(name, "name", 200, 1);
+    if (!nameCheck.valid) return validationError(nameCheck.error);
+
+    if (description !== undefined && description !== null) {
+      const descCheck = validateStringLength(description, "description", 2000);
+      if (!descCheck.valid) return validationError(descCheck.error);
+    }
+
+    // DAT-13: Ensure DB handle is always closed
     const d = db();
-    d.prepare("UPDATE radars SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(name.trim(), description ?? null, id);
-    const updated = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
-    d.close();
-    if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
-    return NextResponse.json({ project: updated });
+    try {
+      d.prepare("UPDATE radars SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(name.trim(), description ?? null, id);
+      const updated = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
+      if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
+      return NextResponse.json({ project: updated });
+    } finally {
+      d.close();
+    }
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("PATCH /api/v1/projects/[id] error:", err);
+    return NextResponse.json(
+      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to update project", status: 500 } },
+      { status: 500 }
+    );
   }
 }
 
@@ -34,15 +61,32 @@ export async function PATCH(req: Request, context: Params) {
 export async function DELETE(_req: Request, context: Params) {
   try {
     const { id } = await context.params;
+    // DAT-13: Ensure DB handle is always closed
     const d = db();
-    // Cascade manually (foreign_keys pragma handles it if FK constraints exist,
-    // but we delete explicitly to be safe)
-    d.prepare("DELETE FROM project_notes WHERE radar_id = ?").run(id);
-    d.prepare("DELETE FROM project_queries WHERE radar_id = ?").run(id);
-    d.prepare("DELETE FROM radars WHERE id = ?").run(id);
-    d.close();
-    return NextResponse.json({ deleted: true });
+    try {
+      const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
+      if (!existing) {
+        return NextResponse.json(
+          { success: false, error: { code: "NOT_FOUND", message: "Project not found", status: 404 } },
+          { status: 404 }
+        );
+      }
+
+      // Cascade manually (foreign_keys pragma handles it if FK constraints exist,
+      // but we delete explicitly to be safe)
+      d.prepare("DELETE FROM project_notes WHERE radar_id = ?").run(id);
+      d.prepare("DELETE FROM project_queries WHERE radar_id = ?").run(id);
+      d.prepare("DELETE FROM radars WHERE id = ?").run(id);
+      // API-18: DELETE with no body should return 204
+      return new NextResponse(null, { status: 204 });
+    } finally {
+      d.close();
+    }
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("DELETE /api/v1/projects/[id] error:", err);
+    return NextResponse.json(
+      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to delete project", status: 500 } },
+      { status: 500 }
+    );
   }
 }

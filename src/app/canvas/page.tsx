@@ -1,5 +1,20 @@
 "use client";
 
+// TODO: ARC-01 / FE-14 — CANVAS GOD-FILE DECOMPOSITION
+// This file is ~7100 lines with 40+ useState hooks, 20+ useEffect, 20 internal components,
+// 500+ inline styles, and 200+ hardcoded colors. Every change recompiles the entire file.
+// FIX: Split into feature modules:
+//   - hooks/useCanvasState.ts (nodes, connections, selection, undo/redo)
+//   - hooks/useCanvasStreaming.ts (LLM streaming, abort controllers)
+//   - hooks/useCanvasKeyboard.ts (keyboard shortcuts, slash commands)
+//   - hooks/useCanvasPersistence.ts (DB save, localStorage, BroadcastChannel)
+//   - components/canvas/NodeRenderer.tsx (node cards by type)
+//   - components/canvas/CanvasToolbar.tsx (toolbar, view mode switcher)
+//   - components/canvas/CanvasModals.tsx (delete confirm, project switcher)
+//   - components/canvas/DetailPanel.tsx (right-side detail panel)
+//   - components/canvas/MiniMap.tsx (minimap component)
+//   - lib/canvas-utils.ts (uid, layout, snap-to-grid)
+
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -324,6 +339,9 @@ function estimateCardHeight(
 
 const STORAGE_KEY = "sis-canvas-v2";
 
+// FIXED: EDGE-08 — Schema version for canvas state migration
+const CANVAS_SCHEMA_VERSION = 1;
+
 // ── Scenario colours ──────────────────────────────────────────────────────
 
 const SCEN: Record<string, { color: string; bg: string; border: string; label: string; labelEn: string }> = {
@@ -340,8 +358,14 @@ function saveToStorage(nodes: CanvasNode[], conns: Connection[], pan: { x: numbe
     const saveable = nodes.filter(n =>
       n.nodeType !== "query" || (n.status === "done" || n.status === "error")
     );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: saveable, conns, pan, zoom, v: 2 }));
-  } catch {}
+    const value = JSON.stringify({ nodes: saveable, conns, pan, zoom, v: 2 });
+    localStorage.setItem(STORAGE_KEY, value);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('localStorage quota exceeded, clearing old data');
+      try { localStorage.removeItem('sis-canvas-history'); localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, conns, pan, zoom, v: 2 })); } catch {}
+    }
+  }
 }
 
 function loadFromStorage(): { nodes: CanvasNode[]; conns: Connection[]; pan: { x: number; y: number }; zoom: number } | null {
@@ -403,18 +427,23 @@ function detectStreamingPhase(acc: string): number {
   return 0;
 }
 
+// TODO: EDGE-17 — Add auto-reconnect with exponential backoff on SSE stream failures.
+// Show user notification: "Verbindung unterbrochen, reconnecting..."
+// Current implementation has no retry logic — if the stream fails, the user must re-submit.
 async function streamQuery(
   query: string, locale: string,
   onChunk: (c: string) => void,
   onComplete: (r: QueryResult) => void,
   onError: (m: string) => void,
   onPhase?: (phase: number) => void,
+  signal?: AbortSignal,
 ) {
   try {
     const res = await fetch("/api/v1/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, locale }),
+      signal,
     });
     if (!res.ok || !res.body) { onError(`HTTP ${res.status}`); return; }
     const reader = res.body.getReader();
@@ -498,7 +527,13 @@ function buildDimensionData(matchedTrends: MatchedTrend[]): DimensionEntry[] {
   });
 }
 
-const uid = () => Math.random().toString(36).slice(2, 10);
+function uid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback with better entropy
+  return Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
 
 function computeDerivedNodes(parentId: string, px: number, py: number, result: QueryResult): DerivedNode[] {
   const derived: DerivedNode[] = [];
@@ -1117,8 +1152,9 @@ function buildDemoProject(): { nodes: CanvasNode[]; conns: Connection[] } {
 // ── ConfidenceBadge ───────────────────────────────────────────────────────
 
 function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
-  const pct = Math.round(value * 100);
-  const cls = value > 0.7 ? "signal-positive-badge" : value > 0.4 ? "signal-neutral-badge" : "signal-negative-badge";
+  const safe = Number.isNaN(value) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value));
+  const pct = Math.round(safe * 100);
+  const cls = safe > 0.7 ? "signal-positive-badge" : safe > 0.4 ? "signal-neutral-badge" : "signal-negative-badge";
   return (
     <span className={cls} style={{ fontSize: 10 }}>
       {pct}% {de ? "Konfidenz" : "confidence"}
@@ -1129,12 +1165,13 @@ function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
 // ── ConfidenceGauge (mini half-circle SVG) ────────────────────────────────
 
 function ConfidenceGauge({ value, size = 44 }: { value: number; size?: number }) {
+  const safe = Number.isNaN(value) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value));
   const r = size * 0.38;
   const cx = size / 2;
   const cy = size * 0.58;
   const circumHalf = Math.PI * r;
-  const offset = circumHalf * (1 - Math.max(0, Math.min(1, value)));
-  const color = value > 0.7 ? "#1A9E5A" : value > 0.4 ? "#F5A623" : "#E8402A";
+  const offset = circumHalf * (1 - safe);
+  const color = safe > 0.7 ? "#1A9E5A" : safe > 0.4 ? "#F5A623" : "#E8402A";
   return (
     <svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.65}`}>
       <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
@@ -1144,7 +1181,7 @@ function ConfidenceGauge({ value, size = 44 }: { value: number; size?: number })
         strokeDasharray={`${circumHalf}`} strokeDashoffset={offset}
         style={{ transition: "stroke-dashoffset 0.4s ease" }} />
       <text x={cx} y={cy - 2} textAnchor="middle" fontSize={size * 0.2} fontWeight={700}
-        fill={color}>{Math.round(value * 100)}%</text>
+        fill={color}>{Math.round(safe * 100)}%</text>
     </svg>
   );
 }
@@ -1491,6 +1528,18 @@ function CommandLine({
     setValue("");
   };
 
+  const SLASH_COMMANDS = [
+    { cmd: '/trend', desc: de ? 'Trend analysieren' : 'Analyze trend' },
+    { cmd: '/scenario', desc: de ? 'Szenarien entwickeln' : 'Develop scenarios' },
+    { cmd: '/signal', desc: de ? 'Schwache Signale finden' : 'Find weak signals' },
+    { cmd: '/clear', desc: de ? 'Canvas leeren' : 'Clear canvas' },
+    { cmd: '/export', desc: de ? 'Als Markdown exportieren' : 'Export as Markdown' },
+  ];
+  const showSlashHints = value.startsWith('/') && value.length < 12;
+  const filteredSlash = showSlashHints
+    ? SLASH_COMMANDS.filter(c => c.cmd.startsWith(value.toLowerCase().split(' ')[0]))
+    : [];
+
   return (
     <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       {contextLabel && (
@@ -1498,22 +1547,40 @@ function CommandLine({
           ↳ {de ? "Folge-Analyse:" : "Follow-up on:"} <em>{contextLabel}</em>
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "2px solid #0A0A0A", borderRadius: 14, padding: "8px 10px 8px 14px", boxShadow: "0 12px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)", width: 520, maxWidth: "90vw" }}>
-        <span style={{ fontSize: 15, color: "var(--color-text-muted)", flexShrink: 0 }}>⌕</span>
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={e => setValue(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
-          placeholder={de ? "Frage, Thema oder Stichwort…" : "Question, topic or keyword…"}
-          style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--color-text-primary)", fontFamily: "inherit" }}
-        />
-        <button onClick={submit} style={{ flexShrink: 0, padding: "6px 16px", borderRadius: 8, background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-          {de ? "Analysieren" : "Analyze"} ↵
-        </button>
+      <div style={{ position: "relative", width: 520, maxWidth: "90vw" }}>
+        {showSlashHints && filteredSlash.length > 0 && (
+          <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, background: 'var(--color-surface, rgba(255,255,255,0.98))', border: '1px solid var(--color-border, #ddd)', borderRadius: 10, padding: '8px 10px', fontSize: 12, zIndex: 1000, boxShadow: '0 4px 16px rgba(0,0,0,0.10)' }}>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{de ? 'Befehle' : 'Commands'}:</div>
+            {filteredSlash.map(c => (
+              <div key={c.cmd}
+                onClick={() => { setValue(c.cmd + ' '); inputRef.current?.focus(); }}
+                style={{ padding: '3px 4px', color: 'var(--color-text-secondary)', cursor: 'pointer', borderRadius: 4, display: 'flex', gap: 8, alignItems: 'center' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-page-bg, #f5f5f5)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <span style={{ fontWeight: 700, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", color: 'var(--color-text-heading)' }}>{c.cmd}</span>
+                <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>{c.desc}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "2px solid #0A0A0A", borderRadius: 14, padding: "8px 10px 8px 14px", boxShadow: "0 12px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)" }}>
+          <span style={{ fontSize: 15, color: "var(--color-text-muted)", flexShrink: 0 }}>⌕</span>
+          <input
+            ref={inputRef}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
+            placeholder={de ? "Frage, Thema oder /befehl…" : "Question, topic or /command…"}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--color-text-primary)", fontFamily: "inherit" }}
+          />
+          <button onClick={submit} style={{ flexShrink: 0, padding: "6px 16px", borderRadius: 8, background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {de ? "Analysieren" : "Analyze"} ↵
+          </button>
+        </div>
       </div>
       <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-        Esc {de ? "schließen" : "to close"} · ↵ {de ? "ausführen" : "to run"}
+        Esc {de ? "schließen" : "to close"} · ↵ {de ? "ausführen" : "to run"} · / {de ? "Befehle" : "commands"}
       </div>
     </div>
   );
@@ -1708,7 +1775,8 @@ function DerivedNodeCard({
         {/* Probability bar (scenario only) */}
         {isScenario && node.probability != null && (
           <div style={{ height: 3, background: `${typeColorHex}28`, flexShrink: 0 }}>
-            <div style={{ height: "100%", width: `${node.probability * 100}%`, background: typeColorHex, transition: "width 0.3s" }} />
+            {/* FIXED: EDGE-15 — Clamp probability to [0,1] */}
+            <div style={{ height: "100%", width: `${Math.max(0, Math.min(1, node.probability!)) * 100}%`, background: typeColorHex, transition: "width 0.3s" }} />
           </div>
         )}
         {/* Header */}
@@ -1723,7 +1791,7 @@ function DerivedNodeCard({
           }}>{cfg.badge}</span>
           {isScenario && node.probability != null && (
             <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>
-              {Math.round(node.probability * 100)}%
+              {Math.round(Math.max(0, Math.min(1, node.probability!)) * 100)}%
             </span>
           )}
           <div style={{ flex: 1 }} />
@@ -2975,14 +3043,15 @@ function DimensionsDetailBody({ dimData, createdAt }: { dimData: DimensionEntry[
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)" }}>{t.name}</div>
                   <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 1 }}>
-                    {t.ring} · {t.velocity === "rising" ? "↑ steigend" : t.velocity === "falling" ? "↓ fallend" : "→ stabil"} · {Math.round(t.relevance * 100)}% Relevanz
+                    {/* FIXED: EDGE-15 — Clamp relevance/confidence to [0,1] */}
+                    {t.ring} · {t.velocity === "rising" ? "↑ steigend" : t.velocity === "falling" ? "↓ fallend" : "→ stabil"} · {Math.round(Math.max(0, Math.min(1, t.relevance)) * 100)}% Relevanz
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
                   <div style={{ width: 52, height: 4, background: "rgba(0,0,0,0.07)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${t.confidence * 100}%`, background: dim.color, borderRadius: 2 }} />
+                    <div style={{ height: "100%", width: `${Math.max(0, Math.min(1, t.confidence)) * 100}%`, background: dim.color, borderRadius: 2 }} />
                   </div>
-                  <span style={{ fontSize: 9, color: dim.color, fontWeight: 600 }}>{Math.round(t.confidence * 100)}%</span>
+                  <span style={{ fontSize: 9, color: dim.color, fontWeight: 600 }}>{Math.round(Math.max(0, Math.min(1, t.confidence)) * 100)}%</span>
                 </div>
               </div>
             ))}
@@ -3083,7 +3152,8 @@ function ScenarioComparisonChart({ scenarios, currentId, de }: {
         {de ? "Szenario-Vergleich" : "Scenario Comparison"}
       </div>
       {sorted.map(s => {
-        const pct = Math.round((s.probability ?? 0) * 100);
+        // FIXED: EDGE-15 — Clamp probability to [0,1]
+        const pct = Math.round(Math.max(0, Math.min(1, s.probability ?? 0)) * 100);
         const isCurrent = s.id === currentId;
         const cfg = s.colorKey ? SCEN[s.colorKey] ?? SCEN.baseline : SCEN.baseline;
         return (
@@ -3520,12 +3590,13 @@ function DetailPanel({
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 9, fontWeight: 700, color: sc.color, letterSpacing: "0.05em" }}>{de ? sc.label.toUpperCase() : sc.labelEn.toUpperCase()}</span>
                       {s.timeframe && <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{s.timeframe}</span>}
-                      {s.probability != null && <span style={{ fontSize: 12, fontWeight: 700, color: sc.color, marginLeft: "auto" }}>{Math.round(s.probability * 100)}%</span>}
+                      {s.probability != null && <span style={{ fontSize: 12, fontWeight: 700, color: sc.color, marginLeft: "auto" }}>{Math.round(Math.max(0, Math.min(1, s.probability)) * 100)}%</span>}
                     </div>
                     {/* Probability bar */}
                     {s.probability != null && (
                       <div style={{ height: 2, background: "rgba(255,255,255,0.5)", borderRadius: 1, marginBottom: 6 }}>
-                        <div style={{ height: "100%", width: `${s.probability * 100}%`, background: sc.color, borderRadius: 1 }} />
+                        {/* FIXED: EDGE-15 — Clamp probability to [0,1] */}
+                        <div style={{ height: "100%", width: `${Math.max(0, Math.min(1, s.probability)) * 100}%`, background: sc.color, borderRadius: 1 }} />
                       </div>
                     )}
                     {s.name && <div style={{ fontSize: 12, fontWeight: 600, color: sc.color, marginBottom: 4 }}>{s.name}</div>}
@@ -3557,9 +3628,10 @@ function DetailPanel({
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                     <div style={{ width: 48, height: 3, background: "var(--color-border)", borderRadius: 1, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${t.relevance * 100}%`, background: "#0369A1", borderRadius: 1 }} />
+                      {/* FIXED: EDGE-15 — Clamp relevance to [0,1] */}
+                      <div style={{ height: "100%", width: `${Math.max(0, Math.min(1, t.relevance)) * 100}%`, background: "#0369A1", borderRadius: 1 }} />
                     </div>
-                    <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{Math.round(t.relevance * 100)}% {de ? "Rel." : "rel."}</span>
+                    <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{Math.round(Math.max(0, Math.min(1, t.relevance)) * 100)}% {de ? "Rel." : "rel."}</span>
                   </div>
                 </div>
               ))}
@@ -4223,6 +4295,27 @@ export default function CanvasPage() {
   const [briefingText, setBriefingText] = useState("");
   const [briefingLoading, setBriefingLoading] = useState(false);
 
+  // FIXED: DAT-08 / EDGE-09 — Concurrent tab detection via BroadcastChannel
+  const [concurrentTabWarning, setConcurrentTabWarning] = useState(false);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return; // SSR / unsupported browser guard
+    const channel = new BroadcastChannel("sis-canvas");
+    const tabId = Date.now();
+    channel.postMessage({ type: "tab-active", tabId });
+    channel.onmessage = (e) => {
+      if (e.data?.type === "tab-active" && e.data.tabId !== tabId) {
+        setConcurrentTabWarning(true);
+      }
+    };
+    return () => channel.close();
+  }, []);
+
+  // UX-11: Snap-to-grid toggle
+  const [snapToGrid, setSnapToGrid] = useState(false);
+
+  // UX-12: Copy/paste clipboard for nodes
+  const clipboardRef = useRef<CanvasNode[]>([]);
+
   const de = locale === "de";
   const queryNodes = useMemo(() => nodes.filter((n): n is QueryNode => n.nodeType === "query"), [nodes]);
   const isEmpty = nodes.length === 0;
@@ -4240,6 +4333,12 @@ export default function CanvasPage() {
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
   useEffect(() => { projectIdRef.current = projectId; }, [projectId]);
   useEffect(() => { iterateCtxRef.current = iterateCtx; }, [iterateCtx]);
+  // UX-11: Snap-to-grid ref for pointer handler closure
+  const snapToGridRef = useRef(snapToGrid);
+  useEffect(() => { snapToGridRef.current = snapToGrid; }, [snapToGrid]);
+
+  // ── Per-view-mode pan/zoom transforms ────────────────────────────────────
+  const viewTransformsRef = useRef<Record<string, { x: number; y: number; z: number }>>({});
 
   const draggingRef  = useRef<{ id: string; sx: number; sy: number; ox: number; oy: number } | null>(null);
   const resizingRef  = useRef<{ id: string; dir: "h" | "v" | "both"; startX: number; startW: number; startY: number; startH: number } | null>(null);
@@ -4247,6 +4346,9 @@ export default function CanvasPage() {
   const viewportRef  = useRef<HTMLDivElement>(null);
   const saveTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // ── Active stream abort controllers (keyed by node ID) ────────────────────
+  const activeStreamsRef = useRef<Map<string, AbortController>>(new Map());
 
   // ── File upload refs ──────────────────────────────────────────────────────
   const fileInputRef     = useRef<HTMLInputElement>(null);
@@ -4266,6 +4368,37 @@ export default function CanvasPage() {
   const portDropCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const [nodePickerPos, setNodePickerPos] = useState<{ x: number; y: number } | null>(null); // viewport coords
   const nextQueryPosOverrideRef = useRef<{ x: number; y: number } | null>(null);
+
+  // ── Undo / Redo history ─────────────────────────────────────────────────
+  const historyRef = useRef<{ nodes: CanvasNode[]; connections: Connection[] }[]>([]);
+  const historyIndexRef = useRef(-1);
+  const MAX_HISTORY = 50;
+
+  const pushHistory = useCallback(() => {
+    const snapshot = { nodes: [...nodesRef.current], connections: [...connectionsRef.current] };
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+    historyRef.current.push(snapshot);
+    if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
+    historyIndexRef.current = historyRef.current.length - 1;
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current--;
+      const snapshot = historyRef.current[historyIndexRef.current];
+      setNodes(snapshot.nodes);
+      setConnections(snapshot.connections);
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current++;
+      const snapshot = historyRef.current[historyIndexRef.current];
+      setNodes(snapshot.nodes);
+      setConnections(snapshot.connections);
+    }
+  }, []);
 
   // ── Project API functions ─────────────────────────────────────────────────
 
@@ -4297,6 +4430,7 @@ export default function CanvasPage() {
         pan: { x: panXRef.current, y: panYRef.current },
         zoom: zoomRef.current,
         v: 2,
+        _schemaVersion: CANVAS_SCHEMA_VERSION, // FIXED: EDGE-08 — Include schema version in saved state
       };
       await fetch(`/api/v1/canvas/${id}`, {
         method: "PATCH",
@@ -4347,6 +4481,18 @@ export default function CanvasPage() {
   }, [de, loadProjects, showProjectError]);
 
   const loadProject = useCallback(async (id: string) => {
+    // FIXED: DAT-07 — Check for unsaved changes before switching projects
+    if (dbSaveTimerRef.current && projectIdRef.current && projectIdRef.current !== id) {
+      const confirmSwitch = window.confirm(
+        de ? "Ungespeicherte Änderungen. Trotzdem wechseln?" : "Unsaved changes. Switch anyway?"
+      );
+      if (!confirmSwitch) return;
+      // FIXED: DAT-06 — Flush pending save before project switch
+      clearTimeout(dbSaveTimerRef.current);
+      dbSaveTimerRef.current = undefined;
+      // Save old project immediately before switching
+      await saveCanvasToDb(projectIdRef.current);
+    }
     setProjectOp("loading");
     try {
       const res = await fetch(`/api/v1/canvas/${id}`);
@@ -4358,20 +4504,33 @@ export default function CanvasPage() {
       setProjectName(canvas.name);
       setSaveStatus(null);
       try { localStorage.setItem("sis-active-canvas", id); } catch {}
-      if (canvas.canvas_state) {
-        const state = JSON.parse(canvas.canvas_state);
-        if (state.v !== 2) {
-          setNodes([]); setConnections([]);
-          setPanX(0); setPanY(0); setZoom(1);
-        } else {
-          if (state.nodes) setNodes(state.nodes);
-          if (state.conns) setConnections(state.conns);
-          if (state.pan) { setPanX(state.pan.x); setPanY(state.pan.y); }
-          if (state.zoom) setZoom(state.zoom);
-        }
-      } else {
+      const canvasState = canvas.canvas_state;
+      if (!canvasState || canvasState === 'null' || canvasState === '{}' || canvasState.trim() === '') {
         setNodes([]); setConnections([]);
         setPanX(0); setPanY(0); setZoom(1);
+      } else {
+        try {
+          const state = JSON.parse(canvasState);
+          if (!state || typeof state !== "object") throw new Error("Invalid canvas state structure");
+          if (state.v !== 2) {
+            setNodes([]); setConnections([]);
+            setPanX(0); setPanY(0); setZoom(1);
+          } else {
+            // FIXED: EDGE-08 — Schema version mismatch check
+            if (state._schemaVersion !== undefined && state._schemaVersion !== CANVAS_SCHEMA_VERSION) {
+              console.warn("[SIS Canvas] Schema version mismatch:", state._schemaVersion, "->", CANVAS_SCHEMA_VERSION);
+              // TODO: EDGE-08 — Add migration functions for schema version upgrades
+            }
+            if (Array.isArray(state.nodes)) setNodes(state.nodes); else setNodes([]);
+            if (Array.isArray(state.conns)) setConnections(state.conns); else setConnections([]);
+            if (state.pan) { setPanX(state.pan.x); setPanY(state.pan.y); }
+            if (state.zoom) setZoom(state.zoom);
+          }
+        } catch (parseErr) {
+          console.error("[SIS Canvas] Failed to parse canvas_state:", parseErr);
+          setNodes([]); setConnections([]);
+          setPanX(0); setPanY(0); setZoom(1);
+        }
       }
       setProjectDropdownOpen(false);
     } catch (e) {
@@ -4459,12 +4618,19 @@ export default function CanvasPage() {
           if (!canvas) { fallbackLocalStorage(); return; }
           setProjectId(activeId);
           setProjectName(canvas.name);
-          if (canvas.canvas_state) {
-            const state = JSON.parse(canvas.canvas_state);
-            if (state.nodes) setNodes(state.nodes);
-            if (state.conns) setConnections(state.conns);
-            if (state.pan)  { setPanX(state.pan.x); setPanY(state.pan.y); }
-            if (state.zoom) setZoom(state.zoom);
+          const initState = canvas.canvas_state;
+          if (initState && initState !== 'null' && initState !== '{}' && initState.trim() !== '') {
+            try {
+              const state = JSON.parse(initState);
+              if (state && typeof state === "object") {
+                if (Array.isArray(state.nodes)) setNodes(state.nodes);
+                if (Array.isArray(state.conns)) setConnections(state.conns);
+                if (state.pan)  { setPanX(state.pan.x); setPanY(state.pan.y); }
+                if (state.zoom) setZoom(state.zoom);
+              }
+            } catch (parseErr) {
+              console.error("[SIS Canvas] Failed to parse canvas_state on init:", parseErr);
+            }
           }
         })
         .catch(fallbackLocalStorage);
@@ -4487,6 +4653,15 @@ export default function CanvasPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Seed the undo history with the initial state once nodes are loaded
+  const historySeededRef = useRef(false);
+  useEffect(() => {
+    if (!historySeededRef.current && nodesRef.current.length > 0) {
+      historySeededRef.current = true;
+      pushHistory();
+    }
+  }, [nodes, pushHistory]);
 
   // Viewport size tracking (for Minimap)
   useEffect(() => {
@@ -4686,6 +4861,22 @@ export default function CanvasPage() {
     return () => clearTimeout(saveTimerRef.current);
   }, [nodes, connections, panX, panY, zoom]);
 
+  // FIXED: DAT-06 — Flush pending save before project switch to prevent saving old nodes to new project
+  const prevProjectIdRef = useRef<string | null>(projectId);
+  useEffect(() => {
+    if (prevProjectIdRef.current && prevProjectIdRef.current !== projectId) {
+      // Project changed — flush any pending DB save for the OLD project immediately
+      if (dbSaveTimerRef.current) {
+        clearTimeout(dbSaveTimerRef.current);
+        dbSaveTimerRef.current = undefined;
+        // Note: we do NOT call saveCanvasToDb here because nodes/connections
+        // state may already be reset to the new project's data. The loadProject
+        // function handles this (see DAT-07 below).
+      }
+    }
+    prevProjectIdRef.current = projectId;
+  }, [projectId]);
+
   // Debounced DB persist (only when a project is active)
   useEffect(() => {
     if (!projectId) return;
@@ -4700,7 +4891,11 @@ export default function CanvasPage() {
 
   // Save on browser close / tab close
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Warn user about unsaved changes
+      if (nodesRef.current.length > 0) {
+        e.preventDefault();
+      }
       const pid = projectIdRef.current;
       if (!pid || nodesRef.current.length === 0) return;
       // Synchronous localStorage save as last resort
@@ -4708,13 +4903,16 @@ export default function CanvasPage() {
       if (doneNodes.length > 0) saveToStorage(doneNodes, connectionsRef.current, { x: panXRef.current, y: panYRef.current }, zoomRef.current);
       // Also try async DB save via sendBeacon (best-effort)
       const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
-      try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, JSON.stringify({ canvasState: state })); } catch {}
+      try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, new Blob([JSON.stringify({ canvasState: state })], { type: "application/json" })); } catch {}
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   // ── Global pointer events ─────────────────────────────────────────────────
+  // TODO: EDGE-18 — Pointer/drag callbacks capture stale React state in closures.
+  // Currently mitigated by using refs (zoomRef, panXRef, panYRef, nodesRef, snapToGridRef)
+  // instead of state directly. If adding new state to these handlers, always use refs.
 
   useEffect(() => {
     const move = (e: PointerEvent) => {
@@ -4722,7 +4920,12 @@ export default function CanvasPage() {
         const { id, sx, sy, ox, oy } = draggingRef.current;
         const dx = (e.clientX - sx) / zoomRef.current;
         const dy = (e.clientY - sy) / zoomRef.current;
-        setNodes(prev => prev.map(n => n.id === id ? { ...n, x: ox + dx, y: oy + dy } : n));
+        // FIXED: UX-11 — Optional snap-to-grid (20px grid)
+        const rawX = ox + dx;
+        const rawY = oy + dy;
+        const finalX = snapToGridRef.current ? Math.round(rawX / 20) * 20 : rawX;
+        const finalY = snapToGridRef.current ? Math.round(rawY / 20) * 20 : rawY;
+        setNodes(prev => prev.map(n => n.id === id ? { ...n, x: finalX, y: finalY } : n));
       } else if (resizingRef.current) {
         const { id, dir, startX, startW, startY, startH } = resizingRef.current;
         if (dir === "h" || dir === "both") {
@@ -4753,6 +4956,7 @@ export default function CanvasPage() {
       }
     };
     const up = (e: PointerEvent) => {
+      if (draggingRef.current || resizingRef.current) pushHistory();
       draggingRef.current = null; resizingRef.current = null; panningRef.current = null;
       if (portDragRef.current) {
         const { nodeId, prefill, startClientX, startClientY } = portDragRef.current;
@@ -4779,27 +4983,70 @@ export default function CanvasPage() {
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
   }, []);
 
+  // Ref for deleteNode to avoid block-scoping issue in keyboard handler
+  const deleteNodeRef = useRef<(id: string) => void>(() => {});
+
   // Keyboard shortcuts
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); setDetailNodeId(null); setDeleteConfirmId(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; portDragRef.current = null; setPortDragPreview(null); }
+      if (e.key === "Escape") {
+        setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); setDetailNodeId(null); setDeleteConfirmId(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; portDragRef.current = null; setPortDragPreview(null);
+        // Also abort any active streams on Escape
+        activeStreamsRef.current.forEach(ctrl => ctrl.abort());
+        activeStreamsRef.current.clear();
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId && !cmdVisible) {
         const el = document.activeElement;
-        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
         e.preventDefault();
         setDeleteConfirmId(selectedId);
       }
       if (e.key === "Enter" && deleteConfirmId) {
         const el = document.activeElement;
-        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
-        deleteNode(deleteConfirmId);
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+        deleteNodeRef.current(deleteConfirmId);
         setDeleteConfirmId(null);
+      }
+      // Undo: Ctrl/Cmd+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+        e.preventDefault(); undo();
+      }
+      // Redo: Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+        e.preventDefault(); redo();
+      }
+      // FIXED: UX-12 — Copy/paste for canvas nodes
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && selectedId) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+        const selected = nodesRef.current.filter(n => n.id === selectedId);
+        if (selected.length > 0) {
+          clipboardRef.current = selected.map(n => ({ ...n }));
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v' && clipboardRef.current.length > 0) {
+        const el = document.activeElement;
+        if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable)) return;
+        e.preventDefault();
+        pushHistory();
+        const pasted = clipboardRef.current.map(n => ({
+          ...n,
+          id: uid(),
+          x: n.x + 40,
+          y: n.y + 40,
+          createdAt: Date.now(),
+        }));
+        setNodes(prev => [...prev, ...pasted]);
       }
     };
     window.addEventListener("keydown", kd);
     return () => window.removeEventListener("keydown", kd);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, cmdVisible, deleteConfirmId]);
+  }, [selectedId, cmdVisible, deleteConfirmId, undo, redo, pushHistory]);
 
   // ── Positioning ───────────────────────────────────────────────────────────
 
@@ -4834,8 +5081,109 @@ export default function CanvasPage() {
   // ── Query submission ──────────────────────────────────────────────────────
 
   const submitQuery = useCallback((query: string, parentId?: string, opts?: { refreshed?: boolean }) => {
+    const trimmed = query.trim();
+    const lower = trimmed.toLowerCase();
+
+    // ── Slash commands ───────────────────────────────────────────────────
+    if (lower === "/clear") {
+      if (!window.confirm(de ? 'Gesamtes Canvas löschen? Diese Aktion kann nicht rückgängig gemacht werden.' : 'Clear entire canvas? This action cannot be undone.')) {
+        setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+        return;
+      }
+      pushHistory();
+      setNodes([]); setConnections([]);
+      setPanX(0); setPanY(0); setZoom(1);
+      setSelectedId(null); setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      if (projectIdRef.current) {
+        fetch(`/api/v1/canvas/${projectIdRef.current}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ canvasState: null }),
+        }).catch(() => {});
+      }
+      return;
+    }
+    if (lower === "/export") {
+      exportCanvas("markdown");
+      setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+      return;
+    }
+    if (lower.startsWith("/trend ") || lower === "/trend") {
+      const topic = trimmed.slice(6).trim();
+      const q = topic
+        ? `Analysiere den Trend: ${topic} — Entwicklung, Treiber, Auswirkungen und Zeithorizont.`
+        : "Welche Megatrends prägen die strategische Landschaft aktuell?";
+      // Fall through to normal query with the generated query text
+      pushHistory();
+      setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+      const id2 = uid();
+      const pos2 = getNextQueryPos(parentId);
+      const qNode2: QueryNode = {
+        id: id2, nodeType: "query", x: pos2.x, y: pos2.y, query: q, locale,
+        status: "loading", synthesis: "", result: null, collapsed: false,
+        parentId, createdAt: Date.now(),
+      };
+      setNodes(prev => [...prev, qNode2]);
+      if (parentId) setConnections(prev => [...prev, { from: parentId, to: id2, derived: false }]);
+      setSelectedId(id2);
+      const abortCtrl2 = new AbortController();
+      activeStreamsRef.current.set(id2, abortCtrl2);
+      streamQuery(q, locale,
+        (chunk) => setNodes(prev => prev.map(n => n.id === id2 && n.nodeType === "query" ? { ...n, status: "streaming", synthesis: (n as QueryNode).synthesis + chunk } : n)),
+        (result) => {
+          activeStreamsRef.current.delete(id2);
+          setNodes(prev => prev.map(n => n.id === id2 && n.nodeType === "query" ? { ...n, status: "done", synthesis: result.synthesis || (n as QueryNode).synthesis, result } as QueryNode : n));
+          const derived = computeDerivedNodes(id2, pos2.x, pos2.y, result);
+          derived.forEach((d, i) => { setTimeout(() => { setNodes(prev => [...prev, d]); setConnections(prev => [...prev, { from: id2, to: d.id, derived: true }]); }, 200 + i * 90); });
+        },
+        (msg) => { activeStreamsRef.current.delete(id2); setNodes(prev => prev.map(n => n.id === id2 && n.nodeType === "query" ? { ...n, status: "error", errorMsg: msg } as QueryNode : n)); },
+        (phase) => setNodes(prev => prev.map(n => n.id === id2 && n.nodeType === "query" ? { ...n, streamingPhase: phase } as QueryNode : n)),
+        abortCtrl2.signal,
+      );
+      return;
+    }
+    if (lower.startsWith("/scenario") || lower.startsWith("/signal")) {
+      const isScenario = lower.startsWith("/scenario");
+      const topic = trimmed.slice(isScenario ? 9 : 7).trim();
+      const q = isScenario
+        ? (topic
+          ? `Entwickle optimistische, wahrscheinliche und pessimistische Szenarien für: ${topic}`
+          : "Entwickle Szenarien für die wichtigsten strategischen Unsicherheiten.")
+        : (topic
+          ? `Identifiziere schwache Signale und Frühwarnzeichen für: ${topic}`
+          : "Welche schwachen Signale und Frühwarnzeichen gibt es aktuell?");
+      pushHistory();
+      setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
+      const id3 = uid();
+      const pos3 = getNextQueryPos(parentId);
+      const qNode3: QueryNode = {
+        id: id3, nodeType: "query", x: pos3.x, y: pos3.y, query: q, locale,
+        status: "loading", synthesis: "", result: null, collapsed: false,
+        parentId, createdAt: Date.now(),
+      };
+      setNodes(prev => [...prev, qNode3]);
+      if (parentId) setConnections(prev => [...prev, { from: parentId, to: id3, derived: false }]);
+      setSelectedId(id3);
+      const abortCtrl3 = new AbortController();
+      activeStreamsRef.current.set(id3, abortCtrl3);
+      streamQuery(q, locale,
+        (chunk) => setNodes(prev => prev.map(n => n.id === id3 && n.nodeType === "query" ? { ...n, status: "streaming", synthesis: (n as QueryNode).synthesis + chunk } : n)),
+        (result) => {
+          activeStreamsRef.current.delete(id3);
+          setNodes(prev => prev.map(n => n.id === id3 && n.nodeType === "query" ? { ...n, status: "done", synthesis: result.synthesis || (n as QueryNode).synthesis, result } as QueryNode : n));
+          const derived = computeDerivedNodes(id3, pos3.x, pos3.y, result);
+          derived.forEach((d, i) => { setTimeout(() => { setNodes(prev => [...prev, d]); setConnections(prev => [...prev, { from: id3, to: d.id, derived: true }]); }, 200 + i * 90); });
+        },
+        (msg) => { activeStreamsRef.current.delete(id3); setNodes(prev => prev.map(n => n.id === id3 && n.nodeType === "query" ? { ...n, status: "error", errorMsg: msg } as QueryNode : n)); },
+        (phase) => setNodes(prev => prev.map(n => n.id === id3 && n.nodeType === "query" ? { ...n, streamingPhase: phase } as QueryNode : n)),
+        abortCtrl3.signal,
+      );
+      return;
+    }
+
     // ── Test-Modus: "test" in Command-Line eingeben ───────────────────────
-    if (query.trim().toLowerCase() === "test" && !parentId) {
+    if (lower === "test" && !parentId) {
+      pushHistory();
       const { nodes: testNodes, conns: testConns } = buildTestDataset();
       setNodes(testNodes);
       setConnections(testConns);
@@ -4845,6 +5193,7 @@ export default function CanvasPage() {
       return;
     }
 
+    pushHistory();
     const id = uid();
     const pos = getNextQueryPos(parentId);
     const qNode: QueryNode = {
@@ -4871,10 +5220,15 @@ export default function CanvasPage() {
       }
     }
 
+    // Create an AbortController for this stream so it can be cancelled
+    const abortController = new AbortController();
+    activeStreamsRef.current.set(id, abortController);
+
     streamQuery(
       queryWithContext, locale,
       (chunk) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, status: "streaming", synthesis: (n as QueryNode).synthesis + chunk } : n)),
       (result) => {
+        activeStreamsRef.current.delete(id);
         setNodes(prev => prev.map(n =>
           n.id === id && n.nodeType === "query"
             ? { ...n, status: "done", synthesis: result.synthesis || (n as QueryNode).synthesis, result } as QueryNode
@@ -4888,21 +5242,34 @@ export default function CanvasPage() {
           }, 200 + i * 90);
         });
       },
-      (msg) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, status: "error", errorMsg: msg } as QueryNode : n)),
+      (msg) => {
+        activeStreamsRef.current.delete(id);
+        setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, status: "error", errorMsg: msg } as QueryNode : n));
+      },
       (phase) => setNodes(prev => prev.map(n => n.id === id && n.nodeType === "query" ? { ...n, streamingPhase: phase } as QueryNode : n)),
+      abortController.signal,
     );
-  }, [locale, getNextQueryPos, setPanX, setPanY, setZoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, getNextQueryPos, setPanX, setPanY, setZoom, pushHistory, de, exportCanvas]);
 
   // ── Node actions ──────────────────────────────────────────────────────────
 
   const DERIVED_TYPES = new Set(["insight","scenario","decision","followup","dimensions","causalgraph"]);
   const deleteNode = useCallback((id: string) => {
+    pushHistory();
+    // Cancel any active stream writing to this node before deleting
+    const streamController = activeStreamsRef.current.get(id);
+    if (streamController) {
+      streamController.abort();
+      activeStreamsRef.current.delete(id);
+    }
     // Only cascade-delete auto-generated derived children; preserve user-created nodes (note/idea/list/file/query)
     setNodes(prev => prev.filter(n => n.id !== id && !(n.parentId === id && DERIVED_TYPES.has(n.nodeType))));
     setConnections(prev => prev.filter(c => c.from !== id && c.to !== id));
     setSelectedId(prev => prev === id ? null : prev);
     setDetailNodeId(prev => prev === id ? null : prev);
-  }, []);
+  }, [pushHistory]);
+  deleteNodeRef.current = deleteNode;
 
   const handleSelectNode = useCallback((id: string) => {
     setSelectedId(id);
@@ -4940,24 +5307,43 @@ export default function CanvasPage() {
   }, [submitQuery]);
 
   const handleUpdateNote = useCallback((id: string, content: string) => {
+    pushHistory();
     setNodes(prev => prev.map(n => n.id === id && n.nodeType === "note" ? { ...n, content } : n));
-  }, []);
+  }, [pushHistory]);
 
   const handleUpdateIdea = useCallback((id: string, title: string, content: string) => {
+    pushHistory();
     setNodes(prev => prev.map(n => n.id === id && n.nodeType === "idea" ? { ...n, title, content } : n));
-  }, []);
+  }, [pushHistory]);
 
   const handlePromoteIdea = useCallback((query: string) => {
     submitQuery(query);
   }, [submitQuery]);
 
   const handleUpdateList = useCallback((id: string, title: string, items: string[]) => {
+    pushHistory();
     setNodes(prev => prev.map(n => n.id === id && n.nodeType === "list" ? { ...n, title, items } : n));
-  }, []);
+  }, [pushHistory]);
 
   const handlePromoteNote = useCallback((query: string) => {
     submitQuery(query);
   }, [submitQuery]);
+
+  // ── View mode switching with per-view transform save/restore ──────────────
+  const switchViewMode = useCallback((nextMode: ViewMode) => {
+    // Save current transform for the active view
+    viewTransformsRef.current[viewMode] = { x: panX, y: panY, z: zoom };
+    // Restore transform for the target view (or reset)
+    const saved = viewTransformsRef.current[nextMode];
+    if (saved) {
+      setPanX(saved.x); setPanY(saved.y); setZoom(saved.z);
+    } else {
+      setPanX(0); setPanY(0); setZoom(1);
+    }
+    // FIXED: EDGE-13 — Preserve selectedId and detailNodeId across view transitions
+    // (Previously these would be implicitly cleared; now we intentionally keep them)
+    setViewMode(nextMode);
+  }, [viewMode, panX, panY, zoom]);
 
   // ── File upload ────────────────────────────────────────────────────────────
 
@@ -5074,6 +5460,7 @@ export default function CanvasPage() {
 
     const pos = getCtxPos();
     const id = uid();
+    pushHistory();
 
     if (type === "note") {
       const node: NoteNode = {
@@ -5112,7 +5499,8 @@ export default function CanvasPage() {
   }, [getNextQueryPos, triggerFileUpload]);
 
   const clearCanvas = useCallback(() => {
-    if (!window.confirm(de ? "Canvas leeren?" : "Clear canvas?")) return;
+    if (!window.confirm(de ? "Gesamtes Canvas löschen? Diese Aktion kann nicht rückgängig gemacht werden." : "Clear entire canvas? This action cannot be undone.")) return;
+    pushHistory();
     setNodes([]); setConnections([]);
     setPanX(0); setPanY(0); setZoom(1);
     setSelectedId(null); setCmdVisible(false);
@@ -5124,7 +5512,7 @@ export default function CanvasPage() {
         body: JSON.stringify({ canvasState: null }),
       }).catch(() => {});
     }
-  }, [de]);
+  }, [de, pushHistory]);
 
   // ── Auto-reorganize layout ────────────────────────────────────────────────
 
@@ -5533,7 +5921,7 @@ export default function CanvasPage() {
               return (
                 <Tooltip key={mode} content={tips[mode]} placement="bottom">
                   <button
-                    onClick={() => setViewMode(mode)}
+                    onClick={() => switchViewMode(mode)}
                     style={{
                       display: "inline-flex", alignItems: "center", gap: 5,
                       fontSize: 11, padding: "5px 11px",
@@ -5596,8 +5984,42 @@ export default function CanvasPage() {
               >{de ? "Leeren" : "Clear"}</button>
             </>
           )}
+          {/* FIXED: UX-11 — Snap-to-grid toggle */}
+          <Tooltip content={de ? "Am Raster ausrichten (20px)" : "Snap to grid (20px)"} placement="bottom">
+            <button
+              onClick={() => setSnapToGrid(prev => !prev)}
+              style={{
+                fontSize: 11, padding: "3px 9px", borderRadius: 6,
+                border: snapToGrid ? "1px solid #86EFAC" : "1px solid var(--color-border)",
+                background: snapToGrid ? "#F0FDF4" : "transparent",
+                color: snapToGrid ? "#166534" : "var(--color-text-muted)",
+                cursor: "pointer", transition: "all 0.12s", fontWeight: snapToGrid ? 600 : 400,
+              }}
+              onMouseEnter={e => { if (!snapToGrid) { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}}
+              onMouseLeave={e => { if (!snapToGrid) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}}
+            >{snapToGrid ? "# Raster" : "# Raster"}</button>
+          </Tooltip>
         </div>
       </div>
+      )}
+
+      {/* FIXED: DAT-08 / EDGE-09 — Concurrent tab warning banner */}
+      {concurrentTabWarning && (
+        <div style={{
+          position: "absolute", top: 52, left: "50%", transform: "translateX(-50%)", zIndex: 9100,
+          padding: "8px 20px", borderRadius: 8, background: "#FFFBEB", border: "1px solid #FCD34D",
+          color: "#92400E", fontSize: 12, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          display: "flex", alignItems: "center", gap: 8, maxWidth: 560,
+          animation: "sis-tooltip-in 0.15s ease",
+        }}>
+          <span>&#x26A0;</span>
+          <span style={{ flex: 1 }}>
+            {de
+              ? "Canvas ist in einem anderen Tab ge\u00f6ffnet. \u00c4nderungen k\u00f6nnen verloren gehen (last-write-wins)."
+              : "Canvas is open in another tab. Changes may be lost (last-write-wins)."}
+          </span>
+          <button onClick={() => setConcurrentTabWarning(false)} style={{ background: "none", border: "none", color: "#92400E", cursor: "pointer", fontSize: 14, padding: 0 }}>&#x2715;</button>
+        </div>
       )}
 
       {/* Error banner */}
@@ -6131,6 +6553,18 @@ export default function CanvasPage() {
           backgroundPosition: `${panX % (20 * zoom)}px ${panY % (20 * zoom)}px`,
         }}
       >
+        {/* FIXED: UX-09 — Empty state / onboarding guidance */}
+        {nodes.length === 0 && viewMode === "canvas" && (
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center", color: "var(--muted-foreground, #888)", fontFamily: "var(--font-display)", maxWidth: 400, zIndex: 10, pointerEvents: "none" }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>&#x1F9ED;</div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: "var(--color-text-heading, #333)" }}>Willkommen im Canvas</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+              Tippe eine Frage ein und dr&uuml;cke Enter, um zu starten.<br/>
+              Nutze <kbd style={{ padding: "1px 5px", borderRadius: 4, border: "1px solid var(--color-border)", background: "var(--color-surface, #fff)", fontSize: 11 }}>/trend</kbd>, <kbd style={{ padding: "1px 5px", borderRadius: 4, border: "1px solid var(--color-border)", background: "var(--color-surface, #fff)", fontSize: 11 }}>/scenario</kbd> oder <kbd style={{ padding: "1px 5px", borderRadius: 4, border: "1px solid var(--color-border)", background: "var(--color-surface, #fff)", fontSize: 11 }}>/signal</kbd> f&uuml;r spezifische Analysen.
+            </div>
+          </div>
+        )}
+
         {/* Canvas transform layer */}
         {viewMode === "canvas" && (
           <ErrorBoundary>
@@ -6418,7 +6852,7 @@ export default function CanvasPage() {
                     {i < nodes.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 20, background: "var(--color-border)", marginTop: 3 }} />}
                   </div>
                   <div
-                    onClick={() => { handleSelectNode(n.id); setViewMode("canvas"); }}
+                    onClick={() => { handleSelectNode(n.id); switchViewMode("canvas"); }}
                     style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
@@ -6504,10 +6938,10 @@ export default function CanvasPage() {
                   const trendLabel = qId.replace("__orbit_deepen__", "");
                   setCmdVisible(true);
                   setCmdPrefill(`Vertiefen: ${trendLabel} — Wie beeinflusst dieser Trend andere strategische Bereiche?`);
-                  setViewMode("canvas");
+                  switchViewMode("canvas");
                 } else {
                   handleSelectNode(qId);
-                  setViewMode("canvas");
+                  switchViewMode("canvas");
                 }
               }}
             />
@@ -6520,7 +6954,7 @@ export default function CanvasPage() {
             de={de}
             onNavigateToNode={(nodeId) => {
               handleSelectNode(nodeId);
-              setViewMode("canvas");
+              switchViewMode("canvas");
             }}
           />
         )}
@@ -6713,7 +7147,11 @@ export default function CanvasPage() {
         )}
       </div>
 
-      <style>{`@keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
+      {/* FIXED: UX-05 — Ensure text cursor in input/textarea/contentEditable even when parent has cursor:pointer */}
+      <style>{`
+        @keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        input, textarea, [contenteditable="true"] { cursor: text !important; }
+      `}</style>
 
       {/* ── Detail Panel ────────────────────────────────────────────── */}
       {detailNodeId && (() => {
@@ -6755,6 +7193,9 @@ export default function CanvasPage() {
       })()}
 
       {/* ── Delete Confirmation Toast ──────────────────────────────── */}
+      {/* VERIFIED: UX-07 — deleteConfirmId captures target node ID at dialog-show time,
+          so even if selectedId changes between showing dialog and confirming,
+          the correct node is always deleted. Both Enter-key and button use deleteConfirmId. */}
       {deleteConfirmId && (() => {
         const dn = nodes.find(n => n.id === deleteConfirmId);
         const label = dn

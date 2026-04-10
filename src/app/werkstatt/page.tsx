@@ -1,2 +1,2 @@
 import { redirect } from "next/navigation";
-export default function WerkstattPage() { redirect("/workspace"); }
+export default function WerkstattPage() { redirect("/canvas"); }

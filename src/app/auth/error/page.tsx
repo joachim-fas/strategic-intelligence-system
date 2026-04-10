@@ -5,6 +5,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Image from "next/image";
 
 function ErrorContent() {
   const searchParams = useSearchParams();
@@ -24,8 +25,7 @@ function ErrorContent() {
       <div style={{ maxWidth: 420, width: "100%", padding: "40px 32px", textAlign: "center" }}>
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 32 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/volt-signet.svg" alt="SIS" style={{ width: 32, height: 21 }} />
+          <Image src="/icons/volt-signet.svg" alt="SIS" width={32} height={21} />
           <div style={{ textAlign: "left" }}>
             <div className="volt-heading" style={{ color: "var(--color-text-heading)" }}>Strategic Intelligence System</div>
             <div className="volt-body-sm" style={{ color: "var(--color-text-muted)" }}>Zugang nur für autorisierte Nutzer</div>

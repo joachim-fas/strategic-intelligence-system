@@ -1,7 +1,18 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState, useMemo } from "react";
-import * as d3 from "d3";
+// TODO: UX-14 — Technical error messages shown to users (SQLITE_CONSTRAINT, TypeError...).
+// FIX: Map error codes to user-friendly German messages with actionable guidance.
+
+// TODO: UX-16 — Color contrast issues: pastel badges, light gray text fail WCAG AA (4.5:1).
+// FIX: Run contrast audit, darken light text, increase badge text contrast.
+
+import { useRef, useEffect, useCallback, useState, useMemo, type ChangeEvent } from "react";
+import { select } from "d3-selection";
+import type { Selection } from "d3-selection";
+import { zoom } from "d3-zoom";
+import { drag } from "d3-drag";
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from "d3-force";
+import type { SimulationNodeDatum } from "d3-force";
 import { TrendDot, RING_COLORS, TIME_HORIZON_COLORS } from "@/types";
 import {
   TREND_EDGES,
@@ -82,6 +93,8 @@ interface LiveFeedResponse {
 export default function CausalGraphView({ trends, onTrendClick, locale, highlightTrendId }: CausalGraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const simulationRef = useRef<ReturnType<typeof forceSimulation> | null>(null);
+  const prevDimsRef = useRef<{ width: number; height: number } | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<TrendEdge | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(highlightTrendId || null);
   const [ringFilter, setRingFilter] = useState<RingFilter>("all");
@@ -89,6 +102,16 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
     () => new Set<EdgeType>(["drives", "amplifies", "dampens", "correlates"])
   );
   const [search, setSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
+  const searchDebounceRef = useRef<NodeJS.Timeout>(undefined);
+  const handleSearchChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setLocalSearch(v);
+    clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => setSearch(v), 250);
+  }, []);
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => clearTimeout(searchDebounceRef.current), []);
   // Path-mode: Shift+Click two nodes to compute the shortest path between them.
   // `pathAnchor` is the first picked node; once the second is picked `pathIds`
   // holds the resolved BFS path. A non-Shift click clears the whole thing.
@@ -158,6 +181,25 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
 
   const { width, height } = dimensions;
 
+  // Resize-only handler: when only dimensions change and a simulation already
+  // exists, update the SVG viewBox and re-center the force without tearing
+  // down the entire graph. This avoids restarting the force layout on every
+  // browser resize event.
+  useEffect(() => {
+    const sim = simulationRef.current;
+    if (!sim || !prevDimsRef.current) return;
+    const prev = prevDimsRef.current;
+    if (prev.width === width && prev.height === height) return;
+    // Update center force to new midpoint
+    sim.force("center", forceCenter(width / 2, height / 2));
+    sim.alpha(0.15).restart();
+    // Update SVG viewBox attribute
+    if (svgRef.current) {
+      svgRef.current.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    }
+    prevDimsRef.current = { width, height };
+  }, [width, height]);
+
   // Compute path-highlighted edges as a Set<string> of "from→to" keys so the
   // draw callback can O(1)-test whether a link belongs to the current path.
   const pathEdgeKeys = useMemo(() => {
@@ -176,7 +218,12 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
   const pathNodeSet = useMemo(() => new Set<string>(pathIds ?? []), [pathIds]);
 
   const draw = useCallback(() => {
-    const svg = d3.select(svgRef.current);
+    // Stop any existing simulation before rebuilding
+    if (simulationRef.current) {
+      simulationRef.current.stop();
+      simulationRef.current = null;
+    }
+    const svg = select(svgRef.current);
     svg.selectAll("*").remove();
 
     const trendMap = new Map(enrichedTrends.map((t) => [t.id, t]));
@@ -283,19 +330,21 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
     const g = svg.append("g");
 
     // Zoom
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.3, 3])
       .on("zoom", (event) => g.attr("transform", event.transform));
-    (svg as unknown as d3.Selection<SVGSVGElement, unknown, null, undefined>).call(zoom);
+    (svg as unknown as Selection<SVGSVGElement, unknown, null, undefined>).call(zoomBehavior);
 
     // Force simulation — distance slightly longer when there are few nodes so
     // the graph breathes; charge stays strong to keep labels legible.
     const linkDistance = nodes.length < 15 ? 170 : 140;
-    const simulation = d3.forceSimulation(nodes as d3.SimulationNodeDatum[])
-      .force("link", d3.forceLink(links).id((d: any) => d.id).distance(linkDistance))
-      .force("charge", d3.forceManyBody().strength(-520))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(48));
+    const simulation = forceSimulation(nodes as SimulationNodeDatum[])
+      .force("link", forceLink(links).id((d: any) => d.id).distance(linkDistance))
+      .force("charge", forceManyBody().strength(-520))
+      .force("center", forceCenter(width / 2, height / 2))
+      .force("collision", forceCollide().radius(48));
+    simulationRef.current = simulation;
+    prevDimsRef.current = { width, height };
 
     // Focus/connection helpers — decide which elements get full opacity.
     const isConnected = (link: GraphLink) => {
@@ -389,7 +438,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         if (pathNodeSet.size > 0) return pathNodeSet.has(d.id) ? 1 : 0.15;
         return isNodeConnected(d.id) ? 1 : 0.15;
       })
-      .call(d3.drag<SVGGElement, GraphNode>()
+      .call(drag<SVGGElement, GraphNode>()
         .on("start", (event, d: any) => {
           if (!event.active) simulation.alphaTarget(0.3).restart();
           d.fx = d.x; d.fy = d.y;
@@ -528,7 +577,10 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
 
       node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
     });
-  }, [enrichedTrends, focusedNode, width, height, locale, onTrendClick, ringFilter, edgeTypeFilter, search, pathAnchor, pathEdgeKeys, pathNodeSet, pathIds, hubIds]);
+  // Note: width/height are intentionally excluded — resize is handled by a
+  // separate useEffect that updates the center force without rebuilding.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedTrends, focusedNode, locale, onTrendClick, ringFilter, edgeTypeFilter, search, pathAnchor, pathEdgeKeys, pathNodeSet, pathIds, hubIds]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -619,7 +671,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
                 borderRadius: 999,
                 border: active ? `1px solid ${def.color}` : "1px solid var(--volt-border, #E8E8E8)",
                 background: active ? def.color : "var(--volt-surface-raised, #fff)",
-                color: active ? "#fff" : "var(--volt-text-muted, #6B6B6B)",
+                color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
                 cursor: "pointer",
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 transition: "all 120ms ease",
@@ -628,7 +680,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
               {r !== "all" && (
                 <span style={{
                   width: 6, height: 6, borderRadius: "50%",
-                  background: active ? "#fff" : def.color,
+                  background: active ? "var(--background, #fff)" : def.color,
                 }} />
               )}
               {locale === "de" ? def.de : def.en}
@@ -684,7 +736,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
                 borderRadius: 999,
                 border: active ? `1px solid ${color}` : "1px solid var(--volt-border, #E8E8E8)",
                 background: active ? color : "var(--volt-surface-raised, #fff)",
-                color: active ? "#fff" : "var(--volt-text-muted, #6B6B6B)",
+                color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
                 cursor: "pointer",
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 transition: "all 120ms ease",
@@ -693,9 +745,9 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
             >
               <span style={{
                 width: 16, height: 2, borderRadius: 1,
-                background: active ? "#fff" : color,
+                background: active ? "var(--background, #fff)" : color,
                 display: "inline-block",
-                ...(type === "dampens" ? { height: 0, borderTop: `2px dashed ${active ? "#fff" : color}` } : {}),
+                ...(type === "dampens" ? { height: 0, borderTop: `2px dashed ${active ? "var(--background, #fff)" : color}` } : {}),
               }} />
               {EDGE_LABELS[type]?.[locale]}
             </button>
@@ -706,8 +758,8 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={localSearch}
+            onChange={handleSearchChange}
             placeholder={locale === "de" ? "Suche…" : "Search…"}
             style={{
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
@@ -721,9 +773,9 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
               outline: "none",
             }}
           />
-          {search && (
+          {localSearch && (
             <button
-              onClick={() => setSearch("")}
+              onClick={() => { setLocalSearch(""); setSearch(""); clearTimeout(searchDebounceRef.current); }}
               style={{
                 fontSize: 10, cursor: "pointer",
                 background: "transparent", border: "none",

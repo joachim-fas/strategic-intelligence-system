@@ -83,6 +83,9 @@ const NGRAM_SEEDS: ReadonlyArray<{ phrase: string; topic: string }> = [
 // happily returns one entry per phrase in one response.
 const TOPIC_MAP = new Map(NGRAM_SEEDS.map((s) => [s.phrase.toLowerCase(), s.topic]));
 const PHRASE_LIST = NGRAM_SEEDS.map((s) => s.phrase).join(",");
+// NOTE: CON-22 — Google Ngram Viewer data extends only to 2019. This is a
+// data source limitation, not a bug. Use for historical trend analysis only.
+
 // 2015–2019 is the last 5 years with reliable coverage in the 2020 corpus.
 const YEAR_START = 2015;
 const YEAR_END = 2019;

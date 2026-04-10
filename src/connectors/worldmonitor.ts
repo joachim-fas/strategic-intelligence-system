@@ -1,5 +1,7 @@
 import { SourceConnector, RawSignal } from "./types";
 
+// WARNING: SEC-20 — Spoofing Origin/Referer headers may violate worldmonitor.app ToS. Consider reaching out for official API access.
+
 const API_BASE = "https://api.worldmonitor.app/api";
 
 // Required headers — Cloudflare blocks without Origin/Referer

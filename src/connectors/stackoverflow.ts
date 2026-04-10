@@ -38,14 +38,24 @@ export const stackoverflowConnector: SourceConnector = {
     const tagNames = Object.keys(TRACKED_TAGS).join(";");
 
     try {
-      const res = await fetch(
-        `https://api.stackexchange.com/2.3/tags/${encodeURIComponent(tagNames)}/info?site=stackoverflow&key=${process.env.SO_API_KEY || ""}`
-      );
+      // NOTE: API key in URL - required by Stack Exchange API's design
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://api.stackexchange.com/2.3/tags/${encodeURIComponent(tagNames)}/info?site=stackoverflow&key=${process.env.SO_API_KEY || ""}`,
+          { signal: controller.signal }
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) return signals;
 
       const data = await res.json();
       const tags: SOTag[] = data.items || [];
 
+      // TODO: Use week-over-week delta instead of cumulative tag count for better signal freshness
       // Get max count for normalization
       const maxCount = Math.max(...tags.map((t) => t.count), 1);
 

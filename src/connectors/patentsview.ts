@@ -17,7 +17,8 @@ export const patentsviewConnector: SourceConnector = {
     const signals: RawSignal[] = [];
 
     try {
-      const q = encodeURIComponent('{"_gte":{"patent_date":"2025-01-01"}}');
+      const year = new Date().getFullYear();
+      const q = encodeURIComponent(`{"_gte":{"patent_date":"${year}-01-01"}}`);
       const f = encodeURIComponent('["patent_title","patent_date","patent_type"]');
       const s = encodeURIComponent('[{"patent_date":"desc"}]');
 
@@ -52,7 +53,7 @@ export const patentsviewConnector: SourceConnector = {
           sourceTitle: `USPTO: ${title}`,
           signalType: "paper",
           topic,
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: {
             title,
             date: patent.patent_date,

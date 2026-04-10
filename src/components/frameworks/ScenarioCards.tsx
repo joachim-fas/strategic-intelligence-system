@@ -37,7 +37,12 @@ export function ScenarioCards({ scenarios, de }: { scenarios: Scenario[]; de?: b
           return (
             <div
               key={i}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isActive}
+              aria-label={s.title}
               onClick={() => setActive(isActive ? null : `${i}`)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActive(isActive ? null : `${i}`); } }}
               style={{
                 border: `1px solid ${colors.border}`,
                 borderRadius: 12,

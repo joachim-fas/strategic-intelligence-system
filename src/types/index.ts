@@ -1,6 +1,5 @@
 export type Ring = "adopt" | "trial" | "assess" | "hold";
 export type TimeHorizon = "short" | "mid" | "long";
-export type TrendStatus = "candidate" | "confirmed" | "archived";
 
 export type SourceType =
   | "google_trends"
@@ -48,7 +47,10 @@ export type SourceType =
   | "docker_hub"
   | "vdem"
   | "patentsview"
-  | "kalshi";
+  | "kalshi"
+  | "youtube_sentiment"
+  | "mastodon_sentiment"
+  | "news_sentiment";
 
 // ─── Klassifizierung nach Dauer und Reichweite ──────────────────
 export type TrendDuration = "hype" | "trend" | "megatrend";
@@ -123,13 +125,6 @@ export interface RadarConfig {
   };
 }
 
-export const RING_LABELS: Record<Ring, string> = {
-  adopt: "Adopt",
-  trial: "Trial",
-  assess: "Assess",
-  hold: "Hold",
-};
-
 export const RING_COLORS: Record<Ring, string> = {
   adopt: "#6DDBA0",  // Volt Mint
   trial: "#7AB8F5",  // Volt Sky
@@ -142,18 +137,6 @@ export const TIME_HORIZON_COLORS: Record<TimeHorizon, string> = {
   mid: "#7AB8F5",    // Volt Sky
   long: "#D98AE8",   // Volt Orchid
 };
-
-/** Volt Pastell-Palette fuer Datenpunkte (8 Farben) */
-export const VOLT_PASTELS = [
-  "#F4A0B5", // Rose
-  "#7AB8F5", // Sky
-  "#6DDBA0", // Mint
-  "#F5C87A", // Amber
-  "#D98AE8", // Orchid
-  "#F0956A", // Peach
-  "#5ECECE", // Aqua
-  "#E8C840", // Yellow
-] as const;
 
 export const DURATION_CONFIG: Record<TrendDuration, { label: { de: string; en: string }; color: string; icon: string }> = {
   hype: { label: { de: "Hype / Mode", en: "Hype / Fad" }, color: "#f97316", icon: "⚡" },
@@ -183,3 +166,38 @@ export const DEFAULT_QUADRANTS = [
   "Development & Engineering",
   "Data & Infrastructure",
 ];
+
+// ─── Shared Canvas / Analysis Types ─────────────────────────
+// TODO: ARC-10 — These types are duplicated in canvas/page.tsx, OrbitGraphView.tsx, OrbitEvidenzView.tsx.
+// Import from here instead of re-defining locally.
+
+export interface UsedSignal {
+  source: string;
+  title: string;
+  url?: string;
+  strength?: number;
+  date?: string;
+}
+
+export interface Scenario {
+  type?: "optimistic" | "baseline" | "pessimistic" | "wildcard" | string;
+  name: string;
+  description: string;
+  probability: number;
+  timeframe?: string;
+  keyDrivers?: string[];
+}
+
+export interface Reference {
+  title: string;
+  url: string;
+  relevance?: string;
+}
+
+export interface MatchedEdge {
+  from: string;
+  to: string;
+  type: "drives" | "amplifies" | "dampens" | "correlates" | string;
+  strength: number;
+  description?: string;
+}

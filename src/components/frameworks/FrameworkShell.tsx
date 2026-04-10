@@ -1,6 +1,11 @@
 "use client";
 
+// TODO: UX-16 — Color contrast issues: pastel badges, light gray text fail WCAG AA (4.5:1).
+// FIX: Run contrast audit, darken light text, increase badge text contrast.
+
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import { FrameworkMeta } from "@/types/frameworks";
@@ -39,11 +44,11 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           {/* Breadcrumb */}
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-            <a href="/" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>SIS</a>
+            <Link href="/" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>SIS</Link>
             <span style={{ opacity: 0.4 }}>/</span>
-            <a href="/frameworks" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>
+            <Link href="/frameworks" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>
               {de ? "Frameworks" : "Frameworks"}
-            </a>
+            </Link>
             <span style={{ opacity: 0.4 }}>/</span>
             <span style={{ color: meta.color.accent, fontWeight: 600 }}>{name}</span>
           </div>
@@ -57,8 +62,7 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
               display: "flex", alignItems: "center", justifyContent: "center",
               flexShrink: 0,
             }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={meta.iconSvg} alt="" style={{ width: 20, height: 20, opacity: 0.8 }} />
+              <Image src={meta.iconSvg} alt="" width={20} height={20} style={{ opacity: 0.8 }} />
             </span>
             <div>
               <h1 style={{
@@ -144,8 +148,7 @@ function EmptyState({ meta, de }: { meta: FrameworkMeta; de: boolean }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         marginBottom: 16,
       }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={meta.iconSvg} alt="" style={{ width: 28, height: 28, opacity: 0.7 }} />
+        <Image src={meta.iconSvg} alt="" width={28} height={28} style={{ opacity: 0.7 }} />
       </div>
       <h2 style={{
         fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700,

@@ -55,19 +55,24 @@ function lastYearRange(): string {
   return `${fmt(start)}+TO+${fmt(end)}`;
 }
 
-export const openFdaConnector = buildDeclarativeConnector<FdaEventResult>({
+// Build the endpoint URL fresh each time it's accessed so the date range
+// is never stale (was previously computed once at module load).
+const openFdaConfig = {
   name: "openfda",
   displayName: "OpenFDA (Drug Events)",
-  endpoint:
-    "https://api.fda.gov/drug/event.json" +
-    `?search=receivedate:%5B${lastYearRange()}%5D` +
-    "&limit=100",
+  get endpoint() {
+    return (
+      "https://api.fda.gov/drug/event.json" +
+      `?search=receivedate:%5B${lastYearRange()}%5D` +
+      "&limit=100"
+    );
+  },
   rowsPath: "results",
   defaultTopic: "Health, Biotech & Longevity",
-  defaultSignalType: "mention",
+  defaultSignalType: "mention" as const,
   minStrength: 0.25,
   limit: 100,
-  map: (e) => {
+  map: (e: FdaEventResult) => {
     const drugs = e.patient?.drug ?? [];
     const reactions = e.patient?.reaction ?? [];
     if (drugs.length === 0) return null;
@@ -111,4 +116,6 @@ export const openFdaConnector = buildDeclarativeConnector<FdaEventResult>({
       },
     };
   },
-});
+};
+
+export const openFdaConnector = buildDeclarativeConnector<FdaEventResult>(openFdaConfig);

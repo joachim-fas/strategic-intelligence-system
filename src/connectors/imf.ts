@@ -22,10 +22,11 @@ export const imfConnector: SourceConnector = {
 
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];
+    const year = new Date().getFullYear();
 
     try {
       const res = await fetch(
-        "https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH?periods=2025",
+        `https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH?periods=${year}`,
         {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(20000),
@@ -40,13 +41,13 @@ export const imfConnector: SourceConnector = {
 
       for (const country of countries) {
         const yearData = values[country] || {};
-        const growth = yearData["2025"] as number | undefined;
+        const growth = yearData[String(year)] as number | undefined;
         if (growth === undefined) continue;
 
         signals.push({
           sourceType: "imf",
           sourceUrl: "https://www.imf.org/external/datamapper/NGDP_RPCH@WEO",
-          sourceTitle: `IMF: ${country} GDP growth ${growth.toFixed(1)}% (2025)`,
+          sourceTitle: `IMF: ${country} GDP growth ${growth.toFixed(1)}% (${year})`,
           signalType: Math.abs(growth) > 5 ? "spike" : "mention",
           topic: INDICATOR_TOPICS["NGDP_RPCH"] || "Economic Trends",
           rawStrength: Math.min(1, Math.abs(growth) / 10),
@@ -54,7 +55,7 @@ export const imfConnector: SourceConnector = {
             country,
             indicator: "NGDP_RPCH",
             value: growth,
-            period: "2025",
+            period: String(year),
           },
           detectedAt: new Date(),
         });

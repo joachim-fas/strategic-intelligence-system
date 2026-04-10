@@ -17,6 +17,10 @@ export const whoGhoConnector: SourceConnector = {
     const signals: RawSignal[] = [];
 
     try {
+      // TODO: CON-12 — This connector fetches indicator metadata (names/codes),
+      // not actual health data values. To fix: use the GHO OData API endpoint
+      // /api/GHO/{indicatorCode}?$filter=... to fetch actual data points for
+      // specific indicators.
       const url = `https://ghoapi.azureedge.net/api/Indicator?$filter=contains(IndicatorName,'life expectancy') or contains(IndicatorName,'mortality')&$top=20`;
 
       const res = await fetch(url, {
@@ -37,13 +41,16 @@ export const whoGhoConnector: SourceConnector = {
         // Only include English entries
         if (language !== "EN") continue;
 
+        // CON-12: Improve title to be more descriptive about what this data represents
+        const descriptiveTitle = `WHO GHO Indicator Definition: ${name} [${code}]`;
+
         signals.push({
           sourceType: "who_gho",
           sourceUrl: `https://www.who.int/data/gho/data/indicators/indicator-details/GHO/${code}`,
-          sourceTitle: `WHO GHO: ${name}`,
+          sourceTitle: descriptiveTitle,
           signalType: "mention",
           topic: "Health, Biotech & Longevity",
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: {
             indicatorCode: code,
             indicatorName: name,

@@ -6,7 +6,7 @@ import { SourceConnector, RawSignal } from "./types";
  * Total population statistics from the UN DESA.
  * No API key required.
  *
- * API: http://data.un.org/
+ * API: https://data.un.org/
  */
 
 export const unDataConnector: SourceConnector = {
@@ -18,7 +18,7 @@ export const unDataConnector: SourceConnector = {
 
     try {
       const res = await fetch(
-        "http://data.un.org/ws/rest/data/DF_UNData_DESA/SP_POP_TOTL..?startPeriod=2023&format=sdmx-json",
+        "https://data.un.org/ws/rest/data/DF_UNData_DESA/SP_POP_TOTL..?startPeriod=2023&format=sdmx-json",
         {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(20000),
@@ -34,11 +34,11 @@ export const unDataConnector: SourceConnector = {
       if (keys.length > 0) {
         signals.push({
           sourceType: "un_data",
-          sourceUrl: "http://data.un.org/",
+          sourceUrl: "https://data.un.org/",
           sourceTitle: `UN Data: Population statistics — ${keys.length} observations`,
           signalType: "mention",
           topic: "Demographic Shifts & Aging",
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: {
             observationCount: keys.length,
             period: "2023+",

@@ -6,6 +6,12 @@
  * and JSON-parse on read.
  */
 
+// TODO: ARC-04 — SCHEMA SPLIT-BRAIN
+// PG schema (schema.ts) has: query_versions, scenario_alerts (not in SQLite)
+// SQLite schema (schema-sqlite.ts) has: project_notes, project_queries (not in PG)
+// Neither has: bsc_ratings, live_signals, og_image_cache, scenarios
+// FIX: Unify both schemas to have identical table sets.
+
 import {
   sqliteTable,
   text,
@@ -99,6 +105,8 @@ export const radars = sqliteTable("radars", {
   description: text("description"),
   scope: text("scope").default("{}"),
   isShared: integer("is_shared", { mode: "boolean" }).default(false),
+  canvasState: text("canvas_state"),
+  archivedAt: text("archived_at"),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
@@ -201,6 +209,67 @@ export const projectNotes = sqliteTable("project_notes", {
   content: text("content").notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// TODO: DAT-16 — Shadow tables not in schema:
+// - bsc_ratings (created in bsc-ratings/route.ts)
+// - scenarios (created in scenarios/route.ts)
+// - live_signals (created in migrate-sqlite.ts)
+// - og_image_cache (created in migrate-sqlite.ts)
+// These should be defined here for Drizzle migration support.
+
+// ─── BSC Ratings ────────────────────────────────────────
+export const bscRatings = sqliteTable("bsc_ratings", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  queryHash: text("query_hash").notNull(),
+  perspectiveId: text("perspective_id").notNull(),
+  rating: text("rating").notNull(), // 'up' | 'down'
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.queryHash, table.perspectiveId)]);
+
+// ─── Scenarios ──────────────────────────────────────────
+export const scenarios = sqliteTable("scenarios", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").default("custom"),
+  probability: real("probability").default(0.5),
+  timeframe: text("timeframe"),
+  keyDrivers: text("key_drivers"),    // JSON array stored as text
+  impacts: text("impacts"),           // JSON array stored as text
+  source: text("source").default("user"),
+  sourceQuery: text("source_query"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// ─── Scenario Alerts ────────────────────────────────────
+export const scenarioAlerts = sqliteTable("scenario_alerts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  canvasNodeId: text("canvas_node_id").notNull(),
+  radarId: text("radar_id").references(() => radars.id, { onDelete: "cascade" }),
+  queryText: text("query_text").notNull(),
+  triggerSignalId: text("trigger_signal_id"),
+  reason: text("reason").notNull(),
+  severity: text("severity").default("medium").notNull(),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  dismissedAt: text("dismissed_at"),
+});
+
+// ─── Query Versions ─────────────────────────────────────
+export const queryVersions = sqliteTable("query_versions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  canvasNodeId: text("canvas_node_id").notNull(),
+  radarId: text("radar_id").references(() => radars.id, { onDelete: "cascade" }),
+  queryText: text("query_text").notNull(),
+  locale: text("locale").default("de").notNull(),
+  versionNumber: integer("version_number").notNull().default(1),
+  resultJson: text("result_json").notNull(),
+  confidence: real("confidence"),
+  matchedTrendCount: integer("matched_trend_count"),
+  signalCount: integer("signal_count"),
+  executedAt: text("executed_at").default(sql`(datetime('now'))`).notNull(),
+  notes: text("notes"),
 });
 
 // ─── Data Sources ────────────────────────────────────────

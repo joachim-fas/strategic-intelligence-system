@@ -38,7 +38,8 @@ const DEFAULT_DIMENSION_WEIGHTS: DimensionWeights = {
 };
 
 const TIME_DECAY_LAMBDA = 0.05; // half-life ~14 days
-const TOTAL_ACTIVE_SOURCES = 10;
+// TODO: compute dynamically from active connectors (e.g. connectorRegistry.getActive().length)
+const TOTAL_ACTIVE_SOURCES = 54;
 
 // Map topics to categories and quadrants
 const TOPIC_METADATA: Record<string, { category: string; quadrant: number }> = {
@@ -73,7 +74,8 @@ const TOPIC_METADATA: Record<string, { category: string; quadrant: number }> = {
 
 function timeDecay(detectedAt: Date): number {
   const daysSince = (Date.now() - detectedAt.getTime()) / (1000 * 60 * 60 * 24);
-  return Math.exp(-TIME_DECAY_LAMBDA * daysSince);
+  // Clamp to [0, 1]: future signals must not amplify (daysSince < 0 => decay > 1)
+  return Math.min(1.0, Math.max(0, Math.exp(-TIME_DECAY_LAMBDA * daysSince)));
 }
 
 function slugify(text: string): string {
@@ -105,7 +107,7 @@ export function groupSignalsByTopic(signals: RawSignal[]): SignalGroup[] {
   }));
 }
 
-function normalizeTopic(topic: string): string {
+export function normalizeTopic(topic: string): string {
   // Normalize common variations
   const aliases: Record<string, string> = {
     "artificial intelligence": "AI",
@@ -151,8 +153,10 @@ function normalizeTopic(topic: string): string {
     vectordb: "Vector Database",
   };
 
-  const lower = topic.toLowerCase().trim();
-  return aliases[lower] || topic;
+  // Canonical normalization: lowercase, trim, collapse whitespace
+  const lower = topic.toLowerCase().trim().replace(/\s+/g, " ");
+  // Return alias if known, otherwise the normalized form for consistent grouping
+  return aliases[lower] || lower;
 }
 
 /**
@@ -161,12 +165,14 @@ function normalizeTopic(topic: string): string {
 export function scoreTrend(
   group: SignalGroup,
   sourceWeights: SourceWeights = DEFAULT_SOURCE_WEIGHTS,
-  _dimensionWeights: DimensionWeights = DEFAULT_DIMENSION_WEIGHTS
+  dimensionWeights: DimensionWeights = DEFAULT_DIMENSION_WEIGHTS
 ): TrendDot {
   const { topic, signals } = group;
   const meta = TOPIC_METADATA[topic] || { category: "Other", quadrant: 0 };
 
-  // Relevance: weighted sum of signal strengths with time decay
+  // ALG-08: Relevance uses average weighted strength * coverage factor.
+  // Dividing by signal count prevents volume from dominating quality.
+  // The coverage factor (0.6 base + 0.4 * min(1, count/10)) rewards breadth sub-linearly.
   const totalWeight = Object.values(sourceWeights).reduce((a, b) => a + b, 0);
   let relevanceSum = 0;
   for (const signal of signals) {
@@ -174,7 +180,9 @@ export function scoreTrend(
     const decay = timeDecay(signal.detectedAt);
     relevanceSum += signal.rawStrength * weight * decay;
   }
-  const relevance = Math.min(1, relevanceSum / totalWeight);
+  const avgRelevance = signals.length > 0 ? relevanceSum / signals.length : 0;
+  const coverageFactor = Math.min(1, signals.length / 10);
+  const relevance = Math.min(1, (avgRelevance / totalWeight) * (0.6 + 0.4 * coverageFactor));
 
   // Confidence: number of distinct sources / total
   const distinctSources = new Set(signals.map((s) => s.sourceType)).size;
@@ -189,22 +197,23 @@ export function scoreTrend(
   // Time horizon: based on signal composition
   const timeHorizon = determineTimeHorizon(signals);
 
-  // Ring: based on weighted score
-  const weightedScore =
-    relevance * DEFAULT_DIMENSION_WEIGHTS.relevance +
-    confidence * DEFAULT_DIMENSION_WEIGHTS.confidence +
-    impact * DEFAULT_DIMENSION_WEIGHTS.impact;
+  // Recency: best (most recent) signal's time decay
+  const recency = signals.length
+    ? Math.max(...signals.map((s) => timeDecay(s.detectedAt)))
+    : 0;
 
-  const ring: Ring =
-    weightedScore >= 0.6
-      ? "adopt"
-      : weightedScore >= 0.4
-      ? "trial"
-      : weightedScore >= 0.2
-      ? "assess"
-      : "hold";
+  // ALG-23: Ring uses caller-supplied dimension weights (defaults to DEFAULT_DIMENSION_WEIGHTS).
+  const weightedScore =
+    relevance * dimensionWeights.relevance +
+    confidence * dimensionWeights.confidence +
+    impact * dimensionWeights.impact +
+    recency * dimensionWeights.recency;
+
+  const ring: Ring = calculateRing(weightedScore);
 
   // Velocity: compare recent vs older signals
+  // ALG-09: Require minimum 3 signals in each half to avoid deterministic
+  // artifacts from sparse data. With fewer signals, default to "stable".
   const now = Date.now();
   const midpoint = now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
   const recentSignals = signals.filter((s) => s.detectedAt.getTime() > midpoint);
@@ -216,11 +225,13 @@ export function scoreTrend(
     ? olderSignals.reduce((s, sig) => s + sig.rawStrength, 0) / olderSignals.length
     : 0;
   const velocity: "rising" | "stable" | "falling" =
-    recentAvg > olderAvg * 1.2
-      ? "rising"
-      : recentAvg < olderAvg * 0.8
-      ? "falling"
-      : "stable";
+    recentSignals.length < 3 || olderSignals.length < 3
+      ? "stable"
+      : recentAvg > olderAvg * 1.2
+        ? "rising"
+        : recentAvg < olderAvg * 0.8
+          ? "falling"
+          : "stable";
 
   // Top sources by signal count
   const sourceCounts = new Map<string, number>();
@@ -250,6 +261,17 @@ export function scoreTrend(
     velocity,
     userOverride: false,
   };
+}
+
+/**
+ * Shared ring classification from a pre-computed weighted score.
+ * Thresholds are identical to scenarios.ts — keep in sync.
+ */
+export function calculateRing(score: number): Ring {
+  if (score >= 0.6) return "adopt";
+  if (score >= 0.4) return "trial";
+  if (score >= 0.2) return "assess";
+  return "hold";
 }
 
 function determineTimeHorizon(signals: RawSignal[]): TimeHorizon {

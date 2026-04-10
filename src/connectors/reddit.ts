@@ -47,10 +47,17 @@ export const redditConnector: SourceConnector = {
 
     for (const sub of TECH_SUBREDDITS) {
       try {
-        const res = await fetch(
-          `https://www.reddit.com/r/${sub}/hot.json?limit=10`,
-          { headers: { "User-Agent": "SIS/1.0" } }
-        );
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://www.reddit.com/r/${sub}/hot.json?limit=10`,
+            { headers: { "User-Agent": "SIS/1.0" }, signal: controller.signal }
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
         if (!res.ok) continue;
 
         const data = await res.json();

@@ -29,9 +29,9 @@ export const finnhubConnector: SourceConnector = {
     if (!key) return signals;
 
     try {
-      // Fetch general market news
-      const newsRes = await fetch(`https://finnhub.io/api/v1/news?category=general&token=${key}`, {
-        headers: { Accept: "application/json" },
+      // SEC-09: API key moved from URL query string to X-Finnhub-Token header
+      const newsRes = await fetch(`https://finnhub.io/api/v1/news?category=general`, {
+        headers: { Accept: "application/json", "X-Finnhub-Token": key },
         signal: AbortSignal.timeout(20000),
       });
 
@@ -42,8 +42,9 @@ export const finnhubConnector: SourceConnector = {
       // Fetch market sentiment for SPY (S&P 500 ETF) as a market-wide indicator
       let marketSentiment = 0.5;
       try {
-        const sentRes = await fetch(`https://finnhub.io/api/v1/news-sentiment?symbol=SPY&token=${key}`, {
-          headers: { Accept: "application/json" },
+        // SEC-09: API key moved from URL query string to X-Finnhub-Token header
+        const sentRes = await fetch(`https://finnhub.io/api/v1/news-sentiment?symbol=SPY`, {
+          headers: { Accept: "application/json", "X-Finnhub-Token": key },
           signal: AbortSignal.timeout(20000),
         });
         if (sentRes.ok) {

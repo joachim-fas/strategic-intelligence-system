@@ -67,7 +67,7 @@ export const owidConnector: SourceConnector = {
           sourceTitle: `OWID: ${ind.label} — ${value.toLocaleString("en-US", { maximumFractionDigits: 1 })} (${year})`,
           signalType: "mention",
           topic: ind.topic,
-          rawStrength: 0.5, // Long-term data — steady importance
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: { slug: ind.slug, label: ind.label, value, year, metric: metricCol },
           detectedAt: new Date(),
         });

@@ -17,6 +17,7 @@ export const openMeteoConnector: SourceConnector = {
     const signals: RawSignal[] = [];
 
     try {
+      // TODO: Make coordinates configurable instead of hardcoded Vienna (48.2, 16.37)
       const res = await fetch(
         "https://api.open-meteo.com/v1/forecast?latitude=48.2&longitude=16.37&daily=temperature_2m_max,temperature_2m_min&past_days=7&timezone=Europe/Vienna",
         {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { useParams } from "next/navigation";
 import { useLocale } from "@/lib/locale-context";
@@ -65,13 +66,13 @@ export default function TrendDetailPage() {
             <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>
               ID: {trendId}
             </div>
-            <a href="/verstehen?lens=trends" style={{
+            <Link href="/verstehen?lens=trends" style={{
               fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10,
               background: "var(--volt-black, #0A0A0A)", color: "var(--volt-white, #fff)",
               textDecoration: "none", display: "inline-block",
             }}>
               {de ? "Alle Trends anzeigen" : "Show all trends"} →
-            </a>
+            </Link>
           </div>
         </main>
       </div>
@@ -86,12 +87,12 @@ export default function TrendDetailPage() {
         {/* Back link + breadcrumb */}
         <div style={{ flex: 1, padding: "24px 24px 80px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-            <a href="/verstehen?lens=trends" style={{
+            <Link href="/verstehen?lens=trends" style={{
               fontFamily: "var(--volt-font-ui)", fontSize: 13, color: "var(--color-text-muted)",
               textDecoration: "none",
             }}>
               ← Cockpit
-            </a>
+            </Link>
             <span style={{ color: "var(--color-text-muted)", fontSize: 10 }}>·</span>
             <span style={{
               fontFamily: "var(--volt-font-mono)", fontSize: 10, letterSpacing: "0.08em",

@@ -7,6 +7,8 @@ import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { randomUUID } from "crypto";
+import { checkRateLimit, tooManyRequests, validationError } from "@/lib/api-utils";
+import { validateStringLength } from "@/lib/validation";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -30,57 +32,98 @@ function db() {
   return d;
 }
 
-export async function GET() {
+// TODO: SEC-14 — Add user_id ownership check when user_id column exists on the scenarios table.
+// GET should filter by user_id; POST should set user_id from session.
+
+export async function GET(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60000)) {
+    return tooManyRequests();
+  }
+  // DAT-13: Ensure DB handle is always closed
   const d = db();
-  const rows = d.prepare(
-    "SELECT * FROM scenarios ORDER BY updated_at DESC"
-  ).all();
-  d.close();
+  try {
+    const rows = d.prepare(
+      "SELECT * FROM scenarios ORDER BY updated_at DESC"
+    ).all();
 
-  const scenarios = (rows as any[]).map((r) => ({
-    ...r,
-    key_drivers: r.key_drivers ? JSON.parse(r.key_drivers) : [],
-    impacts: r.impacts ? JSON.parse(r.impacts) : [],
-  }));
+    const scenarios = (rows as any[]).map((r) => ({
+      ...r,
+      key_drivers: r.key_drivers ? JSON.parse(r.key_drivers) : [],
+      impacts: r.impacts ? JSON.parse(r.impacts) : [],
+    }));
 
-  return NextResponse.json({ scenarios });
+    return NextResponse.json({ scenarios });
+  } finally {
+    d.close();
+  }
 }
 
 export async function POST(req: Request) {
+  const clientIp = req.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60000)) {
+    return tooManyRequests();
+  }
+
   const body = await req.json().catch(() => ({}));
   const { name, description, type, probability, timeframe, key_drivers, impacts, source, source_query } = body;
 
-  if (!name) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  // SEC-13: Input validation
+  const nameCheck = validateStringLength(name, "name", 300, 1);
+  if (!nameCheck.valid) return validationError(nameCheck.error);
+
+  if (description !== undefined && description !== null) {
+    const descCheck = validateStringLength(description, "description", 5000);
+    if (!descCheck.valid) return validationError(descCheck.error);
+  }
+
+  if (type !== undefined && type !== null) {
+    const typeCheck = validateStringLength(type, "type", 100);
+    if (!typeCheck.valid) return validationError(typeCheck.error);
+  }
+
+  if (probability !== undefined && probability !== null) {
+    if (typeof probability !== "number" || probability < 0 || probability > 1) {
+      return validationError("probability must be a number between 0 and 1");
+    }
+  }
+
+  if (timeframe !== undefined && timeframe !== null) {
+    const tfCheck = validateStringLength(timeframe, "timeframe", 200);
+    if (!tfCheck.valid) return validationError(tfCheck.error);
   }
 
   const id = randomUUID();
+  // DAT-13: Ensure DB handle is always closed
   const d = db();
+  try {
+    d.prepare(`
+      INSERT INTO scenarios (id, name, description, type, probability, timeframe, key_drivers, impacts, source, source_query)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      name,
+      description ?? null,
+      type ?? "custom",
+      probability ?? 0.5,
+      timeframe ?? null,
+      key_drivers ? JSON.stringify(key_drivers) : null,
+      impacts ? JSON.stringify(impacts) : null,
+      source ?? "user",
+      source_query ?? null,
+    );
 
-  d.prepare(`
-    INSERT INTO scenarios (id, name, description, type, probability, timeframe, key_drivers, impacts, source, source_query)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    name,
-    description ?? null,
-    type ?? "custom",
-    probability ?? 0.5,
-    timeframe ?? null,
-    key_drivers ? JSON.stringify(key_drivers) : null,
-    impacts ? JSON.stringify(impacts) : null,
-    source ?? "user",
-    source_query ?? null,
-  );
+    const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
 
-  const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
-  d.close();
-
-  return NextResponse.json({
-    scenario: {
-      ...row,
-      key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
-      impacts: row.impacts ? JSON.parse(row.impacts) : [],
-    },
-  });
+    // API-18: POST creating a resource should return 201
+    return NextResponse.json({
+      scenario: {
+        ...row,
+        key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
+        impacts: row.impacts ? JSON.parse(row.impacts) : [],
+      },
+    }, { status: 201 });
+  } finally {
+    d.close();
+  }
 }

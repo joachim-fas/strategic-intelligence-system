@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import * as d3 from "d3";
+import { select } from "d3-selection";
+import "d3-transition";
 import { TrendDot, RING_COLORS, TIME_HORIZON_COLORS, Ring } from "@/types";
 
 interface MiniRadarProps {
@@ -26,7 +27,7 @@ export default function MiniRadar({ trends, onTrendClick, width = 320, height = 
   const maxR = Math.min(cx, cy) - 30;
 
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
+    const svg = select(svgRef.current);
     svg.selectAll("*").remove();
 
     const g = svg.append("g").attr("transform", `translate(${cx},${cy})`);
@@ -57,8 +58,8 @@ export default function MiniRadar({ trends, onTrendClick, width = 320, height = 
     });
 
     // Crosshairs
-    g.append("line").attr("x1", -maxR).attr("x2", maxR).attr("y1", 0).attr("y2", 0).attr("stroke", "var(--volt-text-muted, #222)").attr("stroke-width", 0.5);
-    g.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -maxR).attr("y2", maxR).attr("stroke", "var(--volt-text-muted, #222)").attr("stroke-width", 0.5);
+    g.append("line").attr("x1", -maxR).attr("x2", maxR).attr("y1", 0).attr("y2", 0).attr("stroke", "var(--muted-foreground, #6B6B6B)").attr("stroke-width", 0.5);
+    g.append("line").attr("x1", 0).attr("x2", 0).attr("y1", -maxR).attr("y2", maxR).attr("stroke", "var(--muted-foreground, #6B6B6B)").attr("stroke-width", 0.5);
 
     // Place trends
     const jitter = (id: string) => {
@@ -113,10 +114,10 @@ export default function MiniRadar({ trends, onTrendClick, width = 320, height = 
 
       // Hover
       dot.on("mouseenter", function () {
-        d3.select(this).select("circle").transition().duration(100).attr("r", size + 2);
+        select(this).select("circle").transition().duration(100).attr("r", size + 2);
       });
       dot.on("mouseleave", function () {
-        d3.select(this).select("circle").transition().duration(100).attr("r", size);
+        select(this).select("circle").transition().duration(100).attr("r", size);
       });
     });
   }, [trends, cx, cy, maxR, onTrendClick]);

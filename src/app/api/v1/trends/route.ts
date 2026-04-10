@@ -1,6 +1,12 @@
+// TODO: DAT-15 — This route reads exclusively from SQLite via better-sqlite3.
+// PG writes via Drizzle in pipeline.ts create orphaned data never read by any API.
+// FIX: Use a unified DB access layer (Drizzle for both, or a getDb() wrapper).
+
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { calculateRing } from "@/lib/scoring";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 
 interface DbTrend {
   id: string;
@@ -24,7 +30,12 @@ function getLocalDb() {
   return db;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60000)) {
+    return tooManyRequests();
+  }
+
   try {
     const db = getLocalDb();
     const rows = db.prepare("SELECT * FROM trends WHERE status != 'archived'").all() as DbTrend[];
@@ -44,7 +55,7 @@ export async function GET() {
         confidence: row.agg_confidence ?? 0.5,
         impact: row.agg_impact ?? 0.5,
         timeHorizon: row.time_horizon || "mid",
-        ring: meta.ring || deriveRing(row.agg_relevance ?? 0.5, row.agg_confidence ?? 0.5),
+        ring: meta.ring || calculateRing(((row.agg_relevance ?? 0.5) + (row.agg_confidence ?? 0.5)) / 2),
         quadrant: meta.quadrant ?? 0,
         signalCount: meta.signalCount ?? 0,
         topSources: meta.topSources ?? [],
@@ -61,10 +72,5 @@ export async function GET() {
   }
 }
 
-function deriveRing(relevance: number, confidence: number): string {
-  const score = (relevance + confidence) / 2;
-  if (score >= 0.85) return "adopt";
-  if (score >= 0.7) return "trial";
-  if (score >= 0.5) return "assess";
-  return "hold";
-}
+// ALG-06: Local deriveRing removed — now uses shared calculateRing() from scoring.ts
+// to ensure consistent ring thresholds across the entire application.

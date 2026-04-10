@@ -11,9 +11,17 @@ export const producthuntConnector: SourceConnector = {
 
     try {
       // Use the unofficial front page endpoint
-      const res = await fetch("https://www.producthunt.com/feed", {
-        headers: { Accept: "application/rss+xml, application/xml, text/xml" },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      let res: Response;
+      try {
+        res = await fetch("https://www.producthunt.com/feed", {
+          headers: { Accept: "application/rss+xml, application/xml, text/xml" },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) return signals;
 
       const text = await res.text();
@@ -39,7 +47,7 @@ export const producthuntConnector: SourceConnector = {
           sourceTitle: title,
           signalType: "mention",
           topic,
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: { description },
           detectedAt: pubDate ? new Date(pubDate) : new Date(),
         });

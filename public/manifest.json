@@ -1,0 +1,8 @@
+{
+  "name": "SIS \u2013 Strategic Intelligence System",
+  "short_name": "SIS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#4F638A"
+}

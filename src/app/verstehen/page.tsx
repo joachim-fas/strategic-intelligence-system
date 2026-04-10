@@ -1,5 +1,8 @@
 "use client";
 
+// TODO: FE-01 — Remove "use client". Extract interactive parts into Client Components.
+// This page should be a Server Component with only interactive islands as "use client".
+
 /**
  * /verstehen — Knowledge Cockpit
  *
@@ -76,9 +79,16 @@ export default function VerstehenPage() {
 
   // Trends data — megaTrends as base, overlay DB scores if available.
   const [trends, setTrends] = useState<TrendDot[]>(megaTrends);
-  useEffect(() => {
+  const [trendsLoading, setTrendsLoading] = useState(true);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
+  const loadTrends = useCallback(() => {
+    setTrendsLoading(true);
+    setTrendsError(null);
     fetch("/api/v1/trends")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => {
         if (data.trends?.length > 0) {
           const dbTrends = data.trends as TrendDot[];
@@ -91,8 +101,12 @@ export default function VerstehenPage() {
           setTrends(classifyTrends(merged));
         }
       })
-      .catch(() => {});
+      .catch((e) => {
+        setTrendsError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => setTrendsLoading(false));
   }, []);
+  useEffect(() => { loadTrends(); }, [loadTrends]);
 
   // Live sources count — pulled from /api/v1/feed sourceStatus. No more
   // hardcoded "47" lies. Falls back to the total connector count if the
@@ -259,7 +273,44 @@ export default function VerstehenPage() {
 
         {/* Left: Visualization */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {activeTab === "radar" && (
+          {/* UX-15 / EDGE-20: Loading indicator and error state for trend data */}
+          {trendsLoading && (activeTab === "radar" || activeTab === "netzwerk") && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--volt-text-muted, #6B6B6B)", fontSize: 13 }}>
+              {de ? "Trends laden\u2026" : "Loading trends\u2026"}
+            </div>
+          )}
+          {trendsError && (activeTab === "radar" || activeTab === "netzwerk") && (
+            <div role="alert" style={{
+              margin: "24px", padding: "20px 22px",
+              background: "var(--volt-negative-light, #FEF2F2)",
+              border: "1px solid var(--volt-negative-border, #FECACA)",
+              borderRadius: "var(--volt-radius-md, 10px)",
+              color: "var(--volt-negative-text, #991B1B)",
+              fontSize: 13,
+              display: "flex", flexDirection: "column", gap: 12,
+            }}>
+              <span>
+                {de
+                  ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+                  : "Data could not be loaded. Please try again."}
+              </span>
+              <button
+                onClick={loadTrends}
+                style={{
+                  alignSelf: "flex-start",
+                  fontSize: 12, fontWeight: 600, padding: "6px 16px",
+                  borderRadius: "var(--volt-radius-md, 10px)",
+                  border: "1px solid var(--volt-negative-border, #FECACA)",
+                  background: "transparent",
+                  color: "var(--volt-negative-text, #991B1B)",
+                  cursor: "pointer",
+                }}
+              >
+                {de ? "Erneut versuchen" : "Retry"}
+              </button>
+            </div>
+          )}
+          {activeTab === "radar" && !trendsLoading && (
             <RadarView
               trends={trends}
               onTrendClick={handleTrendClick}
@@ -268,7 +319,7 @@ export default function VerstehenPage() {
             />
           )}
 
-          {activeTab === "netzwerk" && (
+          {activeTab === "netzwerk" && !trendsLoading && (
             <div style={{ padding: "20px 24px 40px" }}>
               <CausalGraphView
                 trends={trends}

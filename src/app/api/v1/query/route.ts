@@ -3,6 +3,71 @@ import Database from "better-sqlite3";
 import path from "path";
 import { readFileSync } from "fs";
 import { TrendDot } from "@/types";
+import { requireAuth } from "@/lib/auth-guard";
+
+// ── Input sanitization ──────────────────────────────────────────────────────
+// SECURITY: Prevent prompt injection attacks by sanitizing user input before
+// it reaches the LLM. Strips patterns that could manipulate the prompt structure.
+
+/** Maximum allowed query length in characters */
+const MAX_QUERY_LENGTH = 2000;
+
+/**
+ * Patterns that indicate prompt injection attempts.
+ * SECURITY: These patterns match common prompt injection techniques:
+ * - System/role directives that try to override the system prompt
+ * - XML-like tags that could manipulate structured prompt formats
+ * - Instruction override attempts
+ */
+const INJECTION_PATTERNS: RegExp[] = [
+  // Role/instruction overrides (case-insensitive)
+  /\b(?:system|assistant|human)\s*:/gi,
+  /\byou are\b/gi,
+  /\bignore (?:all |the )?(?:previous |above )?instructions?\b/gi,
+  /\bforget (?:all |the )?(?:previous |above )?instructions?\b/gi,
+  /\bdisregard (?:all |the )?(?:previous |above )?instructions?\b/gi,
+  /\boverride (?:all |the )?(?:previous |above )?instructions?\b/gi,
+  /\bnew instructions?\s*:/gi,
+  /\bact as\b/gi,
+  /\bpretend (?:to be|you are)\b/gi,
+];
+
+/**
+ * XML-like tag pattern — matches opening and self-closing tags that could
+ * manipulate prompt structure (e.g., <system>, <instructions>, </user>).
+ */
+const XML_TAG_PATTERN = /<\/?[a-zA-Z][a-zA-Z0-9_-]*(?:\s[^>]*)?\s*\/?>/g;
+
+/**
+ * Sanitize user query input to mitigate prompt injection.
+ * SECURITY: This is defense-in-depth — the system prompt should also be
+ * robust against injection, but sanitizing input reduces attack surface.
+ *
+ * Returns the sanitized string, or null if the input is invalid.
+ */
+function sanitizeQuery(raw: string): string | null {
+  if (typeof raw !== "string") return null;
+
+  let sanitized = raw.trim();
+
+  // Length check
+  if (sanitized.length === 0) return null;
+  if (sanitized.length > MAX_QUERY_LENGTH) return null;
+
+  // Strip XML-like tags that could manipulate prompt structure
+  sanitized = sanitized.replace(XML_TAG_PATTERN, "");
+
+  // Neutralize prompt injection patterns by replacing with harmless text
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "[filtered]");
+  }
+
+  // Final trim after sanitization
+  sanitized = sanitized.trim();
+  if (sanitized.length === 0) return null;
+
+  return sanitized;
+}
 
 // Fallback: read .env.local directly if Next.js failed to inject it
 // (happens when project path contains spaces, e.g. "Meine Ablage")
@@ -106,10 +171,17 @@ function tryRepairJSON(text: string): any | null {
 }
 
 /**
+ * Required fields in a valid briefing result.
+ * API-03: Used to validate repaired JSON has the minimum structure.
+ */
+const REQUIRED_RESULT_FIELDS = ["synthesis"] as const;
+
+/**
  * Extract and parse a JSON object from LLM output.
  * Handles markdown code fences, leading text, and truncated output.
+ * API-03: Returns { data, repaired } so callers can flag repaired results.
  */
-function extractJSON(text: string): any | null {
+function extractJSON(text: string): { data: any; repaired: boolean } | null {
   // Strip markdown fences (closed or open/truncated)
   let cleaned = text
     .replace(/^```(?:json)?\s*/i, "")
@@ -122,16 +194,27 @@ function extractJSON(text: string): any | null {
   cleaned = cleaned.slice(start);
 
   // 1. Direct parse (happy path — complete JSON)
-  try { return JSON.parse(cleaned); } catch {}
+  try { return { data: JSON.parse(cleaned), repaired: false }; } catch {}
 
   // 2. Find last '}' and try substring (handles trailing text after JSON)
   const end = cleaned.lastIndexOf("}");
   if (end > 0) {
-    try { return JSON.parse(cleaned.slice(0, end + 1)); } catch {}
+    try { return { data: JSON.parse(cleaned.slice(0, end + 1)), repaired: false }; } catch {}
   }
 
   // 3. Repair truncated JSON (streaming cut off mid-response)
-  return tryRepairJSON(cleaned);
+  const repaired = tryRepairJSON(cleaned);
+  if (!repaired) return null;
+
+  // API-03: Validate that repaired JSON has required structure
+  for (const field of REQUIRED_RESULT_FIELDS) {
+    if (!(field in repaired)) {
+      console.warn(`[query] Repaired JSON missing required field: ${field}`);
+      return null;
+    }
+  }
+
+  return { data: repaired, repaired: true };
 }
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
@@ -157,6 +240,12 @@ function checkRateLimit(ip: string): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
+  // ── Authentication (defense-in-depth) ──────────────────────────────────
+  // SECURITY: Middleware already validates auth, but route-level check
+  // protects against middleware bypass (misconfigured matcher, etc.)
+  const authResult = await requireAuth();
+  if (!authResult.authorized) return authResult.response;
+
   // Rate limit by IP
   const forwarded = (req as any).headers?.get?.("x-forwarded-for") ?? "";
   const ip = (forwarded ? forwarded.split(",")[0] : "unknown").trim();
@@ -168,17 +257,33 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { query, locale, contextProfile, previousContext } = body;
+  const { query: rawQuery, locale, contextProfile, previousContext } = body;
   // previousContext: { query: string, synthesis: string } — from the preceding briefing
 
-  if (!query) {
+  // ── Input validation ───────────────────────────────────────────────────
+  if (!rawQuery || typeof rawQuery !== "string") {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
+  }
+
+  // SECURITY: Enforce maximum input length to prevent abuse
+  if (rawQuery.length > MAX_QUERY_LENGTH) {
+    return NextResponse.json(
+      { error: `Query exceeds maximum length of ${MAX_QUERY_LENGTH} characters` },
+      { status: 422 }
+    );
+  }
+
+  // SECURITY: Sanitize input to mitigate prompt injection
+  const query = sanitizeQuery(rawQuery);
+  if (!query) {
+    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
 
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey || apiKey.length < 10) {
+    // SECURITY: Do not disclose which specific configuration is missing
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY not configured" },
+      { error: "Service temporarily unavailable" },
       { status: 503 }
     );
   }
@@ -239,8 +344,21 @@ export async function POST(req: Request) {
         });
 
         if (!anthropicRes.ok) {
+          // SECURITY: Log the full error server-side for debugging,
+          // but never expose API error details (may contain API keys,
+          // internal URLs, or infrastructure details) to the client.
           const errText = await anthropicRes.text();
-          send({ type: "error", error: `Anthropic API error ${anthropicRes.status}: ${errText}` });
+          console.error(`[query] Anthropic API error ${anthropicRes.status}:`, errText);
+
+          // Map to generic client-facing error messages
+          const status = anthropicRes.status;
+          const clientError =
+            status === 429
+              ? "AI service is temporarily overloaded. Please try again in a moment."
+              : status >= 500
+                ? "AI service is temporarily unavailable."
+                : "Unable to process your request. Please try again.";
+          send({ type: "error", error: clientError });
           controller.close();
           return;
         }
@@ -283,7 +401,10 @@ export async function POST(req: Request) {
         if (lineBuffer.trim()) processAnthropicLine(lineBuffer.trim());
 
         // Parse complete JSON and send structured result
-        let result = extractJSON(fullText);
+        // API-03: extractJSON now returns { data, repaired } to flag repaired results.
+        const extracted = extractJSON(fullText);
+        let result = extracted?.data ?? null;
+        const wasRepaired = extracted?.repaired ?? false;
         if (!result) {
           // Fallback: the LLM responded with prose instead of JSON.
           // Use the full streamed text as synthesis so the user sees something.
@@ -344,19 +465,31 @@ export async function POST(req: Request) {
               strength: e.strength, description: e.description,
             }));
 
-          send({ type: "complete", result: { ...result, usedSignals: signalsMeta, matchedTrends, matchedEdges } });
+          // API-03: Flag repaired results so the client can detect incomplete data
+          const finalResult = {
+            ...result,
+            usedSignals: signalsMeta,
+            matchedTrends,
+            matchedEdges,
+            ...(wasRepaired ? { _repaired: true } : {}),
+          };
+          send({ type: "complete", result: finalResult });
         } catch {
           send({ type: "error", error: "JSON parse failed" });
         }
 
         controller.close();
       } catch (err) {
-        send({ type: "error", error: String(err) });
+        // SECURITY: Log full error server-side, send generic message to client.
+        // String(err) may contain API keys, file paths, or stack traces.
+        console.error("[query] Stream processing error:", err);
+        send({ type: "error", error: "An unexpected error occurred. Please try again." });
         controller.close();
       }
     },
   });
 
+  // TODO: API-10 — Add 60s idle timeout on SSE stream. Send keepalive ':ping' every 15s.
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",

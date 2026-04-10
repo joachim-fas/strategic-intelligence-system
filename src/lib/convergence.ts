@@ -15,13 +15,15 @@
 
 import { TrendDot } from "@/types";
 import { RawSignal } from "@/connectors/types";
+import { normalizeTopic } from "./scoring";
 
 export interface ConvergenceEvent {
   id: string;
   trendId: string;
   trendName: string;
   severity: "low" | "medium" | "high" | "critical";
-  sourceCount: number;
+  /** Number of distinct source domains (not individual sources) contributing signals */
+  domainCount: number;
   sources: ConvergenceSource[];
   detectedAt: Date;
   description: string;
@@ -73,11 +75,11 @@ export function detectConvergence(
   const events: ConvergenceEvent[] = [];
   const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000);
 
-  // Group recent signals by topic
+  // Group recent signals by normalized topic for consistent matching
   const topicSignals = new Map<string, RawSignal[]>();
   for (const signal of signals) {
     if (signal.detectedAt < cutoff) continue;
-    const topic = signal.topic;
+    const topic = normalizeTopic(signal.topic);
     if (!topicSignals.has(topic)) topicSignals.set(topic, []);
     topicSignals.get(topic)!.push(signal);
   }
@@ -108,10 +110,16 @@ export function detectConvergence(
       severity = "medium";
     }
 
-    // Find matching trend
+    // Find matching trend — symmetric: either name contains topic or topic contains name
+    const normalizedTopic = normalizeTopic(topic);
+    const topicLower = normalizedTopic.toLowerCase();
     const matchedTrend = existingTrends.find(
-      (t) => t.name.toLowerCase().includes(topic.toLowerCase()) ||
-             t.tags.some((tag) => tag.toLowerCase() === topic.toLowerCase())
+      (t) => {
+        const nameLower = t.name.toLowerCase();
+        return nameLower.includes(topicLower) ||
+               topicLower.includes(nameLower) ||
+               t.tags.some((tag) => tag.toLowerCase() === topicLower);
+      }
     );
 
     const sources: ConvergenceSource[] = [];
@@ -136,7 +144,7 @@ export function detectConvergence(
       trendId: matchedTrend?.id || topic.toLowerCase().replace(/\s+/g, "-"),
       trendName: matchedTrend?.name || topic,
       severity,
-      sourceCount: domainCount,
+      domainCount: domainCount,
       sources,
       detectedAt: new Date(),
       description: buildDescription(topic, sources, severity),
@@ -148,7 +156,7 @@ export function detectConvergence(
   // Sort by severity (critical first) then by source count
   const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   return events.sort((a, b) =>
-    severityOrder[a.severity] - severityOrder[b.severity] || b.sourceCount - a.sourceCount
+    severityOrder[a.severity] - severityOrder[b.severity] || b.domainCount - a.domainCount
   );
 }
 
@@ -204,8 +212,8 @@ export function formatConvergenceForDisplay(
     const domainList = e.sources.map((s) => s.domain).join(", ");
 
     if (locale === "de") {
-      return `${severityEmoji} KONVERGENZ: "${e.trendName}" — ${e.sourceCount} unabhängige Domänen (${domainList}) zeigen korrelierte Aktivität. Confidence +${(e.confidenceBoost * 100).toFixed(0)}%`;
+      return `${severityEmoji} KONVERGENZ: "${e.trendName}" — ${e.domainCount} unabhängige Domänen (${domainList}) zeigen korrelierte Aktivität. Confidence +${(e.confidenceBoost * 100).toFixed(0)}%`;
     }
-    return `${severityEmoji} CONVERGENCE: "${e.trendName}" — ${e.sourceCount} independent domains (${domainList}) showing correlated activity. Confidence +${(e.confidenceBoost * 100).toFixed(0)}%`;
+    return `${severityEmoji} CONVERGENCE: "${e.trendName}" — ${e.domainCount} independent domains (${domainList}) showing correlated activity. Confidence +${(e.confidenceBoost * 100).toFixed(0)}%`;
   });
 }

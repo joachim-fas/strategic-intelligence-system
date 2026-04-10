@@ -1,3 +1,8 @@
+// TODO: FE-07 / UX-19 — i18n MIGRATION NEEDED
+// Currently only ~40 keys translated. 300+ inline ternaries (lang === "de" ? ... : ...) across codebase.
+// FIX: Migrate all strings to this i18n system. Consider next-intl for proper i18n support.
+// Files with most ternaries: canvas/page.tsx, QuellenTable.tsx, SessionList.tsx, page.tsx
+
 export type Locale = "de" | "en";
 
 const translations = {

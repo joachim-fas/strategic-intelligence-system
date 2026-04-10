@@ -254,9 +254,15 @@ export function queryIntelligence(
   const signalSummary = buildSignalSummary(matchedTrends, locale);
 
   // Step 7: Confidence based on data coverage
+  // FIX: Use logarithmic scale so confidence reaches ~0.95 only with 50+ trends,
+  // not saturating at 7. Formula: 1 - 1/(1 + k*sqrt(signals)), blended with
+  // log-scaled trend count and source count.
   const totalSignals = matchedTrends.reduce((sum, m) => sum + m.trend.signalCount, 0);
   const totalSources = new Set(matchedTrends.flatMap((m) => m.trend.topSources)).size;
-  const confidence = Math.min(1, (matchedTrends.length * 0.15 + totalSources * 0.05 + Math.min(totalSignals, 500) / 500 * 0.3));
+  const trendComponent  = Math.log2(1 + matchedTrends.length) / Math.log2(1 + 50) * 0.4;  // ~0.4 at 50 trends
+  const sourceComponent = Math.log2(1 + totalSources)         / Math.log2(1 + 30) * 0.25; // ~0.25 at 30 sources
+  const signalComponent = (1 - 1 / (1 + 0.005 * Math.sqrt(totalSignals)))          * 0.3;  // ~0.3 at ~500 signals
+  const confidence = Math.min(0.98, trendComponent + sourceComponent + signalComponent);
 
   // Step 8: Generate tag cloud for disambiguation
   const suggestedTags = generateTagCloud(q, matchedTrends, allTrends, locale);
@@ -319,6 +325,16 @@ function generateTagCloud(query: string, matches: TrendMatch[], allTrends: Trend
  * Energy Transition, Geopolitics, Mobility, Climate, Social Stability.
  *
  * Structure: keyword → [{ trendTag, strength, reasoning }]
+ *
+ * TODO: PERF-11 — Module-level caches grow unbounded in long-running servers.
+ * Add LRU eviction (max 500 entries) or TTL-based cleanup.
+ * Note: SEMANTIC_MAP is static and safe, but any runtime caches (e.g. in semantic-engine)
+ * must be bounded. See semantic-engine.ts for existing LRU pattern.
+ *
+ * TODO: CONSOLIDATE — overlapping with findConcepts (semantic-engine),
+ * keywordMap, and contextMap in findMatchingTrends. All four systems do
+ * variants of query-to-tag matching; should be unified into a single
+ * scoring pipeline to avoid triple-counting and maintenance burden.
  */
 const SEMANTIC_MAP: Record<string, { tag: string; strength: number; chain: string }[]> = {
   // Energy & Fuel
@@ -497,6 +513,7 @@ function findMatchingTrends(query: string, trends: TrendDot[]): TrendMatch[] {
   const matches: TrendMatch[] = [];
 
   // FIRST: Use semantic engine for broad concept matching
+  // TODO: CONSOLIDATE — overlapping with SEMANTIC_MAP, keywordMap, and contextMap below
   const semanticResult = findConcepts(query, trends);
   const semanticTrendIds = semanticResult.trendIds;
   const semanticChains = semanticResult.chains;
@@ -505,11 +522,16 @@ function findMatchingTrends(query: string, trends: TrendDot[]): TrendMatch[] {
     let score = 0;
     let reason = "";
     const reasoningChains: string[] = [];
+    // FIX: Track which match sources already contributed to prevent
+    // triple-counting the same trend (e.g., once via semantic engine,
+    // once via tag match, once via SEMANTIC_MAP for the same concept).
+    const matchedSources = new Set<string>();
 
     // Semantic engine match (strongest for unknown/novel queries)
     if (semanticTrendIds.has(trend.id)) {
       score += 0.7;
       reason = "semantic match";
+      matchedSources.add("semantic-engine");
       reasoningChains.push(...semanticChains.filter((c) => c.length < 100).slice(0, 2));
     }
 
@@ -517,19 +539,22 @@ function findMatchingTrends(query: string, trends: TrendDot[]): TrendMatch[] {
     if (trend.name.toLowerCase().includes(query)) {
       score += 1.0;
       reason = "name match";
+      matchedSources.add("name");
     }
 
-    // Tag match
+    // Tag match — skip if semantic engine already matched this trend
     const tagMatch = trend.tags.find((t) => t.toLowerCase().includes(query) || query.includes(t.toLowerCase()));
-    if (tagMatch) {
+    if (tagMatch && !matchedSources.has("semantic-engine")) {
       score += 0.7;
       reason = reason ? reason + " + tag" : `tag: ${tagMatch}`;
+      matchedSources.add("tag");
     }
 
     // Category match
     if (trend.category.toLowerCase().includes(query)) {
       score += 0.5;
       reason = reason ? reason + " + category" : "category match";
+      matchedSources.add("category");
     }
 
     // Keyword matching for common queries
@@ -587,39 +612,55 @@ function findMatchingTrends(query: string, trends: TrendDot[]): TrendMatch[] {
       spacex: ["technology", "disruption"],
     };
 
-    // Check context mapping
-    for (const [contextTerm, relatedTags] of Object.entries(contextMap)) {
-      if (query.includes(contextTerm)) {
-        if (trend.tags.some((t) => relatedTags.includes(t.toLowerCase())) ||
-            relatedTags.some((rt) => trend.name.toLowerCase().includes(rt))) {
-          score += 0.6;
-          reason = reason ? reason + ` + context:${contextTerm}` : `context: ${contextTerm}`;
+    // TODO: CONSOLIDATE — overlapping with findConcepts (semantic-engine), keywordMap, and SEMANTIC_MAP
+    // Check context mapping — skip if already matched via semantic engine
+    if (!matchedSources.has("semantic-engine")) {
+      for (const [contextTerm, relatedTags] of Object.entries(contextMap)) {
+        if (query.includes(contextTerm) && !matchedSources.has(`context:${contextTerm}`)) {
+          if (trend.tags.some((t) => relatedTags.includes(t.toLowerCase())) ||
+              relatedTags.some((rt) => trend.name.toLowerCase().includes(rt))) {
+            score += 0.6;
+            matchedSources.add(`context:${contextTerm}`);
+            reason = reason ? reason + ` + context:${contextTerm}` : `context: ${contextTerm}`;
+          }
         }
       }
     }
 
-    for (const [keyword, related] of Object.entries(keywordMap)) {
-      if (query.includes(keyword) || related.some((r) => query.includes(r))) {
-        if (trend.tags.some((t) => related.includes(t.toLowerCase()))) {
-          score += 0.4;
-          reason = reason ? reason + " + keyword" : `keyword: ${keyword}`;
+    // TODO: CONSOLIDATE — overlapping with findConcepts (semantic-engine), contextMap, and SEMANTIC_MAP
+    // Keyword map — skip if already matched via semantic engine or context
+    if (!matchedSources.has("semantic-engine")) {
+      for (const [keyword, related] of Object.entries(keywordMap)) {
+        if (!matchedSources.has(`keyword:${keyword}`) &&
+            (query.includes(keyword) || related.some((r) => query.includes(r)))) {
+          if (trend.tags.some((t) => related.includes(t.toLowerCase()))) {
+            score += 0.4;
+            matchedSources.add(`keyword:${keyword}`);
+            reason = reason ? reason + " + keyword" : `keyword: ${keyword}`;
+          }
         }
       }
     }
 
     // Semantic association map — the "thinking" layer
-    // Splits query into words and looks up each in the semantic map
-    const queryWords = query.split(/\s+/);
-    for (const word of queryWords) {
-      const associations = SEMANTIC_MAP[word];
-      if (associations) {
-        for (const assoc of associations) {
-          if (trend.tags.some((t) => t.toLowerCase().includes(assoc.tag)) ||
-              trend.name.toLowerCase().includes(assoc.tag) ||
-              trend.category.toLowerCase().includes(assoc.tag)) {
-            score += assoc.strength * 0.8;
-            reasoningChains.push(assoc.chain);
-            reason = reason ? reason + ` + semantic:${assoc.tag}` : `semantic: ${assoc.chain}`;
+    // Only apply if semantic engine did not already match this trend
+    // (SEMANTIC_MAP and semantic-engine overlap heavily)
+    if (!matchedSources.has("semantic-engine")) {
+      const queryWords = query.split(/\s+/);
+      const matchedTags = new Set<string>(); // Deduplicate by tag within SEMANTIC_MAP
+      for (const word of queryWords) {
+        const associations = SEMANTIC_MAP[word];
+        if (associations) {
+          for (const assoc of associations) {
+            if (matchedTags.has(assoc.tag)) continue; // already scored this tag
+            if (trend.tags.some((t) => t.toLowerCase().includes(assoc.tag)) ||
+                trend.name.toLowerCase().includes(assoc.tag) ||
+                trend.category.toLowerCase().includes(assoc.tag)) {
+              score += assoc.strength * 0.8;
+              matchedTags.add(assoc.tag);
+              reasoningChains.push(assoc.chain);
+              reason = reason ? reason + ` + semantic:${assoc.tag}` : `semantic: ${assoc.chain}`;
+            }
           }
         }
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import { FRAMEWORK_META, FrameworkMeta } from "@/types/frameworks";
@@ -137,8 +138,7 @@ function FrameworkCard({ fw, de }: { fw: FrameworkMeta; de: boolean }) {
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0,
         }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={fw.iconSvg} alt="" style={{ width: 20, height: 20, opacity: 0.8 }} />
+          <Image src={fw.iconSvg} alt="" width={20} height={20} style={{ opacity: 0.8 }} />
         </span>
         <div>
           <div style={{

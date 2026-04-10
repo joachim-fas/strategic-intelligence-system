@@ -29,6 +29,9 @@ export const nytConnector: SourceConnector = {
     if (!key) return signals;
 
     try {
+      // TODO: SEC-09 — NYT Article Search API only supports query-param auth (api-key=...).
+      // No header-based authentication alternative is documented.
+      // See https://developer.nytimes.com/docs/articlesearch-product/1/overview
       const res = await fetch(
         `https://api.nytimes.com/svc/search/v2/articlesearch.json?q=technology&sort=newest&api-key=${key}`,
         {
@@ -53,7 +56,7 @@ export const nytConnector: SourceConnector = {
           sourceTitle: `NYT: ${headline.slice(0, 150)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.7,
+          rawStrength: 0.7, // TODO: compute strength dynamically from signal data
           rawData: {
             headline,
             section,

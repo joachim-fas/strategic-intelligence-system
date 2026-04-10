@@ -24,6 +24,10 @@ export interface TrendEdge {
 /**
  * Curated causal relationships between mega/macro trends.
  * These represent the fundamental connections between global forces.
+ *
+ * NOTE: Currently 102 static edges are hardcoded below. This should
+ * eventually be data-driven (loaded from a DB or config file) so that
+ * analysts can add/edit edges without code changes.
  */
 export const TREND_EDGES: TrendEdge[] = [
   // ─── Climate drives everything ─────────────────────────────
@@ -359,19 +363,14 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.9,
     description: "Armed conflict and state collapse drive the largest refugee flows",
   },
+  // FIX: Merged duplicate pair into single bidirectional edge (was two separate edges)
   {
     from: "mega-social-instability",
     to: "mega-migration-displacement",
     type: "amplifies",
     strength: 0.6,
-    description: "Economic inequality and political polarization push voluntary and forced migration",
-  },
-  {
-    from: "mega-migration-displacement",
-    to: "mega-social-instability",
-    type: "amplifies",
-    strength: 0.5,
-    description: "Large-scale migration amplifies social instability in both origin and destination regions",
+    description: "Inequality and polarization push migration; large-scale migration amplifies instability in return",
+    bidirectional: true,
   },
   {
     from: "mega-migration-displacement",
@@ -857,29 +856,38 @@ export function getEdgesForTrend(trendId: string): TrendEdge[] {
 }
 
 /**
- * Get trends that DRIVE a specific trend (upstream causes)
+ * Get trends that DRIVE a specific trend (upstream causes).
+ * Includes reverse direction of bidirectional edges.
  */
 export function getDrivers(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.to === trendId && (e.type === "drives" || e.type === "amplifies")
+    (e) =>
+      (e.type === "drives" || e.type === "amplifies") &&
+      (e.to === trendId || (e.bidirectional && e.from === trendId))
   );
 }
 
 /**
- * Get trends that are AFFECTED BY a specific trend (downstream effects)
+ * Get trends that are AFFECTED BY a specific trend (downstream effects).
+ * Includes reverse direction of bidirectional edges.
  */
 export function getEffects(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.from === trendId && (e.type === "drives" || e.type === "amplifies")
+    (e) =>
+      (e.type === "drives" || e.type === "amplifies") &&
+      (e.from === trendId || (e.bidirectional && e.to === trendId))
   );
 }
 
 /**
- * Get trends that DAMPEN a specific trend (Master Spec: "dampens")
+ * Get trends that DAMPEN a specific trend (Master Spec: "dampens").
+ * Includes reverse direction of bidirectional edges.
  */
 export function getInhibitors(trendId: string): TrendEdge[] {
   return TREND_EDGES.filter(
-    (e) => e.to === trendId && e.type === "dampens"
+    (e) =>
+      e.type === "dampens" &&
+      (e.to === trendId || (e.bidirectional && e.from === trendId))
   );
 }
 /** Alias for spec compliance */
@@ -897,19 +905,55 @@ export function calculateCascadeDepth(trendId: string, maxDepth = 3): string[] {
     const current = queue.shift()!;
     if (current.depth >= maxDepth) continue;
 
+    // Forward edges: from === current.id (standard direction)
+    // Also follow bidirectional edges in reverse: to === current.id
     const effects = TREND_EDGES.filter(
-      (e) => e.from === current.id && e.type !== "dampens"
+      (e) =>
+        e.type !== "dampens" &&
+        (e.from === current.id || (e.bidirectional && e.to === current.id))
     );
 
     for (const edge of effects) {
-      if (!affected.has(edge.to) && edge.to !== trendId) {
-        affected.add(edge.to);
-        queue.push({ id: edge.to, depth: current.depth + 1 });
+      const target = edge.from === current.id ? edge.to : edge.from;
+      if (!affected.has(target) && target !== trendId) {
+        affected.add(target);
+        queue.push({ id: target, depth: current.depth + 1 });
       }
     }
   }
 
   return Array.from(affected);
+}
+
+/**
+ * ALG-20: Like calculateCascadeDepth but returns a Map from target ID to the
+ * BFS depth at which it was first reached. Used by scenarios.ts to set the
+ * actual cascadeDepth per affected trend instead of hardcoding 1.
+ */
+export function calculateCascadeDepthMap(trendId: string, maxDepth = 3): Map<string, number> {
+  const depthMap = new Map<string, number>();
+  const queue: { id: string; depth: number }[] = [{ id: trendId, depth: 0 }];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.depth >= maxDepth) continue;
+
+    const effects = TREND_EDGES.filter(
+      (e) =>
+        e.type !== "dampens" &&
+        (e.from === current.id || (e.bidirectional && e.to === current.id))
+    );
+
+    for (const edge of effects) {
+      const target = edge.from === current.id ? edge.to : edge.from;
+      if (!depthMap.has(target) && target !== trendId) {
+        depthMap.set(target, current.depth + 1);
+        queue.push({ id: target, depth: current.depth + 1 });
+      }
+    }
+  }
+
+  return depthMap;
 }
 
 /**
@@ -931,13 +975,17 @@ export function findFeedbackLoops(maxLength = 4): string[][] {
       if (path.length > maxLength + 1) continue;
 
       const current = path[path.length - 1];
-      const outEdges = TREND_EDGES.filter((e) => e.from === current);
+      // Follow forward edges, plus reverse of bidirectional edges
+      const outEdges = TREND_EDGES.filter(
+        (e) => e.from === current || (e.bidirectional && e.to === current)
+      );
 
       for (const edge of outEdges) {
-        if (edge.to === startNode && path.length > 2) {
+        const target = edge.from === current ? edge.to : edge.from;
+        if (target === startNode && path.length > 2) {
           loops.push([...path, startNode]);
-        } else if (!path.includes(edge.to)) {
-          paths.push([...path, edge.to]);
+        } else if (!path.includes(target)) {
+          paths.push([...path, target]);
         }
       }
     }
@@ -1062,7 +1110,8 @@ export function cascadeDepthCount(trendId: string, maxDepth = 3): number {
 
 /**
  * Network density — ratio of actual edges to possible edges.
- * For an undirected graph with N nodes: density = 2E / (N * (N-1))
+ * For a directed graph with N nodes: density = E / (N * (N-1))
+ * (undirected would be 2E / (N*(N-1)), but our graph is directed)
  * Used in the Netzwerk statistics panel to give the user a sense of how
  * connected the system map actually is.
  */
@@ -1071,7 +1120,7 @@ export function networkDensity(): number {
   const n = adj.size;
   if (n < 2) return 0;
   const e = TREND_EDGES.length;
-  return (2 * e) / (n * (n - 1));
+  return e / (n * (n - 1));
 }
 
 /** Re-export the directed adjacency builder for callers that need it. */

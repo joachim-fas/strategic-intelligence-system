@@ -1,3 +1,9 @@
+// TODO: ARC-04 — SCHEMA SPLIT-BRAIN
+// PG schema (schema.ts) has: query_versions, scenario_alerts (not in SQLite)
+// SQLite schema (schema-sqlite.ts) has: project_notes, project_queries (not in PG)
+// Neither has: bsc_ratings, live_signals, og_image_cache, scenarios
+// FIX: Unify both schemas to have identical table sets.
+
 import {
   pgTable,
   uuid,
@@ -99,6 +105,8 @@ export const radars = pgTable("radars", {
   description: text("description"),
   scope: jsonb("scope").default({}), // { categories: [], tags: [] }
   isShared: boolean("is_shared").default(false),
+  canvasState: text("canvas_state"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -199,6 +207,38 @@ export const queryVersions = pgTable("query_versions", {
   signalCount: integer("signal_count"),
   executedAt: timestamp("executed_at").defaultNow().notNull(),
   notes: text("notes"),
+});
+
+// TODO: DAT-16 — Shadow tables not in schema:
+// - bsc_ratings (created in bsc-ratings/route.ts)
+// - scenarios (created in scenarios/route.ts)
+// - live_signals (created in migrate-sqlite.ts)
+// - og_image_cache (created in migrate-sqlite.ts)
+// These should be defined here for Drizzle migration support.
+
+// ─── BSC Ratings ────────────────────────────────────────
+export const bscRatings = pgTable("bsc_ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  queryHash: text("query_hash").notNull(),
+  perspectiveId: text("perspective_id").notNull(),
+  rating: text("rating").notNull(), // 'up' | 'down'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.queryHash, table.perspectiveId)]);
+
+// ─── Scenarios ──────────────────────────────────────────
+export const scenarios = pgTable("scenarios", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").default("custom"),
+  probability: real("probability").default(0.5),
+  timeframe: text("timeframe"),
+  keyDrivers: text("key_drivers"),
+  impacts: text("impacts"),
+  source: text("source").default("user"),
+  sourceQuery: text("source_query"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ─── Scenario Alerts (staleness detection) ───────────────

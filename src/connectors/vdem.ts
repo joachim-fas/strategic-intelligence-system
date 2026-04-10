@@ -1,5 +1,9 @@
 import { SourceConnector, RawSignal } from "./types";
 
+// WARNING: This connector returns STATIC DATA - not connected to real V-Dem API
+// The V-Dem website is fetched only to check availability, but the signal
+// returned is always the same hardcoded data regardless of response content.
+
 /**
  * V-Dem Connector — Varieties of Democracy
  *
@@ -34,7 +38,7 @@ export const vdemConnector: SourceConnector = {
         sourceTitle: "V-Dem: Global democracy monitoring active",
         signalType: "mention",
         topic: "Geopolitical Fragmentation",
-        rawStrength: 0.5,
+        rawStrength: 0.5, // TODO: compute strength dynamically from signal data
         rawData: {
           note: "V-Dem dataset available for detailed analysis",
           latestVersion: "v14",

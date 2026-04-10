@@ -1,14 +1,33 @@
 /**
  * Data Pipeline — orchestrates the signal collection and scoring cycle.
  *
- * 1. Runs all connectors (with rate-limiting delay between calls)
- * 2. Matches signals to existing trends or creates new ones
- * 3. Stores signals in trend_signals table
- * 4. Recomputes aggregate scores on the trends table
- * 5. Writes daily snapshots to score_log
+ * 1. Runs all connectors (with concurrency-limited parallelism)
+ * 2. Deduplicates signals
+ * 3. Matches signals to existing trends or creates new ones
+ * 4. Stores signals in trend_signals table
+ * 5. Recomputes aggregate scores on the trends table
+ * 6. Writes daily snapshots to score_log
  *
  * Designed for resilience: one connector failure does not abort the pipeline.
  */
+
+// TODO: DAT-03 — DUAL STORAGE CONSOLIDATION
+// Currently there are 3 independent signal storage paths:
+// 1. pipeline/route.ts: fetches connectors → stores in-memory (lastFetchResult)
+// 2. pipeline.ts: fetches connectors → stores in trend_signals (SQLite) + trend_signals (PG via Drizzle)
+// 3. signals/route.ts: fetches connectors → returns directly without storage
+// This causes: triple API calls, inconsistent data between paths, inflated scores.
+// FIX: Consolidate into a single pipeline path that:
+// - Fetches each connector once
+// - Deduplicates signals
+// - Stores in ONE canonical table
+// - Returns from that table for all consumers
+
+// TODO: ARC-06 — DUAL PIPELINE IMPLEMENTATIONS
+// pipeline/route.ts: Promise.allSettled, parallel, stores in-memory
+// pipeline.ts: for-loop (now with concurrency), stores in DB
+// Completely different behavior depending on call path.
+// FIX: Consolidate into one pipeline implementation.
 
 import { connectors, type RawSignal } from "@/connectors";
 import { groupSignalsByTopic, scoreTrend } from "@/lib/scoring";
@@ -21,6 +40,7 @@ import { eq, sql } from "drizzle-orm";
 
 export interface PipelineResult {
   success: boolean;
+  skipped?: boolean;
   signalCount: number;
   trendCount: number;
   sources: string[];
@@ -30,12 +50,61 @@ export interface PipelineResult {
 }
 
 // ---------------------------------------------------------------------------
-// Rate-limit delay between connector calls (ms)
+// In-memory mutex — prevents concurrent pipeline runs
 // ---------------------------------------------------------------------------
-const CONNECTOR_DELAY_MS = 1500;
+let pipelineRunning = false;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// ---------------------------------------------------------------------------
+// Concurrency-limited task runner
+// ---------------------------------------------------------------------------
+const CONCURRENCY_LIMIT = 10;
+
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = [];
+  const executing: Promise<void>[] = [];
+  for (const task of tasks) {
+    const p = task().then(
+      (value) => {
+        results.push({ status: "fulfilled", value });
+      },
+      (reason) => {
+        results.push({ status: "rejected", reason });
+      },
+    );
+    executing.push(p);
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+      executing.splice(
+        executing.findIndex((e) => e === p),
+        1,
+      );
+    }
+  }
+  await Promise.all(executing);
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Signal deduplication
+// ---------------------------------------------------------------------------
+
+function deduplicateSignals(signals: RawSignal[]): RawSignal[] {
+  const seen = new Map<string, RawSignal>();
+  for (const signal of signals) {
+    // Prefer dedup by URL when available, otherwise by (source, title, date)
+    const key = signal.sourceUrl
+      ? `url:${signal.sourceUrl}`
+      : `composite:${signal.sourceType}|${signal.sourceTitle}|${signal.detectedAt.toISOString().slice(0, 10)}`;
+    // Keep the most recent version of each duplicate
+    const existing = seen.get(key);
+    if (!existing || signal.detectedAt > existing.detectedAt) {
+      seen.set(key, signal);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 // ---------------------------------------------------------------------------
@@ -43,49 +112,87 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function runPipeline(): Promise<PipelineResult> {
+  // Prevent concurrent runs
+  if (pipelineRunning) {
+    return {
+      success: true,
+      skipped: true,
+      signalCount: 0,
+      trendCount: 0,
+      sources: [],
+      errors: [],
+      durationMs: 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
+  pipelineRunning = true;
+
   const start = Date.now();
   const allSignals: RawSignal[] = [];
   const errors: Array<{ source: string; error: string }> = [];
   const activeSources: string[] = [];
 
-  // Phase 1: Collect signals from all connectors sequentially with delay
-  for (const connector of connectors) {
-    try {
-      const signals = await connector.fetchSignals();
-      allSignals.push(...signals);
-      activeSources.push(connector.name);
-      console.log(`[pipeline] ${connector.name}: ${signals.length} signals`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      errors.push({ source: connector.name, error: message });
-      console.error(`[pipeline] ${connector.name} FAILED: ${message}`);
-    }
-    // Rate-limit between calls
-    await sleep(CONNECTOR_DELAY_MS);
-  }
-
-  // Phase 2: Store signals and update scores in the database
   try {
-    await storeSignalsAndUpdateScores(allSignals);
-  } catch (err) {
-    console.error("[pipeline] DB update failed:", err);
-    errors.push({
-      source: "database",
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // Phase 1: Collect signals from all connectors with concurrency limit
+    const tasks = connectors.map((connector) => () =>
+      connector.fetchSignals().then((signals) => ({
+        name: connector.name,
+        signals,
+      })),
+    );
+
+    const results = await runWithConcurrency(tasks, CONCURRENCY_LIMIT);
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const connectorName = connectors[i].name;
+      if (result.status === "fulfilled") {
+        allSignals.push(...result.value.signals);
+        activeSources.push(result.value.name);
+        console.log(
+          `[pipeline] ${result.value.name}: ${result.value.signals.length} signals`,
+        );
+      } else {
+        const message =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        errors.push({ source: connectorName, error: message });
+        console.error(`[pipeline] ${connectorName} FAILED: ${message}`);
+      }
+    }
+
+    // Phase 1b: Deduplicate signals
+    const dedupedSignals = deduplicateSignals(allSignals);
+    console.log(
+      `[pipeline] Deduplication: ${allSignals.length} → ${dedupedSignals.length} signals`,
+    );
+
+    // Phase 2: Store signals and update scores in the database
+    try {
+      await storeSignalsAndUpdateScores(dedupedSignals);
+    } catch (err) {
+      console.error("[pipeline] DB update failed:", err);
+      errors.push({
+        source: "database",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const durationMs = Date.now() - start;
+
+    return {
+      success: errors.length === 0,
+      signalCount: dedupedSignals.length,
+      trendCount: megaTrends.length,
+      sources: activeSources,
+      errors,
+      durationMs,
+      timestamp: new Date().toISOString(),
+    };
+  } finally {
+    pipelineRunning = false;
   }
-
-  const durationMs = Date.now() - start;
-
-  return {
-    success: errors.length === 0,
-    signalCount: allSignals.length,
-    trendCount: megaTrends.length,
-    sources: activeSources,
-    errors,
-    durationMs,
-    timestamp: new Date().toISOString(),
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +209,10 @@ async function storeSignalsAndUpdateScores(signals: RawSignal[]) {
     await storeSignalsSqlite(signals);
   }
 }
+
+// TODO: ARC-16 — storeSignalsPg and storeSignalsSqlite are 96/103 lines respectively,
+// differing only in async vs sync and Date vs ISO-String.
+// FIX: Abstract behind a DB-agnostic storeSignals() wrapper.
 
 async function storeSignalsPg(signals: RawSignal[]) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -132,6 +243,9 @@ async function storeSignalsPg(signals: RawSignal[]) {
       if (existing.length > 0) {
         trendId = existing[0].id;
         // Update aggregate scores
+        // TODO: DAT-14 — Date format divergence: PG uses native Date objects, SQLite uses ISO strings.
+        // Tags: PG = native Array, SQLite = JSON.stringify. Read code must handle both.
+        // FIX: Define a canonical date format (ISO-8601 strings) and use consistently.
         await db
           .update(schema.trends)
           .set({

@@ -1,3 +1,4 @@
+// TODO: ARC-09 – VoltNavbar is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltNavbar – Atmospheric Volt UI Design System
  * Top-Navigation mit Glasmorphismus und Volt-Textur.

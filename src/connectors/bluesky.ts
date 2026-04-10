@@ -37,9 +37,17 @@ export const blueskyConnector: SourceConnector = {
         const reposts = post.repostCount || 0;
         const engagement = likes + reposts;
 
+        // Build post-specific URL using the AT URI (at://did/app.bsky.feed.post/rkey)
+        let sourceUrl = `https://bsky.app/profile/${author}`;
+        const atUri = post.uri as string | undefined;
+        if (atUri) {
+          const rkey = atUri.split("/").pop();
+          if (rkey) sourceUrl = `https://bsky.app/profile/${author}/post/${rkey}`;
+        }
+
         signals.push({
           sourceType: "bluesky",
-          sourceUrl: `https://bsky.app/profile/${author}`,
+          sourceUrl,
           sourceTitle: `Bluesky @${author}: ${text.slice(0, 80)}...`,
           signalType: engagement > 50 ? "spike" : "discussion",
           topic: "Technological Disruption",

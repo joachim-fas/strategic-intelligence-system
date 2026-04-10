@@ -22,6 +22,7 @@ export const crossrefConnector: SourceConnector = {
         {
           headers: {
             Accept: "application/json",
+            // TODO: Replace with real contact email for CrossRef polite pool access
             "User-Agent": "SIS-TrendRadar/1.0 (mailto:info@example.com)",
           },
           signal: AbortSignal.timeout(20000),
@@ -37,7 +38,7 @@ export const crossrefConnector: SourceConnector = {
         const title = (item.title?.[0] || "Untitled").slice(0, 200);
         const subjects = item.subject || [];
         const topic = subjects.length > 0
-          ? "Artificial Intelligence & Automation"
+          ? subjects[0]
           : "Artificial Intelligence & Automation";
         const refs = item["is-referenced-by-count"] || 0;
 

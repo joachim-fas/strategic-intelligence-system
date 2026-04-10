@@ -35,9 +35,18 @@ export const npmPypiConnector: SourceConnector = {
     const npmNames = npmPackages.map((p) => p.npm!).join(",");
 
     try {
-      const res = await fetch(
-        `https://api.npmjs.org/downloads/point/last-week/${npmNames}`
-      );
+      const npmController = new AbortController();
+      const npmTimeout = setTimeout(() => npmController.abort(), 30000);
+      let res: Response;
+      try {
+        // NOTE: May only return first package; consider using bulk endpoint
+        res = await fetch(
+          `https://api.npmjs.org/downloads/point/last-week/${npmNames}`,
+          { signal: npmController.signal }
+        );
+      } finally {
+        clearTimeout(npmTimeout);
+      }
       if (res.ok) {
         const data = await res.json();
         // Data comes back as object keyed by package name
@@ -68,9 +77,17 @@ export const npmPypiConnector: SourceConnector = {
     // PyPI downloads (use pypistats.org)
     for (const pkg of TRACKED_PACKAGES.filter((p) => p.pypi)) {
       try {
-        const res = await fetch(
-          `https://pypistats.org/api/packages/${pkg.pypi}/recent`
-        );
+        const pypiController = new AbortController();
+        const pypiTimeout = setTimeout(() => pypiController.abort(), 30000);
+        let res: Response;
+        try {
+          res = await fetch(
+            `https://pypistats.org/api/packages/${pkg.pypi}/recent`,
+            { signal: pypiController.signal }
+          );
+        } finally {
+          clearTimeout(pypiTimeout);
+        }
         if (!res.ok) continue;
 
         const data = await res.json();

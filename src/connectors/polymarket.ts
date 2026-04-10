@@ -95,7 +95,7 @@ export const polymarketConnector: SourceConnector = {
             sourceTitle: market.question || event.title,
             signalType: "mention",
             topic,
-            rawStrength: yesProbability, // Probability IS the signal strength
+            rawStrength: 0.3 + Math.abs(0.5 - yesProbability) * 1.4, // Extreme predictions = stronger signal
             rawData: {
               eventId: event.id,
               marketId: market.id,

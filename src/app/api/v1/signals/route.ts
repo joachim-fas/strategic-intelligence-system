@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { storeSignals, pruneOldSignals, getSignalAge } from "@/lib/signals";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 
 // Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
 ensureEnvLoaded();
 
 // GET — signal store status
-export async function GET() {
+export async function GET(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60000)) {
+    return tooManyRequests();
+  }
   const age = getSignalAge();
   return NextResponse.json({
     signalCount: age.count,
@@ -17,7 +22,11 @@ export async function GET() {
 }
 
 // POST — run connectors and persist signals
-export async function POST() {
+export async function POST(request: Request) {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60000)) {
+    return tooManyRequests();
+  }
   const { connectors } = await import("@/connectors");
 
   // Prune signals older than 48h before adding new ones

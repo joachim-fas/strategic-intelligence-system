@@ -73,7 +73,8 @@ export function storeSignals(
 
 // ─── Clear stale signals (older than N hours) ─────────────────────────────────
 
-export function pruneOldSignals(maxAgeHours = 48): void {
+// Default matches the 14-day exponential decay window in scoring.ts
+export function pruneOldSignals(maxAgeHours = 336): void {
   const d = db();
   d.prepare(
     `DELETE FROM live_signals WHERE fetched_at < datetime('now', ? || ' hours')`
@@ -109,6 +110,31 @@ export function getSignalAge(): { count: number; oldestHours: number; newestHour
 export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const d = db();
 
+  // ALG-21: Cross-language alias map for common DE<>EN term pairs.
+  // When a keyword matches any alias group, all aliases in that group
+  // are added to the keyword list so "Cybersicherheit" also matches
+  // signals tagged with "cybersecurity" and vice versa.
+  const CROSS_LANG_ALIASES: Record<string, string[]> = {
+    "ki": ["ai", "artificial intelligence", "künstliche intelligenz"],
+    "klimawandel": ["climate change", "global warming"],
+    "cybersicherheit": ["cybersecurity", "cyber security"],
+    "energiewende": ["energy transition"],
+    "lieferkette": ["supply chain"],
+    "gesundheit": ["health", "public health"],
+    "migration": ["immigration", "refugees"],
+    "geopolitik": ["geopolitics"],
+    "kryptowährung": ["cryptocurrency", "crypto"],
+  };
+
+  // Build a reverse lookup: any alias term -> all terms in its group
+  const aliasLookup = new Map<string, string[]>();
+  for (const [key, aliases] of Object.entries(CROSS_LANG_ALIASES)) {
+    const group = [key, ...aliases];
+    for (const term of group) {
+      aliasLookup.set(term, group);
+    }
+  }
+
   // Extract meaningful keywords from query (skip short/common words)
   const stopWords = new Set([
     "wie", "was", "wo", "wer", "wann", "warum", "welche", "welcher", "welches",
@@ -119,12 +145,30 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "und", "oder", "aber", "und", "also", "noch", "schon", "sehr",
   ]);
 
-  const keywords = query
+  // Important short terms that must bypass the minimum-length filter
+  const importantShortTerms = new Set([
+    "ki", "ai", "eu", "un", "us", "uk", "it", "ml", "ar", "vr", "xr",
+    "5g", "6g", "iot", "llm", "rag", "api", "b2b", "b2c", "esg", "gdp",
+  ]);
+
+  const baseKeywords = query
     .toLowerCase()
     .replace(/[^\w\säöüß]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 3 && !stopWords.has(w))
-    .slice(0, 8); // Use up to 8 keywords
+    .filter((w) => !stopWords.has(w) && (w.length >= 2 || importantShortTerms.has(w)));
+
+  // ALG-21: Expand keywords with cross-language aliases
+  const expandedSet = new Set(baseKeywords);
+  // Also check multi-word phrases from the query against alias keys
+  const lowerQuery = query.toLowerCase().replace(/[^\w\säöüß]/g, " ");
+  for (const [aliasKey, group] of aliasLookup) {
+    if (lowerQuery.includes(aliasKey) || baseKeywords.includes(aliasKey)) {
+      for (const alias of group) {
+        expandedSet.add(alias);
+      }
+    }
+  }
+  const keywords = Array.from(expandedSet).slice(0, 12); // Allow more keywords after expansion
 
   if (keywords.length === 0) {
     // Fallback: return most recent high-strength signals
@@ -152,7 +196,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     SELECT *,
       (${scoreExpr}) as relevance_score
     FROM live_signals
-    WHERE fetched_at > datetime('now', '-72 hours')
+    WHERE fetched_at > datetime('now', '-336 hours')
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
   `).all([...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
@@ -167,6 +211,23 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────
 
+/**
+ * SEC-07: Sanitize signal text before embedding in LLM prompts.
+ * Strips control characters, XML-like tags, and role markers that
+ * could be used for prompt injection via crafted signal data.
+ */
+function sanitizeSignalText(input: string): string {
+  if (!input) return "";
+  return input
+    // Strip control characters (except newline/tab)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    // Strip XML-style tags that could hijack prompt structure
+    .replace(/<\/?[a-zA-Z_|][^>]{0,80}>/g, "")
+    // Strip role markers used in chat prompts
+    .replace(/\b(system|user|assistant|human)\s*:/gi, "")
+    .trim();
+}
+
 export function formatSignalsForPrompt(signals: LiveSignal[]): string {
   if (signals.length === 0) return "";
 
@@ -174,10 +235,11 @@ export function formatSignalsForPrompt(signals: LiveSignal[]): string {
     const date = s.fetched_at.slice(0, 10);
     const strength = s.strength != null ? ` [Stärke: ${(s.strength * 100).toFixed(0)}%]` : "";
     const url = s.url ? ` → ${s.url}` : "";
-    const content = s.content ? `\n    ${s.content.slice(0, 200)}` : "";
-    return `• [${s.source.toUpperCase()}, ${date}]${strength} ${s.title}${url}${content}`;
+    const title = sanitizeSignalText(s.title);
+    const content = s.content ? `\n    ${sanitizeSignalText(s.content.slice(0, 200))}` : "";
+    return `• [${sanitizeSignalText(s.source).toUpperCase()}, ${date}]${strength} ${title}${url}${content}`;
   });
 
-  return `AKTUELLE BELEGTE SIGNALE (letzte 72h, aus ${new Set(signals.map((s) => s.source)).size} Quellen):
+  return `AKTUELLE BELEGTE SIGNALE (letzte 14 Tage, aus ${new Set(signals.map((s) => s.source)).size} Quellen):
 ${lines.join("\n")}`;
 }

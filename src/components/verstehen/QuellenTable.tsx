@@ -1,5 +1,8 @@
 "use client";
 
+// TODO: PERF-08 — All list items rendered to DOM. At 500+ entries, UI becomes sluggish.
+// FIX: Use react-virtual or react-window for lists with >50 items.
+
 /**
  * QuellenTable — Implements the Volt UI "Quellen-Tabelle" template.
  *
@@ -18,7 +21,7 @@
  * Typ badges: LIVE-SIGNAL / SOCIAL / FORSCHUNG / PROGNOSE
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { connectors } from "@/connectors";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { PLANNED_CONNECTORS } from "@/lib/planned-connectors";
@@ -378,11 +381,11 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         ) : (
           <>
             {liveCount} {de ? "Live-Quellen" : "live sources"} ·{" "}
-            <span style={{ color: "#1A9E5A", fontWeight: 600 }}>
+            <span style={{ color: "var(--signal-positive, #1A9E5A)", fontWeight: 600 }}>
               {activeCount} {de ? "aktiv" : "active"}
             </span>
             {" · "}
-            <span style={{ color: "#7A5C00", fontWeight: 600 }}>
+            <span style={{ color: "var(--pastel-butter-text, #7A5C00)", fontWeight: 600 }}>
               {plannedCount} {de ? "geplant" : "planned"}
             </span>
           </>
@@ -511,7 +514,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   borderRadius: 999,
                   border: active ? "1px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
                   background: active ? "var(--volt-text, #0A0A0A)" : "var(--volt-surface-raised, #fff)",
-                  color: active ? "#fff" : "var(--volt-text-muted, #6B6B6B)",
+                  color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
                   cursor: "pointer",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                   transition: "all 120ms ease",
@@ -615,7 +618,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                       {isPlanned && r.priority === "high" && (
                         <span
                           title={de ? "Hohe Priorität" : "High priority"}
-                          style={{ fontSize: 9, color: "#C8102E", fontWeight: 700, flexShrink: 0 }}
+                          style={{ fontSize: 9, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
                         >●</span>
                       )}
                     </div>
@@ -771,6 +774,23 @@ export default function QuellenTable({ de }: QuellenTableProps) {
 // ─── Sub-components ─────────────────────────────────────────────────
 
 function SearchBox({ value, onChange, de }: { value: string; onChange: (v: string) => void; de: boolean }) {
+  const [local, setLocal] = useState(value);
+  const debounceTimer = useRef<NodeJS.Timeout>(undefined);
+
+  // Sync external value changes (e.g. reset from parent)
+  useEffect(() => { setLocal(value); }, [value]);
+
+  const handleChange = useCallback((v: string) => {
+    setLocal(v);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      onChange(v);
+    }, 250);
+  }, [onChange]);
+
+  // Cleanup on unmount
+  useEffect(() => () => clearTimeout(debounceTimer.current), []);
+
   return (
     <div
       style={{
@@ -787,8 +807,8 @@ function SearchBox({ value, onChange, de }: { value: string; onChange: (v: strin
       <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>🔍</span>
       <input
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={local}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder={de ? "Suchen..." : "Search..."}
         style={{
           border: "none",

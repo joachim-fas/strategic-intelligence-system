@@ -26,9 +26,15 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 
+// TODO: UX-04 — No responsive/mobile layout. No breakpoints, no touch support.
+// FIX: Add responsive breakpoints or show "Desktop only" notice on mobile.
+
 export const metadata: Metadata = {
-  title: "Strategic Intelligence System",
-  description: "Multi-industry strategic intelligence platform",
+  title: { default: "SIS — Strategic Intelligence System", template: "%s | SIS" },
+  description: "Strategic Intelligence System for trend analysis and signal monitoring",
+  // UX-21: Favicon and PWA manifest
+  icons: { icon: "/favicon.ico" },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

@@ -1,5 +1,10 @@
 "use client";
 
+// TODO: PERF-08 — All list items rendered to DOM. At 500+ entries, UI becomes sluggish.
+// FIX: Use react-virtual or react-window for lists with >50 items.
+
+// TODO: ARC-12 — Namespace collision: src/components/session/ and src/components/sessions/ both active.
+
 /**
  * Shared list of sessions used by both /sessions (active) and /sessions/archiv
  * (archived). Handles data fetching, row actions (archive / restore / delete),
@@ -298,15 +303,34 @@ export function SessionList({ mode, de }: Props) {
 
   if (error) {
     return (
-      <div style={{
-        padding: "16px 18px",
+      <div role="alert" style={{
+        padding: "20px 22px",
         background: "var(--volt-negative-light, #FEF2F2)",
         border: "1px solid var(--volt-negative-border, #FECACA)",
         borderRadius: "var(--volt-radius-md, 10px)",
         color: "var(--volt-negative-text, #991B1B)",
         fontSize: 13,
+        display: "flex", flexDirection: "column", gap: 12,
       }}>
-        {de ? "Fehler beim Laden: " : "Load error: "}{error}
+        <span>
+          {de
+            ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+            : "Data could not be loaded. Please try again."}
+        </span>
+        <button
+          onClick={load}
+          style={{
+            alignSelf: "flex-start",
+            fontSize: 12, fontWeight: 600, padding: "6px 16px",
+            borderRadius: "var(--volt-radius-md, 10px)",
+            border: "1px solid var(--volt-negative-border, #FECACA)",
+            background: "transparent",
+            color: "var(--volt-negative-text, #991B1B)",
+            cursor: "pointer",
+          }}
+        >
+          {de ? "Erneut versuchen" : "Retry"}
+        </button>
       </div>
     );
   }
@@ -426,6 +450,7 @@ export function SessionList({ mode, de }: Props) {
             }}
             aria-haspopup="listbox"
             aria-expanded={sortMenuOpen}
+            aria-label={de ? "Sortierung ändern" : "Change sort order"}
           >
             <ArrowDownUp size={12} strokeWidth={2} style={{ color: "var(--volt-text-faint, #999)" }} />
             <span style={{
@@ -825,6 +850,8 @@ function FilterPill({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
+      aria-label={`${label} (${count})`}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         fontSize: 11, fontWeight: 600,

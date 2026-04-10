@@ -55,7 +55,7 @@ export const iloConnector: SourceConnector = {
           sourceTitle: `ILO: Unemployment rate in ${country} — ${value.toFixed(1)}% (${time})`,
           signalType: "mention",
           topic: "Future of Work",
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: {
             country,
             indicator: "UNE_DEAP_SEX_AGE_RT",

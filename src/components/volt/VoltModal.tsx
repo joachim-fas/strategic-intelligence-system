@@ -1,3 +1,4 @@
+// TODO: ARC-09 – VoltModal is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltModal – Atmospheric Volt UI Design System
  * Modal/Dialog mit Glasmorphismus und Volt-Textur.

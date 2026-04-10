@@ -29,10 +29,11 @@ export const newsdataConnector: SourceConnector = {
     if (!key) return signals;
 
     try {
+      // SEC-09: API key moved from URL query string to X-ACCESS-KEY header
       const res = await fetch(
-        `https://newsdata.io/api/1/latest?apikey=${key}&language=en,de&category=technology,politics`,
+        `https://newsdata.io/api/1/latest?language=en,de&category=technology,politics`,
         {
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json", "X-ACCESS-KEY": key },
           signal: AbortSignal.timeout(20000),
         }
       );
@@ -53,7 +54,7 @@ export const newsdataConnector: SourceConnector = {
           sourceTitle: `NewsData: ${title.slice(0, 150)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.5,
+          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
           rawData: {
             title,
             category,

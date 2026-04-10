@@ -9,14 +9,22 @@ import { SourceConnector, RawSignal } from "./types";
  * API: https://docs.joinmastodon.org/methods/timelines/
  */
 
+// CON-18: Use more specific multi-word keywords to reduce false positives.
+// "tech" alone matches "techno", "technically", etc. — use more specific terms.
 const KEYWORD_TOPICS: Record<string, string> = {
-  ai: "Artificial Intelligence & Automation",
-  climate: "Climate Change & Sustainability",
+  "artificial intelligence": "Artificial Intelligence & Automation",
+  "machine learning": "Artificial Intelligence & Automation",
+  "climate change": "Climate Change & Sustainability",
+  "global warming": "Climate Change & Sustainability",
+  "renewable energy": "Climate Change & Sustainability",
   economy: "Economic Trends",
-  politics: "Geopolitical Fragmentation",
-  tech: "Technological Disruption",
-  security: "Security, Trust & Resilience",
-  health: "Health & Wellbeing",
+  inflation: "Economic Trends",
+  geopolitics: "Geopolitical Fragmentation",
+  "foreign policy": "Geopolitical Fragmentation",
+  cybersecurity: "Security, Trust & Resilience",
+  "data breach": "Security, Trust & Resilience",
+  "public health": "Health & Wellbeing",
+  pandemic: "Health & Wellbeing",
 };
 
 function detectTopic(text: string): string {
@@ -27,6 +35,9 @@ function detectTopic(text: string): string {
   return "Technological Disruption";
 }
 
+// TODO: CON-18 — Add keyword relevance scoring to filter out low-relevance
+// posts. Currently matches any post containing the search term.
+
 export const mastodonApiConnector: SourceConnector = {
   name: "mastodon_api",
   displayName: "Mastodon (Public Timeline)",
@@ -35,6 +46,9 @@ export const mastodonApiConnector: SourceConnector = {
     const signals: RawSignal[] = [];
 
     try {
+      // CON-18: Fetch public timeline — no topic-specific filtering available
+      // on the public timeline endpoint. The detectTopic function below uses
+      // single generic keywords (e.g. "tech") that match too broadly.
       const res = await fetch(
         "https://mastodon.social/api/v1/timelines/public?limit=20",
         {

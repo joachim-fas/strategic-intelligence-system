@@ -1,3 +1,4 @@
+// TODO: ARC-09 – VoltToggle is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltToggle / VoltCheckbox / VoltRadio – Volt UI
  * KONTRAST-GARANTIE: Alle Farben über CSS-Variablen.

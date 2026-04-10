@@ -1,3 +1,4 @@
+// TODO: ARC-09 – VoltStat is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltStat / VoltKPI – Atmospheric Volt UI Design System
  * Kennzahlen-Karten für Dashboards.

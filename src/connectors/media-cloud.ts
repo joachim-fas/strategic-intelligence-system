@@ -9,6 +9,22 @@ import { SourceConnector, RawSignal } from "./types";
  * API: https://search.mediacloud.org/
  */
 
+// CON-13: Expanded query list covering major STEEP+V topics instead of only 2
+// hardcoded queries. Each entry maps a search query to its SIS topic.
+const MEDIA_CLOUD_QUERIES: Array<{ query: string; topic: string }> = [
+  // Original 2 queries
+  { query: "artificial intelligence", topic: "Artificial Intelligence & Automation" },
+  { query: "climate change", topic: "Climate Change & Sustainability" },
+  // CON-13: Additional STEEP+V topics
+  { query: "cybersecurity", topic: "Cybersecurity & Zero Trust" },
+  { query: "energy transition", topic: "Energy Transition & Decarbonization" },
+  { query: "migration", topic: "Migration & Displacement" },
+  { query: "geopolitics", topic: "Geopolitical Fragmentation" },
+  { query: "supply chain", topic: "Platform Economy & Ecosystems" },
+  { query: "cryptocurrency", topic: "Web3 & Decentralization" },
+  { query: "public health", topic: "Health, Biotech & Longevity" },
+];
+
 export const mediaCloudConnector: SourceConnector = {
   name: "media_cloud",
   displayName: "Media Cloud (Media Analysis)",
@@ -17,59 +33,40 @@ export const mediaCloudConnector: SourceConnector = {
     const signals: RawSignal[] = [];
 
     try {
-      const res = await fetch(
-        "https://search.mediacloud.org/api/v4/search/overview?q=artificial+intelligence",
-        {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(20000),
-        }
-      );
+      for (const { query, topic } of MEDIA_CLOUD_QUERIES) {
+        try {
+          const encodedQuery = encodeURIComponent(query);
+          const res = await fetch(
+            `https://search.mediacloud.org/api/v4/search/overview?q=${encodedQuery}`,
+            {
+              headers: { Accept: "application/json" },
+              signal: AbortSignal.timeout(20000),
+            },
+          );
 
-      if (!res.ok) return signals;
+          if (!res.ok) continue;
 
-      const data = await res.json();
-      const totalHits = data.total || data.total_hits || 0;
+          const data = await res.json();
+          const totalHits = data.total || data.total_hits || 0;
 
-      if (totalHits > 0) {
-        signals.push({
-          sourceType: "media_cloud",
-          sourceUrl: "https://search.mediacloud.org/",
-          sourceTitle: `Media Cloud: ${totalHits} articles on AI`,
-          signalType: totalHits > 10000 ? "spike" : "mention",
-          topic: "Artificial Intelligence & Automation",
-          rawStrength: Math.min(1, totalHits / 50000),
-          rawData: {
-            query: "artificial intelligence",
-            totalHits,
-            rawResponse: typeof data === "object" ? Object.keys(data) : [],
-          },
-          detectedAt: new Date(),
-        });
-      }
-
-      // Also query for climate
-      const res2 = await fetch(
-        "https://search.mediacloud.org/api/v4/search/overview?q=climate+change",
-        {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(20000),
-        }
-      );
-
-      if (res2.ok) {
-        const data2 = await res2.json();
-        const hits2 = data2.total || data2.total_hits || 0;
-        if (hits2 > 0) {
-          signals.push({
-            sourceType: "media_cloud",
-            sourceUrl: "https://search.mediacloud.org/",
-            sourceTitle: `Media Cloud: ${hits2} articles on climate change`,
-            signalType: hits2 > 10000 ? "spike" : "mention",
-            topic: "Climate Change & Sustainability",
-            rawStrength: Math.min(1, hits2 / 50000),
-            rawData: { query: "climate change", totalHits: hits2 },
-            detectedAt: new Date(),
-          });
+          if (totalHits > 0) {
+            signals.push({
+              sourceType: "media_cloud",
+              sourceUrl: "https://search.mediacloud.org/",
+              sourceTitle: `Media Cloud: ${totalHits} articles on ${query}`,
+              signalType: totalHits > 10000 ? "spike" : "mention",
+              topic,
+              rawStrength: Math.min(1, totalHits / 50000),
+              rawData: {
+                query,
+                totalHits,
+                rawResponse: typeof data === "object" ? Object.keys(data) : [],
+              },
+              detectedAt: new Date(),
+            });
+          }
+        } catch {
+          // Individual query failed, continue with the rest
         }
       }
     } catch {
