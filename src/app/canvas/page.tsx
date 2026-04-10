@@ -4347,6 +4347,9 @@ export default function CanvasPage() {
   const saveTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dbSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  // ── Auto-naming: track whether session has been auto-renamed after first query ──
+  const hasAutoNamedRef = useRef(false);
+
   // ── Active stream abort controllers (keyed by node ID) ────────────────────
   const activeStreamsRef = useRef<Map<string, AbortController>>(new Map());
 
@@ -4468,6 +4471,7 @@ export default function CanvasPage() {
       setPanX(0); setPanY(0); setZoom(1);
       setSelectedId(null); setCmdVisible(false);
       setSaveStatus(null);
+      hasAutoNamedRef.current = false;
       try { localStorage.setItem("sis-active-canvas", newCanvas.id); } catch {}
       try { window.history.replaceState(null, "", `/canvas?project=${newCanvas.id}`); } catch {}
       await loadProjects();
@@ -4519,6 +4523,8 @@ export default function CanvasPage() {
       setProjectId(id);
       setProjectName(canvas.name);
       setSaveStatus(null);
+      // Reset auto-naming flag so the next first-query can rename this session
+      hasAutoNamedRef.current = false;
       try { localStorage.setItem("sis-active-canvas", id); } catch {}
       // Keep URL in sync so bookmarks / refresh / back-button all work
       try { window.history.replaceState(null, "", `/canvas?project=${id}`); } catch {}
@@ -4886,24 +4892,63 @@ export default function CanvasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, connections, panX, panY, zoom, projectId]);
 
+  // Flush pending DB save immediately (used by unload, visibility, and unmount handlers)
+  const flushPendingSave = useCallback(() => {
+    const pid = projectIdRef.current;
+    if (!pid || nodesRef.current.length === 0) return;
+    if (dbSaveTimerRef.current) {
+      clearTimeout(dbSaveTimerRef.current);
+      dbSaveTimerRef.current = undefined;
+    }
+    const doneNodes = nodesRef.current.filter(n => n.nodeType !== "query" || (n as QueryNode).status === "done" || (n as QueryNode).status === "error");
+    if (doneNodes.length === 0) return;
+    // Synchronous localStorage save as last resort
+    saveToStorage(doneNodes, connectionsRef.current, { x: panXRef.current, y: panYRef.current }, zoomRef.current);
+    // Best-effort DB save via sendBeacon (works even during unload)
+    const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
+    try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, new Blob([JSON.stringify({ canvasState: state })], { type: "application/json" })); } catch {}
+  }, []);
+
   // Save on browser close / tab close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Warn user about unsaved changes
       if (nodesRef.current.length > 0) {
         e.preventDefault();
       }
-      const pid = projectIdRef.current;
-      if (!pid || nodesRef.current.length === 0) return;
-      // Synchronous localStorage save as last resort
-      const doneNodes = nodesRef.current.filter(n => n.nodeType !== "query" || (n as QueryNode).status === "done" || (n as QueryNode).status === "error");
-      if (doneNodes.length > 0) saveToStorage(doneNodes, connectionsRef.current, { x: panXRef.current, y: panYRef.current }, zoomRef.current);
-      // Also try async DB save via sendBeacon (best-effort)
-      const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
-      try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, new Blob([JSON.stringify({ canvasState: state })], { type: "application/json" })); } catch {}
+      flushPendingSave();
+    };
+    // Save when tab becomes hidden (covers Alt+Tab, switching tabs, mobile backgrounding)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushPendingSave();
+      }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushPendingSave]);
+
+  // Flush pending save on component unmount (Next.js client-side navigation)
+  useEffect(() => {
+    return () => {
+      // On unmount, flush any pending debounced save so SPA navigation doesn't lose data
+      if (dbSaveTimerRef.current) {
+        clearTimeout(dbSaveTimerRef.current);
+        dbSaveTimerRef.current = undefined;
+        const pid = projectIdRef.current;
+        if (pid && nodesRef.current.length > 0) {
+          const doneNodes = nodesRef.current.filter(n => n.nodeType !== "query" || (n as QueryNode).status === "done" || (n as QueryNode).status === "error");
+          if (doneNodes.length > 0) {
+            const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
+            try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, new Blob([JSON.stringify({ canvasState: state })], { type: "application/json" })); } catch {}
+          }
+        }
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Global pointer events ─────────────────────────────────────────────────
@@ -5238,6 +5283,31 @@ export default function CanvasPage() {
             setConnections(prev => [...prev, { from: id, to: d.id, derived: true }]);
           }, 200 + i * 90);
         });
+
+        // Auto-rename session after first successful query if still has default name
+        const pid = projectIdRef.current;
+        if (pid && !hasAutoNamedRef.current) {
+          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project"];
+          // Use a function updater pattern: read current name from state
+          setProjectName(prevName => {
+            if (DEFAULT_NAMES.includes(prevName) || !prevName.trim()) {
+              hasAutoNamedRef.current = true;
+              const autoName = query.substring(0, 60);
+              // Fire-and-forget rename API call
+              fetch(`/api/v1/canvas/${pid}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: autoName }),
+              }).catch(() => {});
+              // Update project list too
+              setProjects(prev => prev.map(p => p.id === pid ? { ...p, name: autoName } : p));
+              return autoName;
+            }
+            // Name was already customized — mark as done and don't rename
+            hasAutoNamedRef.current = true;
+            return prevName;
+          });
+        }
       },
       (msg) => {
         activeStreamsRef.current.delete(id);
