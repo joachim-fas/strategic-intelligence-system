@@ -380,6 +380,471 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.55,
     description: "Migration flows reshape demographic composition in aging societies",
   },
+
+  // ─── Sprint 4a expansion (2026-04-10) ────────────────────────────────────
+  // Filling 4 orphan trends, adding second connections to 18 lonely-leaf
+  // trends, and weaving cross-domain relationships that the original
+  // hand-curated edge set missed. Goal: turn the network from a thin
+  // hub-and-spoke (47 edges, 4 invisible nodes) into a dense system map
+  // where every trend has a meaningful neighborhood.
+
+  // ── Mobility (was orphan) ──────────────────────────────────────────────
+  {
+    from: "mega-mobility",
+    to: "macro-autonomous-mobility",
+    type: "drives",
+    strength: 0.95,
+    description: "Mobility transformation directly drives autonomous vehicle adoption",
+  },
+  {
+    from: "mega-energy-transition",
+    to: "mega-mobility",
+    type: "drives",
+    strength: 0.85,
+    description: "Electrification mandates restructure the entire mobility sector",
+  },
+  {
+    from: "mega-mobility",
+    to: "mega-urbanization",
+    type: "amplifies",
+    strength: 0.7,
+    description: "New mobility forms reshape urban density, parking, and street design",
+    bidirectional: true,
+  },
+  {
+    from: "mega-climate-sustainability",
+    to: "mega-mobility",
+    type: "drives",
+    strength: 0.75,
+    description: "Climate targets force decarbonization of transport — the largest single emitter",
+  },
+
+  // ── Identity & Values (was orphan) ─────────────────────────────────────
+  {
+    from: "mega-knowledge-culture",
+    to: "mega-identity-values",
+    type: "drives",
+    strength: 0.7,
+    description: "Cultural and educational shifts reshape generational value systems",
+  },
+  {
+    from: "mega-identity-values",
+    to: "macro-conscious-consumption",
+    type: "drives",
+    strength: 0.8,
+    description: "Values-driven consumers reject consumption-as-identity, demand ethical brands",
+  },
+  {
+    from: "mega-identity-values",
+    to: "mega-social-instability",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Identity polarization fuels political fragmentation and culture-war dynamics",
+  },
+  {
+    from: "macro-web3-decentralization",
+    to: "mega-identity-values",
+    type: "correlates",
+    strength: 0.5,
+    description: "Self-sovereign identity tech aligns with values of autonomy and privacy",
+  },
+  {
+    from: "mega-ai-transformation",
+    to: "mega-identity-values",
+    type: "drives",
+    strength: 0.65,
+    description: "AI authorship, deepfakes, and synthetic media destabilize concepts of authenticity",
+  },
+
+  // ── Cloud Native (was orphan) ──────────────────────────────────────────
+  {
+    from: "mega-technological-disruption",
+    to: "macro-cloud-native",
+    type: "drives",
+    strength: 0.85,
+    description: "Cloud-native architectures are the dominant deployment pattern for new tech",
+  },
+  {
+    from: "macro-cloud-native",
+    to: "macro-ai-agents",
+    type: "amplifies",
+    strength: 0.75,
+    description: "Container orchestration and serverless make agent deployment economically viable",
+  },
+  {
+    from: "macro-cloud-native",
+    to: "macro-cybersecurity",
+    type: "drives",
+    strength: 0.7,
+    description: "Cloud-first architectures expand the attack surface and shift security models to zero-trust",
+  },
+  {
+    from: "macro-cloud-native",
+    to: "macro-edge-iot",
+    type: "correlates",
+    strength: 0.65,
+    description: "Edge and cloud are increasingly continuous — same primitives, different runtimes",
+    bidirectional: true,
+  },
+
+  // ── Exponential Manufacturing (was orphan) ─────────────────────────────
+  {
+    from: "mega-technological-disruption",
+    to: "macro-exponential-manufacturing",
+    type: "drives",
+    strength: 0.8,
+    description: "3D printing, robotics, and digital twins compound into a manufacturing revolution",
+  },
+  {
+    from: "macro-exponential-manufacturing",
+    to: "macro-circular-economy",
+    type: "amplifies",
+    strength: 0.7,
+    description: "On-demand local production enables design for repair, reuse, and recycling",
+  },
+  {
+    from: "macro-exponential-manufacturing",
+    to: "mega-geopolitical-fracturing",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Distributed manufacturing weakens reliance on single-source global supply chains",
+  },
+  {
+    from: "mega-energy-transition",
+    to: "macro-exponential-manufacturing",
+    type: "correlates",
+    strength: 0.5,
+    description: "Renewable-powered factories enable carbon-aware production scheduling",
+  },
+
+  // ── Quantum Computing — fill out the second connection ─────────────────
+  {
+    from: "mega-technological-disruption",
+    to: "macro-quantum-computing",
+    type: "amplifies",
+    strength: 0.75,
+    description: "Frontier R&D continues to push quantum closer to commercial relevance",
+  },
+  {
+    from: "macro-quantum-computing",
+    to: "mega-health-biotech",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Quantum simulation accelerates drug discovery and protein folding research",
+  },
+
+  // ── Spatial Computing & XR ─────────────────────────────────────────────
+  {
+    from: "mega-technological-disruption",
+    to: "macro-spatial-computing",
+    type: "drives",
+    strength: 0.7,
+    description: "AR/VR hardware leaps enable new spatial interaction paradigms",
+  },
+  {
+    from: "macro-spatial-computing",
+    to: "macro-remote-hybrid",
+    type: "amplifies",
+    strength: 0.6,
+    description: "Immersive collaboration reduces the in-person/remote experience gap",
+  },
+  {
+    from: "macro-spatial-computing",
+    to: "mega-knowledge-culture",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Spatial learning environments transform training and skill acquisition",
+  },
+
+  // ── Web3 & Decentralization ────────────────────────────────────────────
+  {
+    from: "macro-web3-decentralization",
+    to: "macro-platform-economy",
+    type: "dampens",
+    strength: 0.45,
+    description: "Decentralized protocols challenge centralized platform monopolies",
+  },
+  {
+    from: "macro-web3-decentralization",
+    to: "macro-cybersecurity",
+    type: "correlates",
+    strength: 0.5,
+    description: "Cryptographic primitives and decentralized identity reshape trust architectures",
+  },
+
+  // ── Generative AI — second connection beyond mega-AI ───────────────────
+  {
+    from: "macro-generative-ai",
+    to: "mega-knowledge-culture",
+    type: "drives",
+    strength: 0.85,
+    description: "Generative tools fundamentally change how knowledge is created, edited, and validated",
+  },
+  {
+    from: "macro-generative-ai",
+    to: "macro-attention-economy",
+    type: "amplifies",
+    strength: 0.7,
+    description: "AI-generated content floods feeds, accelerates the attention scarcity arms race",
+  },
+  {
+    from: "macro-generative-ai",
+    to: "mega-security-trust",
+    type: "drives",
+    strength: 0.7,
+    description: "Deepfakes and synthetic media erode the baseline of verifiable truth",
+  },
+
+  // ── AI Agents — second connection ──────────────────────────────────────
+  {
+    from: "macro-ai-agents",
+    to: "mega-future-of-work",
+    type: "drives",
+    strength: 0.9,
+    description: "Autonomous agents reshape job roles, productivity, and what 'work' even means",
+  },
+  {
+    from: "macro-ai-agents",
+    to: "macro-platform-economy",
+    type: "amplifies",
+    strength: 0.65,
+    description: "Agentic platforms become the new layer above app stores and marketplaces",
+  },
+
+  // ── Human-Machine Collaboration ────────────────────────────────────────
+  {
+    from: "macro-human-machine",
+    to: "mega-future-of-work",
+    type: "drives",
+    strength: 0.85,
+    description: "Co-bots and copilots redefine the boundary of human and machine work",
+  },
+  {
+    from: "macro-human-machine",
+    to: "mega-health-biotech",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Brain-computer interfaces and assistive robotics extend human capability",
+  },
+
+  // ── Green Energy ───────────────────────────────────────────────────────
+  {
+    from: "macro-green-energy",
+    to: "mega-geopolitical-fracturing",
+    type: "dampens",
+    strength: 0.55,
+    description: "Domestic renewables reduce dependence on fossil-exporting petrostates",
+  },
+  {
+    from: "macro-green-energy",
+    to: "macro-exponential-manufacturing",
+    type: "amplifies",
+    strength: 0.5,
+    description: "Cheap renewable power makes energy-intensive manufacturing carbon-viable",
+  },
+
+  // ── Circular Economy ───────────────────────────────────────────────────
+  {
+    from: "macro-circular-economy",
+    to: "macro-conscious-consumption",
+    type: "amplifies",
+    strength: 0.7,
+    description: "Closed-loop product systems normalize repair, lease, and refurbish over buy-new",
+    bidirectional: true,
+  },
+  {
+    from: "macro-circular-economy",
+    to: "mega-geopolitical-fracturing",
+    type: "dampens",
+    strength: 0.4,
+    description: "Domestic material loops reduce dependence on critical-mineral exporting regions",
+  },
+
+  // ── Conscious Consumption ──────────────────────────────────────────────
+  {
+    from: "macro-conscious-consumption",
+    to: "macro-platform-economy",
+    type: "drives",
+    strength: 0.5,
+    description: "Ethical consumers force platform marketplaces to expose supply chain transparency",
+  },
+
+  // ── Edge / IoT ─────────────────────────────────────────────────────────
+  {
+    from: "macro-edge-iot",
+    to: "macro-smart-surroundings",
+    type: "drives",
+    strength: 0.85,
+    description: "Edge sensors are the substrate of ambient intelligence environments",
+  },
+  {
+    from: "macro-edge-iot",
+    to: "macro-cybersecurity",
+    type: "drives",
+    strength: 0.7,
+    description: "Billions of edge devices vastly expand the attack surface",
+  },
+
+  // ── Data Economy ───────────────────────────────────────────────────────
+  {
+    from: "macro-data-economy",
+    to: "mega-ai-transformation",
+    type: "amplifies",
+    strength: 0.85,
+    description: "Data availability is the binding constraint on AI capability gains",
+    bidirectional: true,
+  },
+  {
+    from: "macro-data-economy",
+    to: "mega-identity-values",
+    type: "drives",
+    strength: 0.6,
+    description: "Data-as-asset reshapes individual rights, consent norms, and self-conception",
+  },
+
+  // ── Cybersecurity — strengthen the web ────────────────────────────────
+  {
+    from: "macro-cybersecurity",
+    to: "mega-future-of-work",
+    type: "drives",
+    strength: 0.5,
+    description: "Security skills are now a horizontal requirement across every job role",
+  },
+
+  // ── Digital Health ─────────────────────────────────────────────────────
+  {
+    from: "macro-digital-health",
+    to: "mega-demographic-shift",
+    type: "dampens",
+    strength: 0.5,
+    description: "Telemedicine and remote monitoring extend independent living for aging populations",
+  },
+  {
+    from: "macro-digital-health",
+    to: "macro-data-economy",
+    type: "amplifies",
+    strength: 0.6,
+    description: "Continuous health data streams form one of the largest emerging data markets",
+  },
+
+  // ── Genomics ───────────────────────────────────────────────────────────
+  {
+    from: "macro-genomics",
+    to: "macro-engineered-evolution",
+    type: "drives",
+    strength: 0.85,
+    description: "Affordable sequencing and CRISPR are the foundation of human enhancement",
+  },
+  {
+    from: "macro-genomics",
+    to: "mega-identity-values",
+    type: "correlates",
+    strength: 0.45,
+    description: "Genomic medicine reshapes how individuals understand ancestry, risk, and self",
+  },
+
+  // ── Engineered Evolution ───────────────────────────────────────────────
+  {
+    from: "macro-engineered-evolution",
+    to: "mega-social-instability",
+    type: "amplifies",
+    strength: 0.5,
+    description: "Access inequality to enhancement technologies risks new forms of biological stratification",
+  },
+
+  // ── Knowledge Culture & Lifelong Learning ──────────────────────────────
+  {
+    from: "macro-skills-upskilling",
+    to: "mega-knowledge-culture",
+    type: "amplifies",
+    strength: 0.75,
+    description: "Continuous learning is now a structural feature of adult life, not just school years",
+    bidirectional: true,
+  },
+  {
+    from: "mega-knowledge-culture",
+    to: "macro-attention-economy",
+    type: "amplifies",
+    strength: 0.5,
+    description: "Knowledge production migrates to creator platforms and short-form formats",
+  },
+
+  // ── Remote / Hybrid Work ───────────────────────────────────────────────
+  {
+    from: "macro-remote-hybrid",
+    to: "mega-urbanization",
+    type: "dampens",
+    strength: 0.45,
+    description: "Distributed work reverses some commuting-driven urban concentration",
+  },
+  {
+    from: "macro-remote-hybrid",
+    to: "macro-attention-economy",
+    type: "correlates",
+    strength: 0.4,
+    description: "Async work patterns reshape attention allocation and meeting culture",
+  },
+
+  // ── Smart Surroundings ─────────────────────────────────────────────────
+  {
+    from: "macro-smart-surroundings",
+    to: "mega-security-trust",
+    type: "drives",
+    strength: 0.6,
+    description: "Always-on ambient sensors raise existential privacy and surveillance questions",
+  },
+
+  // ── Autonomous Mobility ────────────────────────────────────────────────
+  {
+    from: "macro-autonomous-mobility",
+    to: "macro-platform-economy",
+    type: "amplifies",
+    strength: 0.55,
+    description: "Mobility-as-a-service platforms become the new layer between vehicles and riders",
+  },
+
+  // ── Seamless Commerce ──────────────────────────────────────────────────
+  {
+    from: "macro-seamless-commerce",
+    to: "mega-knowledge-culture",
+    type: "correlates",
+    strength: 0.35,
+    description: "Frictionless commerce shapes purchase decisions through micro-content and recommendations",
+  },
+
+  // ── Attention Economy ──────────────────────────────────────────────────
+  {
+    from: "macro-attention-economy",
+    to: "mega-social-instability",
+    type: "amplifies",
+    strength: 0.65,
+    description: "Engagement-optimized algorithms fuel polarization, outrage, and filter bubbles",
+  },
+  {
+    from: "macro-attention-economy",
+    to: "mega-identity-values",
+    type: "drives",
+    strength: 0.6,
+    description: "Algorithmic feeds shape self-image, aspiration, and group identity at scale",
+  },
+
+  // ── Platform Economy — strengthen the web ─────────────────────────────
+  {
+    from: "macro-platform-economy",
+    to: "macro-data-economy",
+    type: "amplifies",
+    strength: 0.7,
+    description: "Platforms are the dominant collection points for the global data economy",
+  },
+
+  // ── Connectivity — additional cross-link ───────────────────────────────
+  {
+    from: "mega-connectivity",
+    to: "macro-cloud-native",
+    type: "amplifies",
+    strength: 0.6,
+    description: "Reliable global connectivity is the precondition for cloud-native adoption",
+  },
 ];
 
 /**
@@ -480,3 +945,135 @@ export function findFeedbackLoops(maxLength = 4): string[][] {
 
   return loops;
 }
+
+// ─── Sprint 4a: Graph analysis helpers ───────────────────────────────────
+// These power the Netzwerk view's path-finding, hub-detection, and
+// statistics panel, and the Radar's cascade-depth tooltip badges.
+
+/** Build an undirected adjacency map for path-finding and degree analysis. */
+function buildAdjacency(): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  for (const edge of TREND_EDGES) {
+    if (!adj.has(edge.from)) adj.set(edge.from, new Set());
+    if (!adj.has(edge.to)) adj.set(edge.to, new Set());
+    adj.get(edge.from)!.add(edge.to);
+    // Treat edges as undirected for path-finding — causal direction matters
+    // for the *meaning*, but a user asking "how does X relate to Y?"
+    // wants any causal chain regardless of direction.
+    adj.get(edge.to)!.add(edge.from);
+  }
+  return adj;
+}
+
+/** Build a directed adjacency map (forward edges only). */
+function buildDirectedAdjacency(): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  for (const edge of TREND_EDGES) {
+    if (!adj.has(edge.from)) adj.set(edge.from, new Set());
+    adj.get(edge.from)!.add(edge.to);
+  }
+  return adj;
+}
+
+/**
+ * BFS shortest path between two trends (undirected).
+ * Returns the sequence of trend IDs from `from` to `to`, or null if no
+ * path exists. The first and last elements are `from` and `to`.
+ */
+export function findShortestPath(from: string, to: string): string[] | null {
+  if (from === to) return [from];
+  const adj = buildAdjacency();
+  if (!adj.has(from) || !adj.has(to)) return null;
+
+  const visited = new Set<string>([from]);
+  const queue: { id: string; path: string[] }[] = [{ id: from, path: [from] }];
+
+  while (queue.length > 0) {
+    const { id, path } = queue.shift()!;
+    const neighbors = adj.get(id);
+    if (!neighbors) continue;
+    for (const next of neighbors) {
+      if (next === to) return [...path, next];
+      if (visited.has(next)) continue;
+      visited.add(next);
+      queue.push({ id: next, path: [...path, next] });
+    }
+  }
+  return null;
+}
+
+/**
+ * Degree centrality — total connections per trend (in + out).
+ * Returns a map of trendId → degree, sorted descending when iterated.
+ */
+export function degreeCentrality(): Map<string, number> {
+  const degree = new Map<string, number>();
+  for (const edge of TREND_EDGES) {
+    degree.set(edge.from, (degree.get(edge.from) || 0) + 1);
+    degree.set(edge.to, (degree.get(edge.to) || 0) + 1);
+  }
+  // Re-build sorted map
+  return new Map([...degree.entries()].sort((a, b) => b[1] - a[1]));
+}
+
+/**
+ * Find the top N hub trends by degree centrality.
+ * Returns [trendId, degree] tuples sorted descending.
+ */
+export function findHubs(topN = 5): Array<[string, number]> {
+  return [...degreeCentrality().entries()].slice(0, topN);
+}
+
+/**
+ * Connected components — groups of trends that are reachable from each
+ * other via the (undirected) edge set. A healthy network has exactly 1
+ * component; orphan trends form their own singleton component.
+ */
+export function getComponents(): string[][] {
+  const adj = buildAdjacency();
+  const visited = new Set<string>();
+  const components: string[][] = [];
+
+  for (const startId of adj.keys()) {
+    if (visited.has(startId)) continue;
+    const component: string[] = [];
+    const stack: string[] = [startId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      component.push(id);
+      const neighbors = adj.get(id);
+      if (neighbors) for (const n of neighbors) if (!visited.has(n)) stack.push(n);
+    }
+    components.push(component);
+  }
+  return components.sort((a, b) => b.length - a.length);
+}
+
+/**
+ * Cascade depth (already exists as `calculateCascadeDepth`) — wrapper that
+ * returns just the count. Used by the Radar tooltip's "affects N trends"
+ * badge so we can render a single-number cascade summary cheaply.
+ */
+export function cascadeDepthCount(trendId: string, maxDepth = 3): number {
+  return calculateCascadeDepth(trendId, maxDepth).length;
+}
+
+/**
+ * Network density — ratio of actual edges to possible edges.
+ * For an undirected graph with N nodes: density = 2E / (N * (N-1))
+ * Used in the Netzwerk statistics panel to give the user a sense of how
+ * connected the system map actually is.
+ */
+export function networkDensity(): number {
+  const adj = buildAdjacency();
+  const n = adj.size;
+  if (n < 2) return 0;
+  const e = TREND_EDGES.length;
+  return (2 * e) / (n * (n - 1));
+}
+
+/** Re-export the directed adjacency builder for callers that need it. */
+export { buildDirectedAdjacency };
+
