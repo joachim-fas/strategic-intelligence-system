@@ -11,6 +11,7 @@ import { BOARD_COLUMNS, NODE_COLORS } from "@/lib/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
+import { OrbitEvidenzView, type EvCanvasNode } from "./OrbitEvidenzView";
 import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
 import { GitBranch } from "lucide-react";
 
@@ -4190,6 +4191,7 @@ export default function CanvasPage() {
   // locale fixed to "de" — language toggle deferred
   const locale: "de" | "en" = "de";
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [orbitSubMode, setOrbitSubMode] = useState<"netzwerk" | "evidenz">("netzwerk");
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [cmdVisible, setCmdVisible] = useState(false);
@@ -5525,7 +5527,7 @@ export default function CanvasPage() {
                 canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
                 board: de ? "Strukturierte Spalten-Ansicht nach Node-Typ" : "Structured column view by node type",
                 timeline: de ? "Chronologische Ansicht aller Analysen" : "Chronological view of all analyses",
-                orbit: de ? "Kausal-Orbit: Alle Trends als verbundenes Netzwerk" : "Causal Orbit: All trends as connected network",
+                orbit: de ? "Orbit: Netzwerk & Evidenzketten" : "Orbit: Network & Evidence chains",
               };
               const isActive = viewMode === mode;
               return (
@@ -6442,14 +6444,44 @@ export default function CanvasPage() {
           </div>
         )}
 
-        {/* ── Orbit view ──────────────────────────────────────────── */}
-        {viewMode === "orbit" && (() => {
+        {/* ── Orbit view (Netzwerk / Evidenz sub-modes) ────────── */}
+        {/* Sub-mode toggle (absolute, renders above OrbitGraphView / OrbitEvidenzView) */}
+        {viewMode === "orbit" && (
+          <div style={{
+            position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+            zIndex: 20, display: "inline-flex", gap: 1, padding: 3,
+            background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
+            borderRadius: 8, border: "1px solid var(--color-border)",
+          }}>
+            {(["netzwerk", "evidenz"] as const).map(mode => {
+              const isAct = orbitSubMode === mode;
+              return (
+                <button key={mode} onClick={() => setOrbitSubMode(mode)}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "none",
+                    background: isAct ? "var(--card, #fff)" : "transparent",
+                    color: isAct ? "var(--foreground, #0A0A0A)" : "var(--muted-foreground, #6B6B6B)",
+                    fontWeight: isAct ? 700 : 500,
+                    fontFamily: "var(--font-ui)",
+                    boxShadow: isAct ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                    cursor: "pointer", transition: "all 0.12s",
+                  }}
+                >
+                  {mode === "netzwerk"
+                    ? `\u2B21 ${de ? "Netzwerk" : "Network"}`
+                    : `\u25C9 ${de ? "Evidenz" : "Evidence"}`}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {viewMode === "orbit" && orbitSubMode === "netzwerk" && (() => {
           // Aggregate all causal edges + trend names from causalgraph nodes
           const cgNodes = nodes.filter(n => n.nodeType === "causalgraph") as DerivedNode[];
           const orbitEdges = cgNodes.flatMap(n => n.causalEdges ?? []);
           const orbitNames: Record<string, string> = {};
           cgNodes.forEach(n => { Object.assign(orbitNames, n.causalTrendNames ?? {}); });
-          // Build trendId → parentQueryId map
           const trendQueryMap: Record<string, string[]> = {};
           cgNodes.forEach(cg => {
             const parentQId = cg.parentId;
@@ -6481,6 +6513,17 @@ export default function CanvasPage() {
             />
           );
         })()}
+        {viewMode === "orbit" && orbitSubMode === "evidenz" && (
+          <OrbitEvidenzView
+            nodes={nodes as unknown as EvCanvasNode[]}
+            selectedNodeId={selectedId}
+            de={de}
+            onNavigateToNode={(nodeId) => {
+              handleSelectNode(nodeId);
+              setViewMode("canvas");
+            }}
+          />
+        )}
 
         {/* ── Empty state ─────────────────────────────────────────── */}
         {/* Embedded empty state — subtle hint */}
