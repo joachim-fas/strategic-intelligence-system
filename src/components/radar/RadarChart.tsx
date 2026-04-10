@@ -11,6 +11,7 @@ import {
 } from "@/types";
 import { useLocale } from "@/lib/locale-context";
 import { t, getRingLabel } from "@/lib/i18n";
+import { cascadeDepthCount, getDrivers, getEffects } from "@/lib/causal-graph";
 
 interface RadarChartProps {
   trends: TrendDot[];
@@ -304,12 +305,32 @@ export default function RadarChart({
           .attr("stroke-opacity", 0.5).classed("glow", true);
       }
 
-      // Velocity ring (rising = dashed outer ring)
+      // Live-signal heat glow — outer halo whose radius scales with the
+      // number of signals matched to this trend in the last 72h. Only shown
+      // when /api/v1/feed has supplied counts (signalCount72h is set).
+      const live = d.signalCount72h ?? 0;
+      if (live > 0) {
+        const heatR = size + 4 + Math.min(14, Math.log2(1 + live) * 3);
+        dotG.append("circle")
+          .attr("r", heatR)
+          .attr("fill", color)
+          .attr("fill-opacity", 0.10 + Math.min(0.25, live / 200))
+          .attr("stroke", "none")
+          .classed("heat-glow", true);
+      }
+
+      // Velocity ring — green dashed for rising, red solid for falling, none
+      // for stable. Sized just outside the dot.
       if (d.velocity === "rising") {
         dotG.append("circle")
           .attr("r", size + 2).attr("fill", "none")
-          .attr("stroke", color).attr("stroke-width", 1)
-          .attr("stroke-opacity", 0.35).attr("stroke-dasharray", "2,2");
+          .attr("stroke", "#1A9E5A").attr("stroke-width", 1.4)
+          .attr("stroke-opacity", 0.6).attr("stroke-dasharray", "2,2");
+      } else if (d.velocity === "falling") {
+        dotG.append("circle")
+          .attr("r", size + 2).attr("fill", "none")
+          .attr("stroke", "#E8402A").attr("stroke-width", 1.2)
+          .attr("stroke-opacity", 0.55);
       }
 
       // Main dot — Volt-style radial gradient
@@ -502,11 +523,60 @@ export default function RadarChart({
             </span>
           </div>
 
+          {/* ── Live signal block — only when /api/v1/feed has data ── */}
+          {(tooltip.trend.signalCount72h ?? 0) > 0 && (
+            <div style={{
+              marginTop: 6, paddingTop: 6,
+              borderTop: "1px solid var(--color-border)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, fontSize: 10 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  color: "var(--signal-positive, #1A9E5A)",
+                  fontWeight: 700,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1A9E5A", boxShadow: "0 0 4px rgba(26,158,90,0.7)" }} />
+                  {tooltip.trend.signalCount72h} {locale === "de" ? "Live-Signale (72h)" : "live signals (72h)"}
+                </span>
+                {tooltip.trend.avgStrength != null && (
+                  <span style={{ color: "var(--color-text-muted)" }}>
+                    ⌀ {(tooltip.trend.avgStrength * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+              {tooltip.trend.sparkline && tooltip.trend.sparkline.length === 7 && (
+                <Sparkline values={tooltip.trend.sparkline} />
+              )}
+            </div>
+          )}
+
+          {/* ── Causal-graph block: drivers, effects, cascade depth ── */}
+          <div style={{
+            marginTop: 6, paddingTop: 6,
+            borderTop: "1px solid var(--color-border)",
+            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "2px 8px",
+            fontSize: 9, color: "var(--color-text-muted)",
+          }}>
+            <CausalStat
+              label={locale === "de" ? "Treiber" : "Drivers"}
+              value={getDrivers(tooltip.trend.id).length}
+            />
+            <CausalStat
+              label={locale === "de" ? "Effekte" : "Effects"}
+              value={getEffects(tooltip.trend.id).length}
+            />
+            <CausalStat
+              label={locale === "de" ? "Kaskade" : "Cascade"}
+              value={cascadeDepthCount(tooltip.trend.id, 3)}
+              suffix={locale === "de" ? " Trends" : " trends"}
+            />
+          </div>
+
           <div style={{
             marginTop: 6, paddingTop: 6,
             borderTop: "1px solid var(--color-border)",
             fontSize: 9, color: "var(--color-text-muted)",
-            display: "flex", gap: 4,
+            display: "flex", gap: 4, flexWrap: "wrap",
           }}>
             <span>{tooltip.trend.signalCount} {t(locale, "signals")}</span>
             <span>·</span>
@@ -532,6 +602,67 @@ export default function RadarChart({
         <span>● Größe = Impact</span>
         <span>◐ Deckkraft = Konfidenz</span>
       </div>
+    </div>
+  );
+}
+
+// ── Tooltip sub-components ──────────────────────────────────────────────────
+
+function CausalStat({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <span style={{
+        fontSize: 11, fontWeight: 700,
+        color: value > 0 ? "var(--color-text-heading)" : "var(--color-text-muted)",
+      }}>
+        {value}{suffix && value > 0 ? suffix : ""}
+      </span>
+      <span style={{ fontSize: 8, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  if (!values.length) return null;
+  const w = 110;
+  const h = 22;
+  const max = Math.max(1, ...values);
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - (v / max) * (h - 2) - 1;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <svg width={w} height={h} style={{ display: "block" }}>
+        {/* Baseline */}
+        <line x1={0} y1={h - 1} x2={w} y2={h - 1} stroke="var(--color-border, #ddd)" strokeWidth={0.5} />
+        {/* Area fill */}
+        <polyline
+          points={`0,${h - 1} ${points} ${w},${h - 1}`}
+          fill="rgba(26,158,90,0.12)"
+          stroke="none"
+        />
+        {/* Line */}
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#1A9E5A"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Latest point dot */}
+        {values.length > 0 && (() => {
+          const lastV = values[values.length - 1];
+          const lastX = w;
+          const lastY = h - (lastV / max) * (h - 2) - 1;
+          return <circle cx={lastX} cy={lastY} r={2} fill="#1A9E5A" />;
+        })()}
+      </svg>
     </div>
   );
 }

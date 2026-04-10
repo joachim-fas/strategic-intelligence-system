@@ -99,6 +99,14 @@ export interface TrendDot {
   userOverride: boolean;
   // New: structured classification
   classification?: TrendClassification;
+
+  // ── Live signal overlay (filled by Radar/Netzwerk views from /api/v1/feed) ──
+  /** Number of live signals matched to this trend in the last 72 hours. */
+  signalCount72h?: number;
+  /** Average raw signal strength (0-1) for matched signals in the last 72h. */
+  avgStrength?: number;
+  /** Per-day signal counts for the last 7 days, oldest first. Length = 7. */
+  sparkline?: number[];
 }
 
 export interface RadarConfig {
