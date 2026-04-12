@@ -838,13 +838,13 @@ function FilterPill({
   color?: FrameworkCategory;
 }) {
   const bg = active
-    ? (color?.bg ?? "var(--volt-text, #0A0A0A)")
+    ? (color?.bg ?? "#0A0A0A")
     : "var(--volt-surface-raised, #fff)";
   const fg = active
     ? (color?.fg ?? "#fff")
     : "var(--volt-text-muted, #6B6B6B)";
   const border = active
-    ? (color?.border ?? "var(--volt-text, #0A0A0A)")
+    ? (color?.border ?? "#0A0A0A")
     : "var(--volt-border, #E8E8E8)";
   return (
     <button

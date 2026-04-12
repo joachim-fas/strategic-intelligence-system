@@ -1058,8 +1058,8 @@ export default function Home() {
                       <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
                     </span>
                     <div>
-                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "var(--volt-text, #0A0A0A)", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
-                      <div className="text-muted-foreground" style={{ fontSize: 10, lineHeight: 1.35 }}>{t.desc}</div>
+                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "#0A0A0A", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
+                      <div style={{ fontSize: 10, lineHeight: 1.35, color: "#555" }}>{t.desc}</div>
                     </div>
                   </div>
                 </GrainCard>

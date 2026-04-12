@@ -1306,7 +1306,7 @@ function DimensionsNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1422,7 +1422,7 @@ function CausalGraphNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1651,7 +1651,7 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         // Connection type styling
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":     { stroke: "rgba(0,0,0,0.16)", dash: "4 3", width: 1, marker: "url(#arr-d)" },
+          "derived":     { stroke: "rgba(0,0,0,0.28)", dash: "4 3", width: 1.2, marker: "url(#arr-d)" },
           "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
           "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
           "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
@@ -1766,7 +1766,7 @@ function DerivedNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : isFollowup ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected
           ? `${!isFollowup ? `inset 3px 0 0 ${typeColorHex}, ` : ""}0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)`
@@ -1809,6 +1809,7 @@ function DerivedNodeCard({
             fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
             color: "var(--color-text-secondary)",
             margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
+            display: "-webkit-box", WebkitLineClamp: Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19)), WebkitBoxOrient: "vertical",
           }}>
             {isFollowup ? `→ ${node.content}` : node.content}
           </p>
@@ -2223,7 +2224,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2306,7 +2307,7 @@ function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2395,7 +2396,7 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2509,7 +2510,7 @@ function FileNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
