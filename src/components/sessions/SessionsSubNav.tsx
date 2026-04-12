@@ -21,7 +21,7 @@ export function SessionsSubNav({ active, de }: Props) {
 
   return (
     <nav
-      aria-label={de ? "Session-Bereich" : "Sessions area"}
+      aria-label={de ? "Projekt-Bereich" : "Projects area"}
       style={{
         display: "flex",
         gap: 0,

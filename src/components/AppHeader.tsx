@@ -20,7 +20,7 @@ const NAV_ITEMS: Array<{
   matchAlso?: string[];
 }> = [
   { href: "/",          labelDe: "Start",              labelEn: "Home"               },
-  { href: "/sessions",  labelDe: "Sessions",          labelEn: "Sessions"          },
+  { href: "/sessions",  labelDe: "Projekte",           labelEn: "Projects"          },
   { href: "/canvas",    labelDe: "Canvas",             labelEn: "Canvas"             },
   { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
 ];

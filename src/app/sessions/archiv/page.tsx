@@ -41,7 +41,7 @@ export default function SessionsArchivePage() {
               fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em",
               color: "var(--volt-text, #0A0A0A)", margin: 0, lineHeight: 1.15,
             }}>
-              {de ? "Session-Archiv" : "Session Archive"}
+              {de ? "Projekt-Archiv" : "Project Archive"}
             </h1>
           </div>
           <p style={{
@@ -49,8 +49,8 @@ export default function SessionsArchivePage() {
             margin: "12px 0 20px", maxWidth: 620,
           }}>
             {de
-              ? "Abgeschlossene Sessions, die nicht mehr aktiv bearbeitet werden. Du kannst sie jederzeit wiederherstellen oder endgültig löschen."
-              : "Completed sessions that are no longer actively worked on. You can restore them at any time or delete them permanently."}
+              ? "Abgeschlossene Projekte, die nicht mehr aktiv bearbeitet werden. Du kannst sie jederzeit wiederherstellen oder endgültig löschen."
+              : "Completed projects that are no longer actively worked on. You can restore them at any time or delete them permanently."}
           </p>
 
           <SessionsSubNav active="archive" de={de} />
