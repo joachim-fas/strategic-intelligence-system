@@ -279,7 +279,7 @@ interface CanvasProject {
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-const QUERY_NODE_W       = 420;
+const QUERY_NODE_W       = 340;
 const QUERY_NODE_H       = QUERY_NODE_W;  // square base
 const DERIVED_W          = 300;
 const LIST_NODE_W        = 280;
@@ -1788,7 +1788,8 @@ function DerivedNodeCard({
           <span style={{
             flexShrink: 0, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
             fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
-            color: typeColorHex,
+            color: typeColorHex, background: `${typeColorHex}14`, border: `1px solid ${typeColorHex}30`,
+            borderRadius: 5, padding: "2px 7px",
           }}>{cfg.badge}</span>
           {isScenario && node.probability != null && (
             <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>
@@ -1807,7 +1808,7 @@ function DerivedNodeCard({
           )}
           <p style={{
             fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
-            color: "var(--color-text-secondary)",
+            color: "var(--foreground, #0A0A0A)",
             margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
             display: "-webkit-box", WebkitLineClamp: Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19)), WebkitBoxOrient: "vertical",
           }}>
@@ -3866,7 +3867,7 @@ function DetailPanel({
             style={{
               fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
               border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
-              background: current === s ? `${meta.color}18` : "transparent",
+              background: current === s ? `${meta.color}25` : "transparent",
               color: current === s ? meta.color : "var(--color-text-muted)",
               fontWeight: current === s ? 700 : 400,
               transition: "all 0.1s",
