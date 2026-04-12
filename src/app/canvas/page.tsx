@@ -4329,6 +4329,7 @@ export default function CanvasPage() {
   const nodesRef = useRef(nodes);
   const connectionsRef = useRef(connections);
   const projectIdRef = useRef(projectId);
+  const isDirtyRef = useRef(false);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { panXRef.current = panX; panYRef.current = panY; }, [panX, panY]);
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
@@ -4385,6 +4386,7 @@ export default function CanvasPage() {
     historyRef.current.push(snapshot);
     if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
     historyIndexRef.current = historyRef.current.length - 1;
+    isDirtyRef.current = true;
   }, []);
 
   const undo = useCallback(() => {
@@ -4443,6 +4445,7 @@ export default function CanvasPage() {
         body: JSON.stringify({ canvasState: state }),
       });
       setSaveStatus("saved");
+      isDirtyRef.current = false;
       // Refresh project list to update updated_at
       setProjects(prev => prev.map(p =>
         p.id === id ? { ...p, updated_at: new Date().toISOString(), hasState: true } : p
@@ -4914,7 +4917,7 @@ export default function CanvasPage() {
   // Save on browser close / tab close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (nodesRef.current.length > 0) {
+      if (isDirtyRef.current) {
         e.preventDefault();
       }
       flushPendingSave();

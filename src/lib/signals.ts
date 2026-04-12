@@ -203,10 +203,10 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
 
   d.close();
 
-  // Only return signals with at least some relevance (score > 0)
-  const relevant = rows.filter((r) => r.relevance_score > 0);
-  // If nothing matched keywords, fall back to all recent signals
-  return relevant.length > 0 ? relevant : rows.slice(0, Math.min(6, rows.length));
+  // Only return signals with at least some relevance (score > 0).
+  // FIXED: Do NOT fall back to random signals — irrelevant noise (sports betting,
+  // stock earnings) is worse than no signals at all.
+  return rows.filter((r) => r.relevance_score > 0);
 }
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────

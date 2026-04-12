@@ -95,6 +95,16 @@ export default function Home() {
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [frameworkTopic, frameworkModal]);
+
+  // Close framework modal on Escape key
+  useEffect(() => {
+    if (!frameworkModal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setFrameworkModal(null); }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [frameworkModal]);
   // demoTab removed — demos moved to /beispiele
 
   // Ref for syncToCanvasDb — avoids stale closure reading localStorage
