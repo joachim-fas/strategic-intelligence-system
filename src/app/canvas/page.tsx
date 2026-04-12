@@ -1953,7 +1953,7 @@ function QueryNodeCard({
         <div style={{ padding: "12px 14px 0", flex: 1, overflow: "hidden", position: "relative" }}>
           {node.synthesis && (cardZoom === undefined || cardZoom >= 0.7) && (
             <>
-              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
+              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word", display: "-webkit-box", WebkitLineClamp: Math.max(3, Math.floor(((node.customHeight ?? QUERY_NODE_W) - 120) / 21)), WebkitBoxOrient: "vertical" }}>
                 {node.synthesis}
               </p>
               {/* Causal fingerprint pills */}
