@@ -185,8 +185,8 @@ export function SessionList({ mode, de }: Props) {
     if (busyId) return;
     const confirmed = window.confirm(
       de
-        ? `Session dauerhaft löschen?\n\n„${name}"\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
-        : `Permanently delete session?\n\n"${name}"\n\nThis action cannot be undone.`
+        ? `Projekt dauerhaft löschen?\n\n„${name}"\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
+        : `Permanently delete project?\n\n"${name}"\n\nThis action cannot be undone.`
     );
     if (!confirmed) return;
     setBusyId(id);
@@ -296,7 +296,7 @@ export function SessionList({ mode, de }: Props) {
   if (loading) {
     return (
       <div style={{ textAlign: "center", fontSize: 13, color: "var(--volt-text-muted)", padding: "60px 0" }}>
-        {de ? "Lade Sessions…" : "Loading sessions…"}
+        {de ? "Lade Projekte…" : "Loading projects…"}
       </div>
     );
   }
@@ -341,11 +341,11 @@ export function SessionList({ mode, de }: Props) {
       : (de ? "Archiv ist leer" : "Archive is empty");
     const emptyDesc = mode === "active"
       ? (de
-          ? "Eröffne eine Session direkt über die Startseite — mit einer Frage oder einem Framework."
-          : "Open a session from the home page — with a question or a framework.")
+          ? "Eröffne ein Projekt direkt über die Startseite — mit einer Frage oder einem Framework."
+          : "Open a project from the home page — with a question or a framework.")
       : (de
-          ? "Wenn du eine Session abschließt, kannst du sie hier ablegen, ohne sie zu löschen."
-          : "When you finish a session, archive it here without deleting.");
+          ? "Wenn du ein Projekt abschließt, kannst du es hier ablegen, ohne es zu löschen."
+          : "When you finish a project, archive it here without deleting.");
     return (
       <div style={{
         textAlign: "center",
@@ -360,8 +360,8 @@ export function SessionList({ mode, de }: Props) {
           color: "var(--volt-text-faint, #AAA)", marginBottom: 14,
         }}>
           {mode === "active"
-            ? (de ? "Keine Sessions vorhanden" : "No sessions yet")
-            : (de ? "Keine archivierten Sessions" : "No archived sessions")}
+            ? (de ? "Keine Projekte vorhanden" : "No projects yet")
+            : (de ? "Keine archivierten Projekte" : "No archived projects")}
         </div>
         <h2 style={{
           fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
@@ -534,7 +534,7 @@ export function SessionList({ mode, de }: Props) {
           color: "var(--volt-text-muted, #6B6B6B)",
           textAlign: "center",
         }}>
-          {de ? "Keine Sessions in dieser Kategorie." : "No sessions in this category."}
+          {de ? "Keine Projekte in dieser Kategorie." : "No projects in this category."}
         </div>
       )}
 
@@ -563,7 +563,7 @@ export function SessionList({ mode, de }: Props) {
         textTransform: "uppercase",
         color: "var(--volt-text-faint, #999)",
       }}>
-        <div>{de ? "Session" : "Session"}</div>
+        <div>{de ? "Projekt" : "Project"}</div>
         <div>{de ? "Framework" : "Framework"}</div>
         <div>{de ? "Gestartet" : "Started"}</div>
         <div>
@@ -581,7 +581,7 @@ export function SessionList({ mode, de }: Props) {
         const isLast = idx === sorted.length - 1;
         const isBusy = busyId === s.id;
         const secondDate = mode === "active" ? s.updated_at : (s.archived_at ?? s.updated_at);
-        const displayTitle = cleanSessionTitle(s.name) || (de ? "Unbenannte Session" : "Untitled session");
+        const displayTitle = cleanSessionTitle(s.name) || (de ? "Unbenanntes Projekt" : "Untitled project");
 
         // Row backgrounds:
         //   active session → lime tint  (rgba(228,255,151,0.16))

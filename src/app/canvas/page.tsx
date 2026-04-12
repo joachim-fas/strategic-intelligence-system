@@ -5287,7 +5287,7 @@ export default function CanvasPage() {
         // Auto-rename session after first successful query if still has default name
         const pid = projectIdRef.current;
         if (pid && !hasAutoNamedRef.current) {
-          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project"];
+          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project", "New Project"];
           // Use a function updater pattern: read current name from state
           setProjectName(prevName => {
             if (DEFAULT_NAMES.includes(prevName) || !prevName.trim()) {
