@@ -119,7 +119,8 @@ export const VoltTabs: React.FC<VoltTabsProps> = ({
               {variant === "underline" && isActive && (
                 <motion.div
                   layoutId="tab-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-foreground rounded-full"
+                  className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-full"
+                  style={{ background: "var(--foreground, #0A0A0A)" }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
