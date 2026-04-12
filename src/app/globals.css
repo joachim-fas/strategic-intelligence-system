@@ -694,7 +694,7 @@ h1, h2, h3, h4, h5, h6 {
   to   { stroke-dashoffset: 0; }
 }
 .nc-run     { animation: ncRunPulse 1.6s ease-in-out infinite; }
-.nc-success { animation: ncSuccessGlow 2s ease-in-out infinite; }
+.nc-success { animation: ncSuccessGlow 1.5s ease-in-out 1; }
 .nc-error   { animation: ncErrorGlow 1.2s ease-in-out infinite; }
 .nc-edge-anim path { animation: ncEdgeDash 1s linear infinite; }
 

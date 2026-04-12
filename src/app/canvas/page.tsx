@@ -1306,7 +1306,7 @@ function DimensionsNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1422,7 +1422,7 @@ function CausalGraphNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1651,7 +1651,7 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         // Connection type styling
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":     { stroke: "rgba(0,0,0,0.16)", dash: "4 3", width: 1, marker: "url(#arr-d)" },
+          "derived":     { stroke: "rgba(0,0,0,0.25)", dash: "4 3", width: 1.2, marker: "url(#arr-d)" },
           "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
           "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
           "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
@@ -1766,7 +1766,7 @@ function DerivedNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : isFollowup ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected
           ? `${!isFollowup ? `inset 3px 0 0 ${typeColorHex}, ` : ""}0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)`
@@ -1788,7 +1788,8 @@ function DerivedNodeCard({
           <span style={{
             flexShrink: 0, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
             fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
-            color: typeColorHex,
+            color: typeColorHex, background: `${typeColorHex}14`, border: `1px solid ${typeColorHex}30`,
+            borderRadius: 5, padding: "2px 7px",
           }}>{cfg.badge}</span>
           {isScenario && node.probability != null && (
             <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>
@@ -1809,6 +1810,7 @@ function DerivedNodeCard({
             fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
             color: "var(--color-text-secondary)",
             margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
+            display: "-webkit-box", WebkitLineClamp: Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19)), WebkitBoxOrient: "vertical",
           }}>
             {isFollowup ? `→ ${node.content}` : node.content}
           </p>
@@ -1920,7 +1922,7 @@ function QueryNodeCard({
           position: "relative", width: "100%", height: "100%",
           display: "flex", flexDirection: "column",
           background: "var(--color-surface)",
-          border: `1.5px solid ${selected ? "#0A0A0A" : staleAccent ?? "rgba(0,0,0,0.09)"}`,
+          border: `1.5px solid ${selected ? "#0A0A0A" : staleAccent ?? "var(--color-border, #E8E8E8)"}`,
           borderRadius: 12, overflow: "hidden",
           ...(selected ? { boxShadow: "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" } :
             (!isLoading && node.status !== "done" && node.status !== "error") ? { boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)" } : {}),
@@ -2223,7 +2225,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2306,7 +2308,7 @@ function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2395,7 +2397,7 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2509,7 +2511,7 @@ function FileNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -4325,6 +4327,7 @@ export default function CanvasPage() {
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
   const nodesRef = useRef(nodes);
+  const isDirtyRef = useRef(false);
   const connectionsRef = useRef(connections);
   const projectIdRef = useRef(projectId);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
@@ -4383,6 +4386,7 @@ export default function CanvasPage() {
     historyRef.current.push(snapshot);
     if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
     historyIndexRef.current = historyRef.current.length - 1;
+    isDirtyRef.current = true;
   }, []);
 
   const undo = useCallback(() => {
@@ -4441,6 +4445,7 @@ export default function CanvasPage() {
         body: JSON.stringify({ canvasState: state }),
       });
       setSaveStatus("saved");
+      isDirtyRef.current = false;
       // Refresh project list to update updated_at
       setProjects(prev => prev.map(p =>
         p.id === id ? { ...p, updated_at: new Date().toISOString(), hasState: true } : p
@@ -4912,7 +4917,7 @@ export default function CanvasPage() {
   // Save on browser close / tab close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (nodesRef.current.length > 0) {
+      if (isDirtyRef.current) {
         e.preventDefault();
       }
       flushPendingSave();
