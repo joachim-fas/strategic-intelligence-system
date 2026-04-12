@@ -25,7 +25,7 @@ export default function SessionsPage() {
       const res = await fetch("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: de ? "Neues Projekt" : "New Project" }),
+        body: JSON.stringify({ name: de ? "Neue Session" : "New Session" }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -56,7 +56,7 @@ export default function SessionsPage() {
             textTransform: "uppercase", color: "var(--volt-text-faint, #AAA)",
             marginBottom: 10,
           }}>
-            {de ? "Deine strategischen Projekte" : "Your strategic projects"}
+            {de ? "Deine strategischen Sessions" : "Your strategic sessions"}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <h1 style={{
@@ -64,7 +64,7 @@ export default function SessionsPage() {
               fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em",
               color: "var(--volt-text, #0A0A0A)", margin: 0, lineHeight: 1.15,
             }}>
-              Projekte
+              Sessions
             </h1>
             <button
               onClick={createNewSession}
@@ -79,7 +79,7 @@ export default function SessionsPage() {
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
               }}
             >
-              {creating ? (de ? "Erstelle…" : "Creating…") : (de ? "+ Neues Projekt" : "+ New Project")}
+              {creating ? (de ? "Erstelle…" : "Creating…") : (de ? "+ Neue Session" : "+ New Session")}
             </button>
           </div>
           <p style={{
@@ -87,8 +87,8 @@ export default function SessionsPage() {
             margin: "12px 0 20px", maxWidth: 620,
           }}>
             {de
-              ? "Jedes Projekt ist ein zusammenhängender strategischer Arbeitsstrang — Fragen, Nodes, Szenarien, Entscheidungen. Klicke ein Projekt an, um im Node Canvas weiterzuarbeiten."
-              : "Each project is a connected strand of strategic work — questions, nodes, scenarios, decisions. Click a project to continue working in the Node Canvas."}
+              ? "Jede Session ist ein zusammenhängender strategischer Arbeitsstrang — Fragen, Nodes, Szenarien, Entscheidungen. Klicke eine Session an, um im Node Canvas weiterzuarbeiten."
+              : "Each session is a connected strand of strategic work — questions, nodes, scenarios, decisions. Click a session to continue working in the Node Canvas."}
           </p>
 
           <SessionsSubNav active="active" de={de} />

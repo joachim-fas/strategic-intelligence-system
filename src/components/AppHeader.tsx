@@ -7,7 +7,7 @@ import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
 // Main navigation — ordered by workflow progression:
-// 1. "Projekte" — list of strategic analysis projects.
+// 1. "Sessions" — list of strategic working threads.
 // 2. "Canvas" — the active workspace (node canvas).
 // 3. "Knowledge Cockpit" — data/reference landscape.
 //
@@ -20,7 +20,7 @@ const NAV_ITEMS: Array<{
   matchAlso?: string[];
 }> = [
   { href: "/",          labelDe: "Start",              labelEn: "Home"               },
-  { href: "/sessions",  labelDe: "Projekte",           labelEn: "Projects"           },
+  { href: "/sessions",  labelDe: "Sessions",          labelEn: "Sessions"          },
   { href: "/canvas",    labelDe: "Canvas",             labelEn: "Canvas"             },
   { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
 ];

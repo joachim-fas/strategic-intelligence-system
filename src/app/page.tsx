@@ -24,6 +24,8 @@ import { SessionBar } from "@/components/session/SessionBar";
 import { GrainCard } from "@/components/grain/GrainCard";
 import { GrainBadge } from "@/components/grain/GrainBadge";
 import {
+  saveHistoryToStorage,
+  loadHistoryFromStorage,
   clearHistoryStorage,
 } from "@/lib/briefing-export";
 // Demo briefings moved to /beispiele page
@@ -95,32 +97,27 @@ export default function Home() {
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [frameworkTopic, frameworkModal]);
-
-  // Close framework modal on Escape key
-  useEffect(() => {
-    if (!frameworkModal) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setFrameworkModal(null); }
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [frameworkModal]);
   // demoTab removed — demos moved to /beispiele
 
-  // Ref for syncToCanvasDb — avoids stale closure reading localStorage
-  const activeProjectIdRef = useRef<string | null>(null);
-
-  // Load past projects + handle URL params on mount.
-  // NOTE: We intentionally do NOT load history or active canvas from localStorage.
-  // The Start page is a clean launcher — previous results live in the Canvas DB.
+  // Load persisted history and active project on mount
   useEffect(() => {
-    // Load recent projects for the welcome screen
+    const stored = loadHistoryFromStorage();
+    if (stored.length > 0) setHistory(stored);
+    const storedProject = typeof window !== "undefined" ? localStorage.getItem("sis-active-canvas") : null;
+    if (storedProject) setActiveProjectId(storedProject);
+    // Phase 5: Load custom session title if set
+    try {
+      const savedTitle = typeof window !== "undefined" ? localStorage.getItem("sis-session-title") : null;
+      if (savedTitle) setCustomSessionTitle(savedTitle);
+    } catch {}
+    // Phase 5: Load past sessions for the picker
     fetch("/api/v1/canvas")
       .then(r => r.json())
       .then(data => {
         const list = (data?.canvases || []) as Array<any>;
+        const activeCanvasId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
         const sessions = list
-          .filter((c: any) => (c.queryCount || 0) > 0)
+          .filter((c: any) => c.id !== activeCanvasId && (c.queryCount || 0) > 0)
           .slice(0, 8)
           .map((c: any) => ({
             id: c.id,
@@ -131,14 +128,29 @@ export default function Home() {
         setPastSessions(sessions);
       })
       .catch(() => {});
-    // Handle ?q= param (e.g. from TrendDetailPanel deep-dive link)
     const params = new URLSearchParams(window.location.search);
+    // Re-run from /projects page
     const urlQ = params.get("q");
     if (urlQ) {
       setQuery(decodeURIComponent(urlQ));
+    }
+    // Phase 5: Jump to a specific node from Zusammenfassung-View
+    const urlNode = params.get("node");
+    if (urlNode && stored.length > 0) {
+      const targetQuery = decodeURIComponent(urlNode);
+      const match = stored.find(h => h.query === targetQuery)
+        ?? stored.find(h => h.query.toLowerCase().trim() === targetQuery.toLowerCase().trim());
+      if (match) setActiveNodeId(match.id ?? match.query);
+    }
+    if (urlQ || urlNode) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
+
+  // Persist history on every change (debounced via completed entries only)
+  useEffect(() => {
+    saveHistoryToStorage(history);
+  }, [history]);
   const [showFullRadar, setShowFullRadar] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -214,22 +226,20 @@ export default function Home() {
 
       const allNodes = [qNode, ...derived];
 
-      // Get or create a canvas project — use ref to avoid stale closure
-      let projectId = activeProjectIdRef.current;
+      // Get or create a canvas project
+      let projectId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
 
       if (!projectId) {
         // Create new canvas project
         const res = await fetch("/api/v1/canvas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Neues Projekt" }),
+          body: JSON.stringify({ name: "Aktuelle Session" }),
         });
         if (!res.ok) return;
         const json = await res.json();
         projectId = json.canvas?.id;
         if (!projectId) return;
-        activeProjectIdRef.current = projectId;
-        setActiveProjectId(projectId);
         try { localStorage.setItem("sis-active-canvas", projectId); } catch {}
       }
 
@@ -303,7 +313,6 @@ export default function Home() {
           const json = await res.json();
           const pid = json.canvas?.id;
           if (pid) {
-            activeProjectIdRef.current = pid;
             try { localStorage.setItem("sis-active-canvas", pid); } catch {}
             window.location.href = `/canvas?project=${pid}`;
             return;
@@ -364,10 +373,8 @@ export default function Home() {
 
     if (q === "/clear") {
       setHistory([]); clearHistoryStorage(); setQuery("");
-      const cid = activeProjectIdRef.current;
+      const cid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
       if (cid) fetch(`/api/v1/canvas/${cid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canvasState: JSON.stringify({ nodes: [], conns: [], pan: { x: 0, y: 0 }, zoom: 1, v: 2 }) }) }).catch(() => {});
-      activeProjectIdRef.current = null;
-      setActiveProjectId(null);
       return;
     }
 
@@ -621,7 +628,7 @@ export default function Home() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
-                placeholder={inputFocused ? "" : (locale === "de" ? "Analyse vertiefen oder neue Frage stellen…" : "Deepen analysis or ask a new question…")}
+                placeholder={inputFocused ? "" : (locale === "de" ? "Session vertiefen oder neue Frage stellen…" : "Deepen session or ask a new question…")}
                 style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
                 autoComplete="off"
                 spellCheck={false}
@@ -802,8 +809,7 @@ export default function Home() {
                             method: "PATCH", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                           });
-                          activeProjectIdRef.current = pid;
-                          try { localStorage.setItem("sis-active-canvas", pid); } catch {}
+                          localStorage.setItem("sis-active-canvas", pid);
                           setFrameworkLoading(false);
                           setFrameworkModal(null);
                           window.location.href = `/canvas?project=${pid}`;
@@ -972,8 +978,7 @@ export default function Home() {
                                 method: "PATCH", headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                               });
-                              activeProjectIdRef.current = pid;
-                              try { localStorage.setItem("sis-active-canvas", pid); } catch {}
+                              localStorage.setItem("sis-active-canvas", pid);
                               setFrameworkLoading(false);
                               setFrameworkModal(null);
                               window.location.href = `/canvas?project=${pid}`;
@@ -1068,91 +1073,11 @@ export default function Home() {
                       <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
                     </span>
                     <div>
-                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "#0A0A0A", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
-                      <div style={{ fontSize: 10, lineHeight: 1.35, color: "#555" }}>{t.desc}</div>
+                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "var(--volt-text, #0A0A0A)", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
+                      <div className="text-muted-foreground" style={{ fontSize: 10, lineHeight: 1.35 }}>{t.desc}</div>
                     </div>
                   </div>
                 </GrainCard>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent Projects — shown on welcome screen when projects exist */}
-        {isFirstVisit && !showFullRadar && pastSessions.length > 0 && (
-          <div style={{ maxWidth: 700, margin: "0 auto", width: "100%", padding: "0 24px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{
-                fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
-                textTransform: "uppercase" as const,
-                color: "var(--volt-text-muted, #6B6B6B)",
-              }}>
-                {locale === "de" ? "Letzte Projekte" : "Recent Projects"}
-              </span>
-              <a
-                href="/sessions"
-                style={{
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                  fontSize: 11, fontWeight: 500, color: "var(--volt-text-muted, #6B6B6B)",
-                  textDecoration: "none",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = "var(--volt-text, #0A0A0A)"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "var(--volt-text-muted, #6B6B6B)"; }}
-              >
-                {locale === "de" ? "Alle Projekte →" : "All projects →"}
-              </a>
-            </div>
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 10,
-            }}>
-              {pastSessions.slice(0, 6).map(s => (
-                <a
-                  key={s.id}
-                  href={`/canvas?project=${s.id}`}
-                  onClick={() => { try { localStorage.setItem("sis-active-canvas", s.id); } catch {} }}
-                  style={{
-                    display: "block",
-                    padding: "14px 16px",
-                    borderRadius: "var(--volt-radius-md, 10px)",
-                    border: "1px solid var(--volt-border, #E8E8E8)",
-                    background: "var(--volt-surface-raised, #fff)",
-                    textDecoration: "none",
-                    cursor: "pointer",
-                    transition: "border-color 120ms, box-shadow 120ms",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  <div style={{
-                    fontFamily: "var(--volt-font-display, 'DM Sans', sans-serif)",
-                    fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
-                    color: "var(--volt-text, #0A0A0A)",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    marginBottom: 4,
-                  }}>
-                    {s.name || (locale === "de" ? "Unbenanntes Projekt" : "Untitled project")}
-                  </div>
-                  <div style={{
-                    fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                    fontSize: 9, color: "var(--volt-text-muted, #6B6B6B)",
-                    letterSpacing: "0.04em",
-                    display: "flex", gap: 8,
-                  }}>
-                    <span>{s.nodeCount} {locale === "de" ? "Analysen" : "analyses"}</span>
-                    {s.updatedAt && (
-                      <span>{new Date(s.updatedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
-                    )}
-                  </div>
-                </a>
               ))}
             </div>
           </div>
@@ -1248,7 +1173,7 @@ export default function Home() {
             const resolvedActiveId = activeNodeId && history.find(h => (h.id ?? h.query) === activeNodeId)
               ? activeNodeId
               : (history[0].id ?? history[0].query);
-            const autoTitle = history[history.length - 1]?.query ?? "Projekt";
+            const autoTitle = history[history.length - 1]?.query ?? "Session";
             const sessionTitle = customSessionTitle || autoTitle;
             return (
               <SessionBar
@@ -1262,24 +1187,22 @@ export default function Home() {
                 activeNodeId={resolvedActiveId}
                 onNodeClick={(id) => setActiveNodeId(id)}
                 onNewSession={() => {
-                  if (history.length > 0 && !window.confirm(locale === "de" ? "Aktuelles Projekt beenden und neu starten?" : "End current project and start new?")) return;
+                  if (!window.confirm(locale === "de" ? "Aktuelle Session beenden und neue starten?" : "End current session and start new?")) return;
                   clearHistoryStorage();
                   setHistory([]);
                   setActiveNodeId(null);
                   setCustomSessionTitle(null);
-                  activeProjectIdRef.current = null;
-                  setActiveProjectId(null);
                   try { localStorage.removeItem("sis-session-title"); } catch {}
                   try { localStorage.removeItem("sis-active-canvas"); } catch {}
                   setQuery("");
                   inputRef.current?.focus();
                 }}
                 onOpenCanvas={() => {
-                  const pid = activeProjectIdRef.current;
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
                   window.location.href = pid ? `/canvas?project=${pid}` : "/canvas";
                 }}
                 onOpenSummary={() => {
-                  const pid = activeProjectIdRef.current;
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
                   if (pid) {
                     window.location.href = `/canvas/${pid}/zusammenfassung`;
                   } else {
@@ -1289,7 +1212,8 @@ export default function Home() {
                 onTitleChange={(newTitle) => {
                   setCustomSessionTitle(newTitle);
                   try { localStorage.setItem("sis-session-title", newTitle); } catch {}
-                  const pid = activeProjectIdRef.current;
+                  // Also rename the canvas project so it's reflected in the picker and elsewhere
+                  const pid = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
                   if (pid) {
                     fetch(`/api/v1/canvas/${pid}`, {
                       method: "PATCH",

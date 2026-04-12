@@ -133,7 +133,7 @@ export function SessionBar({
               color: "var(--muted-foreground)",
             }}
           >
-            {de ? "Aktives Projekt" : "Active Project"}
+            {de ? "Aktive Session" : "Active Session"}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             {editingTitle ? (
@@ -163,7 +163,7 @@ export function SessionBar({
             ) : (
               <button
                 onClick={() => onTitleChange ? setEditingTitle(true) : (pastSessions.length > 0 ? setPickerOpen(o => !o) : null)}
-                title={onTitleChange ? (de ? "Projekt-Titel bearbeiten" : "Edit project title") : (de ? "Projekt wechseln" : "Switch project")}
+                title={onTitleChange ? (de ? "Session-Titel bearbeiten" : "Edit session title") : (de ? "Session wechseln" : "Switch session")}
                 style={{
                   fontFamily: "var(--font-display)",
                   fontSize: 13,
@@ -190,7 +190,7 @@ export function SessionBar({
             {pastSessions.length > 0 && !editingTitle && (
               <button
                 onClick={() => setPickerOpen(o => !o)}
-                title={de ? "Anderes Projekt öffnen" : "Open another project"}
+                title={de ? "Andere Session öffnen" : "Open another session"}
                 style={{
                   background: "transparent", border: "none",
                   padding: 1, cursor: "pointer",
@@ -231,7 +231,7 @@ export function SessionBar({
               textTransform: "uppercase" as const,
               color: "var(--muted-foreground)",
             }}>
-              {de ? "Letzte Projekte" : "Recent Projects"} ({pastSessions.length})
+              {de ? "Letzte Sessions" : "Recent Sessions"} ({pastSessions.length})
             </div>
             {pastSessions.map(s => (
               <button
@@ -261,7 +261,7 @@ export function SessionBar({
                   whiteSpace: "nowrap",
                   marginBottom: 2,
                 }}>
-                  {s.name || (de ? "Unbenanntes Projekt" : "Untitled project")}
+                  {s.name || (de ? "Unbenannte Session" : "Untitled session")}
                 </div>
                 <div style={{
                   fontFamily: "var(--font-mono)",
@@ -374,7 +374,7 @@ export function SessionBar({
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         <button
           onClick={onNewSession}
-          title={de ? "Neues Projekt starten" : "Start new project"}
+          title={de ? "Neue Session starten" : "Start new session"}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -405,7 +405,7 @@ export function SessionBar({
 
         <button
           onClick={onOpenCanvas}
-          title={de ? "Projekt im Node Canvas öffnen" : "Open project in Node Canvas"}
+          title={de ? "Session im Node Canvas öffnen" : "Open session in Node Canvas"}
           className={showPulse ? "sis-session-pulse" : ""}
           style={{
             display: "inline-flex",
@@ -445,8 +445,8 @@ export function SessionBar({
                 ? "Mindestens 2 Analysen nötig"
                 : "At least 2 analyses needed"
               : de
-              ? "Meta-Synthese dieses Projekts"
-              : "Meta-synthesis of this project"
+              ? "Meta-Synthese dieser Session"
+              : "Meta-synthesis of this session"
           }
           style={{
             display: "inline-flex",

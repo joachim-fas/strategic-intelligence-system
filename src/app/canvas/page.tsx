@@ -279,7 +279,7 @@ interface CanvasProject {
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
-const QUERY_NODE_W       = 340;
+const QUERY_NODE_W       = 420;
 const QUERY_NODE_H       = QUERY_NODE_W;  // square base
 const DERIVED_W          = 300;
 const LIST_NODE_W        = 280;
@@ -1306,7 +1306,7 @@ function DimensionsNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1422,7 +1422,7 @@ function CausalGraphNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? `inset 3px 0 0 ${accentColor}, 0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)` : `inset 3px 0 0 ${accentColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -1651,7 +1651,7 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         // Connection type styling
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":     { stroke: "rgba(0,0,0,0.28)", dash: "4 3", width: 1.2, marker: "url(#arr-d)" },
+          "derived":     { stroke: "rgba(0,0,0,0.16)", dash: "4 3", width: 1, marker: "url(#arr-d)" },
           "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
           "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
           "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
@@ -1766,7 +1766,7 @@ function DerivedNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px ${isFollowup ? "dashed" : "solid"} ${selected ? "#0A0A0A" : isFollowup ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected
           ? `${!isFollowup ? `inset 3px 0 0 ${typeColorHex}, ` : ""}0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)`
@@ -1788,8 +1788,7 @@ function DerivedNodeCard({
           <span style={{
             flexShrink: 0, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
             fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
-            color: typeColorHex, background: `${typeColorHex}14`, border: `1px solid ${typeColorHex}30`,
-            borderRadius: 5, padding: "2px 7px",
+            color: typeColorHex,
           }}>{cfg.badge}</span>
           {isScenario && node.probability != null && (
             <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>
@@ -1808,9 +1807,8 @@ function DerivedNodeCard({
           )}
           <p style={{
             fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
-            color: "var(--foreground, #0A0A0A)",
+            color: "var(--color-text-secondary)",
             margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
-            display: "-webkit-box", WebkitLineClamp: Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19)), WebkitBoxOrient: "vertical",
           }}>
             {isFollowup ? `→ ${node.content}` : node.content}
           </p>
@@ -1955,7 +1953,7 @@ function QueryNodeCard({
         <div style={{ padding: "12px 14px 0", flex: 1, overflow: "hidden", position: "relative" }}>
           {node.synthesis && (cardZoom === undefined || cardZoom >= 0.7) && (
             <>
-              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word", display: "-webkit-box", WebkitLineClamp: Math.max(3, Math.floor(((node.customHeight ?? QUERY_NODE_W) - 120) / 21)), WebkitBoxOrient: "vertical" }}>
+              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
                 {node.synthesis}
               </p>
               {/* Causal fingerprint pills */}
@@ -2225,7 +2223,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2308,7 +2306,7 @@ function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2397,7 +2395,7 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -2511,7 +2509,7 @@ function FileNodeCard({
         position: "relative", width: "100%", height: "100%",
         display: "flex", flexDirection: "column",
         background: "var(--color-surface)",
-        border: `1.5px solid ${selected ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        border: `1.5px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.09)"}`,
         borderRadius: 12, overflow: "hidden",
         boxShadow: selected ? "0 0 0 3px rgba(228,255,151,0.65), 0 4px 20px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)",
         transition: "box-shadow 0.15s, border-color 0.15s",
@@ -3867,7 +3865,7 @@ function DetailPanel({
             style={{
               fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
               border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
-              background: current === s ? `${meta.color}25` : "transparent",
+              background: current === s ? `${meta.color}18` : "transparent",
               color: current === s ? meta.color : "var(--color-text-muted)",
               fontWeight: current === s ? 700 : 400,
               transition: "all 0.1s",
@@ -4329,7 +4327,6 @@ export default function CanvasPage() {
   const nodesRef = useRef(nodes);
   const connectionsRef = useRef(connections);
   const projectIdRef = useRef(projectId);
-  const isDirtyRef = useRef(false);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { panXRef.current = panX; panYRef.current = panY; }, [panX, panY]);
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
@@ -4386,7 +4383,6 @@ export default function CanvasPage() {
     historyRef.current.push(snapshot);
     if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift();
     historyIndexRef.current = historyRef.current.length - 1;
-    isDirtyRef.current = true;
   }, []);
 
   const undo = useCallback(() => {
@@ -4445,7 +4441,6 @@ export default function CanvasPage() {
         body: JSON.stringify({ canvasState: state }),
       });
       setSaveStatus("saved");
-      isDirtyRef.current = false;
       // Refresh project list to update updated_at
       setProjects(prev => prev.map(p =>
         p.id === id ? { ...p, updated_at: new Date().toISOString(), hasState: true } : p
@@ -4917,7 +4912,7 @@ export default function CanvasPage() {
   // Save on browser close / tab close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirtyRef.current) {
+      if (nodesRef.current.length > 0) {
         e.preventDefault();
       }
       flushPendingSave();
@@ -5292,7 +5287,7 @@ export default function CanvasPage() {
         // Auto-rename session after first successful query if still has default name
         const pid = projectIdRef.current;
         if (pid && !hasAutoNamedRef.current) {
-          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project", "New Project"];
+          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project"];
           // Use a function updater pattern: read current name from state
           setProjectName(prevName => {
             if (DEFAULT_NAMES.includes(prevName) || !prevName.trim()) {
@@ -7165,11 +7160,10 @@ export default function CanvasPage() {
               onClick={() => setZoom(prev => Math.min(2.5, prev * 1.18))}
               title={de ? "Vergrößern" : "Zoom in"}
               style={{
-                width: 32, height: 32, borderRadius: "var(--radius-sm, 6px)", border: "none",
+                width: 32, height: 32, borderRadius: 7, border: "none",
                 background: "transparent", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "var(--foreground)", fontSize: 16, fontWeight: 500,
-                fontFamily: "var(--font-mono)",
                 transition: "background 0.12s",
               }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--muted, #F7F7F7)"}
