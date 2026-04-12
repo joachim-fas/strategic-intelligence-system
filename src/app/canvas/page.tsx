@@ -7165,10 +7165,11 @@ export default function CanvasPage() {
               onClick={() => setZoom(prev => Math.min(2.5, prev * 1.18))}
               title={de ? "Vergrößern" : "Zoom in"}
               style={{
-                width: 32, height: 32, borderRadius: 7, border: "none",
+                width: 32, height: 32, borderRadius: "var(--radius-sm, 6px)", border: "none",
                 background: "transparent", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "var(--foreground)", fontSize: 16, fontWeight: 500,
+                fontFamily: "var(--font-mono)",
                 transition: "background 0.12s",
               }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--muted, #F7F7F7)"}
