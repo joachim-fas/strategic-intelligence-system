@@ -220,6 +220,19 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             {(briefing.confidence * 100).toFixed(0)}%
           </Badge>
         )}
+        {/* VAL-01: Data quality warnings from validation pipeline */}
+        {!isLoading && (b as any)._repaired && (
+          <Badge variant="outline" className="text-[10px] cursor-help bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]"
+            title={locale === "de" ? "Antwort war unvollständig und wurde repariert — Ergebnisse können lückenhaft sein." : "Response was incomplete and was repaired — results may be partial."}>
+            {locale === "de" ? "Repariert" : "Repaired"}
+          </Badge>
+        )}
+        {!isLoading && (b as any)._dataQualityWarnings?.length > 0 && (
+          <Badge variant="outline" className="text-[10px] cursor-help bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]"
+            title={(b as any)._dataQualityWarnings.join("\n")}>
+            {locale === "de" ? "Datenhinweis" : "Data notice"}
+          </Badge>
+        )}
         <span style={{ fontSize: 11, color: "var(--color-text-muted)", flexShrink: 0 }}>
           {entry.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
@@ -540,8 +553,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               iconVariant="light"
               title={locale === "de" ? "Quellen" : "Sources"}
               subtitle={locale === "de"
-                ? `${b.references.length} authoritative Referenzen`
-                : `${b.references.length} authoritative references`}
+                ? `${b.references.length} Referenzen — von KI vorgeschlagen, nicht redaktionell verifiziert`
+                : `${b.references.length} references — AI-suggested, not editorially verified`}
             >
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {b.references.map((ref: { title: string; url: string; relevance?: string }, i: number) => (
