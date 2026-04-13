@@ -5928,39 +5928,12 @@ export default function CanvasPage() {
       {/* ── Global Header (hidden when embedded) ────────── */}
       {!embedded && hydrated && <AppHeader />}
 
-      {/* ── Canvas Toolbar (Volt UI Node Canvas style) ────────── */}
-      {!embedded && hydrated && (
-      <div style={{ height: 48, flexShrink: 0, zIndex: 190, display: "flex", alignItems: "center", padding: "0 20px", gap: 12, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface, rgba(255,255,255,0.95))", backdropFilter: "blur(12px) saturate(160%)" }}>
+      {/* ── Canvas Toolbar — Row 1: Project Bar ────────── */}
+      {!embedded && hydrated && (<>
+      <div style={{ height: 44, flexShrink: 0, zIndex: 190, display: "flex", alignItems: "center", padding: "0 16px", gap: 12, borderBottom: "1px solid var(--color-border)", background: "var(--color-surface, rgba(255,255,255,0.95))", backdropFilter: "blur(12px) saturate(160%)" }}>
 
-        {/* Node Canvas brand label with icon */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <VoltIconBox icon={<GitBranch size={14} />} variant="lime" size={28} rounded="md" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 0, lineHeight: 1.1 }}>
-            <span style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              color: "var(--foreground, #0A0A0A)",
-            }}>
-              Node Canvas
-            </span>
-            <span style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 8,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase" as const,
-              color: "var(--muted-foreground, #6B6B6B)",
-            }}>
-              {de ? "Workflow-System" : "Workflow System"}
-            </span>
-          </div>
-        </div>
-        <span style={{ color: "var(--color-border)", fontSize: 14, margin: "0 4px" }}>|</span>
-
-        {/* ── Project management ─────────────────────────────── */}
-        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, zIndex: 200 }}>
+        {/* ── LEFT: Project management ─────────────────────────────── */}
+        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, zIndex: 200, flexShrink: 0 }}>
           {/* Editable project name */}
           {editingName ? (
             <input
@@ -5991,14 +5964,6 @@ export default function CanvasPage() {
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
           >{projectDropdownOpen ? "▴" : "▾"}</button>
 
-          {/* New project button */}
-          <button
-            onClick={createNewProject}
-            style={{ padding: "3px 10px", fontSize: 11, fontWeight: 600, background: "transparent", border: "1px solid var(--color-border)", borderRadius: 20, cursor: "pointer", color: "var(--color-text-secondary)", transition: "all 0.12s", whiteSpace: "nowrap" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
-          >+ {de ? "Neu" : "New"}</button>
-
           {/* Save status */}
           {projectId && saveStatus && (
             <span style={{ fontSize: 10, color: saveStatus === "saved" ? "#1A9E5A" : saveStatus === "error" ? "#E8402A" : "var(--color-text-muted)", minWidth: 80, transition: "opacity 0.5s" }}>
@@ -6008,7 +5973,7 @@ export default function CanvasPage() {
             </span>
           )}
 
-          {/* Project dropdown */}
+          {/* Project dropdown — with "+ Neu" as first item */}
           {projectDropdownOpen && (
             <div style={{
               position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 300,
@@ -6018,10 +5983,24 @@ export default function CanvasPage() {
               boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
               minWidth: 280, maxHeight: 320, overflowY: "auto",
             }}>
+              {/* New project — always first item in dropdown */}
+              <button
+                onClick={() => { createNewProject(); setProjectDropdownOpen(false); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "9px 14px", border: "none", borderBottom: "1px solid var(--color-border)",
+                  background: "transparent", color: "var(--color-text-secondary)",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "all 0.12s",
+                }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 300, lineHeight: 1, color: "#1A9E5A" }}>+</span>
+                {de ? "Neues Projekt erstellen" : "Create new project"}
+              </button>
               {projects.length === 0 ? (
                 <div style={{ padding: "16px 16px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
-                  {de ? "Noch keine Projekte" : "No projects yet"}<br />
-                  <span style={{ fontSize: 11, opacity: 0.7 }}>{de ? "Klicke »+ Neu« um zu starten" : 'Click "+ New" to start'}</span>
+                  {de ? "Noch keine Projekte" : "No projects yet"}
                 </div>
               ) : (
                 projects.map((p, i) => (
@@ -6060,146 +6039,8 @@ export default function CanvasPage() {
           )}
         </div>
 
-        {/* Stats */}
-        {nodes.length > 0 && (
-          <span style={{ fontSize: 11, color: "var(--color-text-muted)", flexShrink: 0 }}>
-            {queryNodes.length} {de ? "Abfragen" : "queries"} · {nodes.length - queryNodes.length} {de ? "Karten" : "cards"}
-            {connections.length > 0 && ` · ${connections.length} ${de ? "Verb." : "links"}`}
-          </span>
-        )}
-
-        {/* Right controls */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-
-          {/* + Add node — always visible in top right */}
-          <button
-            onClick={() => { setIterateCtx(null); setNodePickerVisible(true); }}
-            title={de ? "Neue Karte hinzufügen (Abfrage, Notiz, Idee, Liste)" : "Add new card (query, note, idea, list)"}
-            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 5 }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
-          >
-            <span style={{ fontSize: 15, fontWeight: 300, lineHeight: 1 }}>+</span>
-            {de ? "Hinzufügen" : "Add"}
-          </button>
-
-          <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-
-          {/* Sort/Arrange dropdown */}
-          {nodes.length > 1 && (
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setSortMenuOpen(v => !v)}
-                title={de ? "Karten sortieren und anordnen" : "Sort and arrange cards"}
-                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: sortMenuOpen ? "var(--color-page-bg)" : "transparent", color: sortMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-                onMouseLeave={e => { if (!sortMenuOpen) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; } }}
-              >⊞ {de ? "Ordnen" : "Arrange"} ▾</button>
-              {sortMenuOpen && (
-                <>
-                  <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
-                  <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
-                    {([
-                      { mode: "tree" as SortMode, icon: "🌳", label: de ? "Baum (Standard)" : "Tree (Default)" },
-                      { mode: "time" as SortMode, icon: "🕐", label: de ? "Zeitlich" : "By Time" },
-                      { mode: "type" as SortMode, icon: "📋", label: de ? "Nach Typ" : "By Type" },
-                      { mode: "status" as SortMode, icon: "🏷", label: de ? "Nach Status" : "By Status" },
-                    ] as const).map(item => (
-                      <button key={item.mode}
-                        onClick={() => { reorganizeCanvas(item.mode); setSortMenuOpen(false); }}
-                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 14px", border: "none", background: "transparent", color: "var(--color-text-secondary)", fontSize: 12, fontWeight: 500, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"; }}
-                      >
-                        <span style={{ fontSize: 13 }}>{item.icon}</span>
-                        <span>{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Group button (when multi-selected) */}
-          {multiSelectedIds.size >= 2 && (
-            <button
-              onClick={() => {
-                const ids = [...multiSelectedIds];
-                const gNodes = nodes.filter(n => ids.includes(n.id));
-                if (gNodes.length < 2) return;
-                const xs = gNodes.map(n => n.x);
-                const ys = gNodes.map(n => n.y);
-                const PAD = 40;
-                const colors = ["#2563EB", "#8B5CF6", "#F97316", "#1A9E5A", "#0369A1", "#D4A017"];
-                const newGroup: CanvasGroup = {
-                  id: `ug-${Date.now()}`,
-                  nodeIds: ids,
-                  label: de ? "Neue Gruppe" : "New Group",
-                  color: colors[userGroups.length % colors.length],
-                  bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2, h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2 },
-                };
-                setUserGroups(prev => [...prev, newGroup]);
-                setMultiSelectedIds(new Set());
-                setEditingGroupId(newGroup.id);
-              }}
-              title={de ? "Ausgewählte Karten gruppieren" : "Group selected cards"}
-              style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: "1px solid #2563EB40", background: "#2563EB14", color: "#2563EB", cursor: "pointer", transition: "all 0.12s" }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB"; el.style.color = "#fff"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB14"; el.style.color = "#2563EB"; }}
-            >
-              ⊞ {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
-            </button>
-          )}
-
-          <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-          {(["analyse", "karte", "datei"] as CanvasLayer[]).map(layer => (
-            <button key={layer}
-              onClick={() => toggleLayer(layer)}
-              title={`Layer ${LAYER_LABELS[layer].de} ${hiddenLayers.has(layer) ? "einblenden" : "ausblenden"}`}
-              style={{
-                fontSize: 10, padding: "2px 8px", borderRadius: 20,
-                border: `1px solid ${hiddenLayers.has(layer) ? "var(--color-border)" : LAYER_LABELS[layer].color}`,
-                background: hiddenLayers.has(layer) ? "transparent" : `${LAYER_LABELS[layer].color}18`,
-                color: hiddenLayers.has(layer) ? "var(--color-text-muted)" : LAYER_LABELS[layer].color,
-                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
-                textDecoration: hiddenLayers.has(layer) ? "line-through" : "none",
-              }}
-            >{LAYER_LABELS[layer].de}</button>
-          ))}
-
-          {/* Tag filter pills */}
-          {allTags.length > 0 && (
-            <>
-              <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap", overflow: "hidden" }}>
-                <span style={{ fontSize: 8, fontWeight: 700, color: "var(--color-text-muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 1, flexShrink: 0 }}>Tags</span>
-                {allTags.slice(0, 8).map(tag => {
-                  const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
-                  const isActive = activeTagFilter === tag;
-                  return (
-                    <button key={tag}
-                      onClick={() => setActiveTagFilter(prev => prev === tag ? null : tag)}
-                      style={{
-                        fontSize: 9, padding: "1px 7px", borderRadius: 10, border: `1px solid ${isActive ? `hsl(${hue}, 55%, 50%)` : `hsl(${hue}, 45%, 80%)`}`,
-                        background: isActive ? `hsl(${hue}, 55%, 92%)` : `hsl(${hue}, 55%, 96%)`, color: `hsl(${hue}, 55%, ${isActive ? 30 : 45}%)`,
-                        fontWeight: isActive ? 700 : 500, cursor: "pointer", transition: "all 0.12s", whiteSpace: "nowrap", flexShrink: 0,
-                        boxShadow: isActive ? `0 0 0 2px hsl(${hue}, 55%, 80%)` : "none",
-                      }}
-                    >{tag}</button>
-                  );
-                })}
-                {activeTagFilter && (
-                  <button onClick={() => setActiveTagFilter(null)}
-                    style={{ fontSize: 9, padding: "1px 5px", borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                    title={de ? "Tag-Filter aufheben" : "Clear tag filter"}
-                  >✕</button>
-                )}
-              </div>
-            </>
-          )}
-
-          <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-          {/* Volt UI boxed-tab pattern: gray container with white active tab */}
+        {/* ── CENTER: View mode tabs (primary navigation) ─────────────── */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
           <div style={{
             display: "inline-flex",
             alignItems: "center",
@@ -6245,22 +6086,72 @@ export default function CanvasPage() {
               );
             })}
           </div>
+        </div>
 
-          {nodes.length >= 2 && (
-            <>
-              <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
-              <Tooltip content={de ? "Strategisches Memo aus allen Analysen generieren" : "Generate strategic memo from all analyses"} placement="bottom">
-                <button
-                  onClick={generateBriefing}
-                  disabled={briefingLoading}
-                  style={{ fontSize: 10, padding: "2px 10px", borderRadius: 20, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", fontWeight: 600, opacity: briefingLoading ? 0.5 : 1 }}
-                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-                >{briefingLoading ? (de ? "Generiere…" : "Generating…") : "📄 Briefing"}</button>
-              </Tooltip>
-            </>
+        {/* ── RIGHT: Compact action buttons ─────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+
+          {/* + Add node */}
+          <button
+            onClick={() => { setIterateCtx(null); setNodePickerVisible(true); }}
+            title={de ? "Neue Karte hinzufügen (Abfrage, Notiz, Idee, Liste)" : "Add new card (query, note, idea, list)"}
+            style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 5 }}
+            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
+          >
+            <span style={{ fontSize: 15, fontWeight: 300, lineHeight: 1 }}>+</span>
+            {de ? "Neu" : "Add"}
+          </button>
+
+          {/* Sort/Arrange dropdown */}
+          {nodes.length > 1 && (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setSortMenuOpen(v => !v)}
+                title={de ? "Karten sortieren und anordnen" : "Sort and arrange cards"}
+                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: sortMenuOpen ? "var(--color-page-bg)" : "transparent", color: sortMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                onMouseLeave={e => { if (!sortMenuOpen) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; } }}
+              >⊞ {de ? "Ordnen" : "Arrange"} ▾</button>
+              {sortMenuOpen && (
+                <>
+                  <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
+                  <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
+                    {([
+                      { mode: "tree" as SortMode, icon: "🌳", label: de ? "Baum (Standard)" : "Tree (Default)" },
+                      { mode: "time" as SortMode, icon: "🕐", label: de ? "Zeitlich" : "By Time" },
+                      { mode: "type" as SortMode, icon: "📋", label: de ? "Nach Typ" : "By Type" },
+                      { mode: "status" as SortMode, icon: "🏷", label: de ? "Nach Status" : "By Status" },
+                    ] as const).map(item => (
+                      <button key={item.mode}
+                        onClick={() => { reorganizeCanvas(item.mode); setSortMenuOpen(false); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 14px", border: "none", background: "transparent", color: "var(--color-text-secondary)", fontSize: 12, fontWeight: 500, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"; }}
+                      >
+                        <span style={{ fontSize: 13 }}>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
+          {/* Briefing button (icon-only with tooltip) */}
+          {nodes.length >= 2 && (
+            <Tooltip content={de ? "Strategisches Memo aus allen Analysen generieren" : "Generate strategic memo from all analyses"} placement="bottom">
+              <button
+                onClick={generateBriefing}
+                disabled={briefingLoading}
+                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", fontWeight: 500, opacity: briefingLoading ? 0.5 : 1, transition: "all 0.12s" }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{briefingLoading ? "..." : "Briefing"}</button>
+            </Tooltip>
+          )}
+
+          {/* Export dropdown-style: md, json, clear */}
           {nodes.length > 0 && (
             <>
               <Tooltip content={de ? "Canvas als Markdown exportieren" : "Export canvas as Markdown"} placement="bottom">
@@ -6285,7 +6176,8 @@ export default function CanvasPage() {
               >{de ? "Leeren" : "Clear"}</button>
             </>
           )}
-          {/* FIXED: UX-11 — Snap-to-grid toggle */}
+
+          {/* Snap-to-grid toggle */}
           <Tooltip content={de ? "Am Raster ausrichten (20px)" : "Snap to grid (20px)"} placement="bottom">
             <button
               onClick={() => setSnapToGrid(prev => !prev)}
@@ -6302,7 +6194,98 @@ export default function CanvasPage() {
           </Tooltip>
         </div>
       </div>
+
+      {/* ── Canvas Toolbar — Row 2: Filter Bar (only when nodes exist) ────────── */}
+      {nodes.length > 0 && (
+      <div style={{ height: 32, flexShrink: 0, zIndex: 189, display: "flex", alignItems: "center", padding: "0 16px", gap: 10, borderBottom: "1px solid var(--color-border)", background: "var(--color-page-bg)", fontSize: 11 }}>
+
+        {/* LEFT: Stats */}
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)", flexShrink: 0 }}>
+          {queryNodes.length} {de ? "Abfragen" : "queries"} · {nodes.length - queryNodes.length} {de ? "Karten" : "cards"}
+          {connections.length > 0 && ` · ${connections.length} ${de ? "Verb." : "links"}`}
+        </span>
+
+        {/* RIGHT: Layer toggles + Tag filters + Gruppieren */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+
+          {/* Layer toggles */}
+          {(["analyse", "karte", "datei"] as CanvasLayer[]).map(layer => (
+            <button key={layer}
+              onClick={() => toggleLayer(layer)}
+              title={`Layer ${LAYER_LABELS[layer].de} ${hiddenLayers.has(layer) ? "einblenden" : "ausblenden"}`}
+              style={{
+                fontSize: 10, padding: "1px 7px", borderRadius: 20,
+                border: `1px solid ${hiddenLayers.has(layer) ? "var(--color-border)" : LAYER_LABELS[layer].color}`,
+                background: hiddenLayers.has(layer) ? "transparent" : `${LAYER_LABELS[layer].color}18`,
+                color: hiddenLayers.has(layer) ? "var(--color-text-muted)" : LAYER_LABELS[layer].color,
+                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
+                textDecoration: hiddenLayers.has(layer) ? "line-through" : "none",
+              }}
+            >{LAYER_LABELS[layer].de}</button>
+          ))}
+
+          {/* Tag filter pills */}
+          {allTags.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap", overflow: "hidden" }}>
+              <span style={{ fontSize: 8, fontWeight: 700, color: "var(--color-text-muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 1, flexShrink: 0 }}>Tags</span>
+              {allTags.slice(0, 8).map(tag => {
+                const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                const isActive = activeTagFilter === tag;
+                return (
+                  <button key={tag}
+                    onClick={() => setActiveTagFilter(prev => prev === tag ? null : tag)}
+                    style={{
+                      fontSize: 9, padding: "1px 7px", borderRadius: 10, border: `1px solid ${isActive ? `hsl(${hue}, 55%, 50%)` : `hsl(${hue}, 45%, 80%)`}`,
+                      background: isActive ? `hsl(${hue}, 55%, 92%)` : `hsl(${hue}, 55%, 96%)`, color: `hsl(${hue}, 55%, ${isActive ? 30 : 45}%)`,
+                      fontWeight: isActive ? 700 : 500, cursor: "pointer", transition: "all 0.12s", whiteSpace: "nowrap", flexShrink: 0,
+                      boxShadow: isActive ? `0 0 0 2px hsl(${hue}, 55%, 80%)` : "none",
+                    }}
+                  >{tag}</button>
+                );
+              })}
+              {activeTagFilter && (
+                <button onClick={() => setActiveTagFilter(null)}
+                  style={{ fontSize: 9, padding: "1px 5px", borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                  title={de ? "Tag-Filter aufheben" : "Clear tag filter"}
+                >✕</button>
+              )}
+            </div>
+          )}
+
+          {/* Group button (when multi-selected) */}
+          {multiSelectedIds.size >= 2 && (
+            <button
+              onClick={() => {
+                const ids = [...multiSelectedIds];
+                const gNodes = nodes.filter(n => ids.includes(n.id));
+                if (gNodes.length < 2) return;
+                const xs = gNodes.map(n => n.x);
+                const ys = gNodes.map(n => n.y);
+                const PAD = 40;
+                const colors = ["#2563EB", "#8B5CF6", "#F97316", "#1A9E5A", "#0369A1", "#D4A017"];
+                const newGroup: CanvasGroup = {
+                  id: `ug-${Date.now()}`,
+                  nodeIds: ids,
+                  label: de ? "Neue Gruppe" : "New Group",
+                  color: colors[userGroups.length % colors.length],
+                  bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2, h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2 },
+                };
+                setUserGroups(prev => [...prev, newGroup]);
+                setMultiSelectedIds(new Set());
+                setEditingGroupId(newGroup.id);
+              }}
+              title={de ? "Ausgewählte Karten gruppieren" : "Group selected cards"}
+              style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, border: "1px solid #2563EB40", background: "#2563EB14", color: "#2563EB", cursor: "pointer", transition: "all 0.12s" }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB"; el.style.color = "#fff"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB14"; el.style.color = "#2563EB"; }}
+            >
+              ⊞ {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
+            </button>
+          )}
+        </div>
+      </div>
       )}
+      </>)}
 
       {/* FIXED: DAT-08 / EDGE-09 — Concurrent tab warning banner */}
       {concurrentTabWarning && (
