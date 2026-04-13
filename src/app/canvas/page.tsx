@@ -7325,14 +7325,14 @@ export default function CanvasPage() {
               );
             })}
 
+            {/* Group membership left-border stripes */}
             {visibleNodes.map(n => {
+              const grpColor = nodeGroupColor.get(n.id);
+              if (!grpColor) return null;
               const isDimmedBySelection = selectedId !== null && !pipelineChain.has(n.id);
               const isDimmedByTag = activeTagFilter !== null && !(n.tags ?? []).includes(activeTagFilter);
               const isDimmed = isDimmedBySelection || isDimmedByTag;
-              const isMultiSelected = multiSelectedIds.has(n.id);
-              const grpColor = nodeGroupColor.get(n.id);
-              // Group membership left-border indicator
-              const groupStripe = grpColor ? (
+              return (
                 <div key={`grp-${n.id}`} style={{
                   position: "absolute", left: n.x - 5, top: n.y + 4,
                   width: 3, height: getNodeHeight(n) - 8,
@@ -7340,12 +7340,18 @@ export default function CanvasPage() {
                   pointerEvents: "none", opacity: isDimmed ? 0.15 : 0.7,
                   transition: "opacity 0.2s",
                 }} />
-              ) : null;
+              );
+            })}
+
+            {visibleNodes.map(n => {
+              const isDimmedBySelection = selectedId !== null && !pipelineChain.has(n.id);
+              const isDimmedByTag = activeTagFilter !== null && !(n.tags ?? []).includes(activeTagFilter);
+              const isDimmed = isDimmedBySelection || isDimmedByTag;
+              const isMultiSelected = multiSelectedIds.has(n.id);
               if (n.nodeType === "query") {
                 const qNode = n as QueryNode;
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <QueryNodeCard
+                return (
+                  <QueryNodeCard key={n.id}
                     node={qNode} de={de}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7378,13 +7384,12 @@ export default function CanvasPage() {
                     onAddTag={handleAddTag}
                     onSetStatus={handleSetNodeStatus}
                   />
-                </React.Fragment>);
+                );
               }
               if (n.nodeType === "note") {
                 const nNode = n as NoteNode;
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <NoteNodeCard
+                return (
+                  <NoteNodeCard key={n.id}
                     node={nNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7399,13 +7404,12 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                </React.Fragment>);
+                );
               }
               if (n.nodeType === "idea") {
                 const iNode = n as IdeaNode;
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <IdeaNodeCard
+                return (
+                  <IdeaNodeCard key={n.id}
                     node={iNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7420,13 +7424,12 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                </React.Fragment>);
+                );
               }
               if (n.nodeType === "list") {
                 const lNode = n as ListNode;
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <ListNodeCard
+                return (
+                  <ListNodeCard key={n.id}
                     node={lNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7440,13 +7443,12 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                </React.Fragment>);
+                );
               }
               if (n.nodeType === "file") {
                 const fNode = n as FileNode;
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <FileNodeCard
+                return (
+                  <FileNodeCard key={n.id}
                     node={fNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7460,13 +7462,12 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                </React.Fragment>);
+                );
               }
               const dNode = n as DerivedNode;
               if (dNode.nodeType === "dimensions") {
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <DimensionsNodeCard
+                return (
+                  <DimensionsNodeCard key={n.id}
                     node={dNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7478,12 +7479,11 @@ export default function CanvasPage() {
                     nodeW={dNode.customWidth ?? DERIVED_W}
                     dimmed={isDimmed}
                   />
-                </React.Fragment>);
+                );
               }
               if (dNode.nodeType === "causalgraph") {
-                return (<React.Fragment key={n.id}>
-                  {groupStripe}
-                  <CausalGraphNodeCard
+                return (
+                  <CausalGraphNodeCard key={n.id}
                     node={dNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7495,11 +7495,10 @@ export default function CanvasPage() {
                     nodeW={dNode.customWidth ?? DERIVED_W}
                     dimmed={isDimmed}
                   />
-                </React.Fragment>);
+                );
               }
-              return (<React.Fragment key={n.id}>
-                {groupStripe}
-                <DerivedNodeCard
+              return (
+                <DerivedNodeCard key={n.id}
                   node={dNode} de={de}
                   selected={selectedId === n.id}
                   onSelect={handleSelectNode}
@@ -7515,7 +7514,7 @@ export default function CanvasPage() {
                   dimmed={isDimmed}
                   zoom={zoom}
                 />
-              </React.Fragment>);
+              );
             })}
           </div>
           </ErrorBoundary>
