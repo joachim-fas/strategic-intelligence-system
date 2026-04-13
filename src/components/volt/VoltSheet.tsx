@@ -62,22 +62,40 @@ export const VoltSheet: React.FC<VoltSheetProps> = ({
 
 /* ── Trigger ── */
 export interface VoltSheetTriggerProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  asChild?: boolean;
+}
 
 export const VoltSheetTrigger = React.forwardRef<
   HTMLButtonElement,
   VoltSheetTriggerProps
->(({ onClick, children, ...props }, ref) => {
+>(({ onClick, children, asChild, ...props }, ref) => {
   const { setOpen } = useContext(SheetContext);
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setOpen(true);
+    onClick?.(e);
+  };
+
+  // asChild: merge trigger props into the single child element
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
+      ref,
+      "data-slot": "sheet-trigger",
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        handleClick(e);
+        const childOnClick = (children as React.ReactElement<Record<string, unknown>>).props?.onClick;
+        if (typeof childOnClick === "function") childOnClick(e);
+      },
+    });
+  }
+
   return (
     <button
       ref={ref}
       data-slot="sheet-trigger"
       type="button"
-      onClick={(e) => {
-        setOpen(true);
-        onClick?.(e);
-      }}
+      onClick={handleClick}
       {...props}
     >
       {children}

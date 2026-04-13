@@ -66,13 +66,35 @@ export const VoltDropdownMenu: React.FC<VoltDropdownMenuProps> = ({
 
 /* ── Trigger ── */
 export interface VoltDropdownMenuTriggerProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  asChild?: boolean;
+}
 
 export const VoltDropdownMenuTrigger = React.forwardRef<
   HTMLButtonElement,
   VoltDropdownMenuTriggerProps
->(({ onClick, children, ...props }, ref) => {
+>(({ onClick, children, asChild, ...props }, ref) => {
   const { open, setOpen } = useContext(DropdownContext);
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setOpen(!open);
+    onClick?.(e);
+  };
+
+  // asChild: merge trigger props into the single child element
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
+      ref,
+      "data-slot": "dropdown-menu-trigger",
+      "aria-expanded": open,
+      "aria-haspopup": "menu",
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        handleClick(e);
+        const childOnClick = (children as React.ReactElement<Record<string, unknown>>).props?.onClick;
+        if (typeof childOnClick === "function") childOnClick(e);
+      },
+    });
+  }
 
   return (
     <button
@@ -81,10 +103,7 @@ export const VoltDropdownMenuTrigger = React.forwardRef<
       type="button"
       aria-expanded={open}
       aria-haspopup="menu"
-      onClick={(e) => {
-        setOpen(!open);
-        onClick?.(e);
-      }}
+      onClick={handleClick}
       {...props}
     >
       {children}

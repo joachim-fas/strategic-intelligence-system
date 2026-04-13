@@ -74,23 +74,41 @@ export interface VoltPopoverTriggerProps
 export const VoltPopoverTrigger = React.forwardRef<
   HTMLButtonElement,
   VoltPopoverTriggerProps
->(({ onClick, children, ...props }, ref) => {
+>(({ onClick, children, asChild, ...props }, ref) => {
   const { open, setOpen, triggerRef } = useContext(PopoverContext);
+
+  const mergedRef = (node: HTMLButtonElement | null) => {
+    (triggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setOpen(!open);
+    onClick?.(e);
+  };
+
+  // asChild: merge trigger props into the single child element
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
+      ref: mergedRef,
+      "data-slot": "popover-trigger",
+      "aria-expanded": open,
+      onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+        handleClick(e);
+        const childOnClick = (children as React.ReactElement<Record<string, unknown>>).props?.onClick;
+        if (typeof childOnClick === "function") childOnClick(e);
+      },
+    });
+  }
 
   return (
     <button
-      ref={(node) => {
-        (triggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
-        if (typeof ref === "function") ref(node);
-        else if (ref) (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
-      }}
+      ref={mergedRef}
       data-slot="popover-trigger"
       type="button"
       aria-expanded={open}
-      onClick={(e) => {
-        setOpen(!open);
-        onClick?.(e);
-      }}
+      onClick={handleClick}
       {...props}
     >
       {children}
