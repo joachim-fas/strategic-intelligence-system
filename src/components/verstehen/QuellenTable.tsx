@@ -70,6 +70,10 @@ const CONNECTOR_CATEGORY: Record<string, Exclude<CategoryKey, "all" | "forschung
   openfda:         "gesundheit",
   unhcr:           "migration",
   nextstrain:      "gesundheit",
+  // ── Batch-6 (2026-04): newest live connectors ──────────────────────
+  steamspy:            "gaming",
+  "google-ngram":      "publishing",
+  "usgs-earthquake":   "klima",
 };
 
 const CONNECTOR_TYPE: Record<string, TypeBadgeKind> = {
@@ -98,6 +102,10 @@ const CONNECTOR_TYPE: Record<string, TypeBadgeKind> = {
   openfda:         "live-signal",
   unhcr:           "live-signal",
   nextstrain:      "live-signal",
+  // ── Batch-6 (2026-04) ───────────────────────────────────────────────
+  steamspy:            "live-signal",
+  "google-ngram":      "forschung",
+  "usgs-earthquake":   "live-signal",
 };
 
 // Short descriptions + doc URLs per connector
@@ -149,6 +157,10 @@ const DESCRIPTIONS: Record<string, { de: string; en: string; url?: string }> = {
   "google-trends": { de: "Google-Suchtrends als Attention-Indikator", en: "Google search trends as attention indicator", url: "https://trends.google.com/" },
   "un-data":       { de: "UN Statistical Division Daten", en: "UN Statistical Division data", url: "https://data.un.org/" },
   "un-sdg":        { de: "UN Sustainable Development Goals Tracker", en: "UN Sustainable Development Goals tracker", url: "https://unstats.un.org/sdgs/dataportal" },
+  // ── Batch-6 (2026-04) ───────────────────────────────────────────────
+  steamspy:            { de: "Steam-Spiele: Spielerzahlen, Genre-Trends", en: "Steam games: player counts, genre trends", url: "https://steamspy.com/api.php" },
+  "google-ngram":      { de: "Buch-Korpus Worthäufigkeit seit 1500", en: "Book corpus word frequency since 1500", url: "https://books.google.com/ngrams" },
+  "usgs-earthquake":   { de: "USGS Erdbeben-Daten, weltweit in Echtzeit", en: "USGS earthquake data, worldwide real-time", url: "https://earthquake.usgs.gov/fdsnws/event/1/" },
 };
 
 // Grid column template shared by the header row and every data row.
