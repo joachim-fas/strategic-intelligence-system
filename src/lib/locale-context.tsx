@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { Locale } from "./i18n";
+
+const STORAGE_KEY = "sis-locale";
 
 interface LocaleContextType {
   locale: Locale;
@@ -13,8 +15,20 @@ const LocaleContext = createContext<LocaleContextType>({
   toggleLocale: () => {},
 });
 
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return "de";
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored === "en" ? "en" : "de";
+}
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("de");
+  const [locale, setLocale] = useState<Locale>(readStoredLocale);
+
+  // Persist to localStorage & update <html lang="…"> on every change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const toggleLocale = useCallback(() => {
     setLocale((prev) => (prev === "de" ? "en" : "de"));

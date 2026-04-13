@@ -152,8 +152,8 @@ const DESCRIPTIONS: Record<string, { de: string; en: string; url?: string }> = {
 };
 
 // Grid column template shared by the header row and every data row.
-// 4 columns: Source | Kategorie | Typ | Status
-const GRID_COLS = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(90px, 0.6fr) minmax(180px, auto)";
+// 5 columns: Source | Kategorie | Typ | Status | Docs
+const GRID_COLS = "minmax(220px, 2fr) minmax(120px, 1fr) minmax(90px, 0.6fr) minmax(100px, auto) 60px";
 
 interface QuellenTableProps {
   de: boolean;
@@ -624,6 +624,8 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   )}
                 </div>
               ))}
+              {/* Docs column header — not sortable */}
+              <div style={{ textAlign: "center" }}>Docs</div>
             </div>
 
             {/* Data rows */}
@@ -678,7 +680,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                         >&#9679;</span>
                       )}
                     </div>
-                    {(desc || r.docUrl) && (
+                    {desc && (
                       <div style={{
                         fontSize: 11,
                         color: "var(--muted-foreground)",
@@ -691,26 +693,6 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                         overflow: "hidden",
                       }}>
                         {desc}
-                        {r.docUrl && (
-                          <>
-                            {desc ? " " : ""}
-                            <a
-                              href={r.docUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                fontSize: 10, fontWeight: 600,
-                                color: "var(--signal-positive, #1A9E5A)",
-                                textDecoration: "none",
-                                fontFamily: "var(--font-mono)",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              Docs&nbsp;&#8599;
-                            </a>
-                          </>
-                        )}
                       </div>
                     )}
                   </div>
@@ -750,6 +732,29 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   {/* Col 4: Status */}
                   <div>
                     <VoltStatusBadge kind={r.status} />
+                  </div>
+
+                  {/* Col 5: Docs link */}
+                  <div style={{ textAlign: "center" }}>
+                    {r.docUrl ? (
+                      <a
+                        href={r.docUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title={r.docUrl}
+                        style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: "var(--signal-positive, #1A9E5A)",
+                          textDecoration: "none",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      >
+                        Docs&thinsp;&#8599;
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "var(--muted-foreground)", opacity: 0.3 }}>—</span>
+                    )}
                   </div>
                 </div>
               );

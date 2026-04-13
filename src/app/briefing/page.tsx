@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useLocale } from "@/lib/locale-context";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
 
 /**
@@ -11,14 +12,16 @@ import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
  * Use Cmd+P to export as PDF.
  */
 function BriefingContent() {
+  const { locale } = useLocale();
+  const de = locale === "de";
   const params = useSearchParams();
   const idx = parseInt(params.get("id") ?? "0", 10);
   const entry = DEMO_BRIEFINGS[Math.min(idx, DEMO_BRIEFINGS.length - 1)];
-  if (!entry) return <div>Kein Briefing verfügbar</div>;
+  if (!entry) return <div>{de ? "Kein Briefing verfügbar" : "No briefing available"}</div>;
 
   const b = entry.briefing as any;
   const conf = b.confidence ? Math.round(b.confidence * 100) : 0;
-  const date = new Date().toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
+  const date = new Date().toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "long", day: "numeric" });
 
   return (
     <div style={{
@@ -50,7 +53,7 @@ function BriefingContent() {
           background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)",
           fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 11, fontWeight: 700,
         }}>
-          {conf}% Konfidenz
+          {conf}% {de ? "Konfidenz" : "Confidence"}
         </div>
       </div>
 
@@ -69,7 +72,7 @@ function BriefingContent() {
       {/* Synthesis */}
       <section style={{ marginBottom: 32 }}>
         <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--volt-text, #0A0A0A)" }}>
-          Synthese
+          {de ? "Synthese" : "Synthesis"}
         </h2>
         <div style={{ fontSize: 15, lineHeight: 1.75 }}>
           {b.synthesis}
@@ -80,14 +83,14 @@ function BriefingContent() {
       {b.scenarios?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
-            Szenarien
+            {de ? "Szenarien" : "Scenarios"}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: b.scenarios.length > 2 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 12 }}>
             {b.scenarios.map((s: any, i: number) => {
               const colors: Record<string, { bg: string; border: string; label: string }> = {
-                optimistic: { bg: "var(--pastel-mint-light, #F0FDF6)", border: "var(--pastel-mint-border, #7DD4A8)", label: "Optimistisch" },
-                baseline: { bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", label: "Basisfall" },
-                pessimistic: { bg: "var(--pastel-rose-light, #FEF2F2)", border: "var(--pastel-rose-border, #FCA5A5)", label: "Pessimistisch" },
+                optimistic: { bg: "var(--pastel-mint-light, #F0FDF6)", border: "var(--pastel-mint-border, #7DD4A8)", label: de ? "Optimistisch" : "Optimistic" },
+                baseline: { bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", label: de ? "Basisfall" : "Baseline" },
+                pessimistic: { bg: "var(--pastel-rose-light, #FEF2F2)", border: "var(--pastel-rose-border, #FCA5A5)", label: de ? "Pessimistisch" : "Pessimistic" },
               };
               const c = colors[s.type] ?? { bg: "var(--color-surface, #F9FAFB)", border: "var(--volt-border, #E5E7EB)", label: s.type };
               return (
@@ -125,7 +128,7 @@ function BriefingContent() {
       {b.keyInsights?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
-            Erkenntnisse
+            {de ? "Erkenntnisse" : "Key Insights"}
           </h2>
           {b.keyInsights.map((insight: string, i: number) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "flex-start" }}>
@@ -142,7 +145,7 @@ function BriefingContent() {
       {(b.causalChain?.length > 0 || b.causalAnalysis?.length > 0) && (
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
-            Kausale Zusammenhänge
+            {de ? "Kausale Zusammenhänge" : "Causal Relationships"}
           </h2>
           {(b.causalAnalysis ?? b.causalChain)?.map((chain: string, i: number) => (
             <div key={i} style={{ fontSize: 13, marginBottom: 6, paddingLeft: 12 }}>
@@ -156,7 +159,7 @@ function BriefingContent() {
       {b.decisionFramework && (
         <section style={{ marginBottom: 32, padding: "16px 20px", borderRadius: 10, background: "var(--pastel-butter-light, #FFF8F0)", border: "1px solid var(--pastel-butter-border, #F0D4A8)" }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "var(--pastel-butter-text, #955A20)" }}>
-            Entscheidungshilfe
+            {de ? "Entscheidungshilfe" : "Decision Framework"}
           </h2>
           <div style={{ fontSize: 14, lineHeight: 1.7 }}>
             {b.decisionFramework}
@@ -168,7 +171,7 @@ function BriefingContent() {
       {b.references?.length > 0 && (
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
-            Quellen
+            {de ? "Quellen" : "Sources"}
           </h2>
           {b.references.map((ref: any, i: number) => (
             <div key={i} style={{ fontSize: 12, marginBottom: 4 }}>
@@ -184,10 +187,10 @@ function BriefingContent() {
       {/* Footer */}
       <div style={{ marginTop: 48, paddingTop: 16, borderTop: "1px solid var(--volt-border, #E8E8E8)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--volt-text-faint, #BBB)" }}>
-          Strategic Intelligence System · {date} · Vertraulich
+          Strategic Intelligence System · {date} · {de ? "Vertraulich" : "Confidential"}
         </div>
         <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, color: "var(--volt-text-faint, #BBB)" }}>
-          {conf}% Konfidenz · STEEP+V · EU-Fokus
+          {conf}% {de ? "Konfidenz" : "Confidence"} · STEEP+V · {de ? "EU-Fokus" : "EU Focus"}
         </div>
       </div>
 
@@ -202,7 +205,7 @@ function BriefingContent() {
             marginBottom: 24,
           }}
         >
-          Als PDF exportieren (Cmd+P)
+          {de ? "Als PDF exportieren (Cmd+P)" : "Export as PDF (Cmd+P)"}
         </button>
 
         {/* Other briefings */}
@@ -232,7 +235,7 @@ function BriefingContent() {
 
 export default function BriefingPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>Lade Briefing...</div>}>
+    <Suspense fallback={<div style={{ padding: 40, textAlign: "center" }}>Loading…</div>}>
       <BriefingContent />
     </Suspense>
   );

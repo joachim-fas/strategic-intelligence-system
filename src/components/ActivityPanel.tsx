@@ -14,6 +14,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useActivityStream } from "@/lib/use-activity-stream";
 import type { ActivityEvent } from "@/lib/use-activity-stream";
+import { useLocale } from "@/lib/locale-context";
 import Link from "next/link";
 
 // ── Monitor API response shape ────────────────────────────────────────────
@@ -56,8 +57,8 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("de-DE", {
+function formatTime(iso: string, locale = "de-DE"): string {
+  return new Date(iso).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -84,6 +85,8 @@ function formatMeta(v: unknown): string {
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function ActivityPanel() {
+  const { locale } = useLocale();
+  const de = locale === "de";
   const [open, setOpen] = useState(false);
   const { events, connected, clearEvents } = useActivityStream(open);
   const [monitorData, setMonitorData] = useState<MonitorData | null>(null);
@@ -208,7 +211,7 @@ export function ActivityPanel() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Link
               href="/monitor"
-              title="Vollständiger Monitor"
+              title={de ? "Vollständiger Monitor" : "Full Monitor"}
               onClick={() => setOpen(false)}
               style={{
                 fontSize: 11, color: "var(--color-text-muted, #6B6B6B)",
@@ -223,7 +226,7 @@ export function ActivityPanel() {
             </Link>
             <button
               onClick={() => setOpen(false)}
-              aria-label="Schließen"
+              aria-label={de ? "Schließen" : "Close"}
               style={{
                 width: 28, height: 28, borderRadius: 6, border: "none",
                 background: "transparent", cursor: "pointer", fontSize: 16,
@@ -247,7 +250,7 @@ export function ActivityPanel() {
           flexShrink: 0,
         }}>
           {/* Signal Freshness */}
-          <KPICard label="Signal-Frische">
+          <KPICard label={de ? "Signal-Frische" : "Signal Freshness"}>
             {newestHours !== null ? (
               <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                 <span style={{
@@ -267,7 +270,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* Source Coverage */}
-          <KPICard label="Quellen-Abdeckung">
+          <KPICard label={de ? "Quellen-Abdeckung" : "Source Coverage"}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
               <span style={{
                 fontSize: 20, fontWeight: 700,
@@ -295,7 +298,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* Last Query Confidence */}
-          <KPICard label="Letzte Konfidenz">
+          <KPICard label={de ? "Letzte Konfidenz" : "Last Confidence"}>
             {lastConfidence !== null ? (
               <span style={{
                 fontSize: 20, fontWeight: 700,
@@ -310,7 +313,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* DB / System */}
-          <KPICard label="Datenbank">
+          <KPICard label={de ? "Datenbank" : "Database"}>
             {monitorData ? (
               <div>
                 <span style={{
@@ -342,7 +345,7 @@ export function ActivityPanel() {
             color: "var(--color-text-heading, #0A0A0A)",
             textTransform: "uppercase", letterSpacing: "0.05em",
           }}>
-            Live-Aktivität
+            {de ? "Live-Aktivität" : "Live Activity"}
             {events.length > 0 && (
               <span style={{
                 marginLeft: 8, fontSize: 10, fontWeight: 500,
@@ -361,7 +364,7 @@ export function ActivityPanel() {
                 cursor: "pointer", padding: "2px 6px",
               }}
             >
-              Löschen
+              {de ? "Löschen" : "Clear"}
             </button>
           )}
         </div>
@@ -380,9 +383,9 @@ export function ActivityPanel() {
               color: "var(--color-text-muted, #6B6B6B)", fontSize: 13,
             }}>
               <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>◎</div>
-              <div>Warte auf Aktivität…</div>
+              <div>{de ? "Warte auf Aktivität…" : "Waiting for activity…"}</div>
               <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
-                Starte eine Abfrage oder Pipeline
+                {de ? "Starte eine Abfrage oder Pipeline" : "Start a query or pipeline"}
               </div>
             </div>
           ) : (
@@ -398,8 +401,8 @@ export function ActivityPanel() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
-          <span>Ctrl+M zum Umschalten</span>
-          <span>{connected ? "● Verbunden" : "○ Getrennt"}</span>
+          <span>{de ? "Ctrl+M zum Umschalten" : "Ctrl+M to toggle"}</span>
+          <span>{connected ? (de ? "● Verbunden" : "● Connected") : (de ? "○ Getrennt" : "○ Disconnected")}</span>
         </div>
       </aside>
 
