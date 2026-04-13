@@ -6,8 +6,8 @@ import Image from "next/image";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
-// Main navigation — workflow-oriented, right-aligned next to actions.
-// "Start" and "Canvas" removed (Start = Logo click, Canvas = via Projekte).
+// Main navigation — only core workflow items.
+// Monitor + Dokumentation moved to Footer.
 const NAV_ITEMS: Array<{
   href: string;
   labelDe: string;
@@ -16,8 +16,6 @@ const NAV_ITEMS: Array<{
 }> = [
   { href: "/sessions",      labelDe: "Projekte",           labelEn: "Projects"          },
   { href: "/verstehen",     labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
-  { href: "/monitor",       labelDe: "Monitor",            labelEn: "Monitor"            },
-  { href: "/dokumentation", labelDe: "Dokumentation",      labelEn: "Documentation"      },
 ];
 
 /**

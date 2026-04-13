@@ -4,6 +4,7 @@ import "./globals.css";
 import { LocaleProvider } from "@/lib/locale-context";
 import SignalTicker from "@/components/SignalTicker";
 import { ActivityPanel } from "@/components/ActivityPanel";
+import { Footer } from "@/components/Footer";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -50,7 +51,10 @@ export default function RootLayout({
       </head>
       <body className="antialiased volt-root pattern-dots">
         <LocaleProvider>
-          {children}
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+            {children}
+            <Footer />
+          </div>
           <SignalTicker />
           <ActivityPanel />
         </LocaleProvider>
