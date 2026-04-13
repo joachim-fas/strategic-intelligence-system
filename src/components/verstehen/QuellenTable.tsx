@@ -152,8 +152,8 @@ const DESCRIPTIONS: Record<string, { de: string; en: string; url?: string }> = {
 };
 
 // Grid column template shared by the header row and every data row.
-// 3 columns: Source (flexible) | Category (flexible) | Status+Type (fixed, wide enough for two badges)
-const GRID_COLS = "minmax(200px, 1.4fr) minmax(140px, 0.7fr) minmax(200px, auto)";
+// 4 columns: Source | Kategorie | Typ | Status
+const GRID_COLS = "minmax(220px, 2fr) minmax(130px, 1fr) minmax(90px, 0.6fr) minmax(180px, auto)";
 
 interface QuellenTableProps {
   de: boolean;
@@ -181,6 +181,17 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   const [activeFilter, setActiveFilter] = useState<CategoryKey>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [sortCol, setSortCol] = useState<"name" | "category" | "type" | "status">("status");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = useCallback((col: "name" | "category" | "type" | "status") => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  }, [sortCol]);
 
   useEffect(() => {
     fetch("/api/v1/sources/status")
@@ -302,7 +313,8 @@ export default function QuellenTable({ de }: QuellenTableProps) {
     });
   }, [allRows, activeMacro, activeFilter, statusFilter, search]);
 
-  // Sort rows: aktiv → geplant → needs-key → backlog → inaktiv → fehler.
+  // Sort rows based on active sort column and direction.
+  // Default ("status"): aktiv → geplant → needs-key → backlog → inaktiv → fehler.
   // Within "geplant", high-priority entries float to the top.
   const sorted = useMemo(() => {
     const prioRank = { high: 0, medium: 1, low: 2 } as const;
@@ -317,17 +329,39 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         default:          return 6;
       }
     };
+    const locale = de ? "de" : "en";
+    const dir = sortDir === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
-      const sr = statusRank(a.status) - statusRank(b.status);
-      if (sr !== 0) return sr;
-      if ((a.status === "geplant" || a.status === "needs-key") && a.status === b.status) {
-        const ar = prioRank[a.priority ?? "low"];
-        const br = prioRank[b.priority ?? "low"];
-        if (ar !== br) return ar - br;
+      let cmp = 0;
+      switch (sortCol) {
+        case "name":
+          cmp = a.displayName.localeCompare(b.displayName, locale);
+          break;
+        case "category": {
+          const catA = de ? CATEGORIES[a.category].de : CATEGORIES[a.category].en;
+          const catB = de ? CATEGORIES[b.category].de : CATEGORIES[b.category].en;
+          cmp = catA.localeCompare(catB, locale);
+          break;
+        }
+        case "type":
+          cmp = a.type.localeCompare(b.type, locale);
+          break;
+        case "status":
+        default: {
+          const sr = statusRank(a.status) - statusRank(b.status);
+          if (sr !== 0) return sr * dir;
+          if ((a.status === "geplant" || a.status === "needs-key") && a.status === b.status) {
+            const ar = prioRank[a.priority ?? "low"];
+            const br = prioRank[b.priority ?? "low"];
+            if (ar !== br) return (ar - br) * dir;
+          }
+          cmp = a.displayName.localeCompare(b.displayName, locale);
+          break;
+        }
       }
-      return a.displayName.localeCompare(b.displayName, de ? "de" : "en");
+      return cmp * dir;
     });
-  }, [filtered, de]);
+  }, [filtered, de, sortCol, sortDir]);
 
   const liveCount = connectors.length;
   const activeCount = allRows.filter((r) => r.status === "aktiv").length;
@@ -533,106 +567,155 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         </div>
       )}
 
-      {/* Connectors grid — responsive card-row layout.
-           Each row shows: name/slug, category, type, FULL description
-           (no ellipsis), status, and a clickable link to documentation. */}
+      {/* Connectors grid — 4-column layout with sortable headers.
+           Columns: Source | Kategorie | Typ | Status */}
       {!showResearch && (
         <div
           style={{
             border: "1px solid var(--color-border)",
             borderRadius: 12,
-            overflow: "auto",
+            overflow: "hidden",
             background: "var(--card)",
           }}
         >
-          {/* Header row */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: GRID_COLS,
-              gap: 12,
-              padding: "10px 20px",
-              background: "var(--volt-surface, #FAFAFA)",
-              borderBottom: "1px solid var(--volt-border, #EEE)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: "var(--volt-text-faint, #999)",
-            }}
-          >
-            <div>{de ? "Quelle" : "Source"}</div>
-            <div>{de ? "Kategorie" : "Category"}</div>
-            <div>Status</div>
-          </div>
+          <div style={{ minWidth: 640 }}>
+            {/* Header row — clickable for column sorting */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: GRID_COLS,
+                gap: 12,
+                padding: "10px 20px",
+                background: "var(--volt-surface, #FAFAFA)",
+                borderBottom: "1px solid var(--volt-border, #EEE)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color: "var(--volt-text-faint, #999)",
+              }}
+            >
+              {([
+                { col: "name" as const, labelDe: "Quelle", labelEn: "Source" },
+                { col: "category" as const, labelDe: "Kategorie", labelEn: "Category" },
+                { col: "type" as const, labelDe: "Typ", labelEn: "Type" },
+                { col: "status" as const, labelDe: "Status", labelEn: "Status" },
+              ]).map(({ col, labelDe, labelEn }) => (
+                <div
+                  key={col}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSort(col)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSort(col); }}
+                  style={{
+                    cursor: "pointer",
+                    userSelect: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  {de ? labelDe : labelEn}
+                  {sortCol === col && (
+                    <span style={{ fontSize: 8, lineHeight: 1 }}>
+                      {sortDir === "asc" ? "\u25B2" : "\u25BC"}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
 
-          {/* Data rows */}
-          {sorted.map((r, idx) => {
-            const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
-            const isActiveRow = r.status === "aktiv";
-            const macroKey =
-              r.category !== "forschung" && r.category !== "all"
-                ? CATEGORY_TO_MACRO[r.category]
-                : undefined;
-            const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
-            const MacroIcon = macroMeta?.icon;
-            const desc = de ? r.descDe : r.descEn;
-            return (
-              <div
-                key={r.key}
-                style={{
-                  padding: "14px 20px",
-                  borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
-                  transition: "background-color 120ms ease",
-                  opacity: isPlanned ? 0.86 : 1,
-                  borderLeft: isActiveRow
-                    ? "3px solid var(--signal-positive, #1A9E5A)"
-                    : "3px solid transparent",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(79,99,138,0.07)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {/* Top row: name | category | status */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: GRID_COLS,
-                  gap: 12,
-                  alignItems: "center",
-                }}>
-                  {/* Col 1: Source name + slug */}
+            {/* Data rows */}
+            {sorted.map((r, idx) => {
+              const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
+              const isActiveRow = r.status === "aktiv";
+              const macroKey =
+                r.category !== "forschung" && r.category !== "all"
+                  ? CATEGORY_TO_MACRO[r.category]
+                  : undefined;
+              const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
+              const MacroIcon = macroMeta?.icon;
+              const desc = de ? r.descDe : r.descEn;
+              return (
+                <div
+                  key={r.key}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: GRID_COLS,
+                    gap: 12,
+                    alignItems: "center",
+                    padding: "12px 20px",
+                    borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
+                    transition: "background-color 120ms ease",
+                    borderLeft: isActiveRow
+                      ? "3px solid var(--signal-positive, #1A9E5A)"
+                      : "3px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(79,99,138,0.07)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {/* Col 1: Source — name, description, doc link */}
                   <div style={{ minWidth: 0 }}>
                     <div style={{
-                      display: "flex", alignItems: "center", gap: 6,
+                      display: "flex", alignItems: "center", gap: 5,
                       fontFamily: "var(--font-display)",
-                      fontSize: 14, fontWeight: 600,
+                      fontSize: 13, fontWeight: 600,
                       color: "var(--foreground)",
+                      lineHeight: 1.3,
                     }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {r.displayName}
                       </span>
                       {isPlanned && r.priority === "high" && (
                         <span
-                          title={de ? "Hohe Priorität" : "High priority"}
-                          style={{ fontSize: 9, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
-                        >●</span>
+                          title={de ? "Hohe Priorit\u00e4t" : "High priority"}
+                          style={{ fontSize: 7, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
+                        >&#9679;</span>
                       )}
                     </div>
-                    <div style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 10,
-                      color: "var(--volt-text-faint, #A8A8A8)",
-                      marginTop: 1,
-                    }}>
-                      {r.slug}
-                    </div>
+                    {(desc || r.docUrl) && (
+                      <div style={{
+                        fontSize: 11,
+                        color: "var(--muted-foreground)",
+                        fontFamily: "var(--font-ui)",
+                        lineHeight: 1.4,
+                        marginTop: 2,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical" as const,
+                        overflow: "hidden",
+                      }}>
+                        {desc}
+                        {r.docUrl && (
+                          <>
+                            {desc ? " " : ""}
+                            <a
+                              href={r.docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                fontSize: 10, fontWeight: 600,
+                                color: "var(--signal-positive, #1A9E5A)",
+                                textDecoration: "none",
+                                fontFamily: "var(--font-mono)",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Docs&nbsp;&#8599;
+                            </a>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Col 2: Macro icon + fine category */}
+                  {/* Col 2: Kategorie — macro icon + fine category label */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     {MacroIcon && macroMeta && (
                       <span
@@ -651,70 +734,39 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                       fontSize: 12,
                       color: "var(--muted-foreground)",
                       fontFamily: "var(--font-ui)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}>
                       {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
                     </span>
                   </div>
 
-                  {/* Col 3: Status + type */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", whiteSpace: "nowrap" }}>
-                    <VoltStatusBadge kind={r.status} />
+                  {/* Col 3: Typ */}
+                  <div>
                     <VoltTypeBadge kind={r.type} />
                   </div>
-                </div>
 
-                {/* Bottom detail row: description + doc link */}
-                {(desc || r.docUrl) && (
-                  <div style={{
-                    marginTop: 6,
-                    display: "flex", alignItems: "baseline", gap: 12,
-                    paddingLeft: 2,
-                  }}>
-                    {desc && (
-                      <span style={{
-                        fontSize: 12,
-                        color: "var(--muted-foreground)",
-                        fontFamily: "var(--font-ui)",
-                        lineHeight: 1.45,
-                        flex: 1,
-                      }}>
-                        {desc}
-                      </span>
-                    )}
-                    {r.docUrl && (
-                      <a
-                        href={r.docUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flexShrink: 0,
-                          fontSize: 11, fontWeight: 600,
-                          color: "var(--signal-positive, #1A9E5A)",
-                          textDecoration: "none",
-                          fontFamily: "var(--font-mono)",
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                        }}
-                      >
-                        Docs ↗
-                      </a>
-                    )}
+                  {/* Col 4: Status */}
+                  <div>
+                    <VoltStatusBadge kind={r.status} />
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
 
-          {sorted.length === 0 && (
-            <div style={{
-              padding: "40px 16px",
-              textAlign: "center",
-              color: "var(--muted-foreground)",
-              fontSize: 13,
-              fontFamily: "var(--font-ui)",
-            }}>
-              {de ? "Keine Quellen gefunden" : "No sources found"}
-            </div>
-          )}
+            {sorted.length === 0 && (
+              <div style={{
+                padding: "40px 16px",
+                textAlign: "center",
+                color: "var(--muted-foreground)",
+                fontSize: 13,
+                fontFamily: "var(--font-ui)",
+              }}>
+                {de ? "Keine Quellen gefunden" : "No sources found"}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
