@@ -1,118 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import {
+  VoltCard, VoltCardContent,
+  VoltAlert,
+  VoltStat,
+  VoltBadge,
+  VoltTerminalStatic,
+  VoltTableRoot, VoltTableHeader, VoltTableBody, VoltTableRow, VoltTableHead, VoltTableCell,
+  VoltSeparator,
+  VoltTabs,
+} from "@/components/volt";
 
-/* ────────────────────────────────────────────────────────────────
-   Collapsible Section component
-   ──────────────────────────────────────────────────────────────── */
-function CollapsibleSection({
-  title,
-  tag,
-  children,
-  defaultOpen = false,
-}: {
-  title: string;
-  tag: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+/* ─── Types ──────────────────────────────────────────────────── */
+type TLine = {
+  type: "command" | "output" | "error" | "success" | "warning" | "info" | "comment" | "blank";
+  text: string;
+};
 
-  return (
-    <section
-      style={{
-        marginBottom: 16,
-        border: "1px solid var(--color-border, #E8E8E8)",
-        borderRadius: 12,
-        overflow: "hidden",
-        background: "var(--volt-surface-raised, #fff)",
-      }}
-    >
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "16px 20px",
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          textAlign: "left",
-          fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-          fontSize: 17,
-          fontWeight: 700,
-          color: "var(--color-text-heading, #0A0A0A)",
-          letterSpacing: "-0.01em",
-          transition: "background 0.15s",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background =
-            "rgba(228,255,151,0.15)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "transparent";
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase" as const,
-            color: "var(--color-text-muted, #6B6B6B)",
-            flexShrink: 0,
-          }}
-        >
-          {tag}
-        </span>
-        <span style={{ flex: 1 }}>{title}</span>
-        <span
-          style={{
-            fontSize: 14,
-            color: "var(--color-text-muted, #6B6B6B)",
-            transition: "transform 0.2s",
-            transform: open ? "rotate(90deg)" : "rotate(0deg)",
-          }}
-        >
-          {"\u25B6"}
-        </span>
-      </button>
-      {open && (
-        <div
-          style={{
-            padding: "0 20px 20px",
-            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-            fontSize: 14,
-            lineHeight: 1.7,
-            color: "var(--color-text-heading, #0A0A0A)",
-          }}
-        >
-          {children}
-        </div>
-      )}
-    </section>
-  );
-}
+/* ─── Section Config ─────────────────────────────────────────── */
+const SECTIONS = [
+  { id: "overview", num: "01", de: "Systemübersicht", en: "System Overview" },
+  { id: "connectors", num: "02", de: "Daten-Connectors", en: "Data Connectors" },
+  { id: "retrieval", num: "03", de: "Signal-Retrieval", en: "Signal Retrieval" },
+  { id: "prompt", num: "04", de: "System-Prompt", en: "System Prompt" },
+  { id: "validation", num: "05", de: "Validierung", en: "Validation" },
+  { id: "frameworks", num: "06", de: "Analyse-Frameworks", en: "Frameworks" },
+  { id: "knowledge", num: "07", de: "Wissensbasis", en: "Knowledge Base" },
+  { id: "scoring", num: "08", de: "Scoring & Konfidenz", en: "Scoring" },
+  { id: "output", num: "09", de: "Ausgabestruktur", en: "Output Schema" },
+  { id: "pipeline", num: "10", de: "Analyse-Pipeline", en: "Pipeline" },
+  { id: "limitations", num: "11", de: "Einschränkungen", en: "Limitations" },
+] as const;
 
-/* ────────────────────────────────────────────────────────────────
-   Small code/token badge
-   ──────────────────────────────────────────────────────────────── */
+/* ─── Helpers ────────────────────────────────────────────────── */
+const L = (text: string, type: TLine["type"] = "output"): TLine => ({ type, text });
+const tl = (s: string): TLine[] => s.split("\n").map((l) => L(l));
+
 function Code({ children }: { children: React.ReactNode }) {
   return (
     <code
+      className="font-mono text-xs px-1.5 py-0.5 rounded"
       style={{
-        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-        fontSize: 12,
         background: "rgba(228,255,151,0.25)",
         color: "var(--color-text-heading, #0A0A0A)",
-        padding: "1px 6px",
-        borderRadius: 4,
         border: "1px solid rgba(0,0,0,0.06)",
       }}
     >
@@ -121,578 +54,427 @@ function Code({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
-   Connector grid item
-   ──────────────────────────────────────────────────────────────── */
-function ConnectorChip({ name, apiKey }: { name: string; apiKey?: boolean }) {
+function SubH({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-        fontSize: 11,
-        fontWeight: 500,
-        padding: "3px 8px",
-        borderRadius: 6,
-        background: apiKey ? "rgba(255,200,100,0.15)" : "rgba(228,255,151,0.2)",
-        border: `1px solid ${apiKey ? "rgba(255,180,60,0.3)" : "var(--color-border, #E8E8E8)"}`,
-        color: "var(--color-text-heading, #0A0A0A)",
-        whiteSpace: "nowrap" as const,
-      }}
+    <h3
+      className="text-sm font-bold mt-6 mb-2 first:mt-0"
+      style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)" }}
     >
-      {name}
-      {apiKey && <span style={{ fontSize: 9, opacity: 0.6 }} title="Requires API key">KEY</span>}
-    </span>
+      {children}
+    </h3>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
-   Connector category row
-   ──────────────────────────────────────────────────────────────── */
-function ConnectorCategory({
-  label,
-  connectors,
-}: {
-  label: string;
-  connectors: { name: string; apiKey?: boolean }[];
-}) {
+function SectionHeading({ num, children }: { num: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div
-        style={{
-          fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-          fontSize: 12,
-          fontWeight: 700,
-          color: "var(--color-text-muted, #6B6B6B)",
-          marginBottom: 6,
-          textTransform: "uppercase" as const,
-          letterSpacing: "0.06em",
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}>
-        {connectors.map((c) => (
-          <ConnectorChip key={c.name} name={c.name} apiKey={c.apiKey} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────
-   Pipeline step
-   ──────────────────────────────────────────────────────────────── */
-function PipelineStep({
-  num,
-  text,
-  detail,
-}: {
-  num: number;
-  text: string;
-  detail?: string;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 12,
-        alignItems: "flex-start",
-        marginBottom: 10,
-      }}
-    >
+    <div className="flex items-center gap-3 mb-4">
       <span
-        style={{
-          flexShrink: 0,
-          width: 24,
-          height: 24,
-          borderRadius: "50%",
-          background: "var(--color-lime, #E4FF97)",
-          color: "var(--color-brand-text, #0A0A0A)",
-          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-          fontSize: 11,
-          fontWeight: 700,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 1,
-        }}
+        className="font-mono text-[10px] font-bold uppercase tracking-widest flex-shrink-0"
+        style={{ color: "var(--color-text-muted, #6B6B6B)" }}
       >
         {num}
       </span>
-      <div>
-        <span style={{ fontSize: 13, lineHeight: 1.6 }}>{text}</span>
-        {detail && (
-          <div style={{ fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginTop: 2, lineHeight: 1.5 }}>
-            {detail}
-          </div>
-        )}
-      </div>
+      <h2
+        className="text-lg font-bold tracking-tight"
+        style={{
+          fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+          color: "var(--color-text-heading, #0A0A0A)",
+        }}
+      >
+        {children}
+      </h2>
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
-   JSON field display
-   ──────────────────────────────────────────────────────────────── */
-function JsonField({
-  name,
-  type,
-  desc,
-  constraints,
-  optional,
-}: {
-  name: string;
-  type?: string;
-  desc: string;
-  constraints?: string;
-  optional?: boolean;
-}) {
+/* ─── Connector badges ───────────────────────────────────────── */
+function ConnectorGrid({ items }: { items: { name: string; apiKey?: boolean }[] }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        alignItems: "baseline",
-        marginBottom: 6,
-        fontSize: 13,
-        flexWrap: "wrap" as const,
-      }}
-    >
-      <Code>{name}</Code>
-      {type && (
-        <span style={{ fontSize: 11, fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", color: "rgba(100,140,40,0.8)" }}>
-          {type}
-        </span>
-      )}
-      {optional && (
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: "var(--color-text-muted, #6B6B6B)",
-            textTransform: "uppercase" as const,
-          }}
+    <div className="flex flex-wrap gap-2 py-3">
+      {items.map((c) => (
+        <VoltBadge
+          key={c.name}
+          variant={c.apiKey ? "outline" : "muted"}
+          size="sm"
+          dot={c.apiKey}
+          dotColor="rgb(245,166,35)"
         >
-          optional
-        </span>
-      )}
-      <span style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
-        {desc}
-      </span>
-      {constraints && (
-        <span style={{ fontSize: 11, fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", color: "var(--color-text-muted, #6B6B6B)" }}>
-          [{constraints}]
-        </span>
-      )}
+          {c.name}
+        </VoltBadge>
+      ))}
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
-   Mono pre-formatted block
-   ──────────────────────────────────────────────────────────────── */
-function MonoBlock({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-        fontSize: 12,
-        lineHeight: 1.8,
-        padding: "12px 16px",
-        borderRadius: 8,
-        background: "rgba(0,0,0,0.03)",
-        border: "1px solid var(--color-border, #E8E8E8)",
-        overflowX: "auto" as const,
-        marginBottom: 16,
-        whiteSpace: "pre-wrap" as const,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────
-   Subsection heading
-   ──────────────────────────────────────────────────────────────── */
-function SubH({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-        fontWeight: 700,
-        fontSize: 13,
-        color: "var(--color-text-heading, #0A0A0A)",
-        marginBottom: 8,
-        marginTop: 20,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────
-   Regulation row
-   ──────────────────────────────────────────────────────────────── */
-function RegRow({ shortName, jurisdiction, status, desc }: { shortName: string; jurisdiction: string; status: string; desc: string }) {
-  const colors: Record<string, string> = { enforcing: "rgba(80,180,80,0.2)", adopted: "rgba(100,160,255,0.2)", proposed: "rgba(255,200,80,0.2)", planned: "rgba(200,200,200,0.2)" };
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 6, fontSize: 13 }}>
-      <Code>{shortName}</Code>
-      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: colors[status] || colors.planned, textTransform: "uppercase" as const }}>{status}</span>
-      <span style={{ fontSize: 11, color: "var(--color-text-muted, #6B6B6B)" }}>{jurisdiction}</span>
-      <span style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{desc}</span>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    MAIN PAGE
-   ════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export default function Dokumentation() {
   const { locale } = useLocale();
   const de = locale === "de";
+  const [activeSection, setActiveSection] = useState("overview");
+
+  /* ── Scroll-spy via IntersectionObserver ────────────────────── */
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: "-15% 0px -75% 0px" },
+    );
+    SECTIONS.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  /* ── Connector Tab Data ────────────────────────────────────── */
+  const connectorTabs = [
+    {
+      id: "tech", label: "Tech (9)",
+      content: <ConnectorGrid items={[
+        { name: "Hacker News" }, { name: "GitHub Trending" }, { name: "Reddit" },
+        { name: "arXiv" }, { name: "Stack Overflow" }, { name: "npm & PyPI" },
+        { name: "Product Hunt" }, { name: "Wikipedia Pageviews" }, { name: "Docker Hub" },
+      ]} />,
+    },
+    {
+      id: "search", label: de ? "Suche (3)" : "Search (3)",
+      content: <ConnectorGrid items={[
+        { name: "Google Trends" }, { name: "Social Media Sentiment" }, { name: "Google Books Ngram" },
+      ]} />,
+    },
+    {
+      id: "news", label: "News (6)",
+      content: <ConnectorGrid items={[
+        { name: "News API", apiKey: true }, { name: "The Guardian", apiKey: true },
+        { name: "New York Times", apiKey: true }, { name: "NewsData.io", apiKey: true },
+        { name: "Media Cloud" }, { name: "GDELT" },
+      ]} />,
+    },
+    {
+      id: "research", label: de ? "Forschung (3)" : "Research (3)",
+      content: <ConnectorGrid items={[
+        { name: "OpenAlex" }, { name: "CrossRef" }, { name: "Semantic Scholar" },
+      ]} />,
+    },
+    {
+      id: "stats", label: de ? "Statistik (8)" : "Statistics (8)",
+      content: <ConnectorGrid items={[
+        { name: "Eurostat" }, { name: "OECD" }, { name: "FRED", apiKey: true },
+        { name: "Our World in Data" }, { name: "Destatis" }, { name: "World Bank" },
+        { name: "BLS (US Labor)" }, { name: "IMF" },
+      ]} />,
+    },
+    {
+      id: "prediction", label: de ? "Prognose (4)" : "Prediction (4)",
+      content: <ConnectorGrid items={[
+        { name: "Polymarket" }, { name: "Manifold Markets" }, { name: "Metaculus" }, { name: "Kalshi" },
+      ]} />,
+    },
+    {
+      id: "geopolitics", label: de ? "Geopolitik (4)" : "Geopolitics (4)",
+      content: <ConnectorGrid items={[
+        { name: "ACLED", apiKey: true }, { name: "UCDP" }, { name: "V-Dem" }, { name: "UNHCR Refugee Data" },
+      ]} />,
+    },
+    {
+      id: "health", label: de ? "Gesundheit (5)" : "Health (5)",
+      content: <ConnectorGrid items={[
+        { name: "WHO GHO" }, { name: "ILO ILOSTAT" }, { name: "ClinicalTrials.gov" },
+        { name: "OpenFDA" }, { name: "Nextstrain" },
+      ]} />,
+    },
+    {
+      id: "climate", label: de ? "Klima (3)" : "Climate (3)",
+      content: <ConnectorGrid items={[
+        { name: "NASA EONET" }, { name: "Open-Meteo" }, { name: "USGS Earthquakes" },
+      ]} />,
+    },
+    {
+      id: "finance", label: de ? "Finanzen (4)" : "Finance (4)",
+      content: <ConnectorGrid items={[
+        { name: "Finnhub", apiKey: true }, { name: "Open Exchange Rates" },
+        { name: "CoinGecko" }, { name: "DeFi Llama" },
+      ]} />,
+    },
+    {
+      id: "social", label: "Social (2)",
+      content: <ConnectorGrid items={[
+        { name: "Bluesky" }, { name: "Mastodon" },
+      ]} />,
+    },
+    {
+      id: "global", label: "Global (6)",
+      content: <ConnectorGrid items={[
+        { name: "World Monitor" }, { name: "PatentsView (USPTO)" }, { name: "UN Data" },
+        { name: "UN SDG Indicators" }, { name: "SteamSpy (Gaming)" },
+      ]} />,
+    },
+  ];
+
+  /* ── Pipeline Steps ────────────────────────────────────────── */
+  const pipelineSteps = [
+    { num: 1, t: de ? "Authentifizierung" : "Authentication", d: de ? "requireAuth() -- Middleware + Route-Level (Defense-in-Depth)" : "requireAuth() -- middleware + route-level (defense-in-depth)" },
+    { num: 2, t: "Rate Limiting", d: de ? "100 Requests/IP/Stunde, In-Memory Sliding Window" : "100 requests/IP/hour, in-memory sliding window" },
+    { num: 3, t: de ? "Input-Validierung & Sanitisierung" : "Input Validation & Sanitization", d: de ? "Max 2.000 Zeichen, 9 Injection-Patterns, XML-Tags, contextProfile (SEC-08)" : "Max 2,000 chars, 9 injection patterns, XML tags, contextProfile (SEC-08)" },
+    { num: 4, t: de ? "Trend-Laden aus SQLite" : "Load Trends from SQLite", d: de ? "trends-Tabelle, Fallback auf mega-trends.ts" : "trends table, fallback to mega-trends.ts" },
+    { num: 5, t: de ? "Signal-Freshness-Check" : "Signal Freshness Check", d: de ? "Neueste Signale > 6h alt -> Pipeline auto-refresh (fire-and-forget)" : "Newest signals > 6h old -> pipeline auto-refresh (fire-and-forget)" },
+    { num: 6, t: "Signal-Retrieval (RAG)", d: de ? "getRelevantSignals(query, 12) -- Keyword-Matching, Cross-Language Aliases, Score >= 2" : "getRelevantSignals(query, 12) -- keyword matching, cross-language aliases, score >= 2" },
+    { num: 7, t: de ? "System-Prompt aufbauen" : "Build System Prompt", d: de ? "buildSystemPrompt() -- 40 Trends + 15 Regulierungen + 102 Kanten + Live-Signale + STEEP+V + PFLICHTEN + JSON-Schema" : "buildSystemPrompt() -- 40 trends + 15 regulations + 102 edges + live signals + STEEP+V + PFLICHTEN + JSON schema" },
+    { num: 8, t: de ? "previousContext (SEC-10)" : "previousContext (SEC-10)", d: de ? "Synthesis auf 6.000 Zeichen begrenzen, sanitisieren, als Assistant-Message" : "Truncate synthesis to 6,000 chars, sanitize, inject as assistant message" },
+    { num: 9, t: "LLM-Streaming (Anthropic API)", d: de ? "claude-sonnet-4-6, max_tokens: 12.000, SSE-Streaming, Retry bis 3x bei 429/529" : "claude-sonnet-4-6, max_tokens: 12,000, SSE streaming, retry up to 3x on 429/529" },
+    { num: 10, t: de ? "Synthese-Extraktion während Streaming" : "Synthesis Extraction During Streaming", d: de ? "Progressive JSON-Parsing, Delta-Extraktion für Live-Anzeige" : "Progressive JSON parsing, delta extraction for live display" },
+    { num: 11, t: de ? "JSON-Extraktion (ggf. Reparatur)" : "JSON Extraction (with repair)", d: de ? "extractJSON() -- Markdown-Fences entfernen, truncated JSON reparieren" : "extractJSON() -- strip markdown fences, repair truncated JSON" },
+    { num: 12, t: "Zod-Validierung (VAL-01)", d: de ? "Alle Felder typsicher prüfen, bei Fehler: Partial-Extraction" : "Type-check all fields, on error: partial extraction" },
+    { num: 13, t: "matchedTrendIds (VAL-02)", d: de ? "Halluzinierte IDs entfernen und loggen" : "Remove and log hallucinated IDs" },
+    { num: 14, t: de ? "Szenario-Normalisierung" : "Scenario Normalization", d: de ? "Nulls -> Defaults, Summe 0.8-1.1 akzeptabel, sonst normalisieren" : "Nulls -> defaults, sum 0.8-1.1 acceptable, otherwise normalize" },
+    { num: 15, t: "Blended Confidence (VAL-03)", d: "0.6 * serverScore + 0.4 * llmConfidence, clamped [0.05, 0.98]" },
+    { num: 16, t: "Augmentation", d: de ? "matchedTrends-Details, kausale Kanten, Signal-Metadaten" : "matchedTrends details, causal edges, signal metadata" },
+    { num: 17, t: de ? "Ergebnis an Client streamen" : "Stream Result to Client", d: de ? "SSE: { type: 'delta', text } während Streaming, { type: 'complete', result } am Ende" : "SSE: { type: 'delta', text } during streaming, { type: 'complete', result } at end" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: "transparent" }}>
       <AppHeader />
 
-      <main
-        className="volt-container"
-        style={{ padding: "32px 24px 80px", maxWidth: 920, margin: "0 auto" }}
-      >
-        {/* ── Page header ────────────────────────────────────── */}
-        <div style={{ marginBottom: 40 }}>
+      <div className="max-w-[1120px] mx-auto px-6 py-8">
+        {/* ── Hero ─────────────────────────────────────────────── */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <VoltBadge variant="solid">SIS</VoltBadge>
+            <VoltBadge variant="muted" size="sm">v1.0</VoltBadge>
+          </div>
           <h1
-            style={{
-              fontFamily:
-                "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-              fontSize: 28,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-              color: "var(--color-text-heading, #0A0A0A)",
-              margin: "0 0 8px",
-            }}
+            className="text-3xl font-bold tracking-tight mb-3"
+            style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", color: "var(--color-text-heading, #0A0A0A)" }}
           >
             {de ? "Technische Systemdokumentation" : "Technical System Documentation"}
           </h1>
           <p
-            style={{
-              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-              fontSize: 15,
-              color: "var(--color-text-muted, #6B6B6B)",
-              margin: "0 0 12px",
-              lineHeight: 1.6,
-            }}
+            className="text-[15px] mb-4 max-w-2xl leading-relaxed"
+            style={{ fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", color: "var(--color-text-muted, #6B6B6B)" }}
           >
             {de
-              ? "Vollstaendige technische Referenz des Strategic Intelligence System. Alle Angaben sind aus dem Quellcode extrahiert und 1:1 verifizierbar. Klicke auf eine Sektion, um sie aufzuklappen."
-              : "Complete technical reference of the Strategic Intelligence System. All claims are extracted from source code and 1:1 verifiable. Click a section to expand."}
+              ? "Vollständige technische Referenz des Strategic Intelligence System. Alle Angaben sind aus dem Quellcode extrahiert und 1:1 verifizierbar."
+              : "Complete technical reference of the Strategic Intelligence System. All claims are extracted from source code and 1:1 verifiable."}
           </p>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap" as const,
-              gap: 8,
-              fontSize: 12,
-              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-              color: "var(--color-text-muted, #6B6B6B)",
-            }}
-          >
-            <span>Next.js 15</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>React 19</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>Claude claude-sonnet-4-6</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>SQLite + WAL</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>57 Connectors</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>Zod Validation</span>
-            <span style={{ opacity: 0.3 }}>|</span>
-            <span>SSE Streaming</span>
+          <div className="flex flex-wrap gap-2">
+            {["Next.js 15", "React 19", "Claude claude-sonnet-4-6", "SQLite + WAL", "57 Connectors", "Zod", "SSE Streaming"].map((t) => (
+              <VoltBadge key={t} variant="outline" size="sm">{t}</VoltBadge>
+            ))}
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 1: System Overview
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="01"
-          title={de ? "Systemuebersicht & Architektur" : "System Overview & Architecture"}
-          defaultOpen
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Das SIS (Strategic Intelligence System) ist ein Denk-Instrument auf Think-Tank-Niveau mit explizitem EU-Fokus. Es verbindet 57 Live-Datenquellen mit einem kuratierten Wissensgraphen (40 Trends, 102 kausale Kanten, 15 Regulierungen) und einem LLM-Analysekern (Claude claude-sonnet-4-6) zu einem Retrieval-Augmented-Generation (RAG) System, das strategische Fragen strukturiert und belegt beantwortet."
-              : "SIS (Strategic Intelligence System) is a thinking instrument at think-tank level with an explicit EU focus. It connects 57 live data sources with a curated knowledge graph (40 trends, 102 causal edges, 15 regulations) and an LLM analysis core (Claude claude-sonnet-4-6) into a Retrieval-Augmented Generation (RAG) system that answers strategic questions in a structured and evidence-based way."}
-          </p>
+        {/* ── Key Stats ────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <VoltStat label="Live-Connectors" value={57} variant="lime" />
+          <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={40} />
+          <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={102} />
+          <VoltStat label={de ? "Regulierungen" : "Regulations"} value={15} />
+        </div>
 
-          <SubH>{de ? "RAG-Architektur (Datenfluss)" : "RAG Architecture (Data Flow)"}</SubH>
-          <MonoBlock>
-{`┌─────────────────────────────────────────────────────────────────┐
-│  57 Connectors (APIs)                                           │
-│  HackerNews, GDELT, Eurostat, WHO, ACLED, arXiv, ...           │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ storeSignals()
-                           v
-┌─────────────────────────────────────────────────────────────────┐
-│  SQLite (better-sqlite3, WAL mode)                              │
-│  live_signals: id, source, title, content, url, topic,          │
-│                tags, signal_type, strength, fetched_at           │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ getRelevantSignals(query, 12)
-                           │ Keyword-Matching + Cross-Language Aliases
-                           v
-┌─────────────────────────────────────────────────────────────────┐
-│  System Prompt Builder (buildSystemPrompt)                      │
-│  Top 40 Trends + 15 Regulierungen + 102 Kausale Kanten         │
-│  + formatierte Live-Signale + STEEP+V Framework                 │
-│  + EU JRC 14 Megatrends + 7 PFLICHTEN + JSON-Schema             │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ Anthropic API (claude-sonnet-4-6)
-                           │ max_tokens: 12.000, SSE-Streaming
-                           v
-┌─────────────────────────────────────────────────────────────────┐
-│  Post-Processing & Validation                                   │
-│  1. JSON-Extraktion (inkl. Reparatur bei Truncation)            │
-│  2. Zod-Schema-Validierung (VAL-01)                             │
-│  3. matchedTrendIds Anti-Halluzination (VAL-02)                 │
-│  4. Szenario-Normalisierung                                     │
-│  5. Blended Confidence (VAL-03)                                 │
-│  6. URL-Validierung                                             │
-│  7. Causal-Edge-Augmentation                                    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ SSE (Server-Sent Events)
-                           v
-┌─────────────────────────────────────────────────────────────────┐
-│  Client (React 19 + Next.js 15)                                 │
-│  Streaming-Synthese + Strukturiertes Briefing                   │
-└─────────────────────────────────────────────────────────────────┘`}
-          </MonoBlock>
-
-          <SubH>{de ? "Technologie-Stack" : "Technology Stack"}</SubH>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
-            {[
-              { label: "LLM", value: "Claude claude-sonnet-4-6, max 12.000 tokens, Anthropic API v2023-06-01" },
-              { label: de ? "Datenbank" : "Database", value: "SQLite via better-sqlite3, WAL-Modus, Trend-Tabelle + live_signals-Tabelle" },
-              { label: "Frontend", value: "Next.js 15, React 19, TypeScript" },
-              { label: de ? "Datenquellen" : "Data Sources", value: de ? "57 Live-Connectors, 42+ institutionelle Forschungsquellen" : "57 live connectors, 42+ institutional research sources" },
-              { label: "Streaming", value: "SSE (Server-Sent Events), progressive JSON extraction" },
-              { label: "Validation", value: "Zod Schema, Input Sanitization, Rate Limiting" },
-              { label: de ? "Wissensgraph" : "Knowledge Graph", value: de ? "40 Trends, 102 kausale Kanten, 15 Regulierungen" : "40 trends, 102 causal edges, 15 regulations" },
-              { label: "API", value: de ? "Retry bis 3x bei 429/529, Exponential Backoff" : "Retry up to 3x on 429/529, exponential backoff" },
-            ].map((item) => (
+        {/* ── Two-column layout ────────────────────────────────── */}
+        <div className="flex gap-8">
+          {/* ── Sidebar TOC ──────────────────────────────────── */}
+          <nav className="hidden lg:block w-52 flex-shrink-0">
+            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
               <div
-                key={item.label}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border, #E8E8E8)",
-                  background: "transparent",
-                }}
+                className="text-[10px] font-bold uppercase tracking-widest mb-3 px-3"
+                style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", color: "var(--color-text-muted, #6B6B6B)" }}
               >
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--color-text-muted, #6B6B6B)",
-                    textTransform: "uppercase" as const,
-                    letterSpacing: "0.06em",
-                    marginBottom: 4,
-                  }}
-                >
-                  {item.label}
-                </div>
-                <div style={{ fontSize: 13 }}>{item.value}</div>
+                {de ? "Inhalt" : "Contents"}
               </div>
-            ))}
-          </div>
-        </CollapsibleSection>
+              <div className="space-y-0.5">
+                {SECTIONS.map((s) => {
+                  const isActive = activeSection === s.id;
+                  return (
+                    <a
+                      key={s.id}
+                      href={`#${s.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById(s.id)?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="flex items-center gap-2.5 py-2 px-3 rounded-lg text-[13px] transition-all duration-150"
+                      style={{
+                        background: isActive ? "rgba(228,255,151,0.15)" : "transparent",
+                        color: isActive ? "var(--color-text-heading, #0A0A0A)" : "var(--color-text-muted, #6B6B6B)",
+                        fontWeight: isActive ? 600 : 400,
+                        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                      }}
+                    >
+                      <span className="font-mono text-[10px] font-bold w-5 text-right opacity-50 flex-shrink-0">{s.num}</span>
+                      <span className="truncate">{de ? s.de : s.en}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 2: Data Connectors
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="02"
-          title={
-            de ? "Daten-Connectors (57 gesamt)" : "Data Connectors (57 total)"
-          }
-        >
-          <p style={{ marginBottom: 8 }}>
-            {de
-              ? "Alle 57 Connectors, gruppiert nach Kategorie. Jeder Connector liefert strukturierte Signale (Titel, Inhalt, URL, Datum, Staerke) in die SQLite-Datenbank. Connectors mit \"KEY\" benoetigen einen API-Schluessel in .env.local."
-              : "All 57 connectors, grouped by category. Each connector delivers structured signals (title, content, URL, date, strength) to the SQLite database. Connectors marked \"KEY\" require an API key in .env.local."}
-          </p>
-          <p style={{ marginBottom: 16, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)" }}>
-            {de
-              ? "Signale werden automatisch nach 336 Stunden (14 Tage) geloescht. Bei jedem Query wird geprueft ob die neuesten Signale aelter als 6 Stunden sind -- wenn ja, wird die Pipeline automatisch neu ausgeloest."
-              : "Signals are automatically pruned after 336 hours (14 days). On every query, the system checks if the newest signals are older than 6 hours -- if so, the pipeline is automatically re-triggered."}
-          </p>
+          {/* ── Main Content ─────────────────────────────────── */}
+          <main className="flex-1 min-w-0 space-y-10">
 
-          <ConnectorCategory
-            label={de ? "Tech & Developer (9)" : "Tech & Developer (9)"}
-            connectors={[
-              { name: "Hacker News" },
-              { name: "GitHub Trending" },
-              { name: "Reddit" },
-              { name: "arXiv" },
-              { name: "Stack Overflow" },
-              { name: "npm & PyPI" },
-              { name: "Product Hunt" },
-              { name: "Wikipedia Pageviews" },
-              { name: "Docker Hub" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Suche & Sentiment (3)" : "Search & Sentiment (3)"}
-            connectors={[
-              { name: "Google Trends" },
-              { name: "Social Media Sentiment" },
-              { name: "Google Books Ngram" },
-            ]}
-          />
-          <ConnectorCategory
-            label="News & Media (6)"
-            connectors={[
-              { name: "News API", apiKey: true },
-              { name: "The Guardian", apiKey: true },
-              { name: "New York Times", apiKey: true },
-              { name: "NewsData.io", apiKey: true },
-              { name: "Media Cloud" },
-              { name: "GDELT" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Forschung & Wissenschaft (3)" : "Research & Academia (3)"}
-            connectors={[
-              { name: "OpenAlex" },
-              { name: "CrossRef" },
-              { name: "Semantic Scholar" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Offizielle Statistiken (8)" : "Official Statistics (8)"}
-            connectors={[
-              { name: "Eurostat" },
-              { name: "OECD" },
-              { name: "FRED", apiKey: true },
-              { name: "Our World in Data" },
-              { name: "Destatis" },
-              { name: "World Bank" },
-              { name: "BLS (US Labor)" },
-              { name: "IMF" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Prognosemaerkte (4)" : "Prediction Markets (4)"}
-            connectors={[
-              { name: "Polymarket" },
-              { name: "Manifold Markets" },
-              { name: "Metaculus" },
-              { name: "Kalshi" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Geopolitik & Konflikte (4)" : "Geopolitics & Conflict (4)"}
-            connectors={[
-              { name: "ACLED", apiKey: true },
-              { name: "UCDP" },
-              { name: "V-Dem" },
-              { name: "UNHCR Refugee Data" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Gesundheit & Biowissenschaften (5)" : "Health & Life Sciences (5)"}
-            connectors={[
-              { name: "WHO GHO" },
-              { name: "ILO ILOSTAT" },
-              { name: "ClinicalTrials.gov" },
-              { name: "OpenFDA" },
-              { name: "Nextstrain" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Klima & Umwelt (3)" : "Climate & Environment (3)"}
-            connectors={[
-              { name: "NASA EONET" },
-              { name: "Open-Meteo" },
-              { name: "USGS Earthquakes" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Finanzen & Maerkte (4)" : "Finance & Markets (4)"}
-            connectors={[
-              { name: "Finnhub", apiKey: true },
-              { name: "Open Exchange Rates" },
-              { name: "CoinGecko" },
-              { name: "DeFi Llama" },
-            ]}
-          />
-          <ConnectorCategory
-            label="Social (2)"
-            connectors={[
-              { name: "Bluesky" },
-              { name: "Mastodon" },
-            ]}
-          />
-          <ConnectorCategory
-            label={de ? "Global Intelligence & Sonstige (6)" : "Global Intelligence & Other (6)"}
-            connectors={[
-              { name: "World Monitor" },
-              { name: "PatentsView (USPTO)" },
-              { name: "UN Data" },
-              { name: "UN SDG Indicators" },
-              { name: "SteamSpy (Gaming)" },
-            ]}
-          />
-        </CollapsibleSection>
+            {/* ══════════════════════════════════════════════════
+                01 — SYSTEM OVERVIEW
+                ══════════════════════════════════════════════════ */}
+            <section id="overview" className="scroll-mt-20">
+              <SectionHeading num="01">
+                {de ? "Systemübersicht & Architektur" : "System Overview & Architecture"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Das SIS (Strategic Intelligence System) ist ein Denk-Instrument auf Think-Tank-Niveau mit explizitem EU-Fokus. Es verbindet 57 Live-Datenquellen mit einem kuratierten Wissensgraphen (40 Trends, 102 kausale Kanten, 15 Regulierungen) und einem LLM-Analysekern (Claude claude-sonnet-4-6) zu einem Retrieval-Augmented-Generation (RAG) System, das strategische Fragen strukturiert und belegt beantwortet."
+                      : "SIS (Strategic Intelligence System) is a thinking instrument at think-tank level with an explicit EU focus. It connects 57 live data sources with a curated knowledge graph (40 trends, 102 causal edges, 15 regulations) and an LLM analysis core (Claude claude-sonnet-4-6) into a RAG system that answers strategic questions in a structured and evidence-based way."}
+                  </p>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 3: Signal-Retrieval (RAG)
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="03"
-          title={de ? "Signal-Retrieval (RAG-Schicht)" : "Signal Retrieval (RAG Layer)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Das Signal-Retrieval ist die Bruecke zwischen den 57 Connectors und dem LLM-Prompt. Es findet die thematisch relevantesten Signale fuer eine gegebene Nutzeranfrage und formatiert sie fuer den Prompt. Quellcode: signals.ts"
-              : "Signal retrieval bridges the 57 connectors and the LLM prompt. It finds the most topically relevant signals for a given user query and formats them for the prompt. Source: signals.ts"}
-          </p>
+                  <SubH>{de ? "RAG-Architektur (Datenfluss)" : "RAG Architecture (Data Flow)"}</SubH>
+                  <VoltTerminalStatic
+                    title="RAG Architecture"
+                    variant="dark"
+                    maxHeight="none"
+                    lines={tl(
+`┌──────────────────────────────────────────────────────────┐
+│  57 Connectors (APIs)                                    │
+│  HackerNews, GDELT, Eurostat, WHO, ACLED, arXiv, ...    │
+└────────────────────────────┬─────────────────────────────┘
+                             │ storeSignals()
+                             v
+┌──────────────────────────────────────────────────────────┐
+│  SQLite (better-sqlite3, WAL mode)                       │
+│  live_signals: id, source, title, content, url, topic,   │
+│                tags, signal_type, strength, fetched_at    │
+└────────────────────────────┬─────────────────────────────┘
+                             │ getRelevantSignals(query, 12)
+                             v
+┌──────────────────────────────────────────────────────────┐
+│  System Prompt Builder (buildSystemPrompt)                │
+│  Top 40 Trends + 15 Regulierungen + 102 Kausale Kanten  │
+│  + formatierte Live-Signale + STEEP+V Framework          │
+│  + EU JRC 14 Megatrends + 7 PFLICHTEN + JSON-Schema      │
+└────────────────────────────┬─────────────────────────────┘
+                             │ Anthropic API (claude-sonnet-4-6)
+                             │ max_tokens: 12.000, SSE
+                             v
+┌──────────────────────────────────────────────────────────┐
+│  Post-Processing & Validation                            │
+│  1. JSON-Extraktion (inkl. Reparatur bei Truncation)     │
+│  2. Zod-Schema-Validierung (VAL-01)                      │
+│  3. matchedTrendIds Anti-Halluzination (VAL-02)          │
+│  4. Szenario-Normalisierung                              │
+│  5. Blended Confidence (VAL-03)                          │
+│  6. URL-Validierung                                      │
+│  7. Causal-Edge-Augmentation                             │
+└────────────────────────────┬─────────────────────────────┘
+                             │ SSE (Server-Sent Events)
+                             v
+┌──────────────────────────────────────────────────────────┐
+│  Client (React 19 + Next.js 15)                          │
+│  Streaming-Synthese + Strukturiertes Briefing            │
+└──────────────────────────────────────────────────────────┘`
+                    )}
+                  />
 
-          <SubH>{de ? "Keyword-Extraktion" : "Keyword Extraction"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Die Query wird in Kleinbuchstaben konvertiert, Sonderzeichen entfernt und in Woerter aufgesplittet. Woerter werden gefiltert nach:"
-              : "The query is lowercased, special characters removed, and split into words. Words are filtered by:"}
-          </p>
-          <ul style={{ margin: "0 0 12px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Stoppwoerter werden entfernt (DE + EN): " : "Stop words are removed (DE + EN): "}<Code>wie, was, wo, wer, wann, warum, welche, ist, sind, hat, haben, wird, werden, kann, koennen, fuer, von, mit, bei, auf, an, in, zu, ueber, unter, the, how, what, where, when, why, which, who, is, are, has, have, will, can, for, with, from, und, oder, aber, also, noch, schon, sehr</Code></li>
-            <li>{de ? "Mindestlaenge: 2 Zeichen" : "Minimum length: 2 characters"}</li>
-            <li>{de ? "Ausnahme: Wichtige Kurzterme werden akzeptiert: " : "Exception: Important short terms are accepted: "}<Code>ki, ai, eu, un, us, uk, it, ml, ar, vr, xr, 5g, 6g, iot, llm, rag, api, b2b, b2c, esg, gdp</Code></li>
-            <li>{de ? "Maximale Keywords nach Expansion: 12" : "Maximum keywords after expansion: 12"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Sprachuebergreifende Alias-Gruppen (ALG-21)" : "Cross-Language Alias Groups (ALG-21)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Wenn ein Keyword in einer Alias-Gruppe vorkommt, werden alle anderen Begriffe dieser Gruppe automatisch zur Suchmenge hinzugefuegt. Es gibt 9 Alias-Gruppen:"
-              : "When a keyword matches an alias group, all other terms in that group are automatically added to the search set. There are 9 alias groups:"}
-          </p>
-          <MonoBlock>
-{`1. ki       <-> ai, artificial intelligence, kuenstliche intelligenz
+                  <SubH>{de ? "Technologie-Stack" : "Technology Stack"}</SubH>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { label: "LLM", value: "Claude claude-sonnet-4-6, max 12.000 tokens, Anthropic API v2023-06-01" },
+                      { label: de ? "Datenbank" : "Database", value: "SQLite via better-sqlite3, WAL-Modus, Trend + live_signals Tabelle" },
+                      { label: "Frontend", value: "Next.js 15, React 19, TypeScript, Volt UI" },
+                      { label: de ? "Datenquellen" : "Data Sources", value: de ? "57 Live-Connectors, 42+ institutionelle Forschungsquellen" : "57 live connectors, 42+ institutional research sources" },
+                      { label: "Streaming", value: "SSE (Server-Sent Events), progressive JSON extraction" },
+                      { label: "Validation", value: "Zod Schema, Input Sanitization, Rate Limiting" },
+                      { label: de ? "Wissensgraph" : "Knowledge Graph", value: de ? "40 Trends, 102 kausale Kanten, 15 Regulierungen" : "40 trends, 102 causal edges, 15 regulations" },
+                      { label: "API", value: de ? "Retry bis 3x bei 429/529, Exponential Backoff" : "Retry up to 3x on 429/529, exponential backoff" },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="p-3 rounded-lg"
+                        style={{ border: "1px solid var(--color-border, #E8E8E8)" }}
+                      >
+                        <div className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                          {item.label}
+                        </div>
+                        <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
+
+            {/* ══════════════════════════════════════════════════
+                02 — DATA CONNECTORS
+                ══════════════════════════════════════════════════ */}
+            <section id="connectors" className="scroll-mt-20">
+              <SectionHeading num="02">
+                {de ? "Daten-Connectors (57 gesamt)" : "Data Connectors (57 total)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-4 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Alle 57 Connectors, gruppiert nach Kategorie. Jeder Connector liefert strukturierte Signale (Titel, Inhalt, URL, Datum, Stärke) in die SQLite-Datenbank."
+                      : "All 57 connectors, grouped by category. Each connector delivers structured signals (title, content, URL, date, strength) to the SQLite database."}
+                  </p>
+
+                  <VoltAlert variant="info">
+                    {de
+                      ? "Signale werden automatisch nach 336 Stunden (14 Tage) gelöscht. Bei jedem Query wird geprüft ob die neuesten Signale älter als 6 Stunden sind -- wenn ja, wird die Pipeline automatisch neu ausgelöst. Connectors mit orangem Punkt benötigen einen API-Schlüssel in .env.local."
+                      : "Signals are automatically pruned after 336 hours (14 days). On every query, the system checks if the newest signals are older than 6 hours -- if so, the pipeline is auto-triggered. Connectors with an orange dot require an API key in .env.local."}
+                  </VoltAlert>
+
+                  <VoltTabs variant="pills" tabs={connectorTabs} />
+                </VoltCardContent>
+              </VoltCard>
+            </section>
+
+            {/* ══════════════════════════════════════════════════
+                03 — SIGNAL RETRIEVAL (RAG)
+                ══════════════════════════════════════════════════ */}
+            <section id="retrieval" className="scroll-mt-20">
+              <SectionHeading num="03">
+                {de ? "Signal-Retrieval (RAG-Schicht)" : "Signal Retrieval (RAG Layer)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Das Signal-Retrieval ist die Brücke zwischen den 57 Connectors und dem LLM-Prompt. Es findet die thematisch relevantesten Signale für eine gegebene Nutzeranfrage. Quellcode: signals.ts"
+                      : "Signal retrieval bridges the 57 connectors and the LLM prompt. It finds the most topically relevant signals for a given user query. Source: signals.ts"}
+                  </p>
+
+                  <SubH>{de ? "Keyword-Extraktion" : "Keyword Extraction"}</SubH>
+                  <ul className="text-[13px] leading-relaxed space-y-2 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <li>{de ? "Stoppwörter entfernt (DE + EN): " : "Stop words removed (DE + EN): "}<Code>wie, was, wo, the, how, what, ...</Code></li>
+                    <li>{de ? "Mindestlänge: 2 Zeichen" : "Minimum length: 2 characters"}</li>
+                    <li>{de ? "Ausnahme für wichtige Kurzterme: " : "Exception for important short terms: "}<Code>ki, ai, eu, un, ml, ar, vr, xr, 5g, 6g, iot, llm, rag, ...</Code></li>
+                    <li>{de ? "Max Keywords nach Expansion: 12" : "Max keywords after expansion: 12"}</li>
+                  </ul>
+
+                  <SubH>{de ? "Sprachübergreifende Alias-Gruppen (ALG-21)" : "Cross-Language Alias Groups (ALG-21)"}</SubH>
+                  <p className="text-[13px] mb-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Wenn ein Keyword in einer Alias-Gruppe vorkommt, werden alle anderen Begriffe automatisch zur Suchmenge hinzugefügt. 9 Alias-Gruppen:"
+                      : "When a keyword matches an alias group, all other terms are automatically added. 9 alias groups:"}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Alias Groups"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="220px"
+                    lines={tl(
+`1. ki       <-> ai, artificial intelligence, künstliche intelligenz
 2. klimawandel <-> climate change, global warming
 3. cybersicherheit <-> cybersecurity, cyber security
 4. energiewende  <-> energy transition
@@ -700,1044 +482,866 @@ export default function Dokumentation() {
 6. gesundheit    <-> health, public health
 7. migration     <-> immigration, refugees
 8. geopolitik    <-> geopolitics
-9. kryptowaehrung <-> cryptocurrency, crypto`}
-          </MonoBlock>
+9. kryptowährung <-> cryptocurrency, crypto`
+                    )}
+                  />
 
-          <SubH>{de ? "SQL-Scoring-Formel" : "SQL Scoring Formula"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Jedes Keyword erzeugt drei CASE-Klauseln (parametrisierte LIKE-Queries, keine String-Interpolation):"
-              : "Each keyword generates three CASE clauses (parameterized LIKE queries, no string interpolation):"}
-          </p>
-          <MonoBlock>
-{`Score = SUM(
-  CASE WHEN lower(title)   LIKE '%keyword%' THEN 2 ELSE 0 END +
-  CASE WHEN lower(topic)   LIKE '%keyword%' THEN 2 ELSE 0 END +
-  CASE WHEN lower(content) LIKE '%keyword%' THEN 1 ELSE 0 END
-)
+                  <VoltSeparator />
 
-Filter: Score >= 2 (verhindert Rauschen durch einzelne Content-Treffer)
-Sortierung: relevance_score DESC, strength DESC, fetched_at DESC
-Limit: 12 Signale pro Query
-Zeitfenster: fetched_at > datetime('now', '-336 hours')  (= 14 Tage)`}
-          </MonoBlock>
+                  <SubH>{de ? "SQL-Scoring-Formel" : "SQL Scoring Formula"}</SubH>
+                  <VoltTerminalStatic
+                    title="Scoring"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="200px"
+                    lines={[
+                      L("Score = SUM(", "command"),
+                      L("  CASE WHEN lower(title)   LIKE '%keyword%' THEN 2 ELSE 0 END +"),
+                      L("  CASE WHEN lower(topic)   LIKE '%keyword%' THEN 2 ELSE 0 END +"),
+                      L("  CASE WHEN lower(content) LIKE '%keyword%' THEN 1 ELSE 0 END"),
+                      L(")"),
+                      L(""),
+                      L("Filter:  Score >= 2", "info"),
+                      L("Sort:    relevance_score DESC, strength DESC, fetched_at DESC", "info"),
+                      L("Limit:   12 Signale pro Query", "info"),
+                      L("Window:  fetched_at > datetime('now', '-336 hours')  (14 Tage)", "info"),
+                    ]}
+                  />
 
-          <SubH>{de ? "Signal-Sanitisierung (SEC-07)" : "Signal Sanitization (SEC-07)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Bevor Signale in den LLM-Prompt eingebettet werden, wird der Text sanitisiert um Prompt-Injection ueber manipulierte Signaldaten zu verhindern:"
-              : "Before signals are embedded in the LLM prompt, text is sanitized to prevent prompt injection via crafted signal data:"}
-          </p>
-          <ul style={{ margin: "0 0 12px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Steuerzeichen entfernen (ausser Newline/Tab)" : "Strip control characters (except newline/tab)"}</li>
-            <li>{de ? "XML-artige Tags entfernen die die Prompt-Struktur manipulieren koennten" : "Strip XML-style tags that could hijack prompt structure"}</li>
-            <li>{de ? "Rollen-Marker entfernen: system:, user:, assistant:, human:" : "Strip role markers: system:, user:, assistant:, human:"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Signal-Format im Prompt" : "Signal Format in Prompt"}</SubH>
-          <MonoBlock>
-{`AKTUELLE BELEGTE SIGNALE (letzte 14 Tage, aus N Quellen):
-* [GDELT, 2026-04-10] [Staerke: 85%] Signal-Titel -> URL
-    Signal-Content (max 200 Zeichen)`}
-          </MonoBlock>
-        </CollapsibleSection>
+                  <SubH>{de ? "Signal-Sanitisierung (SEC-07)" : "Signal Sanitization (SEC-07)"}</SubH>
+                  <VoltAlert variant="warning">
+                    {de
+                      ? "Bevor Signale in den LLM-Prompt eingebettet werden, wird der Text sanitisiert um Prompt-Injection über manipulierte Signaldaten zu verhindern: Steuerzeichen entfernen, XML-Tags entfernen, Rollen-Marker (system:, user:, assistant:, human:) entfernen."
+                      : "Before signals are embedded in the LLM prompt, text is sanitized to prevent prompt injection: strip control characters, XML-style tags, and role markers (system:, user:, assistant:, human:)."}
+                  </VoltAlert>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 4: System Prompt (MOST IMPORTANT)
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="04"
-          title={de ? "System-Prompt (vollstaendige Struktur)" : "System Prompt (Complete Structure)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Der System-Prompt ist das Herzsteueck des SIS. Er instruiert das LLM, als Think-Tank-Analyst zu agieren, und liefert gleichzeitig den vollstaendigen Datenkontext. Nachfolgend die exakte Struktur aus llm.ts/buildSystemPrompt():"
-              : "The system prompt is the heart of SIS. It instructs the LLM to act as a think-tank analyst while providing the complete data context. Below is the exact structure from llm.ts/buildSystemPrompt():"}
-          </p>
+                  <SubH>{de ? "Signal-Format im Prompt" : "Signal Format in Prompt"}</SubH>
+                  <VoltTerminalStatic
+                    title="Signal Format"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="120px"
+                    lines={[
+                      L("AKTUELLE BELEGTE SIGNALE (letzte 14 Tage, aus N Quellen):", "comment"),
+                      L("* [GDELT, 2026-04-10] [Stärke: 85%] Signal-Titel -> URL"),
+                      L("    Signal-Content (max 200 Zeichen)"),
+                    ]}
+                  />
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-          <SubH>{de ? "Rollen-Definition" : "Role Definition"}</SubH>
-          <MonoBlock>
-{`"Du bist das Strategic Intelligence System (SIS) -- ein Denk-Instrument
-auf dem Niveau eines erstklassigen Think-Tanks mit explizitem EU-Fokus."
+            {/* ══════════════════════════════════════════════════
+                04 — SYSTEM PROMPT
+                ══════════════════════════════════════════════════ */}
+            <section id="prompt" className="scroll-mt-20">
+              <SectionHeading num="04">
+                {de ? "System-Prompt (vollständige Struktur)" : "System Prompt (Complete Structure)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Der System-Prompt ist das Herzstück des SIS. Er instruiert das LLM, als Think-Tank-Analyst zu agieren, und liefert gleichzeitig den vollständigen Datenkontext. Nachfolgend die exakte Struktur aus llm.ts/buildSystemPrompt():"
+                      : "The system prompt is the heart of SIS. It instructs the LLM to act as a think-tank analyst while providing the complete data context. Below is the exact structure from llm.ts/buildSystemPrompt():"}
+                  </p>
 
-Sprache: Dynamisch per Locale (de/en)`}
-          </MonoBlock>
+                  <SubH>{de ? "Rollen-Definition" : "Role Definition"}</SubH>
+                  <VoltTerminalStatic
+                    title="Role"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="100px"
+                    lines={[
+                      L("\"Du bist das Strategic Intelligence System (SIS) -- ein Denk-Instrument", "info"),
+                      L("auf dem Niveau eines erstklassigen Think-Tanks mit explizitem EU-Fokus.\"", "info"),
+                      L(""),
+                      L("Sprache: Dynamisch per Locale (de/en)", "comment"),
+                    ]}
+                  />
 
-          <SubH>{de ? "STEEP+V Analytisches Framework (6 Dimensionen)" : "STEEP+V Analytical Framework (6 Dimensions)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Jede Frage wird systematisch entlang dieser 6 Dimensionen analysiert. Gewichtung ist dynamisch je nach Fragekontext:"
-              : "Every query is systematically analyzed along these 6 dimensions. Weighting is dynamic depending on query context:"}
-          </p>
-          <MonoBlock>
-{`S = Society     Demografischer Wandel, Urbanisierung, Migration, Wertewandel
-T = Technology   KI, Digitalisierung, Biotech, Quantencomputing, Cybersecurity
-E = Economy      Globalisierung, Handelskonflikte, Arbeitsmarkt, Inflation, Ungleichheit
-E = Environment  Klimawandel, Biodiversitaet, Energie, Ressourcen
-P = Politics     Regulierung, Geopolitik, Demokratie, EU-Politik, Governance
-V = Values       Vertrauenserosion, Polarisierung, Akzeptanz, kulturelle Verschiebungen`}
-          </MonoBlock>
+                  <VoltSeparator />
 
-          <SubH>{de ? "EU JRC 14 Megatrends (Referenzrahmen)" : "EU JRC 14 Megatrends (Reference Frame)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Die 14 Megatrends der Europaeischen Kommission (Joint Research Centre) dienen als Orientierungsraster:"
-              : "The 14 megatrends of the European Commission (Joint Research Centre) serve as an orientation frame:"}
-          </p>
-          <ol style={{ margin: "0 0 16px", paddingLeft: 24, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Beschleunigte technologische Veraenderung & Hyperkonnektivitaet" : "Accelerating technological change & hyperconnectivity"}</li>
-            <li>{de ? "Zunehmende demografische Ungleichgewichte" : "Increasing demographic imbalances"}</li>
-            <li>{de ? "Verschaerfter Klimawandel & oekologische Degradation" : "Intensifying climate change & environmental degradation"}</li>
-            <li>{de ? "Wachsende oekonomische Ungleichheiten" : "Growing economic inequalities"}</li>
-            <li>{de ? "Zunehmende geopolitische Spannungen" : "Increasing geopolitical tensions"}</li>
-            <li>{de ? "Fortschreitende menschliche Erweiterung (Enhancement)" : "Advancing human enhancement"}</li>
-            <li>{de ? "Machtverschiebungen zwischen Staaten" : "Power shifts between states"}</li>
-            <li>{de ? "Wachsende Bedeutung globaler Gemeingueter" : "Growing importance of global commons"}</li>
-            <li>{de ? "Entstehung neuer Governance-Formen" : "Emergence of new governance forms"}</li>
-            <li>{de ? "Schwaechung von Demokratie & institutionellem Vertrauen" : "Weakening of democracy & institutional trust"}</li>
-            <li>{de ? "Veraenderung von Arbeit & Bildung" : "Changing work & education"}</li>
-            <li>{de ? "Zunehmende globale Gesundheitsherausforderungen" : "Increasing global health challenges"}</li>
-            <li>{de ? "Wachsende Rolle von Staedten & Urbanisierung" : "Growing role of cities & urbanization"}</li>
-            <li>{de ? "Steigende Aspirationen & Erwartungen" : "Rising aspirations & expectations"}</li>
-          </ol>
+                  <SubH>{de ? "STEEP+V Analytisches Framework (6 Dimensionen)" : "STEEP+V Analytical Framework (6 Dimensions)"}</SubH>
+                  <VoltTerminalStatic
+                    title="STEEP+V"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="180px"
+                    lines={[
+                      L("S = Society     Demografie, Urbanisierung, Migration, Wertewandel"),
+                      L("T = Technology   KI, Digitalisierung, Biotech, Quantum, Cybersecurity"),
+                      L("E = Economy      Globalisierung, Handel, Arbeitsmarkt, Inflation"),
+                      L("E = Environment  Klima, Biodiversität, Energie, Ressourcen"),
+                      L("P = Politics     Regulierung, Geopolitik, Demokratie, EU-Politik"),
+                      L("V = Values       Vertrauen, Polarisierung, Akzeptanz, Kultur"),
+                    ]}
+                  />
 
-          <SubH>{de ? "7 Absolute PFLICHTEN" : "7 Absolute Requirements (PFLICHTEN)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Diese 7 Regeln sind im Prompt als \"ABSOLUTE PFLICHTEN\" markiert und muessen in jeder Antwort eingehalten werden:"
-              : "These 7 rules are marked as \"ABSOLUTE PFLICHTEN\" in the prompt and must be followed in every response:"}
-          </p>
-          <div style={{ borderLeft: "3px solid var(--color-lime, #E4FF97)", paddingLeft: 16, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>1.</strong> {de
-                ? "BEANTWORTE DIE FRAGE DIREKT UND SUBSTANZIELL -- nicht die Frage welche Trends passen."
-                : "ANSWER THE QUESTION DIRECTLY AND SUBSTANTIALLY -- not which trends fit."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>2.</strong> {de
-                ? "Die synthesis MUSS 6-10 Saetze lang sein. Kurze synthesis = Fehler."
-                : "The synthesis MUST be 6-10 sentences long. Short synthesis = error."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>3.</strong> {de
-                ? "Nenne KONKRETE Zahlen, Laender, Unternehmen, Technologien, Zeitrahmen."
-                : "Name CONCRETE numbers, countries, companies, technologies, timeframes."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>4.</strong> {de
-                ? "Verwende die Trends als HINTERGRUND-KONTEXT -- sie sind Signalgeber, nicht deine Antwort."
-                : "Use trends as BACKGROUND CONTEXT -- they are signal providers, not your answer."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>5.</strong> {de
-                ? "VERBOTEN: Saetze wie \"X ist ein Megatrend mit Y% Relevanz\" -- das ist Datendump, keine Analyse."
-                : "FORBIDDEN: Sentences like \"X is a megatrend with Y% relevance\" -- that is data dump, not analysis."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>6.</strong> {de
-                ? "scenarios IMMER generieren -- GENAU 3 Szenarien: optimistic, baseline, pessimistic. Summe der Wahrscheinlichkeiten muss ungefaehr 100% ergeben."
-                : "scenarios ALWAYS generated -- EXACTLY 3 scenarios: optimistic, baseline, pessimistic. Sum of probabilities must be approximately 100%."}
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 8 }}>
-              <strong>7.</strong> {de
-                ? "TRANSPARENZ & QUELLENHERKUNFT (Provenance Tagging): Fakten aus Live-Signalen mit [SIGNAL: Quelle, Datum], aus Trend-Daten mit [TREND: Name], eigenes Wissen mit [LLM-Einschaetzung]. ERFINDE NIEMALS URLs. Das references-Array darf NIEMALS leer sein (mind. 2 echte Quellen). Wo die Datenlage duenn ist, sage es explizit."
-                : "TRANSPARENCY & PROVENANCE (Provenance Tagging): Facts from live signals tagged [SIGNAL: Source, Date], from trend data [TREND: Name], own knowledge [LLM-Einschaetzung]. NEVER fabricate URLs. The references array must NEVER be empty (min. 2 real sources). Where data is thin, say so explicitly."}
-            </div>
-          </div>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Szenario-Wahrscheinlichkeits-Instruktionen" : "Scenario Probability Instructions"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Wahrscheinlichkeiten muessen sich aus der ANALYSE ERGEBEN, nicht aus einem Default-Schema" : "Probabilities must FOLLOW FROM THE ANALYSIS, not from a default scheme"}</li>
-            <li>{de ? "VERBOTEN: Identische Verteilungen wie 0.20/0.55/0.25 fuer jede Frage" : "FORBIDDEN: Identical distributions like 0.20/0.55/0.25 for every query"}</li>
-            <li>{de ? "Reifer Markt: baseline hoeher (z.B. 0.65)" : "Mature market: baseline higher (e.g. 0.65)"}</li>
-            <li>{de ? "Volatiles Thema: breitere Verteilung, pessimistic kann hoeher sein" : "Volatile topic: wider distribution, pessimistic can be higher"}</li>
-            <li>{de ? "Politisch getrieben: baseline niedriger weil unsicherer" : "Politically driven: baseline lower because more uncertain"}</li>
-            <li>{de ? "Summe muss ~100% sein (95-105% akzeptabel durch Rundung)" : "Sum must be ~100% (95-105% acceptable due to rounding)"}</li>
-          </ul>
+                  <SubH>{de ? "EU JRC 14 Megatrends (Referenzrahmen)" : "EU JRC 14 Megatrends (Reference Frame)"}</SubH>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {[
+                      de ? "Technologische Veränderung & Hyperkonnektivität" : "Technological change & hyperconnectivity",
+                      de ? "Demografische Ungleichgewichte" : "Demographic imbalances",
+                      de ? "Klimawandel & oekologische Degradation" : "Climate change & environmental degradation",
+                      de ? "Ökonomische Ungleichheiten" : "Economic inequalities",
+                      de ? "Geopolitische Spannungen" : "Geopolitical tensions",
+                      de ? "Menschliche Erweiterung (Enhancement)" : "Human enhancement",
+                      de ? "Machtverschiebungen zwischen Staaten" : "Power shifts between states",
+                      de ? "Globale Gemeingüter" : "Global commons",
+                      de ? "Neue Governance-Formen" : "New governance forms",
+                      de ? "Demokratie & institutionelles Vertrauen" : "Democracy & institutional trust",
+                      de ? "Arbeit & Bildung" : "Work & education",
+                      de ? "Globale Gesundheitsherausforderungen" : "Global health challenges",
+                      de ? "Städte & Urbanisierung" : "Cities & urbanization",
+                      de ? "Steigende Aspirationen" : "Rising aspirations",
+                    ].map((mt, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[13px] py-1.5 px-2.5 rounded" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <span className="font-mono text-[10px] font-bold opacity-35 flex-shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                        <span>{mt}</span>
+                      </div>
+                    ))}
+                  </div>
 
-          <SubH>{de ? "Trend-Matching-Instruktionen" : "Trend-Matching Instructions"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Nur Trend-IDs zurueckgeben (z.B. \"mega-ai-transformation\"), NICHT die Namen" : "Return only trend IDs (e.g. \"mega-ai-transformation\"), NOT names"}</li>
-            <li>{de ? "Erwartete Anzahl: 3-8 matched Trends pro Query" : "Expected count: 3-8 matched trends per query"}</li>
-            <li>{de ? "matchedTrendIds = [] ist IMMER ein Fehler" : "matchedTrendIds = [] is ALWAYS an error"}</li>
-            <li>{de ? "Erfundene IDs werden serverseitig herausgefiltert und geloggt" : "Fabricated IDs are filtered out server-side and logged"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Fragetypen-Erkennung" : "Query Type Detection"}</SubH>
-          <MonoBlock>
-{`STRATEGISCH ("Wie entwickelt sich X in 5 Jahren?")
-  -> Tiefe STEEP+V-Analyse + BSC-Kandidat
+                  <SubH>{de ? "7 Absolute PFLICHTEN" : "7 Absolute Requirements (PFLICHTEN)"}</SubH>
+                  <VoltAlert variant="warning" title={de ? "Pflichten" : "Requirements"}>
+                    <div className="space-y-2 text-[13px] mt-2">
+                      <div><strong>1.</strong> {de ? "BEANTWORTE DIE FRAGE DIREKT UND SUBSTANZIELL -- nicht die Frage welche Trends passen." : "ANSWER THE QUESTION DIRECTLY AND SUBSTANTIALLY -- not which trends fit."}</div>
+                      <div><strong>2.</strong> {de ? "Die synthesis MUSS 6-10 Saetze lang sein. Kurze synthesis = Fehler." : "The synthesis MUST be 6-10 sentences long. Short synthesis = error."}</div>
+                      <div><strong>3.</strong> {de ? "Nenne KONKRETE Zahlen, Laender, Unternehmen, Technologien, Zeitrahmen." : "Name CONCRETE numbers, countries, companies, technologies, timeframes."}</div>
+                      <div><strong>4.</strong> {de ? "Verwende Trends als HINTERGRUND-KONTEXT -- Signalgeber, nicht die Antwort." : "Use trends as BACKGROUND CONTEXT -- signal providers, not your answer."}</div>
+                      <div><strong>5.</strong> {de ? "VERBOTEN: \"X ist ein Megatrend mit Y% Relevanz\" -- Datendump, keine Analyse." : "FORBIDDEN: \"X is a megatrend with Y% relevance\" -- data dump, not analysis."}</div>
+                      <div><strong>6.</strong> {de ? "scenarios IMMER: GENAU 3 Szenarien (optimistic, baseline, pessimistic). Summe ~100%." : "scenarios ALWAYS: EXACTLY 3 scenarios (optimistic, baseline, pessimistic). Sum ~100%."}</div>
+                      <div><strong>7.</strong> {de ? "TRANSPARENZ: Fakten aus Live-Signalen [SIGNAL: Quelle, Datum], Trends [TREND: Name], eigenes Wissen [LLM-Einschätzung]. NIEMALS URLs erfinden. references-Array nie leer (mind. 2)." : "TRANSPARENCY: Facts from signals [SIGNAL: Source, Date], trends [TREND: Name], own knowledge [LLM-Einschätzung]. NEVER fabricate URLs. references array never empty (min. 2)."}</div>
+                    </div>
+                  </VoltAlert>
 
-FAKTENFRAGE ("Wer ist X?", "Was kostet Y?")
-  -> Direktantwort aus Allgemeinwissen, Trends nur als Kontext
+                  <VoltSeparator />
 
-STICHWORT/TAG ("AI", "frontier-tech", "Cybersecurity")
-  -> Strategisches Lagebild: was bewegt sich, welche Kraefte wirken
+                  <SubH>{de ? "Szenario-Wahrscheinlichkeiten" : "Scenario Probabilities"}</SubH>
+                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <li>{de ? "Muessen sich aus der ANALYSE ergeben, nicht aus einem Default-Schema" : "Must FOLLOW FROM ANALYSIS, not from a default scheme"}</li>
+                    <li>{de ? "VERBOTEN: identische Verteilungen (z.B. 0.20/0.55/0.25) für jede Frage" : "FORBIDDEN: identical distributions (e.g. 0.20/0.55/0.25) for every query"}</li>
+                    <li>{de ? "Reifer Markt: baseline höher (z.B. 0.65)" : "Mature market: baseline higher (e.g. 0.65)"}</li>
+                    <li>{de ? "Volatiles Thema: breitere Verteilung" : "Volatile topic: wider distribution"}</li>
+                    <li>{de ? "Summe ~100% (95-105% akzeptabel)" : "Sum ~100% (95-105% acceptable)"}</li>
+                  </ul>
 
-VERGLEICH/ITERATION
-  -> Direkte Gegenueberstellung mit Handlungsempfehlung`}
-          </MonoBlock>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Qualitaetsstandard" : "Quality Standard"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Der Prompt verlangt Think-Tank-Niveau -- wie ein brillanter Analyst nach 2 Stunden Recherche:"
-              : "The prompt demands think-tank level -- like a brilliant analyst after 2 hours of research:"}
-          </p>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Was ist der AKTUELLE STAND der Dinge?" : "What is the CURRENT STATE of things?"}</li>
-            <li>{de ? "Was sind die TREIBENDEN KRAEFTE entlang STEEP+V?" : "What are the DRIVING FORCES along STEEP+V?"}</li>
-            <li>{de ? "Was sind die KRITISCHEN UNSICHERHEITEN?" : "What are the CRITICAL UNCERTAINTIES?"}</li>
-            <li>{de ? "Welche KONKRETEN IMPLIKATIONEN ergeben sich -- insbesondere fuer Europa?" : "What CONCRETE IMPLICATIONS arise -- especially for Europe?"}</li>
-            <li>{de ? "Wo ist die DATENLAGE DUENN -- was wissen wir nicht?" : "Where is DATA THIN -- what don't we know?"}</li>
-            <li>{de ? "Belege Aussagen direkt im Fliesstext: [Quellenname, Datum]. Ohne Beleg = Meinung." : "Back claims directly in running text: [Source, Date]. Without citation = opinion."}</li>
-          </ul>
+                  <SubH>{de ? "Fragetypen-Erkennung" : "Query Type Detection"}</SubH>
+                  <VoltTerminalStatic
+                    title="Query Types"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="200px"
+                    lines={[
+                      L("STRATEGISCH (\"Wie entwickelt sich X in 5 Jahren?\")", "command"),
+                      L("  -> Tiefe STEEP+V-Analyse + BSC-Kandidat"),
+                      L(""),
+                      L("FAKTENFRAGE (\"Wer ist X?\", \"Was kostet Y?\")", "command"),
+                      L("  -> Direktantwort, Trends nur als Kontext"),
+                      L(""),
+                      L("STICHWORT/TAG (\"AI\", \"frontier-tech\")", "command"),
+                      L("  -> Strategisches Lagebild"),
+                      L(""),
+                      L("VERGLEICH/ITERATION", "command"),
+                      L("  -> Direkte Gegenüberstellung + Handlungsempfehlung"),
+                    ]}
+                  />
 
-          <SubH>{de ? "Balanced Scorecard (BSC) Regeln" : "Balanced Scorecard (BSC) Rules"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Standard: null. Wird NUR bei strategischen Analyse-Fragen generiert" : "Default: null. Generated ONLY for strategic analysis questions"}</li>
-            <li>{de ? "NICHT bei Faktenfragen, Politik, Namen, historischen Ereignissen" : "NOT for factual questions, politics, names, historical events"}</li>
-            <li>{de ? "3-6 themenspezifische Perspectives (NICHT generisch)" : "3-6 topic-specific perspectives (NOT generic)"}</li>
-            <li>{de ? "scores: 0-1, impacts: -1 bis +1 (0 = keine Verbindung)" : "scores: 0-1, impacts: -1 to +1 (0 = no connection)"}</li>
-            <li>{de ? "overallReadiness: 0-1" : "overallReadiness: 0-1"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Datenkontext im Prompt" : "Data Context in Prompt"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Der Prompt enthaelt drei komprimierte Datenbloecke, die dem LLM den gesamten Wissensstand des Systems vermitteln:"
-              : "The prompt contains three compressed data blocks that convey the system's entire knowledge state to the LLM:"}
-          </p>
-          <MonoBlock>
-{`TRENDS (Top 40, sortiert nach Relevanz):
-- ID:"mega-ai-transformation" | Artificial Intelligence [Mega-Trend]
-  Ring:adopt Rel:98% Conf:95% Imp:98% rising Dur:permanent Dir:both
-  Focus:strategic,investment Signals:500 Sources:PwC,EY,TRENDONE
-  Regs:AI Act,AI EO Edges:6
+                  <SubH>{de ? "Balanced Scorecard (BSC) Regeln" : "Balanced Scorecard (BSC) Rules"}</SubH>
+                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <li>{de ? "Standard: null. NUR bei strategischen Analyse-Fragen" : "Default: null. ONLY for strategic analysis questions"}</li>
+                    <li>{de ? "NICHT bei Faktenfragen, Politik, historischen Ereignissen" : "NOT for factual, political, or historical questions"}</li>
+                    <li>{de ? "3-6 themenspezifische Perspectives (NICHT generisch)" : "3-6 topic-specific perspectives (NOT generic)"}</li>
+                    <li>{de ? "scores: 0-1, impacts: -1 bis +1, overallReadiness: 0-1" : "scores: 0-1, impacts: -1 to +1, overallReadiness: 0-1"}</li>
+                  </ul>
 
-REGULIERUNGEN (15 Frameworks):
-- EU:AI Act [enforcing] -> mega-ai-transformation(reshapes), ...
-- US:CHIPS Act [enforcing] -> mega-technological-disruption(accelerates), ...
+                  <VoltSeparator />
 
-KAUSALE VERBINDUNGEN (102 Kanten):
-mega-climate-sustainability --drives(95%)--> mega-energy-transition
-mega-ai-transformation --drives(95%)--> mega-future-of-work
-mega-geopolitical-fracturing --dampens(70%)--> mega-connectivity`}
-          </MonoBlock>
-        </CollapsibleSection>
+                  <SubH>{de ? "Datenkontext im Prompt" : "Data Context in Prompt"}</SubH>
+                  <VoltTerminalStatic
+                    title="Prompt Data Blocks"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="260px"
+                    lines={[
+                      L("TRENDS (Top 40, sortiert nach Relevanz):", "comment"),
+                      L("- ID:\"mega-ai-transformation\" | AI [Mega-Trend]"),
+                      L("  Ring:adopt Rel:98% Conf:95% Imp:98% rising Dur:permanent"),
+                      L("  Focus:strategic,investment Signals:500 Sources:PwC,EY"),
+                      L(""),
+                      L("REGULIERUNGEN (15 Frameworks):", "comment"),
+                      L("- EU:AI Act [enforcing] -> mega-ai-transformation(reshapes)"),
+                      L("- US:CHIPS Act [enforcing] -> mega-technological-disruption"),
+                      L(""),
+                      L("KAUSALE VERBINDUNGEN (102 Kanten):", "comment"),
+                      L("mega-climate --drives(95%)--> mega-energy-transition"),
+                      L("mega-ai --drives(95%)--> mega-future-of-work"),
+                      L("mega-geopolitical --dampens(70%)--> mega-connectivity"),
+                    ]}
+                  />
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 5: Validation & Anti-Hallucination
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="05"
-          title={de ? "Validierung & Anti-Halluzination" : "Validation & Anti-Hallucination"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Das System implementiert 10 Sicherheits- und Validierungsschichten (SEC-01 bis SEC-10, VAL-01 bis VAL-03), die LLM-Halluzinationen erkennen, korrigieren und dokumentieren. Quellcode: validation.ts, route.ts"
-              : "The system implements 10 security and validation layers (SEC-01 to SEC-10, VAL-01 to VAL-03) that detect, correct, and document LLM hallucinations. Source: validation.ts, route.ts"}
-          </p>
+            {/* ══════════════════════════════════════════════════
+                05 — VALIDATION & ANTI-HALLUCINATION
+                ══════════════════════════════════════════════════ */}
+            <section id="validation" className="scroll-mt-20">
+              <SectionHeading num="05">
+                {de ? "Validierung & Anti-Halluzination" : "Validation & Anti-Hallucination"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "10 Sicherheits- und Validierungsschichten (SEC-01 bis SEC-10, VAL-01 bis VAL-03) erkennen, korrigieren und dokumentieren LLM-Halluzinationen. Quellcode: validation.ts, route.ts"
+                      : "10 security and validation layers (SEC-01 to SEC-10, VAL-01 to VAL-03) detect, correct, and document LLM hallucinations. Source: validation.ts, route.ts"}
+                  </p>
 
-          <SubH>{de ? "Input-Sanitisierung (Prompt-Injection-Schutz)" : "Input Sanitization (Prompt Injection Protection)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Alle 9 Injection-Patterns werden vor der LLM-Uebergabe neutralisiert (route.ts):"
-              : "All 9 injection patterns are neutralized before LLM handoff (route.ts):"}
-          </p>
-          <MonoBlock>
-{`INJECTION_PATTERNS (9 RegExp):
-1. /\\b(?:system|assistant|human)\\s*:/gi     -- Rollen-Direktiven
-2. /\\byou are\\b/gi                           -- Identitaets-Override
-3. /\\bignore .* instructions?\\b/gi           -- Instruktions-Override
-4. /\\bforget .* instructions?\\b/gi           -- Gedaechtnis-Manipulation
-5. /\\bdisregard .* instructions?\\b/gi        -- Instruktions-Override
-6. /\\boverride .* instructions?\\b/gi         -- Instruktions-Override
-7. /\\bnew instructions?\\s*:/gi               -- Neue Instruktionen
-8. /\\bact as\\b/gi                            -- Rollenuebernahme
-9. /\\bpretend (?:to be|you are)\\b/gi         -- Identitaets-Override
+                  <SubH>{de ? "Input-Sanitisierung (9 Injection-Patterns)" : "Input Sanitization (9 Injection Patterns)"}</SubH>
+                  <VoltTerminalStatic
+                    title="INJECTION_PATTERNS"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="280px"
+                    lines={[
+                      L("1. /\\b(?:system|assistant|human)\\s*:/gi", "error"),
+                      L("   -- Rollen-Direktiven", "comment"),
+                      L("2. /\\byou are\\b/gi", "error"),
+                      L("   -- Identitäts-Override", "comment"),
+                      L("3. /\\bignore .* instructions?\\b/gi", "error"),
+                      L("4. /\\bforget .* instructions?\\b/gi", "error"),
+                      L("5. /\\bdisregard .* instructions?\\b/gi", "error"),
+                      L("6. /\\boverride .* instructions?\\b/gi", "error"),
+                      L("   -- Instruktions-Override (3-6)", "comment"),
+                      L("7. /\\bnew instructions?\\s*:/gi", "error"),
+                      L("8. /\\bact as\\b/gi", "error"),
+                      L("9. /\\bpretend (?:to be|you are)\\b/gi", "error"),
+                      L(""),
+                      L("+ XML-Tags: /<\\/?[a-zA-Z][a-zA-Z0-9_-]*>/g", "warning"),
+                      L("+ Max Query-Laenge: 2.000 Zeichen", "warning"),
+                    ]}
+                  />
 
-+ XML-Tag-Pattern: /<\\/?[a-zA-Z][a-zA-Z0-9_-]*>/g
-+ Max Query-Laenge: 2.000 Zeichen`}
-          </MonoBlock>
+                  <SubH>{de ? "Sanitisierung: contextProfile (SEC-08) & previousContext (SEC-10)" : "Sanitization: contextProfile (SEC-08) & previousContext (SEC-10)"}</SubH>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <VoltAlert variant="info" title="SEC-08: contextProfile">
+                      <ul className="text-[12px] mt-1.5 space-y-1 list-disc pl-3">
+                        <li>{de ? "role, industry, region: max 100 Zeichen" : "role, industry, region: max 100 chars"}</li>
+                        <li>{de ? "Newlines, HTML-Tags, Rollen-Marker entfernt" : "Newlines, HTML tags, role markers removed"}</li>
+                      </ul>
+                    </VoltAlert>
+                    <VoltAlert variant="info" title="SEC-10: previousContext">
+                      <ul className="text-[12px] mt-1.5 space-y-1 list-disc pl-3">
+                        <li>{de ? "Synthesis auf 6.000 Zeichen begrenzt" : "Synthesis truncated to 6,000 chars"}</li>
+                        <li>{de ? "XML-Tags + Rollen-Marker entfernt" : "XML tags + role markers removed"}</li>
+                        <li>{de ? "Als Assistant-Message injiziert (geschützt)" : "Injected as assistant message (protected)"}</li>
+                      </ul>
+                    </VoltAlert>
+                  </div>
 
-          <SubH>{de ? "contextProfile-Sanitisierung (SEC-08)" : "contextProfile Sanitization (SEC-08)"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Felder role, industry, region werden auf max 100 Zeichen begrenzt" : "Fields role, industry, region limited to max 100 characters"}</li>
-            <li>{de ? "Newlines/Returns entfernt" : "Newlines/returns removed"}</li>
-            <li>{de ? "HTML-Tags entfernt" : "HTML tags removed"}</li>
-            <li>{de ? "Rollen-Marker (system:, assistant:, human:) entfernt" : "Role markers (system:, assistant:, human:) removed"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "previousContext-Sanitisierung (SEC-10)" : "previousContext Sanitization (SEC-10)"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Synthesis wird auf 6.000 Zeichen begrenzt" : "Synthesis truncated to 6,000 characters"}</li>
-            <li>{de ? "XML-artige Tags werden entfernt" : "XML-like tags are stripped"}</li>
-            <li>{de ? "Rollen-Marker werden entfernt (system:, user:, assistant:, human:)" : "Role markers stripped (system:, user:, assistant:, human:)"}</li>
-            <li>{de ? "Query wird durch sanitizeQuery() gefiltert" : "Query is filtered through sanitizeQuery()"}</li>
-            <li>{de ? "Wird als Assistant-Message injiziert (potenter Injektionsvektor, daher besonders geschuetzt)" : "Injected as assistant message (potent injection vector, thus specially protected)"}</li>
-          </ul>
+                  <SubH>{de ? "Zod-Schema-Validierung (VAL-01)" : "Zod Schema Validation (VAL-01)"}</SubH>
+                  <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Alle LLM-Ausgaben werden gegen ein striktes Zod-Schema validiert:"
+                      : "All LLM outputs are validated against a strict Zod schema:"}
+                  </p>
+                  <div className="overflow-x-auto">
+                    <VoltTableRoot>
+                      <VoltTableHeader>
+                        <VoltTableRow>
+                          <VoltTableHead>{de ? "Feld" : "Field"}</VoltTableHead>
+                          <VoltTableHead>Typ</VoltTableHead>
+                          <VoltTableHead>Constraints</VoltTableHead>
+                        </VoltTableRow>
+                      </VoltTableHeader>
+                      <VoltTableBody>
+                        {[
+                          ["synthesis", "string", "min:1, max:10000"],
+                          ["reasoningChains", "string[]", "max 10, each max 1000"],
+                          ["steepV", "object | null", "6 dimensions, each max 1000"],
+                          ["matchedTrendIds", "string[]", "max 40, each max 100"],
+                          ["keyInsights", "string[]", "max 10, each max 1000"],
+                          ["regulatoryContext", "string[]", "max 10, each max 1000"],
+                          ["causalAnalysis", "string[]", "max 10, each max 1000"],
+                          ["scenarios", "Scenario[]", "max 5; type, name, description, probability, timeframe, keyDrivers"],
+                          ["interpretation", "string | null", "max 3000"],
+                          ["references", "Reference[]", "max 20; title (max 500), url (max 2000, http/https)"],
+                          ["followUpQuestions", "string[]", "max 10, each max 500"],
+                          ["balancedScorecard", "BSC | null", "3-6 perspectives, scores 0-1, impacts -1 to +1"],
+                          ["confidence", "number", "0-1, preprocess: string -> number"],
+                        ].map(([field, type, constr]) => (
+                          <VoltTableRow key={field}>
+                            <VoltTableCell><Code>{field}</Code></VoltTableCell>
+                            <VoltTableCell className="font-mono text-xs">{type}</VoltTableCell>
+                            <VoltTableCell className="text-xs">{constr}</VoltTableCell>
+                          </VoltTableRow>
+                        ))}
+                      </VoltTableBody>
+                    </VoltTableRoot>
+                  </div>
 
-          <SubH>{de ? "Zod-Schema-Validierung (VAL-01)" : "Zod Schema Validation (VAL-01)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Alle LLM-Ausgaben werden gegen ein striktes Zod-Schema validiert. Felder und Constraints:"
-              : "All LLM outputs are validated against a strict Zod schema. Fields and constraints:"}
-          </p>
-          <div style={{ padding: "14px 16px", borderRadius: 8, background: "rgba(0,0,0,0.03)", border: "1px solid var(--color-border, #E8E8E8)", fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 12, lineHeight: 1.9, marginBottom: 16 }}>
-            <JsonField name="synthesis" type="string" desc={de ? "Kernanalyse" : "Core analysis"} constraints="min:1, max:10000" />
-            <JsonField name="reasoningChains" type="string[]" desc={de ? "Kausale Logikketten" : "Causal logic chains"} constraints="max 10 items, each max 1000 chars" />
-            <JsonField name="steepV" type="object|null" desc={de ? "6 Dimensionen, je max 1000 chars, nullable" : "6 dimensions, each max 1000 chars, nullable"} optional />
-            <JsonField name="matchedTrendIds" type="string[]" desc={de ? "IDs aus der Trend-DB" : "IDs from trend DB"} constraints="max 40 items, each max 100 chars" />
-            <JsonField name="keyInsights" type="string[]" desc={de ? "Kern-Erkenntnisse" : "Key insights"} constraints="max 10 items, each max 1000 chars" />
-            <JsonField name="regulatoryContext" type="string[]" desc={de ? "Regulatorischer Kontext" : "Regulatory context"} constraints="max 10 items, each max 1000 chars" />
-            <JsonField name="causalAnalysis" type="string[]" desc={de ? "Ursache-Wirkungs-Analyse" : "Cause-effect analysis"} constraints="max 10 items, each max 1000 chars" />
-            <JsonField name="scenarios" type="Scenario[]" desc={de ? "3 Szenarien" : "3 scenarios"} constraints="max 5 items" />
-            <JsonField name="scenarios[].type" type="enum" desc="optimistic | baseline | pessimistic | wildcard" optional />
-            <JsonField name="scenarios[].name" type="string" desc={de ? "Szenario-Name" : "Scenario name"} constraints="max 200 chars" />
-            <JsonField name="scenarios[].description" type="string" desc={de ? "Beschreibung" : "Description"} constraints="max 2000 chars" />
-            <JsonField name="scenarios[].probability" type="number|null" desc="0-1" constraints="preprocess: string->number" />
-            <JsonField name="scenarios[].timeframe" type="string" desc={de ? "Zeitraum" : "Timeframe"} constraints="max 200 chars" optional />
-            <JsonField name="scenarios[].keyDrivers" type="string[]" desc={de ? "Treiber" : "Drivers"} constraints="max 10, each max 300 chars" optional />
-            <JsonField name="interpretation" type="string|null" desc={de ? "Analytische Einordnung" : "Analytical interpretation"} constraints="max 3000 chars" optional />
-            <JsonField name="references" type="Reference[]" desc={de ? "Quellenverweise" : "Source references"} constraints="max 20 items" />
-            <JsonField name="references[].title" type="string" desc="" constraints="max 500 chars" />
-            <JsonField name="references[].url" type="string" desc="" constraints="max 2000 chars, URL-validated" />
-            <JsonField name="followUpQuestions" type="string[]" desc={de ? "Folgefragen" : "Follow-up questions"} constraints="max 10, each max 500 chars" />
-            <JsonField name="newsContext" type="string|null" desc={de ? "Nachrichtenkontext" : "News context"} constraints="max 3000 chars" optional />
-            <JsonField name="decisionFramework" type="string|null" desc={de ? "Entscheidungsrahmen" : "Decision framework"} constraints="max 3000 chars" optional />
-            <JsonField name="balancedScorecard" type="BSC|null" desc={de ? "Balanced Scorecard" : "Balanced Scorecard"} optional />
-            <JsonField name="balancedScorecard.perspectives" type="Perspective[]" desc="" constraints="min 3, max 6" />
-            <JsonField name="balancedScorecard.overallReadiness" type="number" desc="" constraints="0-1" />
-            <JsonField name="confidence" type="number" desc={de ? "Konfidenz-Score" : "Confidence score"} constraints="0-1, preprocess: string->number" />
-          </div>
+                  <VoltSeparator />
 
-          <SubH>{de ? "matchedTrendIds Anti-Halluzination (VAL-02)" : "matchedTrendIds Anti-Hallucination (VAL-02)"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Jede vom LLM zurueckgegebene Trend-ID wird gegen die echte validTrendIds-Menge geprueft" : "Every trend ID returned by the LLM is checked against the real validTrendIds set"}</li>
-            <li>{de ? "Nicht existierende IDs werden entfernt und in Warnings geloggt" : "Non-existent IDs are removed and logged as warnings"}</li>
-            <li>{de ? "Meldung: \"Dropped N/M hallucinated matchedTrendIds: id1, id2, ...\"" : "Message: \"Dropped N/M hallucinated matchedTrendIds: id1, id2, ...\""}</li>
-            <li>{de ? "Wenn ALLE IDs ungueltig: \"ALL matchedTrendIds were invalid\"" : "If ALL IDs invalid: \"ALL matchedTrendIds were invalid\""}</li>
-          </ul>
+                  <SubH>{de ? "matchedTrendIds Anti-Halluzination (VAL-02)" : "matchedTrendIds Anti-Hallucination (VAL-02)"}</SubH>
+                  <VoltAlert variant="error" title="Anti-Hallucination">
+                    <ul className="text-[12px] mt-1.5 space-y-1 list-disc pl-3">
+                      <li>{de ? "Jede Trend-ID wird gegen die echte validTrendIds-Menge geprüft" : "Every trend ID checked against real validTrendIds set"}</li>
+                      <li>{de ? "Nicht existierende IDs entfernt + Warning geloggt" : "Non-existent IDs removed + warning logged"}</li>
+                      <li>{de ? "Meldung: \"Dropped N/M hallucinated matchedTrendIds: ...\"" : "Message: \"Dropped N/M hallucinated matchedTrendIds: ...\""}</li>
+                    </ul>
+                  </VoltAlert>
 
-          <SubH>{de ? "Szenario-Wahrscheinlichkeits-Normalisierung" : "Scenario Probability Normalization"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Prueft ob genau 3 Szenarien vorhanden sind" : "Checks for exactly 3 scenarios"}</li>
-            <li>{de ? "Null/nicht-numerische Werte: werden durch Defaults ersetzt (baseline=0.45, optimistic=0.30, pessimistic=0.25)" : "Null/non-numeric values: replaced with defaults (baseline=0.45, optimistic=0.30, pessimistic=0.25)"}</li>
-            <li>{de ? "Summe geprueft: 0.8-1.1 ist akzeptabel. Ausserhalb wird auf 1.0 normalisiert." : "Sum checked: 0.8-1.1 is acceptable. Outside this range, normalized to 1.0."}</li>
-            <li>{de ? "Identische Wahrscheinlichkeiten (z.B. alle 0.33) werden als Warning geloggt" : "Identical probabilities (e.g. all 0.33) are logged as warning"}</li>
-          </ul>
+                  <SubH>{de ? "Szenario-Normalisierung & URL-Validierung" : "Scenario Normalization & URL Validation"}</SubH>
+                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <li>{de ? "Null/nicht-numerische Wahrscheinlichkeiten: Defaults (baseline=0.45, optimistic=0.30, pessimistic=0.25)" : "Null/non-numeric probabilities: defaults (baseline=0.45, optimistic=0.30, pessimistic=0.25)"}</li>
+                    <li>{de ? "Summe 0.8-1.1 akzeptabel, sonst normalisiert auf 1.0" : "Sum 0.8-1.1 acceptable, otherwise normalized to 1.0"}</li>
+                    <li>{de ? "URLs müssen http/https-Protokoll haben, malformed URLs werden entfernt" : "URLs must have http/https protocol, malformed URLs are removed"}</li>
+                  </ul>
 
-          <SubH>{de ? "URL-Validierung fuer Referenzen" : "URL Validation for References"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Titel-only-Referenzen (ohne URL) sind erlaubt" : "Title-only references (without URL) are allowed"}</li>
-            <li>{de ? "URLs muessen http: oder https: Protokoll haben" : "URLs must have http: or https: protocol"}</li>
-            <li>{de ? "Malformed URLs werden entfernt und geloggt" : "Malformed URLs are removed and logged"}</li>
-          </ul>
+                  <VoltSeparator />
 
-          <SubH>{de ? "Rate Limiting" : "Rate Limiting"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "In-Memory Sliding Window: 100 Requests pro IP pro Stunde" : "In-memory sliding window: 100 requests per IP per hour"}</li>
-            <li>{de ? "Abgelaufene Eintraege werden alle 50 Aufrufe bereinigt" : "Expired entries pruned every 50 calls"}</li>
-            <li>{de ? "HTTP 429 mit Retry-After: 3600 bei Ueberschreitung" : "HTTP 429 with Retry-After: 3600 on limit exceeded"}</li>
-            <li>{de ? "Reset bei Server-Neustart (kein persistenter Speicher)" : "Resets on server restart (no persistent storage)"}</li>
-          </ul>
+                  <SubH>Rate Limiting</SubH>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <VoltStat label="Requests/IP/h" value={100} size="sm" />
+                    <VoltStat label="Window" value="Sliding" size="sm" />
+                    <VoltStat label="HTTP" value={429} size="sm" />
+                    <VoltStat label="Retry-After" value="3600s" size="sm" />
+                  </div>
 
-          <SubH>{de ? "JSON-Reparatur bei Truncation" : "JSON Repair on Truncation"}</SubH>
-          <ul style={{ margin: "0 0 16px", paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "Wenn der LLM-Stream abgeschnitten wird, versucht das System das JSON zu reparieren" : "If the LLM stream is truncated, the system attempts to repair the JSON"}</li>
-            <li>{de ? "Strategie: Offene Strukturen zaehlen und passende Schlussklammern anfuegen" : "Strategy: Count open structures and append matching closing brackets"}</li>
-            <li>{de ? "Fallback-Strategie: Zurueckgehen zum letzten vollstaendigen Key-Value-Paar" : "Fallback strategy: Backtrack to last complete key-value pair"}</li>
-            <li>{de ? "Reparierte Ergebnisse werden mit _repaired: true markiert" : "Repaired results are marked with _repaired: true"}</li>
-            <li>{de ? "Minimum-Anforderung: synthesis-Feld muss vorhanden sein" : "Minimum requirement: synthesis field must be present"}</li>
-          </ul>
+                  <SubH>{de ? "JSON-Reparatur & Frontend-Transparenz" : "JSON Repair & Frontend Transparency"}</SubH>
+                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <li>{de ? "Truncated JSON: offene Strukturen zählen, Schlussklammern anfügen" : "Truncated JSON: count open structures, append closing brackets"}</li>
+                    <li>{de ? "Reparierte Ergebnisse: _repaired: true" : "Repaired results: _repaired: true"}</li>
+                    <li>{de ? "Frontend: \"KI-vorgeschlagen\"-Badge bei Referenzen, \"Repariert\"-Badge, Datenhinweis-Badges" : "Frontend: \"AI-suggested\" badge on references, \"Repaired\" badge, data quality badges"}</li>
+                  </ul>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-          <SubH>{de ? "Frontend-Transparenz" : "Frontend Transparency"}</SubH>
-          <ul style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9, fontSize: 13 }}>
-            <li>{de ? "\"KI-vorgeschlagen, nicht redaktionell verifiziert\" bei Referenzen" : "\"AI-suggested, not editorially verified\" on references"}</li>
-            <li>{de ? "\"Repariert\"-Badge wenn JSON repariert wurde (_repaired: true)" : "\"Repaired\" badge when JSON was repaired (_repaired: true)"}</li>
-            <li>{de ? "\"Datenhinweis\"-Badges bei Qualitaetsproblemen (_dataQualityWarnings)" : "\"Data Note\" badges on quality issues (_dataQualityWarnings)"}</li>
-            <li>{de ? "Validierungs-Warnungen werden serverseitig geloggt (_validationWarnings)" : "Validation warnings logged server-side (_validationWarnings)"}</li>
-          </ul>
-        </CollapsibleSection>
+            {/* ══════════════════════════════════════════════════
+                06 — ANALYSIS FRAMEWORKS
+                ══════════════════════════════════════════════════ */}
+            <section id="frameworks" className="scroll-mt-20">
+              <SectionHeading num="06">
+                {de ? "Analyse-Frameworks (6)" : "Analysis Frameworks (6)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-4 p-6">
+                  <p className="text-sm leading-relaxed mb-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Neben der Standard-Analyse (STEEP+V) können 6 spezialisierte Frameworks gewählt werden:"
+                      : "Beyond the default analysis (STEEP+V), 6 specialized frameworks can be selected:"}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      {
+                        num: "1", title: de ? "Marktanalyse" : "Market Analysis", method: "SWOT + PESTEL",
+                        desc: de ? "Stärken/Schwächen/Chancen/Risiken und PESTEL-Umfeldanalyse für Markt- und Wettbewerbsfragen." : "Strengths/Weaknesses/Opportunities/Threats and PESTEL for market and competitive questions.",
+                      },
+                      {
+                        num: "2", title: "War-Gaming", method: "RAND + Shell Scenarios",
+                        desc: de ? "Strategische Simulation mit Akteursanalyse, Zügen und Gegenzügen. Geopolitik & Konkurrenzstrategie." : "Strategic simulation with actor analysis, moves and counter-moves. Geopolitics & competitive strategy.",
+                      },
+                      {
+                        num: "3", title: "Pre-Mortem", method: "Gary Klein (1998)",
+                        desc: de ? "Proaktive Risikoanalyse: 'Stell dir vor, das Projekt ist gescheitert. Warum?' Blinde Flecken erkennen." : "Proactive risk analysis: 'Imagine the project has failed. Why?' Identify blind spots.",
+                      },
+                      {
+                        num: "4", title: "Post-Mortem", method: "Toyota 5-Whys",
+                        desc: de ? "Ursachenanalyse: Fuenffaches 'Warum?' bis zur Wurzelursache. Fuer Vorfallanalyse." : "Root cause analysis: five times 'Why?' to the root cause. For incident analysis.",
+                      },
+                      {
+                        num: "5", title: "Trend Deep-Dive", method: "STEEP+V Extended",
+                        desc: de ? "Systemische Analyse entlang aller 6 Dimensionen mit Wechselwirkungen und Kaskadeneffekten." : "Systemic analysis along all 6 dimensions with interactions and cascade effects.",
+                      },
+                      {
+                        num: "6", title: "Stakeholder", method: "Mitchell Salience Model (1997)",
+                        desc: de ? "Einfluss-Mapping nach Power/Legitimacy/Urgency. Dominante, abhängige und fordernde Stakeholder." : "Influence mapping by Power/Legitimacy/Urgency. Dominant, dependent and demanding stakeholders.",
+                      },
+                    ].map((fw) => (
+                      <VoltCard key={fw.num} variant="outlined">
+                        <VoltCardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <span
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-mono text-sm font-bold"
+                              style={{ background: "#E4FF97", color: "#0A0A0A" }}
+                            >
+                              {fw.num}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm mb-0.5" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>{fw.title}</div>
+                              <div className="font-mono text-[11px] mb-1.5" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{fw.method}</div>
+                              <div className="text-[12px] leading-relaxed" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{fw.desc}</div>
+                            </div>
+                          </div>
+                        </VoltCardContent>
+                      </VoltCard>
+                    ))}
+                  </div>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 6: Analysis Frameworks
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="06"
-          title={de ? "Analyse-Frameworks (6)" : "Analysis Frameworks (6)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Neben der Standard-Analyse (STEEP+V) koennen 6 spezialisierte Frameworks gewaehlt werden, die den System-Prompt und die Ausgabestruktur anpassen:"
-              : "Beyond the default analysis (STEEP+V), 6 specialized frameworks can be selected that adjust the system prompt and output structure:"}
-          </p>
+            {/* ══════════════════════════════════════════════════
+                07 — KNOWLEDGE BASE
+                ══════════════════════════════════════════════════ */}
+            <section id="knowledge" className="scroll-mt-20">
+              <SectionHeading num="07">
+                {de ? "Wissensbasis (Trends, Kausalgraph, Regulierungen)" : "Knowledge Base (Trends, Causal Graph, Regulations)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Basiert auf 6 autoritativen Quellen: Zukunftsinstitut (11 Megatrends), PwC (5 Megatrends), EY (Megatrends 2026+), EU ESPAS (Global Trends to 2030), Roland Berger (Trend Compendium 2050), TRENDONE (Trend Universe 2026)."
+                      : "Based on 6 authoritative sources: Zukunftsinstitut, PwC, EY, EU ESPAS, Roland Berger, TRENDONE."}
+                  </p>
 
-          {[
-            {
-              num: "1",
-              title: de ? "Marktanalyse (SWOT + PESTEL)" : "Market Analysis (SWOT + PESTEL)",
-              method: "SWOT + PESTEL",
-              desc: de
-                ? "Klassische Marktanalyse mit Staerken/Schwaechen/Chancen/Risiken und PESTEL-Umfeldanalyse. Fuer Produkt- und Wettbewerbsfragen. Anwendung: Maerkte, Produkte, Wettbewerbsumfeld."
-                : "Classic market analysis with Strengths/Weaknesses/Opportunities/Threats and PESTEL environmental analysis. For product and competitive questions. Applied to: markets, products, competitive landscape.",
-            },
-            {
-              num: "2",
-              title: de ? "War-Gaming (RAND/Shell-Methodik)" : "War-Gaming (RAND/Shell Methodology)",
-              method: "RAND Corporation + Shell Scenario Planning",
-              desc: de
-                ? "Strategische Simulation mit Akteursanalyse, Zuegen und Gegenzuegen. Basiert auf RAND Corporation und Shell Szenario-Methodik. Anwendung: geopolitische Analyse, Konkurrenzstrategie."
-                : "Strategic simulation with actor analysis, moves and counter-moves. Based on RAND Corporation and Shell scenario methodology. Applied to: geopolitical analysis, competitive strategy.",
-            },
-            {
-              num: "3",
-              title: "Pre-Mortem (Gary Klein)",
-              method: "Gary Klein's Pre-Mortem Analysis (1998)",
-              desc: de
-                ? "Proaktive Risikoanalyse: 'Stell dir vor, das Projekt ist gescheitert. Warum?' Identifiziert blinde Flecken und versteckte Risiken bevor sie eintreten. Anwendung: Projektplanung, Strategiepruefung."
-                : "Proactive risk analysis: 'Imagine the project has failed. Why?' Identifies blind spots and hidden risks before they materialize. Applied to: project planning, strategy review.",
-            },
-            {
-              num: "4",
-              title: "Post-Mortem (5-Whys)",
-              method: "Toyota 5-Whys Root Cause Analysis",
-              desc: de
-                ? "Ursachenanalyse: Fuenffaches 'Warum?' bis zur Wurzelursache. Fuer die Aufarbeitung von Ereignissen und Fehlschlaegen. Anwendung: Vorfallanalyse, Fehlerbehebung."
-                : "Root cause analysis: five times 'Why?' until the root cause. For analyzing events and failures. Applied to: incident analysis, failure correction.",
-            },
-            {
-              num: "5",
-              title: de ? "Trend Deep-Dive (STEEP+V)" : "Trend Deep-Dive (STEEP+V)",
-              method: "STEEP+V Extended Analysis",
-              desc: de
-                ? "Systemische Trendanalyse entlang aller 6 STEEP+V-Dimensionen mit Wechselwirkungen, Kaskadeneffekten und Zeitachse. Anwendung: Tiefe Trendforschung, Langfristplanung."
-                : "Systemic trend analysis along all 6 STEEP+V dimensions with interactions, cascade effects and timeline. Applied to: deep trend research, long-term planning.",
-            },
-            {
-              num: "6",
-              title: "Stakeholder (Mitchell Salience Model)",
-              method: "Mitchell, Agle & Wood (1997) Stakeholder Salience",
-              desc: de
-                ? "Einfluss-Mapping nach Power/Legitimacy/Urgency. Identifiziert dominante, abhaengige und fordernde Stakeholder. Anwendung: Change Management, Policy-Analyse."
-                : "Influence mapping by Power/Legitimacy/Urgency. Identifies dominant, dependent and demanding stakeholders. Applied to: change management, policy analysis.",
-            },
-          ].map((fw) => (
-            <div
-              key={fw.num}
-              style={{
-                display: "flex",
-                gap: 14,
-                alignItems: "flex-start",
-                marginBottom: 12,
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border, #E8E8E8)",
-              }}
-            >
-              <span
-                style={{
-                  flexShrink: 0,
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: "var(--color-lime, #E4FF97)",
-                  color: "var(--color-brand-text, #0A0A0A)",
-                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {fw.num}
-              </span>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{fw.title}</div>
-                <div style={{ fontSize: 11, fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", color: "var(--color-text-muted, #6B6B6B)", marginBottom: 4 }}>{fw.method}</div>
-                <div style={{ fontSize: 13, color: "var(--color-text-muted, #6B6B6B)" }}>{fw.desc}</div>
-              </div>
-            </div>
-          ))}
-        </CollapsibleSection>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={40} variant="lime" size="sm" />
+                    <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={102} size="sm" />
+                    <VoltStat label={de ? "Regulierungen" : "Regulations"} value={15} size="sm" />
+                    <VoltStat label={de ? "Quellen" : "Sources"} value="42+" size="sm" />
+                  </div>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 7: Knowledge Base
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="07"
-          title={de ? "Wissensbasis (Trends, Kausalgraph, Regulierungen)" : "Knowledge Base (Trends, Causal Graph, Regulations)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Die statische Wissensbasis wird bei jedem Query in den System-Prompt eingespeist. Sie basiert auf 6 autoritativen Quellen: Zukunftsinstitut (11 Megatrends), PwC (5 Megatrends), EY (Megatrends 2026+), EU ESPAS (Global Trends to 2030), Roland Berger (Trend Compendium 2050), TRENDONE (Trend Universe 2026)."
-              : "The static knowledge base is fed into the system prompt on every query. It is based on 6 authoritative sources: Zukunftsinstitut (11 Megatrends), PwC (5 Megatrends), EY (Megatrends 2026+), EU ESPAS (Global Trends to 2030), Roland Berger (Trend Compendium 2050), TRENDONE (Trend Universe 2026)."}
-          </p>
+                  <VoltSeparator />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
-            {[
-              { label: de ? "Kuratierte Trends" : "Curated Trends", value: "40", desc: de ? "Top 40 nach Relevanz" : "Top 40 by relevance" },
-              { label: de ? "Kausale Kanten" : "Causal Edges", value: "102", desc: "drives | amplifies | dampens | correlates" },
-              { label: de ? "Regulierungen" : "Regulations", value: "15", desc: de ? "4 Jurisdiktionen" : "4 jurisdictions" },
-              { label: de ? "Quellen-Institutionen" : "Source Institutions", value: "42+", desc: de ? "Forschungseinrichtungen" : "Research institutions" },
-            ].map((item) => (
-              <div key={item.label} style={{ padding: "12px 14px", borderRadius: 8, border: "1px solid var(--color-border, #E8E8E8)" }}>
-                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", color: "var(--color-text-heading, #0A0A0A)", marginBottom: 2 }}>{item.value}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading, #0A0A0A)", marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted, #6B6B6B)" }}>{item.desc}</div>
-              </div>
-            ))}
-          </div>
+                  <SubH>{de ? "Trend-Beispiele" : "Trend Examples"}</SubH>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        id: "mega-ai-transformation", name: "AI & Automation",
+                        desc: de ? "PwC: bis 2030 bis zu 15,7 Bio. USD. Treiber: sinkende Rechenkosten, multimodale Modelle, EU AI Act seit Aug 2024." : "PwC: up to 15.7T USD by 2030. Drivers: falling compute costs, multimodal models, EU AI Act since Aug 2024.",
+                        stats: "Rel:98% Conf:95% Imp:98% Ring:adopt Velocity:rising",
+                      },
+                      {
+                        id: "mega-climate-sustainability", name: "Climate & Sustainability",
+                        desc: de ? "IPCC AR6: 1,1 Grad. EU Green Deal: Klimaneutralität 2050, -55% bis 2030. 6/6 Quellen (höchste Confidence)." : "IPCC AR6: 1.1 degree. EU Green Deal: climate neutrality 2050, -55% by 2030. 6/6 sources (highest confidence).",
+                        stats: "Rel:96% Conf:100% Imp:97% Ring:adopt Velocity:rising",
+                      },
+                      {
+                        id: "mega-geopolitical-fracturing", name: "Geopolitical Fragmentation",
+                        desc: de ? "PwC: 'Fracturing World'. Tech/Handels/Finanzräume fragmentieren. EU: strategische Autonomie." : "PwC: 'Fracturing World'. Tech/trade/financial fragmentation. EU: strategic autonomy.",
+                        stats: "Rel:85% Conf:83% Imp:88% Ring:adopt Velocity:rising",
+                      },
+                      {
+                        id: "mega-demographic-shift", name: "Demographic Shifts & Aging",
+                        desc: de ? "UN 2024: 65+ global 10% -> 16% (2050). EU-Dependency-Ratio 33% -> >50%." : "UN 2024: 65+ globally 10% -> 16% (2050). EU dependency ratio 33% -> >50%.",
+                        stats: "Rel:88% Conf:83% Imp:90% Ring:adopt Velocity:stable",
+                      },
+                    ].map((t) => (
+                      <div key={t.id} className="p-3 rounded-lg" style={{ border: "1px solid var(--color-border, #E8E8E8)" }}>
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <Code>{t.id}</Code>
+                          <span className="text-sm font-bold" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>{t.name}</span>
+                        </div>
+                        <p className="text-[12px] mb-1.5" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{t.desc}</p>
+                        <p className="font-mono text-[11px]" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{t.stats}</p>
+                      </div>
+                    ))}
+                  </div>
 
-          <SubH>{de ? "Trend-Beispiele (aus mega-trends.ts)" : "Trend Examples (from mega-trends.ts)"}</SubH>
-          {[
-            {
-              id: "mega-ai-transformation",
-              name: "Artificial Intelligence & Automation",
-              desc: de
-                ? "KI durchdringt alle Wirtschaftssektoren. PwC (2024): bis 2030 bis zu 15,7 Bio. USD Wertschoepfung. Treiber: sinkende Rechenkosten, multimodale Modelle, EU AI Act seit Aug 2024. Confidence: 0.95 (5/6 Quellen)."
-                : "AI permeates all economic sectors. PwC (2024): up to 15.7T USD value by 2030. Drivers: falling compute costs, multimodal models, EU AI Act since Aug 2024. Confidence: 0.95 (5/6 sources).",
-              stats: "Rel:98% Conf:95% Imp:98% Ring:adopt Velocity:rising Signals:500",
-            },
-            {
-              id: "mega-climate-sustainability",
-              name: "Climate Change & Sustainability",
-              desc: de
-                ? "IPCC AR6: 1,1 Grad Erwaermung. EU Green Deal: Klimaneutralitaet 2050, -55% bis 2030. 6/6 Quellen stuetzen diesen Trend (hoechste Confidence aller Trends)."
-                : "IPCC AR6: 1.1 degree warming. EU Green Deal: climate neutrality 2050, -55% by 2030. 6/6 sources support this trend (highest confidence of all trends).",
-              stats: "Rel:96% Conf:100% Imp:97% Ring:adopt Velocity:rising Signals:450",
-            },
-            {
-              id: "mega-geopolitical-fracturing",
-              name: "Geopolitical Fragmentation",
-              desc: de
-                ? "PwC: 'Fracturing World'. Tech-, Handels- und Finanzraeume fragmentieren entlang geopolitischer Linien. EU: strategische Autonomie in Halbleitern, Energie, Rohstoffen. Treiber: Ukraine, Indo-Pazifik, US-China."
-                : "PwC: 'Fracturing World'. Tech, trade and financial spaces fragment along geopolitical lines. EU: strategic autonomy in semiconductors, energy, raw materials. Drivers: Ukraine, Indo-Pacific, US-China.",
-              stats: "Rel:85% Conf:83% Imp:88% Ring:adopt Velocity:rising Signals:250",
-            },
-            {
-              id: "mega-demographic-shift",
-              name: "Demographic Shifts & Aging",
-              desc: de
-                ? "UN 2024: Anteil 65+ global von 10% (2022) auf 16% (2050). EU-Dependency-Ratio: 33% auf >50%. Silver Economy waechst, aber Pflegekosten und Fachkraeftemangel steigen."
-                : "UN 2024: share 65+ globally from 10% (2022) to 16% (2050). EU dependency ratio: 33% to >50%. Silver economy grows, but care costs and skills shortages increase.",
-              stats: "Rel:88% Conf:83% Imp:90% Ring:adopt Velocity:stable Signals:300",
-            },
-          ].map((t) => (
-            <div key={t.id} style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid var(--color-border, #E8E8E8)", marginBottom: 8 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 4 }}>
-                <Code>{t.id}</Code>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</span>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 4 }}>{t.desc}</div>
-              <div style={{ fontSize: 11, fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", color: "var(--color-text-muted, #6B6B6B)" }}>{t.stats}</div>
-            </div>
-          ))}
+                  <VoltSeparator />
 
-          <SubH>{de ? "Kausale Kanten (Beispiele aus causal-graph.ts)" : "Causal Edges (Examples from causal-graph.ts)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "102 handkuratierte Ursache-Wirkungs-Beziehungen. 4 Kantentypen: drives, amplifies, dampens, correlates. Staerke: 0-1."
-              : "102 hand-curated cause-effect relationships. 4 edge types: drives, amplifies, dampens, correlates. Strength: 0-1."}
-          </p>
-          <MonoBlock>
-{`mega-climate-sustainability --drives(95%)--> mega-energy-transition
-  "Climate urgency accelerates energy transition"
+                  <SubH>{de ? "Kausale Kanten (102, aus causal-graph.ts)" : "Causal Edges (102, from causal-graph.ts)"}</SubH>
+                  <p className="text-[13px] mb-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "4 Kantentypen: drives, amplifies, dampens, correlates. Stärke: 0-1."
+                      : "4 edge types: drives, amplifies, dampens, correlates. Strength: 0-1."}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Causal Edges"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="240px"
+                    lines={[
+                      L("mega-climate --drives(95%)--> mega-energy-transition", "success"),
+                      L("  \"Climate urgency accelerates energy transition\"", "comment"),
+                      L(""),
+                      L("mega-ai --drives(95%)--> mega-future-of-work", "success"),
+                      L("  \"AI reshapes jobs, skills, and work models\"", "comment"),
+                      L(""),
+                      L("mega-ai --amplifies(98%)--> macro-generative-ai", "info"),
+                      L("  \"AI research produces generative AI capabilities\"", "comment"),
+                      L(""),
+                      L("mega-geopolitical --dampens(70%)--> mega-connectivity", "error"),
+                      L("  \"Fragmentation leads to splinternet, tech decoupling\"", "comment"),
+                      L(""),
+                      L("mega-demographic --drives(90%)--> mega-health-biotech", "success"),
+                      L("  \"Aging populations drive healthcare innovation\"", "comment"),
+                      L(""),
+                      L("mega-ai --drives(80%)--> mega-security-trust", "warning"),
+                      L("  \"AI creates new attack vectors and defense needs\"", "comment"),
+                    ]}
+                  />
 
-mega-ai-transformation --drives(95%)--> mega-future-of-work
-  "AI fundamentally reshapes jobs, skills, and work models"
+                  <VoltSeparator />
 
-mega-ai-transformation --amplifies(98%)--> macro-generative-ai
-  "AI research directly produces generative AI capabilities"
+                  <SubH>{de ? "Regulatorische Frameworks (15)" : "Regulatory Frameworks (15)"}</SubH>
+                  <div className="overflow-x-auto">
+                    <VoltTableRoot>
+                      <VoltTableHeader>
+                        <VoltTableRow>
+                          <VoltTableHead>Name</VoltTableHead>
+                          <VoltTableHead>{de ? "Jurisdiktion" : "Jurisdiction"}</VoltTableHead>
+                          <VoltTableHead>Status</VoltTableHead>
+                          <VoltTableHead>{de ? "Beschreibung" : "Description"}</VoltTableHead>
+                        </VoltTableRow>
+                      </VoltTableHeader>
+                      <VoltTableBody>
+                        {[
+                          { name: "AI Act", j: "EU", s: "enforcing", d: de ? "Weltweit erste umfassende KI-Regulierung (seit 08/2024)" : "World's first comprehensive AI regulation (since 08/2024)" },
+                          { name: "GDPR", j: "EU", s: "enforcing", d: de ? "Datenschutz-Grundverordnung (seit 05/2018), extraterritorial" : "General Data Protection Regulation (since 05/2018), extraterritorial" },
+                          { name: "DORA", j: "EU", s: "enforcing", d: de ? "IKT-Risikomanagement für Finanzsektor (seit 01/2025)" : "ICT risk management for financial sector (since 01/2025)" },
+                          { name: "NIS2", j: "EU", s: "enforcing", d: de ? "Cybersicherheit für kritische Infrastruktur (seit 10/2024)" : "Cybersecurity for critical infrastructure (since 10/2024)" },
+                          { name: "Green Deal", j: "EU", s: "enforcing", d: de ? "Klimaneutralität 2050, -55% bis 2030, CBAM, ETS" : "Climate neutrality 2050, -55% by 2030, CBAM, ETS" },
+                          { name: "DMA/DSA", j: "EU", s: "enforcing", d: de ? "Platform-Regulierung, Gatekeeper (seit 11/2023)" : "Platform regulation, gatekeeper (since 11/2023)" },
+                          { name: "CSRD", j: "EU", s: "enforcing", d: de ? "Nachhaltigkeitsberichterstattung, ~50.000 Unternehmen" : "Sustainability reporting, ~50,000 companies" },
+                          { name: "AI EO", j: "US", s: "enforcing", d: de ? "Executive Order KI-Sicherheit (seit 10/2023)" : "Executive Order on AI safety (since 10/2023)" },
+                          { name: "CHIPS Act", j: "US", s: "enforcing", d: de ? "$280B Halbleiter, Reshoring, Exportkontrollen" : "$280B semiconductors, reshoring, export controls" },
+                          { name: "IRA", j: "US", s: "enforcing", d: de ? "$370B Clean Energy, EV/Solar/Wind Tax Credits" : "$370B clean energy, EV/solar/wind tax credits" },
+                          { name: "CN AI Gov", j: "China", s: "enforcing", d: de ? "KI-Regulierung, Algorithmen-Regeln, Deepfake-Regeln" : "AI regulation, algorithm rules, deepfake rules" },
+                          { name: "DSL/PIPL", j: "China", s: "enforcing", d: de ? "Datenlokalisierung, Chinas GDPR" : "Data localization, China's GDPR" },
+                          { name: "UK AI", j: "UK", s: "adopted", d: de ? "Pro-Innovation, sektorspezifisch" : "Pro-innovation, sector-specific" },
+                          { name: "OSA", j: "UK", s: "enforcing", d: de ? "Online-Sicherheit, Altersverifikation" : "Online safety, age verification" },
+                          { name: "SDGs", j: "Global", s: "enforcing", d: de ? "UN 17 Nachhaltigkeitsziele 2030" : "UN 17 SDGs 2030" },
+                          { name: "Paris", j: "Global", s: "enforcing", d: de ? "Klimaabkommen: 1,5-Grad-Ziel" : "Climate Agreement: 1.5 degree target" },
+                          { name: "Basel III", j: "Global", s: "enforcing", d: de ? "Bankenregulierung: Eigenkapital, Stresstests" : "Banking regulation: capital adequacy, stress testing" },
+                        ].map((r) => (
+                          <VoltTableRow key={r.name}>
+                            <VoltTableCell><Code>{r.name}</Code></VoltTableCell>
+                            <VoltTableCell className="text-xs">{r.j}</VoltTableCell>
+                            <VoltTableCell>
+                              <VoltBadge variant={r.s === "enforcing" ? "positive" : "blue"} size="sm">{r.s}</VoltBadge>
+                            </VoltTableCell>
+                            <VoltTableCell className="text-xs">{r.d}</VoltTableCell>
+                          </VoltTableRow>
+                        ))}
+                      </VoltTableBody>
+                    </VoltTableRoot>
+                  </div>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-mega-geopolitical-fracturing --dampens(70%)--> mega-connectivity
-  "Fragmentation leads to internet splinternet, tech decoupling"
+            {/* ══════════════════════════════════════════════════
+                08 — SCORING & CONFIDENCE
+                ══════════════════════════════════════════════════ */}
+            <section id="scoring" className="scroll-mt-20">
+              <SectionHeading num="08">
+                {de ? "Scoring & Konfidenz-Berechnung" : "Scoring & Confidence Calculation"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Das System berechnet Konfidenz-Scores auf zwei unabhängigen Pfaden und kombiniert sie. Quellcode: scoring.ts, intelligence-engine.ts, validation.ts"
+                      : "The system computes confidence on two independent paths and combines them. Source: scoring.ts, intelligence-engine.ts, validation.ts"}
+                  </p>
 
-mega-demographic-shift --drives(90%)--> mega-health-biotech
-  "Aging populations drive healthcare innovation demand"
+                  <SubH>{de ? "Quellen-Gewichtungen" : "Source Weights"}</SubH>
+                  <VoltTerminalStatic
+                    title="scoring.ts"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="150px"
+                    lines={[
+                      L("DEFAULT_SOURCE_WEIGHTS:", "comment"),
+                      L("  google_trends: 1.0   hackernews: 1.0   github:  1.0"),
+                      L("  arxiv:         0.7   news:       0.9   reddit:  0.8"),
+                      L("  stackoverflow: 0.7   npm_pypi:   0.6   product: 0.5"),
+                      L("  wikipedia:     0.4"),
+                      L(""),
+                      L("DEFAULT_DIMENSION_WEIGHTS:", "comment"),
+                      L("  relevance: 0.35  confidence: 0.25  impact: 0.25  recency: 0.15"),
+                      L("  TIME_DECAY_LAMBDA = 0.05  (Halbwertszeit ~14 Tage)", "info"),
+                    ]}
+                  />
 
-mega-connectivity --amplifies(80%)--> mega-ai-transformation
-  "Connected data fuels AI training and deployment"
+                  <VoltSeparator />
 
-mega-ai-transformation --drives(80%)--> mega-security-trust
-  "AI creates new attack vectors and defense needs" [bidirectional]`}
-          </MonoBlock>
+                  <SubH>{de ? "Synchrone Konfidenz-Formel" : "Synchronous Confidence Formula"}</SubH>
+                  <VoltTerminalStatic
+                    title="intelligence-engine.ts"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="200px"
+                    lines={[
+                      L("trendComponent  = log2(1 + matchedTrends) / log2(1 + 50) * 0.4"),
+                      L("sourceComponent = log2(1 + totalSources)  / log2(1 + 30) * 0.25"),
+                      L("signalComponent = (1 - 1/(1+0.005*sqrt(totalSignals))) * 0.3"),
+                      L(""),
+                      L("confidence = min(0.98, sum of all components)", "success"),
+                      L(""),
+                      L("// ~0.4 bei 50 Trends, ~0.25 bei 30 Quellen, ~0.3 bei ~500 Signalen", "comment"),
+                      L("// Erreicht ~0.95 nur mit umfassender Datenabdeckung", "comment"),
+                    ]}
+                  />
 
-          <SubH>{de ? "Regulatorische Frameworks (15, aus regulations.ts)" : "Regulatory Frameworks (15, from regulations.ts)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 12 }}>
-            {de
-              ? "Alle erfassten Regulierungen nach Jurisdiktion, mit Status und Wirkung auf Trends:"
-              : "All tracked regulations by jurisdiction, with status and impact on trends:"}
-          </p>
+                  <VoltSeparator />
 
-          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 6, textTransform: "uppercase" as const }}>EU (7)</div>
-          <RegRow shortName="AI Act" jurisdiction="EU" status="enforcing" desc={de ? "Weltweit erste umfassende KI-Regulierung (seit 08/2024). Risikobasiert." : "World's first comprehensive AI regulation (since 08/2024). Risk-based."} />
-          <RegRow shortName="GDPR" jurisdiction="EU" status="enforcing" desc={de ? "Datenschutz-Grundverordnung (seit 05/2018). Extraterritorial." : "General Data Protection Regulation (since 05/2018). Extraterritorial."} />
-          <RegRow shortName="DORA" jurisdiction="EU" status="enforcing" desc={de ? "IKT-Risikomanagement fuer Finanzsektor (seit 01/2025)." : "ICT risk management for financial sector (since 01/2025)."} />
-          <RegRow shortName="NIS2" jurisdiction="EU" status="enforcing" desc={de ? "Cybersicherheit fuer kritische Infrastruktur (seit 10/2024)." : "Cybersecurity for critical infrastructure (since 10/2024)."} />
-          <RegRow shortName="Green Deal" jurisdiction="EU" status="enforcing" desc={de ? "Klimaneutralitaet 2050, -55% bis 2030, CBAM, ETS." : "Climate neutrality 2050, -55% by 2030, CBAM, ETS."} />
-          <RegRow shortName="DMA/DSA" jurisdiction="EU" status="enforcing" desc={de ? "Platform-Regulierung, Gatekeeper, Interoperabilitaet (seit 11/2023)." : "Platform regulation, gatekeeper, interoperability (since 11/2023)."} />
-          <RegRow shortName="CSRD" jurisdiction="EU" status="enforcing" desc={de ? "Nachhaltigkeitsberichterstattung, ~50.000 Unternehmen (seit 01/2024)." : "Sustainability reporting, ~50,000 companies (since 01/2024)."} />
+                  <SubH>{de ? "Blended Confidence (VAL-03)" : "Blended Confidence (VAL-03)"}</SubH>
+                  <VoltTerminalStatic
+                    title="validation.ts"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="220px"
+                    lines={[
+                      L("// Server-Evidenz-Score:", "comment"),
+                      L("trendComp  = log2(1 + matchedTrendCount) / log2(1+50) * 0.35"),
+                      L("sourceComp = log2(1 + sourceCount)       / log2(1+30) * 0.25"),
+                      L("signalComp = (1 - 1/(1+0.005*sqrt(signalCount)))      * 0.25"),
+                      L("refComp    = hasReferences ? 0.15 : 0"),
+                      L("serverScore = min(0.95, sum of all components)"),
+                      L(""),
+                      L("// Blended:", "comment"),
+                      L("blended = 0.6 * serverScore + 0.4 * llmConfidence", "success"),
+                      L("result  = min(0.98, max(0.05, blended))", "success"),
+                      L("// Auf 2 Dezimalstellen gerundet", "comment"),
+                    ]}
+                  />
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 6, marginTop: 12, textTransform: "uppercase" as const }}>US (3)</div>
-          <RegRow shortName="AI EO" jurisdiction="US" status="enforcing" desc={de ? "Executive Order KI-Sicherheit, Safety Testing (seit 10/2023)." : "Executive Order on AI safety, safety testing (since 10/2023)."} />
-          <RegRow shortName="CHIPS Act" jurisdiction="US" status="enforcing" desc={de ? "$280B fuer Halbleiter, Reshoring, Exportkontrollen China." : "$280B for semiconductors, reshoring, China export controls."} />
-          <RegRow shortName="IRA" jurisdiction="US" status="enforcing" desc={de ? "$370B Clean Energy, EV/Solar/Wind Tax Credits." : "$370B clean energy, EV/solar/wind tax credits."} />
-
-          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 6, marginTop: 12, textTransform: "uppercase" as const }}>China (2)</div>
-          <RegRow shortName="CN AI Gov" jurisdiction="China" status="enforcing" desc={de ? "KI-Regulierung, Algorithmen-Regeln, Deepfake-Regeln." : "AI regulation, algorithm rules, deepfake rules."} />
-          <RegRow shortName="DSL/PIPL" jurisdiction="China" status="enforcing" desc={de ? "Datenlokalisierung, Cross-Border-Beschraenkungen. Chinas GDPR." : "Data localization, cross-border restrictions. China's GDPR."} />
-
-          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 6, marginTop: 12, textTransform: "uppercase" as const }}>UK (2)</div>
-          <RegRow shortName="UK AI" jurisdiction="UK" status="adopted" desc={de ? "Pro-Innovation, sektorspezifisch, ohne horizontale Gesetzgebung." : "Pro-innovation, sector-specific, without horizontal legislation."} />
-          <RegRow shortName="OSA" jurisdiction="UK" status="enforcing" desc={de ? "Online-Sicherheit, Altersverifikation, Inhaltsmoderation." : "Online safety, age verification, content moderation."} />
-
-          <div style={{ fontWeight: 700, fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", marginBottom: 6, marginTop: 12, textTransform: "uppercase" as const }}>Global (3)</div>
-          <RegRow shortName="SDGs" jurisdiction="Global" status="enforcing" desc={de ? "UN 17 Ziele fuer nachhaltige Entwicklung 2030." : "UN 17 Sustainable Development Goals 2030."} />
-          <RegRow shortName="Paris" jurisdiction="Global" status="enforcing" desc={de ? "Pariser Klimaabkommen: 1,5-Grad-Ziel, NDCs." : "Paris Climate Agreement: 1.5 degree target, NDCs."} />
-          <RegRow shortName="Basel III" jurisdiction="Global" status="enforcing" desc={de ? "Bankenregulierung: Eigenkapital, Stresstests." : "Banking regulation: capital adequacy, stress testing."} />
-        </CollapsibleSection>
-
-        {/* ══════════════════════════════════════════════════════
-            SECTION 8: Scoring & Confidence
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="08"
-          title={de ? "Scoring & Konfidenz-Berechnung" : "Scoring & Confidence Calculation"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Das System berechnet Konfidenz-Scores auf zwei unabhaengigen Pfaden und kombiniert sie zu einem Blended Score. Quellcode: scoring.ts, intelligence-engine.ts, validation.ts"
-              : "The system computes confidence scores on two independent paths and combines them into a blended score. Source: scoring.ts, intelligence-engine.ts, validation.ts"}
-          </p>
-
-          <SubH>{de ? "Quellen-Gewichtungen (scoring.ts)" : "Source Weights (scoring.ts)"}</SubH>
-          <MonoBlock>
-{`DEFAULT_SOURCE_WEIGHTS:
-  google_trends:   1.0    hackernews:    1.0    github:       1.0
-  arxiv:           0.7    news:          0.9    reddit:        0.8
-  stackoverflow:   0.7    npm_pypi:      0.6    producthunt:   0.5
-  wikipedia:       0.4`}
-          </MonoBlock>
-
-          <SubH>{de ? "Dimensions-Gewichtungen (scoring.ts)" : "Dimension Weights (scoring.ts)"}</SubH>
-          <MonoBlock>
-{`DEFAULT_DIMENSION_WEIGHTS:
-  relevance:    0.35     (35%)
-  confidence:   0.25     (25%)
-  impact:       0.25     (25%)
-  recency:      0.15     (15%)
-
-TIME_DECAY_LAMBDA = 0.05  (Halbwertszeit ~14 Tage)`}
-          </MonoBlock>
-
-          <SubH>{de ? "Synchrone Konfidenz-Formel (intelligence-engine.ts)" : "Synchronous Confidence Formula (intelligence-engine.ts)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Wenn die LLM-API nicht verfuegbar ist, berechnet der synchrone Pfad eine rein evidenzbasierte Konfidenz:"
-              : "When the LLM API is unavailable, the synchronous path computes a purely evidence-based confidence:"}
-          </p>
-          <MonoBlock>
-{`trendComponent  = log2(1 + matchedTrends) / log2(1 + 50) * 0.4
-sourceComponent = log2(1 + totalSources)  / log2(1 + 30) * 0.25
-signalComponent = (1 - 1/(1 + 0.005 * sqrt(totalSignals))) * 0.3
-
-confidence = min(0.98, trendComponent + sourceComponent + signalComponent)
-
-// Saettigungsverhalten:
-// ~0.4 bei 50 Trends, ~0.25 bei 30 Quellen, ~0.3 bei ~500 Signalen
-// Erreicht ~0.95 nur mit umfassender Datenabdeckung`}
-          </MonoBlock>
-
-          <SubH>{de ? "Blended Confidence (VAL-03, validation.ts)" : "Blended Confidence (VAL-03, validation.ts)"}</SubH>
-          <p style={{ fontSize: 13, marginBottom: 8 }}>
-            {de
-              ? "Der finale Score kombiniert Server-Evidenz (objektiv) mit der LLM-Selbsteinschaetzung (subjektiv):"
-              : "The final score combines server evidence (objective) with the LLM self-assessment (subjective):"}
-          </p>
-          <MonoBlock>
-{`// Server-Evidenz-Score (gleiche Formel wie synchroner Pfad):
-trendComponent  = log2(1 + matchedTrendCount) / log2(1 + 50) * 0.35
-sourceComponent = log2(1 + sourceCount)        / log2(1 + 30) * 0.25
-signalComponent = (1 - 1/(1 + 0.005 * sqrt(signalCount)))    * 0.25
-refComponent    = hasReferences ? 0.15 : 0
-serverScore = min(0.95, sum of all components)
-
-// Blended Confidence:
-blended = 0.6 * serverScore + 0.4 * llmConfidence
-
-// Clamping:
-result = min(0.98, max(0.05, blended))
-// Auf 2 Dezimalstellen gerundet`}
-          </MonoBlock>
-        </CollapsibleSection>
-
-        {/* ══════════════════════════════════════════════════════
-            SECTION 9: Output Structure
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="09"
-          title={de ? "Ausgabestruktur (vollstaendiges JSON-Schema)" : "Output Structure (Complete JSON Schema)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Die strukturierte JSON-Antwort, die das System nach Validierung und Augmentation an den Client liefert. Alle Felder sind per Zod typsicher geprueft."
-              : "The structured JSON response the system delivers to the client after validation and augmentation. All fields are type-checked via Zod."}
-          </p>
-
-          <MonoBlock>
-{`{
-  // ── Kern-Analyse ──────────────────────────────────────────
-  "synthesis": string,         // 6-10 Saetze, min 1 char, max 10.000
-  "reasoningChains": string[], // Kausale Ketten, max 10 items
-  "steepV": {                  // STEEP+V Analyse (nullable)
-    "S": string|null,          // Society, max 1000 chars
-    "T": string|null,          // Technology
-    "E_economy": string|null,  // Economy
-    "E_environment": string|null, // Environment
-    "P": string|null,          // Politics
-    "V": string|null           // Values
+            {/* ══════════════════════════════════════════════════
+                09 — OUTPUT STRUCTURE
+                ══════════════════════════════════════════════════ */}
+            <section id="output" className="scroll-mt-20">
+              <SectionHeading num="09">
+                {de ? "Ausgabestruktur (vollständiges JSON-Schema)" : "Output Structure (Complete JSON Schema)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-4 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Die strukturierte JSON-Antwort nach Validierung und Augmentation. Alle Felder per Zod typsicher geprüft."
+                      : "The structured JSON response after validation and augmentation. All fields type-checked via Zod."}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Response Schema"
+                    variant="dark"
+                    maxHeight="600px"
+                    lines={tl(
+`{
+  // Kern-Analyse
+  "synthesis": string,           // 6-10 Saetze, max 10.000
+  "reasoningChains": string[],   // Kausale Ketten, max 10
+  "steepV": {                    // STEEP+V (nullable)
+    "S": string|null,            // Society, max 1000
+    "T": string|null,            // Technology
+    "E_economy": string|null,    // Economy
+    "E_environment": string|null,// Environment
+    "P": string|null,            // Politics
+    "V": string|null             // Values
   },
 
-  // ── Trend-Matching ────────────────────────────────────────
-  "matchedTrendIds": string[], // Verifizierte IDs, max 40
-  "matchedTrends": [{          // Augmentiert: Details pro Trend
+  // Trend-Matching
+  "matchedTrendIds": string[],   // Verifizierte IDs, max 40
+  "matchedTrends": [{            // Augmentiert
     "id", "name", "category", "tags", "relevance",
     "confidence", "impact", "velocity", "ring", "signalCount"
   }],
-  "matchedEdges": [{           // Augmentiert: Kausale Kanten
+  "matchedEdges": [{             // Kausale Kanten
     "from", "to", "type", "strength", "description"
   }],
 
-  // ── Erkenntnisse ──────────────────────────────────────────
-  "keyInsights": string[],     // 3-5 Kern-Erkenntnisse, max 10
-  "regulatoryContext": string[], // Regulatorischer Kontext
-  "causalAnalysis": string[],  // Ursache-Wirkung
+  // Erkenntnisse
+  "keyInsights": string[],       // 3-5, max 10
+  "regulatoryContext": string[],
+  "causalAnalysis": string[],
 
-  // ── Szenarien ─────────────────────────────────────────────
+  // Szenarien (IMMER genau 3)
   "scenarios": [{
     "type": "optimistic"|"baseline"|"pessimistic",
-    "name": string,            // max 200, max 5 Woerter
-    "description": string,     // max 2000, mind. 2 Saetze
-    "probability": number,     // 0-1, Summe ~1.0
-    "timeframe": string,       // Konkreter Zeitraum
-    "keyDrivers": string[]     // max 10 Treiber
-  }],  // IMMER genau 3
+    "name": string,              // max 200, max 5 Woerter
+    "description": string,       // max 2000, mind. 2 Saetze
+    "probability": number,       // 0-1, Summe ~1.0
+    "timeframe": string,
+    "keyDrivers": string[]       // max 10
+  }],
 
-  // ── Strategische Einordnung ───────────────────────────────
-  "interpretation": string|null,     // max 3000
-  "decisionFramework": string|null,  // 3-5 Punkte
-  "newsContext": string|null,        // max 3000
+  // Strategische Einordnung
+  "interpretation": string|null,
+  "decisionFramework": string|null,
+  "newsContext": string|null,
 
-  // ── Quellen & Evidenz ─────────────────────────────────────
-  "references": [{
-    "title": string,           // max 500
-    "url": string,             // max 2000, http/https only
-    "relevance": string        // Warum relevant
-  }],  // min 2, max 20
-
-  // ── Live-Signale ──────────────────────────────────────────
-  "usedSignals": [{            // Augmentiert: verwendete Signale
+  // Quellen & Evidenz
+  "references": [{               // min 2, max 20
+    "title": string,
+    "url": string,               // http/https only
+    "relevance": string
+  }],
+  "usedSignals": [{              // Augmentiert
     "source", "title", "url", "strength", "date"
   }],
 
-  // ── Folgefragen ───────────────────────────────────────────
-  "followUpQuestions": string[], // max 10, je max 500 chars
+  // Folgefragen
+  "followUpQuestions": string[], // max 10
 
-  // ── Balanced Scorecard (optional) ─────────────────────────
+  // Balanced Scorecard (optional)
   "balancedScorecard": {
-    "perspectives": [{         // 3-6 themenspezifische Dimensionen
-      "id": string,
-      "label": string,         // max 3 Woerter
-      "score": number,         // 0-1
+    "perspectives": [{           // 3-6 Dimensionen
+      "id", "label", "score": 0-1,
       "trend": "rising"|"stable"|"declining"|"uncertain",
-      "summary": string,       // max 1000
-      "keyFactors": string[],  // max 10
-      "connectedTrendIds": string[], // max 20
-      "impacts": { [perspId]: number } // -1 bis +1
+      "summary", "keyFactors", "connectedTrendIds",
+      "impacts": { [perspId]: -1 to +1 }
     }],
-    "overallReadiness": number, // 0-1
-    "criticalTension": string   // max 500
+    "overallReadiness": 0-1,
+    "criticalTension": string
   } | null,
 
-  // ── Konfidenz ─────────────────────────────────────────────
-  "confidence": number,        // 0.05-0.98, blended
+  // Konfidenz
+  "confidence": number,          // 0.05-0.98, blended
 
-  // ── Meta (augmentiert) ────────────────────────────────────
-  "_repaired": boolean,        // true wenn JSON repariert wurde
-  "_dataQualityWarnings": string[], // Frontend-Hinweise
-  "_validationWarnings": string[]   // Server-Log-Details
-}`}
-          </MonoBlock>
-        </CollapsibleSection>
+  // Meta
+  "_repaired": boolean,
+  "_dataQualityWarnings": string[],
+  "_validationWarnings": string[]
+}`
+                    )}
+                  />
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 10: Analyse-Pipeline (Schritt fuer Schritt)
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="10"
-          title={de ? "Analyse-Pipeline (vollstaendiger Ablauf)" : "Analysis Pipeline (Complete Flow)"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Der vollstaendige Ablauf von der Nutzereingabe bis zur validierten Antwort (route.ts):"
-              : "The complete flow from user input to validated answer (route.ts):"}
-          </p>
+            {/* ══════════════════════════════════════════════════
+                10 — ANALYSIS PIPELINE
+                ══════════════════════════════════════════════════ */}
+            <section id="pipeline" className="scroll-mt-20">
+              <SectionHeading num="10">
+                {de ? "Analyse-Pipeline (vollständiger Ablauf)" : "Analysis Pipeline (Complete Flow)"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="p-6">
+                  <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Der vollständige Ablauf von der Nutzereingabe bis zur validierten Antwort (route.ts):"
+                      : "The complete flow from user input to validated answer (route.ts):"}
+                  </p>
+                  <div className="relative">
+                    {pipelineSteps.map((step, i) => (
+                      <div key={step.num} className="flex gap-4 items-start relative">
+                        {/* Vertical connector line */}
+                        {i < pipelineSteps.length - 1 && (
+                          <div
+                            className="absolute left-[14px] top-8 w-px"
+                            style={{
+                              height: "calc(100% - 8px)",
+                              background: "var(--color-border, #E8E8E8)",
+                            }}
+                          />
+                        )}
+                        {/* Number circle */}
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-mono text-[11px] font-bold z-10"
+                          style={{ background: "#E4FF97", color: "#0A0A0A" }}
+                        >
+                          {step.num}
+                        </div>
+                        {/* Content */}
+                        <div className="pb-5 min-w-0">
+                          <div className="text-sm font-semibold" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                            {step.t}
+                          </div>
+                          {step.d && (
+                            <div className="text-[12px] mt-0.5 font-mono" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                              {step.d}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
 
-          <PipelineStep
-            num={1}
-            text={de ? "Authentifizierung" : "Authentication"}
-            detail={de
-              ? "requireAuth() -- Middleware + Route-Level (Defense-in-Depth)"
-              : "requireAuth() -- middleware + route-level (defense-in-depth)"}
-          />
-          <PipelineStep
-            num={2}
-            text={de ? "Rate Limiting" : "Rate Limiting"}
-            detail={de
-              ? "100 Requests/IP/Stunde, In-Memory Sliding Window"
-              : "100 requests/IP/hour, in-memory sliding window"}
-          />
-          <PipelineStep
-            num={3}
-            text={de ? "Input-Validierung & Sanitisierung" : "Input Validation & Sanitization"}
-            detail={de
-              ? "Max 2.000 Zeichen, 9 Injection-Patterns, XML-Tags, contextProfile (SEC-08)"
-              : "Max 2,000 chars, 9 injection patterns, XML tags, contextProfile (SEC-08)"}
-          />
-          <PipelineStep
-            num={4}
-            text={de ? "Trend-Laden aus SQLite" : "Load Trends from SQLite"}
-            detail={de
-              ? "trends-Tabelle, Fallback auf mega-trends.ts wenn DB nicht verfuegbar"
-              : "trends table, fallback to mega-trends.ts if DB unavailable"}
-          />
-          <PipelineStep
-            num={5}
-            text={de ? "Signal-Freshness-Check" : "Signal Freshness Check"}
-            detail={de
-              ? "Wenn neueste Signale > 6 Stunden alt -> Pipeline auto-refresh (fire-and-forget)"
-              : "If newest signals > 6 hours old -> pipeline auto-refresh (fire-and-forget)"}
-          />
-          <PipelineStep
-            num={6}
-            text={de ? "Signal-Retrieval (RAG)" : "Signal Retrieval (RAG)"}
-            detail={de
-              ? "getRelevantSignals(query, 12) -- Keyword-Matching, Cross-Language Aliases, Score >= 2"
-              : "getRelevantSignals(query, 12) -- keyword matching, cross-language aliases, score >= 2"}
-          />
-          <PipelineStep
-            num={7}
-            text={de ? "System-Prompt aufbauen" : "Build System Prompt"}
-            detail={de
-              ? "buildSystemPrompt() -- 40 Trends + 15 Regulierungen + 102 Kanten + Live-Signale + STEEP+V + PFLICHTEN + JSON-Schema"
-              : "buildSystemPrompt() -- 40 trends + 15 regulations + 102 edges + live signals + STEEP+V + PFLICHTEN + JSON schema"}
-          />
-          <PipelineStep
-            num={8}
-            text={de ? "previousContext aufbereiten (SEC-10)" : "Prepare previousContext (SEC-10)"}
-            detail={de
-              ? "Wenn Folge-Query: Synthesis auf 6.000 Zeichen begrenzen, sanitisieren, als Assistant-Message"
-              : "If follow-up query: truncate synthesis to 6,000 chars, sanitize, inject as assistant message"}
-          />
-          <PipelineStep
-            num={9}
-            text={de ? "LLM-Streaming via Anthropic API" : "LLM Streaming via Anthropic API"}
-            detail={de
-              ? "claude-sonnet-4-6, max_tokens: 12.000, SSE-Streaming, Retry bis 3x bei 429/529"
-              : "claude-sonnet-4-6, max_tokens: 12,000, SSE streaming, retry up to 3x on 429/529"}
-          />
-          <PipelineStep
-            num={10}
-            text={de ? "Synthese-Extraktion waehrend Streaming" : "Synthesis Extraction During Streaming"}
-            detail={de
-              ? "Progressive JSON-Parsing, Delta-Extraktion fuer Live-Anzeige"
-              : "Progressive JSON parsing, delta extraction for live display"}
-          />
-          <PipelineStep
-            num={11}
-            text={de ? "JSON-Extraktion (ggf. Reparatur)" : "JSON Extraction (with repair if needed)"}
-            detail={de
-              ? "extractJSON() -- Markdown-Fences entfernen, truncated JSON reparieren"
-              : "extractJSON() -- strip markdown fences, repair truncated JSON"}
-          />
-          <PipelineStep
-            num={12}
-            text={de ? "Zod-Validierung (VAL-01)" : "Zod Validation (VAL-01)"}
-            detail={de
-              ? "Alle Felder typsicher pruefen, bei Fehler: Partial-Extraction mit synthesis"
-              : "Type-check all fields, on error: partial extraction with synthesis"}
-          />
-          <PipelineStep
-            num={13}
-            text={de ? "matchedTrendIds-Verifikation (VAL-02)" : "matchedTrendIds Verification (VAL-02)"}
-            detail={de
-              ? "Halluzinierte IDs entfernen und loggen"
-              : "Remove and log hallucinated IDs"}
-          />
-          <PipelineStep
-            num={14}
-            text={de ? "Szenario-Normalisierung" : "Scenario Normalization"}
-            detail={de
-              ? "Nulls -> Defaults, Summe 0.8-1.1 akzeptabel, sonst normalisieren"
-              : "Nulls -> defaults, sum 0.8-1.1 acceptable, otherwise normalize"}
-          />
-          <PipelineStep
-            num={15}
-            text={de ? "Blended Confidence (VAL-03)" : "Blended Confidence (VAL-03)"}
-            detail="0.6 * serverScore + 0.4 * llmConfidence, clamped [0.05, 0.98]"
-          />
-          <PipelineStep
-            num={16}
-            text={de ? "Augmentation" : "Augmentation"}
-            detail={de
-              ? "matchedTrends-Details, kausale Kanten zwischen Matched Trends, Signal-Metadaten"
-              : "matchedTrends details, causal edges between matched trends, signal metadata"}
-          />
-          <PipelineStep
-            num={17}
-            text={de ? "Ergebnis an Client streamen" : "Stream Result to Client"}
-            detail={de
-              ? "SSE: { type: 'delta', text } waehrend Streaming, { type: 'complete', result } am Ende"
-              : "SSE: { type: 'delta', text } during streaming, { type: 'complete', result } at end"}
-          />
-        </CollapsibleSection>
+            {/* ══════════════════════════════════════════════════
+                11 — KNOWN LIMITATIONS
+                ══════════════════════════════════════════════════ */}
+            <section id="limitations" className="scroll-mt-20">
+              <SectionHeading num="11">
+                {de ? "Bekannte Einschränkungen" : "Known Limitations"}
+              </SectionHeading>
+              <VoltCard>
+                <VoltCardContent className="space-y-4 p-6">
+                  <p className="text-sm leading-relaxed mb-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Transparenz ueber die Grenzen des Systems (basierend auf Code-Review):"
+                      : "Transparency about the system's boundaries (based on code review):"}
+                  </p>
 
-        {/* ══════════════════════════════════════════════════════
-            SECTION 11: Known Limitations
-            ══════════════════════════════════════════════════════ */}
-        <CollapsibleSection
-          tag="11"
-          title={de ? "Bekannte Einschraenkungen" : "Known Limitations"}
-        >
-          <p style={{ marginBottom: 16 }}>
-            {de
-              ? "Transparenz ueber die Grenzen des Systems (basierend auf Code-Review):"
-              : "Transparency about the system's boundaries (based on code review):"}
-          </p>
+                  <div className="space-y-2">
+                    {[
+                      { de: "Signal-Retrieval ist keyword-basiert (kein semantisches/Embedding-basiertes Retrieval). Synonyme nur ueber die 9 Alias-Gruppen.", en: "Signal retrieval is keyword-based (no semantic/embedding retrieval). Synonyms only via 9 alias groups." },
+                      { de: "Signale sind Metadaten (Titel + max 200 Zeichen Snippet), keine vollständigen Artikel.", en: "Signals are metadata (title + max 200-char snippet), not full articles." },
+                      { de: "Confidence-Scores sind logarithmisch skalierte Approximationen, nicht statistische Konfidenzintervalle. Max 0.98.", en: "Confidence scores are log-scaled approximations, not statistical confidence intervals. Max 0.98." },
+                      { de: "Szenarien sind analytische Denkrahmen, keine Vorhersagen. Wahrscheinlichkeiten durch Server-Score kalibriert.", en: "Scenarios are analytical frames, not predictions. Probabilities calibrated by server score." },
+                      { de: "URLs können trotz Format-Validierung LLM-fabriziert sein. URL-Existenz wird nicht geprüft.", en: "URLs may be LLM-fabricated despite format validation. URL existence is not verified." },
+                      { de: "Stärkste Abdeckung: Technologie, Wirtschaft, Klima, Geopolitik, EU-Politik.", en: "Strongest coverage: Tech, Economy, Climate, Geopolitics, EU Policy." },
+                      { de: "Schwächste Abdeckung: Kultur, Sport, Unterhaltung, lokale/regionale Themen.", en: "Weakest coverage: Culture, Sports, Entertainment, local topics." },
+                      { de: "Einzelnes LLM (Claude claude-sonnet-4-6) -- keine modellübergreifende Verifikation.", en: "Single LLM (Claude claude-sonnet-4-6) -- no cross-model verification." },
+                      { de: "Rate Limiting In-Memory, resets bei Server-Neustart.", en: "Rate limiting in-memory, resets on server restart." },
+                      { de: "System-Prompt enthält nur Top 40 Trends.", en: "System prompt contains only top 40 trends." },
+                      { de: "Kausale Kanten (102) statisch kodiert. Kein UI zum Bearbeiten.", en: "Causal edges (102) statically coded. No edit UI." },
+                      { de: "previousContext: nur die letzte Frage/Antwort, kein Multi-Turn-Gedächtnis.", en: "previousContext: only last Q&A, no multi-turn memory." },
+                    ].map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-2.5 text-[13px] leading-relaxed"
+                        style={{ color: "var(--color-text-heading, #0A0A0A)" }}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-2"
+                          style={{ background: "var(--color-text-muted, #6B6B6B)" }}
+                        />
+                        <span>{de ? item.de : item.en}</span>
+                      </div>
+                    ))}
+                  </div>
 
-          {[
-            {
-              de: "Signal-Retrieval ist keyword-basiert (kein semantisches/Embedding-basiertes Retrieval). Synonyme werden nur ueber die 9 Alias-Gruppen abgedeckt.",
-              en: "Signal retrieval is keyword-based (no semantic/embedding-based retrieval). Synonyms are only covered via the 9 alias groups.",
-            },
-            {
-              de: "Signale sind Metadaten (Titel + max 200 Zeichen Content-Snippet), keine vollstaendigen Artikel. Das LLM erhaelt nur Schlagzeilen und Kurzauszuege.",
-              en: "Signals are metadata (title + max 200-char content snippet), not full articles. The LLM receives only headlines and short excerpts.",
-            },
-            {
-              de: "Confidence-Scores sind logarithmisch skalierte Approximationen (nicht statistische Konfidenzintervalle). Max-Wert ist auf 0.98 geclampt.",
-              en: "Confidence scores are logarithmically scaled approximations (not statistical confidence intervals). Max value is clamped at 0.98.",
-            },
-            {
-              de: "Szenarien sind analytische Denkrahmen, keine Vorhersagen. Wahrscheinlichkeiten sind LLM-Einschaetzungen, kalibriert durch den Server-Score.",
-              en: "Scenarios are analytical thinking frames, not predictions. Probabilities are LLM estimates, calibrated by the server score.",
-            },
-            {
-              de: "Referenzen und URLs koennen trotz Format-Validierung (http/https) LLM-fabriziert sein. URL-Existenz wird nicht geprueft.",
-              en: "References and URLs may be LLM-fabricated despite format validation (http/https). URL existence is not verified.",
-            },
-            {
-              de: "Staerkste Abdeckung: Technologie, Wirtschaft, Klima, Geopolitik, EU-Politik (aligned mit Quellen und Connectors).",
-              en: "Strongest coverage: Technology, Economy, Climate, Geopolitics, EU Policy (aligned with sources and connectors).",
-            },
-            {
-              de: "Schwaechste Abdeckung: Kultur, Sport, Unterhaltung, lokale/regionale Themen (wenige thematische Connectors).",
-              en: "Weakest coverage: Culture, Sports, Entertainment, local/regional topics (few thematic connectors).",
-            },
-            {
-              de: "Einzelnes LLM (Claude claude-sonnet-4-6) -- keine modelluebergreifende Verifikation oder Ensemble-Methode.",
-              en: "Single LLM (Claude claude-sonnet-4-6) -- no cross-model verification or ensemble method.",
-            },
-            {
-              de: "Rate Limiting ist In-Memory (nicht persistent). Resets bei Server-Neustart. Keine IP-uebergreifende Aggregation.",
-              en: "Rate limiting is in-memory (not persistent). Resets on server restart. No cross-IP aggregation.",
-            },
-            {
-              de: "Der System-Prompt enthaelt nur die Top 40 Trends (sortiert nach Relevanz). Trends ausserhalb der Top 40 werden dem LLM nicht gezeigt.",
-              en: "The system prompt contains only the top 40 trends (sorted by relevance). Trends outside the top 40 are not shown to the LLM.",
-            },
-            {
-              de: "Kausale Kanten (102) sind statisch kodiert. Analytiker koennen sie noch nicht ueber ein UI hinzufuegen/bearbeiten.",
-              en: "Causal edges (102) are statically coded. Analysts cannot add/edit them via a UI yet.",
-            },
-            {
-              de: "previousContext-Fenster: nur die letzte Frage/Antwort wird als Kontext weitergegeben, kein Multi-Turn-Gedaechtnis.",
-              en: "previousContext window: only the last question/answer is passed as context, no multi-turn memory.",
-            },
-          ].map((item, i) => (
+                  <VoltAlert variant="success" title={de ? "Design-Prinzip" : "Design Principle"}>
+                    {de
+                      ? "Transparenz über Unsicherheit ist wertvoller als falsche Präzision. Das System zeigt explizit an, worauf es sich stützt und wo die Grenzen liegen. Jede Aussage ist mit Provenienz-Tags ([SIGNAL], [TREND], [LLM-Einschätzung]) markiert."
+                      : "Transparency about uncertainty is more valuable than false precision. The system explicitly shows what it relies on and where boundaries are. Every statement is marked with provenance tags ([SIGNAL], [TREND], [LLM-Einschätzung])."}
+                  </VoltAlert>
+                </VoltCardContent>
+              </VoltCard>
+            </section>
+
+            {/* ── Footer ───────────────────────────────────────── */}
             <div
-              key={i}
+              className="mt-8 pt-5 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs font-mono"
               style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-                marginBottom: 8,
-                fontSize: 13,
+                borderTop: "1px solid var(--color-border, #E8E8E8)",
+                color: "var(--color-text-muted, #6B6B6B)",
               }}
             >
-              <span
-                style={{
-                  flexShrink: 0,
-                  marginTop: 3,
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "var(--color-text-muted, #6B6B6B)",
-                }}
-              />
-              <span>{de ? item.de : item.en}</span>
+              <span>Strategic Intelligence System</span>
+              <span>
+                {de
+                  ? "Alle Angaben aus dem Quellcode extrahiert"
+                  : "All claims extracted from source code"}
+              </span>
             </div>
-          ))}
-
-          <div
-            style={{
-              marginTop: 20,
-              padding: "12px 16px",
-              borderRadius: 8,
-              background: "rgba(228,255,151,0.2)",
-              border: "1px solid rgba(228,255,151,0.4)",
-              fontSize: 13,
-              lineHeight: 1.6,
-            }}
-          >
-            <strong>
-              {de ? "Design-Prinzip:" : "Design principle:"}
-            </strong>{" "}
-            {de
-              ? "Transparenz ueber Unsicherheit ist wertvoller als falsche Praezision. Das System zeigt explizit an, worauf es sich stuetzt und wo die Grenzen liegen. Jede Aussage ist mit Provenienz-Tags ([SIGNAL], [TREND], [LLM-Einschaetzung]) markiert."
-              : "Transparency about uncertainty is more valuable than false precision. The system explicitly shows what it relies on and where the boundaries are. Every statement is marked with provenance tags ([SIGNAL], [TREND], [LLM-Einschaetzung])."}
-          </div>
-        </CollapsibleSection>
-
-        {/* ── Footer ─────────────────────────────────────────── */}
-        <div
-          style={{
-            marginTop: 32,
-            paddingTop: 20,
-            borderTop: "1px solid var(--color-border, #E8E8E8)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: 12,
-            color: "var(--color-text-muted, #6B6B6B)",
-            fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-          }}
-        >
-          <span>
-            {de
-              ? "Strategic Intelligence System -- Technische Systemdokumentation"
-              : "Strategic Intelligence System -- Technical System Documentation"}
-          </span>
-          <span>
-            {de
-              ? "Alle Angaben aus dem Quellcode extrahiert"
-              : "All claims extracted from source code"}
-          </span>
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
