@@ -41,80 +41,10 @@ import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
 } from "lucide-react";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface UsedSignal {
-  source: string;
-  title: string;
-  url?: string;
-  strength?: number;
-  date?: string;
-}
-
-interface Scenario {
-  type?: "optimistic" | "baseline" | "pessimistic" | "wildcard";
-  name: string;
-  description: string;
-  probability: number;
-  timeframe?: string;
-  keyDrivers?: string[];
-}
-
-interface Reference {
-  title: string;
-  url: string;
-  relevance?: string;
-}
-
-interface MatchedTrend {
-  id: string;
-  name: string;
-  category: string;
-  tags: string[];
-  relevance: number;
-  confidence: number;
-  impact: number;
-  velocity: string;
-  ring: string;
-  signalCount: number;
-}
-
-interface MatchedEdge {
-  from: string;
-  to: string;
-  type: "drives" | "amplifies" | "dampens" | "correlates" | string;
-  strength: number;
-  description?: string;
-}
-
-interface DimensionEntry {
-  label: string;
-  key: "technology" | "society" | "market_economic" | "political_environment";
-  trends: MatchedTrend[];
-  avgConfidence: number;
-  direction: "up" | "down" | "neutral";
-  color: string;
-}
-
-interface QueryResult {
-  synthesis?: string;
-  reasoningChains?: string[];
-  matchedTrendIds?: string[];
-  keyInsights?: string[];
-  scenarios?: Scenario[];
-  decisionFramework?: string;
-  references?: Reference[];
-  followUpQuestions?: string[];
-  confidence?: number;
-  interpretation?: string;
-  newsContext?: string;
-  regulatoryContext?: string[];
-  causalAnalysis?: string[];
-  usedSignals?: UsedSignal[];
-  matchedTrends?: MatchedTrend[];
-  matchedEdges?: MatchedEdge[];
-}
+import type {
+  UsedSignal, Scenario, Reference, MatchedTrend,
+  MatchedEdge, DimensionEntry, QueryResult,
+} from "@/types";
 
 // ── Node Status ────────────────────────────────────────────────────────────
 

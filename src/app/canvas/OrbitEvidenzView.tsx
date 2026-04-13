@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import type { UsedSignal, MatchedEdge, QueryResult } from "@/types";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    OrbitEvidenzView — Evidence constellation for Canvas orbit mode
@@ -17,65 +18,19 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
    back to other canvas nodes, making them the new center.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-// ─── Types (subset of canvas page types) ────────────────────────────────────
-
-interface EvSignal {
-  source: string;
-  title: string;
-  url?: string;
-  strength?: number;
-  date?: string;
-}
-
-interface EvTrend {
-  id: string;
-  name: string;
-  category: string;
-  relevance: number;
-  confidence: number;
-  impact: number;
-}
-
-interface EvEdge {
-  from: string;
-  to: string;
-  type: string;
-  strength: number;
-  description?: string;
-}
-
-interface EvResult {
-  synthesis?: string;
-  reasoningChains?: string[];
-  keyInsights?: string[];
-  scenarios?: Array<{
-    name: string;
-    description: string;
-    probability: number;
-    keyDrivers?: string[];
-  }>;
-  decisionFramework?: string;
-  references?: Array<{ title: string; url: string; relevance?: string }>;
-  followUpQuestions?: string[];
-  usedSignals?: EvSignal[];
-  matchedTrends?: EvTrend[];
-  matchedEdges?: EvEdge[];
-  causalAnalysis?: string[];
-}
-
 /** Minimal canvas-node shape consumed by this component. */
 export interface EvCanvasNode {
   id: string;
   nodeType: string;
   createdAt: number;
   query?: string;
-  result?: EvResult | null;
+  result?: QueryResult | null;
   content?: string;
   label?: string;
   title?: string;
   parentId?: string;
-  sources?: EvSignal[];
-  causalEdges?: EvEdge[];
+  sources?: UsedSignal[];
+  causalEdges?: MatchedEdge[];
   causalTrendNames?: Record<string, string>;
   keyDrivers?: string[];
 }
@@ -156,7 +111,7 @@ function buildEvidenzGraph(
   const nextId = () => `ev-${seq++}`;
 
   // Resolve query result — either this node (if query) or its parent
-  let qr: EvResult | null = null;
+  let qr: QueryResult | null = null;
   let parentQuery: EvCanvasNode | null = null;
 
   if (cn.nodeType === "query") {

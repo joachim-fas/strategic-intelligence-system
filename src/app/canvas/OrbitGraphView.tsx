@@ -2,16 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
-
-// ─── Types (duplicated from page.tsx to keep file standalone) ─────────────────
-
-interface MatchedEdge {
-  from: string;
-  to: string;
-  type: "drives" | "amplifies" | "dampens" | "correlates" | string;
-  strength: number;
-  description?: string;
-}
+import type { MatchedEdge } from "@/types";
 
 interface OrbitNode {
   id: string;
