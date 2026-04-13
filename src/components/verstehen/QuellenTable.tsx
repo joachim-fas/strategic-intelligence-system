@@ -152,8 +152,8 @@ const DESCRIPTIONS: Record<string, { de: string; en: string; url?: string }> = {
 };
 
 // Grid column template shared by the header row and every data row.
-// Responsive: 3 essential columns on narrow viewports, all 5 on wide.
-const GRID_COLS = "minmax(200px, 1.4fr) minmax(140px, 0.7fr) 100px";
+// 3 columns: Source (flexible) | Category (flexible) | Status+Type (fixed, wide enough for two badges)
+const GRID_COLS = "minmax(200px, 1.4fr) minmax(140px, 0.7fr) minmax(200px, auto)";
 
 interface QuellenTableProps {
   de: boolean;
@@ -541,7 +541,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           style={{
             border: "1px solid var(--color-border)",
             borderRadius: 12,
-            overflow: "hidden",
+            overflow: "auto",
             background: "var(--card)",
           }}
         >
@@ -657,7 +657,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   </div>
 
                   {/* Col 3: Status + type */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", whiteSpace: "nowrap" }}>
                     <VoltStatusBadge kind={r.status} />
                     <VoltTypeBadge kind={r.type} />
                   </div>

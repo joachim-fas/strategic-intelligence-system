@@ -6,12 +6,6 @@
  * and JSON-parse on read.
  */
 
-// TODO: ARC-04 — SCHEMA SPLIT-BRAIN
-// PG schema (schema.ts) has: query_versions, scenario_alerts (not in SQLite)
-// SQLite schema (schema-sqlite.ts) has: project_notes, project_queries (not in PG)
-// Neither has: bsc_ratings, live_signals, og_image_cache, scenarios
-// FIX: Unify both schemas to have identical table sets.
-
 import {
   sqliteTable,
   text,
@@ -29,7 +23,9 @@ const nowDefault = sql`(datetime('now'))`;
 export const users = sqliteTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").unique().notNull(),
+  emailVerified: text("email_verified"),
   name: text("name"),
+  image: text("image"),
   role: text("role").default("member").notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
@@ -210,13 +206,6 @@ export const projectNotes = sqliteTable("project_notes", {
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
   updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
 });
-
-// TODO: DAT-16 — Shadow tables not in schema:
-// - bsc_ratings (created in bsc-ratings/route.ts)
-// - scenarios (created in scenarios/route.ts)
-// - live_signals (created in migrate-sqlite.ts)
-// - og_image_cache (created in migrate-sqlite.ts)
-// These should be defined here for Drizzle migration support.
 
 // ─── BSC Ratings ────────────────────────────────────────
 export const bscRatings = sqliteTable("bsc_ratings", {

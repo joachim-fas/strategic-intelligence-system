@@ -28,10 +28,18 @@ import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/componen
 import { OrbitGraphView } from "./OrbitGraphView";
 import { OrbitEvidenzView, type EvCanvasNode } from "./OrbitEvidenzView";
 import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
+import {
+  VoltDropdownMenu,
+  VoltDropdownMenuTrigger,
+  VoltDropdownMenuContent,
+  VoltDropdownMenuItem,
+  VoltDropdownMenuSeparator,
+  VoltDropdownMenuLabel,
+} from "@/components/volt/VoltDropdownMenu";
 import { useLocale } from "@/lib/locale-context";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
-  TreePine, Tag, Layers, X, Group,
+  TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1680,11 +1688,141 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
   );
 }
 
+// ── TagInlineInput (reusable inline tag adder for detail panels) ─────────
+
+function TagInlineInput({ nodeId, de, onAddTag }: { nodeId: string; de: boolean; onAddTag: (id: string, tag: string) => void }) {
+  const [value, setValue] = useState("");
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      <input
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter" && value.trim()) {
+            onAddTag(nodeId, value);
+            setValue("");
+          }
+        }}
+        placeholder={de ? "Neuen Tag eingeben…" : "Add new tag…"}
+        style={{
+          flex: 1, fontSize: 12, padding: "4px 10px",
+          border: "1px solid var(--color-border)", borderRadius: 8,
+          background: "var(--color-surface)", color: "var(--color-text-primary)",
+          outline: "none",
+        }}
+      />
+      <button
+        onClick={() => { if (value.trim()) { onAddTag(nodeId, value); setValue(""); } }}
+        disabled={!value.trim()}
+        style={{
+          fontSize: 11, padding: "4px 10px", borderRadius: 8,
+          border: "1px solid var(--color-border)", background: value.trim() ? "#E4FF97" : "transparent",
+          color: value.trim() ? "#0A0A0A" : "var(--color-text-muted)", cursor: value.trim() ? "pointer" : "default",
+          fontWeight: 600,
+        }}
+      >{de ? "Hinzufügen" : "Add"}</button>
+    </div>
+  );
+}
+
+// ── CardActionsMenu (shared action dropdown for all node cards) ──────────
+
+function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag, onFollowUp, currentStatus }: {
+  nodeId: string;
+  nodeType: string;
+  de: boolean;
+  onDelete: (id: string) => void;
+  onSetStatus: (id: string, status: NodeStatus) => void;
+  onAddTag: (id: string, tag: string) => void;
+  onFollowUp?: (id: string, prefill?: string) => void;
+  currentStatus?: NodeStatus;
+}) {
+  const [tagInput, setTagInput] = useState("");
+  const [showTagInput, setShowTagInput] = useState(false);
+
+  return (
+    <VoltDropdownMenu>
+      <VoltDropdownMenuTrigger asChild>
+        <button
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+            borderRadius: 4, border: "none", background: "transparent", cursor: "pointer",
+            color: "var(--color-text-muted)", flexShrink: 0,
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </VoltDropdownMenuTrigger>
+      <VoltDropdownMenuContent align="end" side="bottom" className="min-w-[180px]">
+        <VoltDropdownMenuLabel>{de ? "Aktionen" : "Actions"}</VoltDropdownMenuLabel>
+        {onFollowUp && (
+          <VoltDropdownMenuItem onClick={() => onFollowUp(nodeId)}>
+            <MessageSquarePlus size={14} />
+            {de ? "Folgefrage stellen" : "Ask follow-up"}
+          </VoltDropdownMenuItem>
+        )}
+        <VoltDropdownMenuSeparator />
+        <VoltDropdownMenuLabel>{de ? "Status" : "Status"}</VoltDropdownMenuLabel>
+        {(["open", "active", "decided", "pinned"] as NodeStatus[]).map(s => (
+          <VoltDropdownMenuItem key={s} onClick={() => onSetStatus(nodeId, s)}>
+            {s === "open" && <Circle size={14} />}
+            {s === "active" && <Zap size={14} />}
+            {s === "decided" && <CheckCircle2 size={14} />}
+            {s === "pinned" && <Pin size={14} />}
+            <span style={{ flex: 1 }}>{NODE_STATUS_META[s].label}</span>
+            {currentStatus === s && <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>●</span>}
+          </VoltDropdownMenuItem>
+        ))}
+        <VoltDropdownMenuSeparator />
+        {!showTagInput ? (
+          <VoltDropdownMenuItem onClick={(e) => { e.preventDefault(); setShowTagInput(true); }}>
+            <TagIcon size={14} />
+            {de ? "Tag hinzufügen" : "Add tag"}
+          </VoltDropdownMenuItem>
+        ) : (
+          <div style={{ padding: "4px 8px" }} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+            <input
+              autoFocus
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && tagInput.trim()) {
+                  onAddTag(nodeId, tagInput);
+                  setTagInput("");
+                  setShowTagInput(false);
+                }
+                if (e.key === "Escape") setShowTagInput(false);
+              }}
+              placeholder={de ? "Tag eingeben…" : "Enter tag…"}
+              style={{
+                width: "100%", fontSize: 12, padding: "4px 8px",
+                border: "1px solid var(--color-border)", borderRadius: 6,
+                background: "var(--color-surface)", color: "var(--color-text-primary)",
+                outline: "none",
+              }}
+            />
+          </div>
+        )}
+        <VoltDropdownMenuSeparator />
+        <VoltDropdownMenuItem variant="destructive" onClick={() => onDelete(nodeId)}>
+          <Trash2 size={14} />
+          {de ? "Löschen" : "Delete"}
+        </VoltDropdownMenuItem>
+      </VoltDropdownMenuContent>
+    </VoltDropdownMenu>
+  );
+}
+
 // ── DerivedNodeCard (compact) ─────────────────────────────────────────────
 
 function DerivedNodeCard({
   node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
   onExplore: _onExplore, // kept for API compatibility, actions live in DetailPanel
+  onAddTag, onSetStatus,
 }: {
   node: DerivedNode; de: boolean; selected: boolean;
   onSelect: (id: string) => void;
@@ -1694,6 +1832,8 @@ function DerivedNodeCard({
   onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onIterate: (nodeId: string, prefill: string) => void;
   onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
+  onAddTag: (id: string, tag: string) => void;
+  onSetStatus: (id: string, status: NodeStatus) => void;
   nodeW: number;
   dimmed?: boolean;
   zoom?: number;
@@ -1802,6 +1942,9 @@ function DerivedNodeCard({
           )}
           <div style={{ flex: 1 }} />
           {accentColorForStatus && <span style={{ width: 5, height: 5, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
+          {(cardZoom === undefined || cardZoom >= 0.6) && (
+            <CardActionsMenu nodeId={node.id} nodeType={node.nodeType} de={de} onDelete={onDelete} onSetStatus={onSetStatus} onAddTag={onAddTag} currentStatus={node.nodeStatus} />
+          )}
         </div>
         {/* Content */}
         <div style={{ padding: "10px 12px 0", flex: 1, overflow: "hidden", position: "relative" }}>
@@ -1868,6 +2011,7 @@ function QueryNodeCard({
   node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom, causalFingerprint,
   // unused in compact view (handled by DetailPanel) — kept for API compatibility:
   onFollowUp: _onFollowUp, onFollowUpQ: _onFollowUpQ, onToggleCollapse: _onToggleCollapse, onRefresh: _onRefresh,
+  onAddTag, onSetStatus,
 }: {
   node: QueryNode; de: boolean; selected: boolean;
   onSelect: (id: string) => void;
@@ -1880,6 +2024,8 @@ function QueryNodeCard({
   onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onIterate: (nodeId: string, prefill: string) => void;
   onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
+  onAddTag: (id: string, tag: string) => void;
+  onSetStatus: (id: string, status: NodeStatus) => void;
   nodeW: number;
   dimmed?: boolean;
   zoom?: number;
@@ -1968,11 +2114,29 @@ function QueryNodeCard({
             {node.query}
           </p>
           {accentColorForStatus && <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
+          {(cardZoom === undefined || cardZoom >= 0.6) && (
+            <CardActionsMenu nodeId={node.id} nodeType="query" de={de} onDelete={onDelete} onSetStatus={onSetStatus} onAddTag={onAddTag} onFollowUp={_onFollowUp} currentStatus={node.nodeStatus} />
+          )}
         </div>
         {/* Content */}
         <div style={{ padding: "12px 14px 0", flex: 1, overflow: "hidden", position: "relative" }}>
           {node.synthesis && (cardZoom === undefined || cardZoom >= 0.7) && (
             <>
+              {/* Source attribution badges */}
+              {node.result?.usedSignals && node.result.usedSignals.length > 0 && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 8 }}>
+                  {[...new Set(node.result.usedSignals.map(s => s.source))].slice(0, 5).map((src, i) => (
+                    <span key={i} style={{
+                      fontSize: 8, fontWeight: 600, padding: "1px 6px", borderRadius: 10,
+                      background: "#2563EB08", border: "1px solid #2563EB20", color: "#2563EB",
+                      fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap",
+                    }}>{src}</span>
+                  ))}
+                  <span style={{ fontSize: 8, color: "var(--color-text-muted)", alignSelf: "center" }}>
+                    {node.result.usedSignals.length} {de ? "Signale" : "signals"}
+                  </span>
+                </div>
+              )}
               <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
                 {node.synthesis}
               </p>
@@ -3731,6 +3895,67 @@ function DetailPanel({
             </CollapsibleSection>
           )}
 
+          {/* ── Tags (editable) ─────────────────────────────────── */}
+          <CollapsibleSection title={`Tags${qNode.tags?.length ? ` (${qNode.tags.length})` : ""}`} accent="#8B5CF6" defaultOpen={!!(qNode.tags && qNode.tags.length > 0)}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+              {(qNode.tags ?? []).map((tag, i) => {
+                const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                return (
+                  <span key={i} style={{
+                    fontSize: 11, padding: "2px 8px", borderRadius: 12,
+                    background: `hsl(${hue}, 55%, 94%)`, border: `1px solid hsl(${hue}, 45%, 82%)`,
+                    color: `hsl(${hue}, 55%, 38%)`, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4,
+                  }}>
+                    {tag}
+                    <button onClick={() => onUpdateTags(qNode.id, (qNode.tags ?? []).filter(t => t !== tag))} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 12, color: `hsl(${hue}, 55%, 50%)`, lineHeight: 1 }}>×</button>
+                  </span>
+                );
+              })}
+            </div>
+            <TagInlineInput nodeId={qNode.id} de={de} onAddTag={(id, tag) => {
+              const trimmed = tag.trim().toLowerCase();
+              if (!trimmed) return;
+              const existing = qNode.tags ?? [];
+              if (!existing.includes(trimmed)) onUpdateTags(id, [...existing, trimmed]);
+            }} />
+          </CollapsibleSection>
+
+          {/* ── System-Prompt (read-only) ─────────────────────────── */}
+          <CollapsibleSection title={de ? "Analyse-Parameter" : "Analysis Parameters"} accent="#6B7280" defaultOpen={false}>
+            <div style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Query</span>
+                <span style={{ flex: 1 }}>{qNode.query}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Locale</span>
+                <span>{qNode.locale === "de" ? "Deutsch" : "English"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Modell</span>
+                <span style={{ fontFamily: "var(--font-code, monospace)", fontSize: 11 }}>Claude (Anthropic)</span>
+              </div>
+              {r?.matchedTrends && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Trends</span>
+                  <span>{r.matchedTrends.length} {de ? "abgeglichen" : "matched"}</span>
+                </div>
+              )}
+              {r?.usedSignals && (
+                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Signale</span>
+                  <span>{r.usedSignals.length} {de ? "verarbeitet" : "processed"}</span>
+                </div>
+              )}
+              {r?.confidence != null && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Konfidenz</span>
+                  <span>{Math.round(r.confidence * 100)}%</span>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
           {/* Timestamp */}
           <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>
             {formatNodeTime(qNode.createdAt)}
@@ -4741,6 +4966,29 @@ export default function CanvasPage() {
 
   const handleSetNodeStatus = useCallback((id: string, status: NodeStatus) => {
     setNodes(prev => prev.map(n => n.id === id ? { ...n, nodeStatus: status } : n));
+  }, []);
+
+  const handleSetTags = useCallback((id: string, tags: string[]) => {
+    setNodes(prev => prev.map(n => n.id === id ? { ...n, tags } : n));
+  }, []);
+
+  const handleAddTag = useCallback((id: string, tag: string) => {
+    const trimmed = tag.trim().toLowerCase();
+    if (!trimmed) return;
+    setNodes(prev => prev.map(n => {
+      if (n.id !== id) return n;
+      const existing = (n as CanvasNode & { tags?: string[] }).tags ?? [];
+      if (existing.includes(trimmed)) return n;
+      return { ...n, tags: [...existing, trimmed] };
+    }));
+  }, []);
+
+  const handleRemoveTag = useCallback((id: string, tag: string) => {
+    setNodes(prev => prev.map(n => {
+      if (n.id !== id) return n;
+      const existing = (n as CanvasNode & { tags?: string[] }).tags ?? [];
+      return { ...n, tags: existing.filter(t => t !== tag) };
+    }));
   }, []);
 
   const pipelineChain = useMemo<Set<string>>(() => {
@@ -7045,6 +7293,8 @@ export default function CanvasPage() {
                         .slice(0, 3)
                         .map(([id]) => names[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
                     })()}
+                    onAddTag={handleAddTag}
+                    onSetStatus={handleSetNodeStatus}
                   />
                 );
               }
@@ -7170,6 +7420,8 @@ export default function CanvasPage() {
                   onResizeStart={handleResizeStart}
                   onIterate={handleIterateFromNode}
                   onPortDragStart={handlePortDragStart}
+                  onAddTag={handleAddTag}
+                  onSetStatus={handleSetNodeStatus}
                   nodeW={dNode.customWidth ?? DERIVED_W}
                   dimmed={isDimmed}
                   zoom={zoom}

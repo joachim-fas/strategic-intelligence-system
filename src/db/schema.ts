@@ -1,9 +1,3 @@
-// TODO: ARC-04 — SCHEMA SPLIT-BRAIN
-// PG schema (schema.ts) has: query_versions, scenario_alerts (not in SQLite)
-// SQLite schema (schema-sqlite.ts) has: project_notes, project_queries (not in PG)
-// Neither has: bsc_ratings, live_signals, og_image_cache, scenarios
-// FIX: Unify both schemas to have identical table sets.
-
 import {
   pgTable,
   uuid,
@@ -193,6 +187,33 @@ export const dataSources = pgTable("data_sources", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Project Queries (saved analyses per project) ───────
+export const projectQueries = pgTable("project_queries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  radarId: uuid("radar_id")
+    .references(() => radars.id, { onDelete: "cascade" })
+    .notNull(),
+  query: text("query").notNull(),
+  locale: text("locale").default("de"),
+  resultJson: jsonb("result_json"),
+  contextProfile: jsonb("context_profile"),
+  pinned: boolean("pinned").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Project Notes (annotations per project or query) ───
+export const projectNotes = pgTable("project_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  radarId: uuid("radar_id")
+    .references(() => radars.id, { onDelete: "cascade" })
+    .notNull(),
+  queryId: uuid("query_id")
+    .references(() => projectQueries.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ─── Query Versions (versioned query results) ─────────────
 export const queryVersions = pgTable("query_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -208,13 +229,6 @@ export const queryVersions = pgTable("query_versions", {
   executedAt: timestamp("executed_at").defaultNow().notNull(),
   notes: text("notes"),
 });
-
-// TODO: DAT-16 — Shadow tables not in schema:
-// - bsc_ratings (created in bsc-ratings/route.ts)
-// - scenarios (created in scenarios/route.ts)
-// - live_signals (created in migrate-sqlite.ts)
-// - og_image_cache (created in migrate-sqlite.ts)
-// These should be defined here for Drizzle migration support.
 
 // ─── BSC Ratings ────────────────────────────────────────
 export const bscRatings = pgTable("bsc_ratings", {
