@@ -6,22 +6,15 @@ import Image from "next/image";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
-// Main navigation — ordered by workflow progression:
-// 1. "Sessions" — list of strategic working threads.
-// 2. "Canvas" — the active workspace (node canvas).
-// 3. "Knowledge Cockpit" — data/reference landscape.
-//
-// Each item can optionally define `matchAlso` prefixes so that child routes
-// (e.g. /verstehen/abc) also highlight the parent nav item.
+// Main navigation — workflow-oriented, right-aligned next to actions.
+// "Start" and "Canvas" removed (Start = Logo click, Canvas = via Projekte).
 const NAV_ITEMS: Array<{
   href: string;
   labelDe: string;
   labelEn: string;
   matchAlso?: string[];
 }> = [
-  { href: "/",              labelDe: "Start",              labelEn: "Home"               },
   { href: "/sessions",      labelDe: "Projekte",           labelEn: "Projects"          },
-  { href: "/canvas",        labelDe: "Canvas",             labelEn: "Canvas"             },
   { href: "/verstehen",     labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
   { href: "/monitor",       labelDe: "Monitor",            labelEn: "Monitor"            },
   { href: "/dokumentation", labelDe: "Dokumentation",      labelEn: "Documentation"      },
@@ -98,8 +91,8 @@ export function AppHeader() {
             cursor: "pointer", fontSize: 20, color: "var(--color-text-muted, #6B6B6B)", flexShrink: 0 }}
         >&#x2261;</button>
 
-        {/* Nav — Desktop (GrainUI: flex items-center gap-1 flex-1) */}
-        <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flex: 1 }}>
+        {/* Nav — Desktop: right-aligned with gap before actions */}
+        <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, flex: 1, marginRight: 16 }}>
           {NAV_ITEMS.map(({ href, labelDe, labelEn }) => {
             const label = de ? labelDe : labelEn;
             const active = isActive(href);
