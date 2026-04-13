@@ -49,7 +49,7 @@ export default function SessionsPage() {
         borderBottom: "1px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
       }}>
-        <div style={{ maxWidth: 1360, margin: "0 auto", padding: "36px 24px 0" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "36px 32px 0" }}>
           <div style={{
             fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
             fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
@@ -66,24 +66,27 @@ export default function SessionsPage() {
             }}>
               Projekte
             </h1>
+            {/* GrainUI Primary Button: 14px/600, h-36, px-20, rounded-lg (8px), bg-lime, tracking-tight */}
             <button
               onClick={createNewSession}
               disabled={creating}
               className={creating ? "" : "sis-shimmer-btn"}
               style={{
-                fontSize: 13, fontWeight: 600, height: 38, padding: "0 18px",
-                borderRadius: "var(--volt-radius-md, 10px)",
-                background: creating ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
+                fontSize: 14, fontWeight: 600, height: 36, padding: "0 20px",
+                borderRadius: 8,
+                background: creating ? "var(--volt-surface, #F7F7F7)" : "#E4FF97",
                 color: creating ? "var(--volt-text-muted)" : "#0A0A0A",
                 border: "none", cursor: creating ? "wait" : "pointer",
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                letterSpacing: "-0.025em",
+                transition: "all 0.2s ease-out",
               }}
             >
               {creating ? (de ? "Erstelle…" : "Creating…") : (de ? "+ Neues Projekt" : "+ New Project")}
             </button>
           </div>
           <p style={{
-            fontSize: 13, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
+            fontSize: 14, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
             margin: "12px 0 20px", maxWidth: 620,
           }}>
             {de
@@ -96,7 +99,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, maxWidth: 1360, margin: "0 auto", width: "100%", padding: "32px 24px 80px" }}>
+      <div style={{ flex: 1, maxWidth: 1400, margin: "0 auto", width: "100%", padding: "32px 32px 80px" }}>
         <SessionList mode="active" de={de} />
       </div>
     </div>

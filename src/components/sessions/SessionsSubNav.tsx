@@ -24,9 +24,9 @@ export function SessionsSubNav({ active, de }: Props) {
       aria-label={de ? "Projekt-Bereich" : "Projects area"}
       style={{
         display: "flex",
-        gap: 0,
+        gap: 4,
         marginTop: 4,
-        marginBottom: -1, // pull down onto the hero bottom border
+        marginBottom: -1,
       }}
     >
       {tabs.map((t) => {
@@ -37,23 +37,23 @@ export function SessionsSubNav({ active, de }: Props) {
             href={t.href}
             aria-current={isActive ? "page" : undefined}
             style={{
+              position: "relative",
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-              fontSize: 13,
-              fontWeight: isActive ? 700 : 500,
+              fontSize: 14,
+              fontWeight: isActive ? 700 : 600,
               color: isActive ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-muted, #6B6B6B)",
               textDecoration: "none",
-              padding: "10px 18px",
-              borderBottom: isActive ? "2px solid var(--volt-text, #0A0A0A)" : "2px solid transparent",
-              borderRadius: isActive ? "0" : "var(--volt-radius-sm, 6px) var(--volt-radius-sm, 6px) 0 0",
-              background: isActive ? "transparent" : "transparent",
-              transition: "color 140ms ease, border-color 140ms ease, background 140ms ease",
-              letterSpacing: isActive ? "-0.01em" : "0",
+              padding: "8px 14px",
+              borderRadius: 8,
+              background: "transparent",
+              transition: "all 150ms ease",
+              letterSpacing: "-0.01em",
             }}
             onMouseEnter={(e) => {
               const el = e.currentTarget as HTMLAnchorElement;
               if (!isActive) {
                 el.style.color = "var(--volt-text, #0A0A0A)";
-                el.style.background = "var(--volt-surface, #F4F4F4)";
+                el.style.background = "rgba(228,255,151,0.5)";
               }
             }}
             onMouseLeave={(e) => {
@@ -65,6 +65,14 @@ export function SessionsSubNav({ active, de }: Props) {
             }}
           >
             {t.label}
+            {/* GrainUI active indicator: absolute bottom-0 inset-x-3 h-[2px] rounded-full */}
+            {isActive && (
+              <span style={{
+                position: "absolute", bottom: 0, left: 12, right: 12,
+                height: 2, borderRadius: 9999,
+                background: "var(--volt-text, #0A0A0A)",
+              }} />
+            )}
           </a>
         );
       })}

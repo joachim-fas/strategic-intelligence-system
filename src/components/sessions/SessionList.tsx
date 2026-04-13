@@ -545,23 +545,22 @@ export function SessionList({ mode, de }: Props) {
           display: "flex",
           flexDirection: "column",
           border: "1px solid var(--volt-border, #E8E8E8)",
-          borderRadius: "var(--volt-radius-lg, 14px)",
+          borderRadius: 16,
           background: "var(--volt-surface-raised, #fff)",
           overflow: "hidden",
         }}
       >
-      {/* Column headers */}
+      {/* Column headers — GrainUI table: font-mono 11px/600, #6B6B6B, bg-muted/30 */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "minmax(280px, 1fr) 150px 128px 128px 96px 120px",
         gap: 16,
         padding: "10px 20px",
-        background: "var(--volt-surface, #FAFAFA)",
-        borderBottom: "1px solid var(--volt-border, #EEE)",
+        background: "rgba(250,250,250,0.3)",
+        borderBottom: "1px solid var(--volt-border, #E8E8E8)",
         fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-        fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        color: "var(--volt-text-faint, #999)",
+        fontSize: 11, fontWeight: 600, letterSpacing: "-0.01em",
+        color: "var(--volt-text-muted, #6B6B6B)",
       }}>
         <div>{de ? "Projekt" : "Project"}</div>
         <div>{de ? "Framework" : "Framework"}</div>
@@ -587,7 +586,7 @@ export function SessionList({ mode, de }: Props) {
         //   active session → lime tint  (rgba(228,255,151,0.16))
         //   hover          → cool slate (rgba(79,99,138,0.07))  — clearly different from the lime active tint
         const activeBg = "rgba(228,255,151,0.16)";
-        const hoverBg  = "rgba(79,99,138,0.07)";
+        const hoverBg  = "rgba(228,255,151,0.04)";
 
         return (
           <div
@@ -598,7 +597,7 @@ export function SessionList({ mode, de }: Props) {
               gridTemplateColumns: "minmax(280px, 1fr) 150px 128px 128px 96px 120px",
               gap: 16,
               alignItems: "center",
-              padding: "16px 20px",
+              padding: "12px 20px",
               borderBottom: isLast ? "none" : "1px solid var(--volt-border, #EEE)",
               background: isActive ? activeBg : "transparent",
               transition: "background-color 120ms ease",
@@ -671,10 +670,10 @@ export function SessionList({ mode, de }: Props) {
               >
                 <div style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-                  fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em",
                   color: "var(--volt-text, #0A0A0A)",
-                  lineHeight: 1.3,
+                  lineHeight: 1.4,
                 }}>
                   <span style={{
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -837,14 +836,18 @@ function FilterPill({
   onClick: () => void;
   color?: FrameworkCategory;
 }) {
+  // GrainUI FilterPill spec: rounded-full, text-[11px], font-mono
+  // Active "Alle": bg-foreground (#0A0A0A) text-background (#fff) font-semibold
+  // Inactive: transparent bg, border-border, text-muted-foreground
+  // Active with color: use framework color
   const bg = active
-    ? (color?.bg ?? "var(--volt-text, #0A0A0A)")
-    : "var(--volt-surface-raised, #fff)";
+    ? (color?.bg ?? "#0A0A0A")
+    : "transparent";
   const fg = active
     ? (color?.fg ?? "#fff")
     : "var(--volt-text-muted, #6B6B6B)";
   const border = active
-    ? (color?.border ?? "var(--volt-text, #0A0A0A)")
+    ? (color?.border ?? "#0A0A0A")
     : "var(--volt-border, #E8E8E8)";
   return (
     <button
@@ -854,20 +857,20 @@ function FilterPill({
       aria-label={`${label} (${count})`}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
-        fontSize: 11, fontWeight: 600,
-        padding: "5px 12px",
-        borderRadius: 999,
-        border: `1px solid ${border}`,
+        fontSize: 11, fontWeight: active ? 600 : 400,
+        padding: "4px 10px",
+        borderRadius: 9999,
+        border: active ? "none" : `1px solid ${border}`,
         background: bg,
         color: fg,
         cursor: "pointer",
-        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-        transition: "all 120ms ease",
+        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+        transition: "all 150ms ease",
+        whiteSpace: "nowrap",
       }}
     >
       <span>{label}</span>
       <span style={{
-        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
         fontSize: 10,
         opacity: 0.75,
       }}>

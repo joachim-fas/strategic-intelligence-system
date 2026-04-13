@@ -1786,10 +1786,10 @@ function DerivedNodeCard({
           style={{ height: 36, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${typeColorHex}0C`, borderBottom: `1px solid ${typeColorHex}22`, borderTopLeftRadius: isScenario ? 0 : 11, borderTopRightRadius: 11 }}
         >
           <span style={{
-            flexShrink: 0, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+            flexShrink: 0, fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
             fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
             color: typeColorHex, background: `${typeColorHex}14`, border: `1px solid ${typeColorHex}30`,
-            borderRadius: 5, padding: "2px 7px",
+            borderRadius: 6, padding: "4px 10px",
           }}>{cfg.badge}</span>
           {isScenario && node.probability != null && (
             <span style={{ fontSize: 12, fontWeight: 700, color: typeColorHex, fontVariantNumeric: "tabular-nums" }}>

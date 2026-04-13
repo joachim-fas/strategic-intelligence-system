@@ -26,7 +26,7 @@ export default function SessionsArchivePage() {
         borderBottom: "1px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
       }}>
-        <div style={{ maxWidth: 1360, margin: "0 auto", padding: "36px 24px 0" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "36px 32px 0" }}>
           <div style={{
             fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
             fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
@@ -45,7 +45,7 @@ export default function SessionsArchivePage() {
             </h1>
           </div>
           <p style={{
-            fontSize: 13, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
+            fontSize: 14, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
             margin: "12px 0 20px", maxWidth: 620,
           }}>
             {de
@@ -58,7 +58,7 @@ export default function SessionsArchivePage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, maxWidth: 1360, margin: "0 auto", width: "100%", padding: "32px 24px 80px" }}>
+      <div style={{ flex: 1, maxWidth: 1400, margin: "0 auto", width: "100%", padding: "32px 32px 80px" }}>
         <SessionList mode="archived" de={de} />
       </div>
     </div>
