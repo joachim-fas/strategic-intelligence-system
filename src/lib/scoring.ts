@@ -38,8 +38,18 @@ const DEFAULT_DIMENSION_WEIGHTS: DimensionWeights = {
 };
 
 const TIME_DECAY_LAMBDA = 0.05; // half-life ~14 days
-// TODO: compute dynamically from active connectors (e.g. connectorRegistry.getActive().length)
-const TOTAL_ACTIVE_SOURCES = 54;
+
+// H4-FIX: Compute active source count dynamically from connector registry
+// instead of hardcoded 54 which deflates all confidence scores.
+function getActiveSourceCount(): number {
+  try {
+    const { connectors } = require("@/connectors/index");
+    return connectors?.length || 10; // fallback to conservative estimate
+  } catch {
+    return 10; // If connectors can't load, use realistic fallback
+  }
+}
+const TOTAL_ACTIVE_SOURCES = getActiveSourceCount();
 
 // Map topics to categories and quadrants
 const TOPIC_METADATA: Record<string, { category: string; quadrant: number }> = {

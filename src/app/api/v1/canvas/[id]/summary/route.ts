@@ -14,17 +14,8 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
-import { readFileSync } from "fs";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
-
-function resolveEnv(key: string): string | undefined {
-  if (process.env[key]) return process.env[key];
-  try {
-    const raw = readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-    const line = raw.split("\n").find(l => l.startsWith(`${key}=`));
-    return line ? line.slice(key.length + 1).trim() : undefined;
-  } catch { return undefined; }
-}
+import { resolveEnv } from "@/lib/env";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));

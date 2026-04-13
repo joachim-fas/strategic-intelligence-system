@@ -8,17 +8,7 @@
  */
 
 import { TrendDot } from "@/types";
-import { readFileSync } from "fs";
-import path from "path";
-
-function resolveEnv(key: string): string | undefined {
-  if (process.env[key]) return process.env[key];
-  try {
-    const raw = readFileSync(path.join(process.cwd(), ".env.local"), "utf8");
-    const line = raw.split("\n").find(l => l.startsWith(`${key}=`));
-    return line ? line.slice(key.length + 1).trim() : undefined;
-  } catch { return undefined; }
-}
+import { resolveEnv } from "./env";
 import { getRegulationsForTrend, getRegulatoryPressure, GLOBAL_REGULATIONS } from "./regulations";
 import { getEdgesForTrend, TREND_EDGES } from "./causal-graph";
 import { getTrendSources, getTotalSourceCount } from "./trend-sources";
