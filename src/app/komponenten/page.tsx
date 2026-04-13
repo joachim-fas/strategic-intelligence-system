@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -53,7 +53,7 @@ import {
   // Display
   VoltTerminalStatic,
   VoltCodeBlock,
-  VoltSidebar,
+  VoltSidebar, type VoltSidebarSection,
   VoltCursor,
   // Skeuomorphic Icons
   SKEU_ICONS,
@@ -511,6 +511,11 @@ const TOC = [
 
 const totalComponents = TOC.reduce((sum, g) => sum + g.items.length, 0);
 
+const SIDEBAR_SECTIONS: VoltSidebarSection[] = TOC.map(group => ({
+  title: group.cat,
+  items: group.items.map(item => ({ id: item.id, label: item.label })),
+}));
+
 /* ===================================================================
    MAIN PAGE
    =================================================================== */
@@ -538,6 +543,42 @@ export default function KomponentenPage() {
   const [paginationPage, setPaginationPage] = useState(3);
   const [stepperStep, setStepperStep] = useState(1);
 
+  // ── Scroll-spy for VoltSidebar ──
+  const [activeSectionId, setActiveSectionId] = useState("foundations-colors");
+  const isScrollingToRef = useRef(false);
+
+  useEffect(() => {
+    const allIds = TOC.flatMap(g => g.items.map(i => i.id));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isScrollingToRef.current) return;
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSectionId(entry.target.id);
+            break;
+          }
+        }
+      },
+      { rootMargin: "-80px 0px -65% 0px", threshold: 0 }
+    );
+    allIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const handleSidebarSelect = useCallback((id: string) => {
+    isScrollingToRef.current = true;
+    setActiveSectionId(id);
+    const el = document.getElementById(id);
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+    setTimeout(() => { isScrollingToRef.current = false; }, 1000);
+  }, []);
+
   const fireToast = useCallback((variant: "success" | "error" | "info" | "warning") => {
     const msgs: Record<string, { title: string; description: string }> = {
       success: { title: de ? "Gespeichert" : "Saved", description: de ? "Aenderungen wurden uebernommen." : "Changes have been applied." },
@@ -551,23 +592,16 @@ export default function KomponentenPage() {
   return (
     <>
       <AppHeader />
-      <div style={{ display: "flex", maxWidth: 1200, margin: "0 auto", padding: "32px 32px 120px", gap: 40 }}>
-        {/* Sidebar TOC */}
-        <nav style={{ width: 180, flexShrink: 0, position: "sticky", top: 80, alignSelf: "flex-start", display: "flex", flexDirection: "column", gap: 1, maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
-          <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--color-text-muted, #999)", marginBottom: 8 }}>Komponenten</div>
-          {TOC.map(group => (
-            <div key={group.cat}>
-              <CategoryLabel>{group.cat}</CategoryLabel>
-              {group.items.map(item => (
-                <a key={item.id} href={`#${item.id}`}
-                  style={{ fontSize: 12, color: "var(--color-text-muted, #6B6B6B)", textDecoration: "none", padding: "3px 10px", borderRadius: 6, transition: "all 0.12s", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", display: "block" }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "var(--color-text-heading)"; e.currentTarget.style.background = "rgba(228,255,151,0.3)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "var(--color-text-muted, #6B6B6B)"; e.currentTarget.style.background = "transparent"; }}
-                >{item.label}</a>
-              ))}
-            </div>
-          ))}
-        </nav>
+      <div style={{ display: "flex", maxWidth: 1200, margin: "0 auto", padding: "32px 32px 120px", gap: 32 }}>
+        {/* Sidebar TOC — VoltSidebar with scroll-spy */}
+        <div style={{ flexShrink: 0, position: "sticky", top: 80, alignSelf: "flex-start", maxHeight: "calc(100vh - 100px)", borderRadius: 12, overflow: "hidden" }}>
+          <VoltSidebar
+            sections={SIDEBAR_SECTIONS}
+            activeId={activeSectionId}
+            onSelect={handleSidebarSelect}
+            style={{ width: 200, maxHeight: "calc(100vh - 100px)" }}
+          />
+        </div>
 
         {/* Main content */}
         <main style={{ flex: 1, minWidth: 0 }}>
