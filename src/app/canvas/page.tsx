@@ -22,7 +22,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { TEMPLATES, FRAMEWORKS, type TemplateResult } from "@/lib/canvas-templates";
-import { BOARD_COLUMNS, NODE_COLORS } from "@/lib/colors";
+import { BOARD_COLUMNS, NODE_COLORS, EDGE_STYLE } from "@/lib/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
@@ -1628,19 +1628,40 @@ function CommandLine({
 
 // ── ConnectionsSVG ────────────────────────────────────────────────────────
 
-function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }: { nodes: CanvasNode[]; connections: Connection[]; pipelineChain?: Set<string>; selectedId?: string | null }) {
+function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, zoom, activeTagFilter, nodeTagMap, nodeGroupMap, connVisMode }: {
+  nodes: CanvasNode[]; connections: Connection[]; pipelineChain?: Set<string>; selectedId?: string | null;
+  zoom: number; activeTagFilter: string | null; nodeTagMap: Map<string, string[]>; nodeGroupMap: Map<string, string>; connVisMode: "auto" | "show" | "hide";
+}) {
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
+
+  // Pre-compute direct edges from selected node (once, before map loop)
+  const directEdges = useMemo(() => {
+    const set = new Set<string>();
+    if (selId) {
+      connections.forEach(c => {
+        if (c.from === selId || c.to === selId) set.add(`${c.from}-${c.to}`);
+      });
+    }
+    return set;
+  }, [selId, connections]);
+
+  // Zoom-adaptive dampening factor
+  const zoomFactor = zoom >= 0.8 ? 1.0
+    : zoom >= 0.5 ? 0.6 + (zoom - 0.5) / 0.3 * 0.4
+    : zoom >= 0.3 ? 0.25 + (zoom - 0.3) / 0.2 * 0.35
+    : 0.1;
+
   return (
     <svg style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
       <defs>
         <marker id="arr-q" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.50)" />
-        </marker>
-        <marker id="arr-d" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.40)" />
         </marker>
+        <marker id="arr-d" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.35)" />
+        </marker>
         <marker id="arr-r" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L6,3 z" fill="#F5A623AA" />
+          <path d="M0,0 L0,6 L6,3 z" fill="#F5A62388" />
         </marker>
         <marker id="arr-builds" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L0,6 L6,3 z" fill="#1A9E5A" />
@@ -1663,30 +1684,54 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         const y2 = to.y + getNodeHeight(to) / 2;
         const cp = Math.min(Math.abs(x2 - x1) * 0.45, 120);
 
-        const inChain = !selId || !pipelineChain || pipelineChain.has(c.from) || pipelineChain.has(c.to);
-        const edgeOpacity = inChain ? 1 : 0.1;
+        // 4-tier opacity system
+        let baseOpacity: number;
+        if (selId) {
+          const isDirect = directEdges.has(`${c.from}-${c.to}`);
+          const inChain = pipelineChain?.has(c.from) || pipelineChain?.has(c.to);
+          baseOpacity = isDirect ? 1.0 : inChain ? 0.45 : 0.05;
+        } else {
+          const sameGroup = nodeGroupMap.get(c.from) && nodeGroupMap.get(c.from) === nodeGroupMap.get(c.to);
+          baseOpacity = sameGroup ? 0.25 : 0.12;
+        }
 
-        // Connection type styling
+        // Tag-filter propagation to connections
+        if (activeTagFilter) {
+          const fromOk = (nodeTagMap.get(c.from) ?? []).includes(activeTagFilter);
+          const toOk = (nodeTagMap.get(c.to) ?? []).includes(activeTagFilter);
+          if (!fromOk && !toOk) baseOpacity = 0;
+          else if (!fromOk || !toOk) baseOpacity = 0.04;
+        }
+
+        // Apply zoom dampening + visibility mode
+        const finalOpacity = connVisMode === "hide" ? 0
+          : connVisMode === "show" ? Math.max(baseOpacity, 0.5)
+          : baseOpacity * zoomFactor;
+
+        if (finalOpacity <= 0.01) return null;
+
+        // Connection type styling — derived is solid (no dash) to prevent moiré at scale
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":     { stroke: "rgba(0,0,0,0.35)", dash: "4 3", width: 1.5, marker: "url(#arr-d)" },
-          "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
-          "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
-          "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
-          "validates":    { stroke: "#2563EB",          dash: "",    width: 1.5, marker: "url(#arr-validates)" },
+          "derived":      { stroke: "rgba(0,0,0,0.35)", dash: "",    width: 1.2, marker: "url(#arr-d)" },
+          "refreshed":    { stroke: "#F5A62344",         dash: "6 4", width: 1,   marker: "url(#arr-r)" },
+          "builds-on":    { stroke: "#1A9E5A",           dash: "",    width: 1.8, marker: "url(#arr-builds)" },
+          "contradicts":  { stroke: "#E8402A",           dash: "3 2", width: 1.2, marker: "url(#arr-contradicts)" },
+          "validates":    { stroke: "#2563EB",           dash: "",    width: 1.5, marker: "url(#arr-validates)" },
         };
 
         const style = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived
           : c.refreshed ? CONN_STYLES.refreshed
           : c.derived   ? CONN_STYLES.derived
-          : { stroke: "rgba(0,0,0,0.40)", dash: "", width: 1.5, marker: "url(#arr-q)" };
+          : { stroke: "rgba(0,0,0,0.35)", dash: "", width: 1.2, marker: "url(#arr-q)" };
 
         return (
           <path key={`${c.from}-${c.to}`}
             d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
             fill="none" stroke={style.stroke} strokeWidth={style.width} strokeLinecap="round"
             strokeDasharray={style.dash || "none"}
-            markerEnd={style.marker} opacity={edgeOpacity}
+            markerEnd={style.marker} opacity={finalOpacity}
+            style={{ transition: "opacity 0.2s" }}
           />
         );
       })}
@@ -4593,6 +4638,7 @@ export default function CanvasPage() {
 
   // Feature: Tag filter
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [connVisMode, setConnVisMode] = useState<"auto" | "show" | "hide">("auto");
 
   const de = locale === "de";
   const queryNodes = useMemo(() => nodes.filter((n): n is QueryNode => n.nodeType === "query"), [nodes]);
@@ -5073,6 +5119,21 @@ export default function CanvasPage() {
     // User groups override auto groups
     for (const g of userGroups) { for (const id of g.nodeIds) map.set(id, g.color); }
     return map;
+  }, [canvasGroups, userGroups]);
+
+  // Tag + group membership maps for ConnectionsSVG and group dimming
+  const nodeTagMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    nodes.forEach(n => m.set(n.id, n.tags ?? []));
+    return m;
+  }, [nodes]);
+
+  const nodeGroupMap = useMemo(() => {
+    const m = new Map<string, string>();
+    [...canvasGroups, ...userGroups].forEach(g => {
+      g.nodeIds.forEach(id => m.set(id, g.id));
+    });
+    return m;
   }, [canvasGroups, userGroups]);
 
   // ── Canvas Export ────────────────────────────────────────────────────────
@@ -6575,6 +6636,24 @@ export default function CanvasPage() {
             >{LAYER_LABELS[layer].de}</button>
           ))}
 
+          {/* Connection visibility toggle */}
+          {connections.length > 0 && (
+            <button
+              onClick={() => setConnVisMode(prev => prev === "auto" ? "show" : prev === "show" ? "hide" : "auto")}
+              title={de ? "Verbindungslinien: auto / ein / aus" : "Connection lines: auto / show / hide"}
+              style={{
+                fontSize: 10, padding: "1px 7px", borderRadius: 20,
+                border: `1px solid ${connVisMode === "show" ? "rgba(0,0,0,0.30)" : "var(--color-border)"}`,
+                background: connVisMode === "show" ? "rgba(0,0,0,0.06)" : "transparent",
+                color: connVisMode === "hide" ? "var(--color-text-muted)" : "var(--color-text-heading)",
+                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
+                textDecoration: connVisMode === "hide" ? "line-through" : "none",
+                opacity: connVisMode === "hide" ? 0.5 : 1,
+              }}
+            >{de ? (connVisMode === "auto" ? "Verb. auto" : connVisMode === "show" ? "Verb. ein" : "Verb. aus")
+                : (connVisMode === "auto" ? "Links auto" : connVisMode === "show" ? "Links on" : "Links off")}</button>
+          )}
+
           {/* Tag filter pills */}
           {allTags.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap", overflow: "hidden" }}>
@@ -7206,7 +7285,7 @@ export default function CanvasPage() {
         {viewMode === "canvas" && (
           <ErrorBoundary>
           <div style={{ position: "absolute", top: 0, left: 0, transform: `translate(${panX}px, ${panY}px) scale(${zoom})`, transformOrigin: "0 0" }}>
-            <ConnectionsSVG nodes={visibleNodes} connections={connections} pipelineChain={pipelineChain} selectedId={selectedId} />
+            <ConnectionsSVG nodes={visibleNodes} connections={connections} pipelineChain={pipelineChain} selectedId={selectedId} zoom={zoom} activeTagFilter={activeTagFilter} nodeTagMap={nodeTagMap} nodeGroupMap={nodeGroupMap} connVisMode={connVisMode} />
 
             {/* Port drag preview line */}
             {portDragPreview && (
@@ -7231,25 +7310,36 @@ export default function CanvasPage() {
             )}
 
             {/* Auto-computed group blobs */}
-            {canvasGroups.map(g => (
+            {canvasGroups.map(g => {
+              const matchRatio = activeTagFilter
+                ? g.nodeIds.filter(id => (nodeTagMap.get(id) ?? []).includes(activeTagFilter!)).length / g.nodeIds.length
+                : 1;
+              const groupOpacity = matchRatio >= 0.3 ? 1 : matchRatio > 0 ? 0.35 : 0.15;
+              return (
               <div key={g.id} style={{
                 position: "absolute",
                 left: g.bounds.x, top: g.bounds.y,
                 width: g.bounds.w, height: g.bounds.h,
-                background: `${g.color}12`,
-                border: `2px dashed ${g.color}70`,
-                borderRadius: 20,
+                background: `${g.color}18`,
+                border: `2px solid ${g.color}38`,
+                borderRadius: 24,
                 pointerEvents: "none",
-                boxShadow: `inset 0 0 24px ${g.color}08`,
+                boxShadow: `inset 0 0 30px ${g.color}0C, 0 0 0 1px ${g.color}12`,
+                opacity: groupOpacity,
+                transition: "opacity 0.2s",
               }}>
                 <div style={{
                   position: "absolute", top: 8, left: 14,
-                  fontSize: 10, fontWeight: 600, letterSpacing: "0.10em", textTransform: "uppercase",
-                  color: `${g.color}CC`,
+                  fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
+                  color: g.color,
+                  background: `${g.color}14`,
+                  padding: "2px 10px 2px 8px",
+                  borderRadius: 6,
                   fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
                 }}>{g.label}</div>
               </div>
-            ))}
+              );
+            })}
 
             {/* User-created group blobs */}
             {userGroups.map(g => {
@@ -7264,15 +7354,21 @@ export default function CanvasPage() {
                 w: Math.max(...gNodes.map(n => n.x + getNodeWidth(n))) - Math.min(...xs) + PAD * 2,
                 h: Math.max(...gNodes.map(n => n.y + getNodeHeight(n))) - Math.min(...ys) + PAD * 2,
               };
+              const matchRatio = activeTagFilter
+                ? g.nodeIds.filter(id => (nodeTagMap.get(id) ?? []).includes(activeTagFilter!)).length / g.nodeIds.length
+                : 1;
+              const groupOpacity = matchRatio >= 0.3 ? 1 : matchRatio > 0 ? 0.35 : 0.15;
               return (
                 <div key={g.id} style={{
                   position: "absolute",
                   left: bounds.x, top: bounds.y,
                   width: bounds.w, height: bounds.h,
-                  background: `${g.color}14`,
-                  border: `2px dashed ${g.color}80`,
-                  boxShadow: `inset 0 0 24px ${g.color}08`,
-                  borderRadius: 20,
+                  background: `${g.color}18`,
+                  border: `2px solid ${g.color}38`,
+                  boxShadow: `inset 0 0 30px ${g.color}0C, 0 0 0 1px ${g.color}12`,
+                  borderRadius: 24,
+                  opacity: groupOpacity,
+                  transition: "opacity 0.2s",
                 }}>
                   {/* Editable label */}
                   <div style={{ position: "absolute", top: 8, left: 14, display: "flex", alignItems: "center", gap: 6 }}>
@@ -7285,14 +7381,17 @@ export default function CanvasPage() {
                           setEditingGroupId(null);
                         }}
                         onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setEditingGroupId(null); } }}
-                        style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", color: g.color, background: "transparent", border: `1px solid ${g.color}50`, borderRadius: 4, padding: "1px 6px", outline: "none", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}
+                        style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: g.color, background: `${g.color}14`, border: `1px solid ${g.color}50`, borderRadius: 6, padding: "2px 10px 2px 8px", outline: "none", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}
                       />
                     ) : (
                       <span
                         onClick={() => setEditingGroupId(g.id)}
                         style={{
-                          fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
-                          color: `${g.color}BB`, cursor: "pointer",
+                          fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
+                          color: g.color, cursor: "pointer",
+                          background: `${g.color}14`,
+                          padding: "2px 10px 2px 8px",
+                          borderRadius: 6,
                           fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
                         }}
                         title={de ? "Klicken zum Umbenennen" : "Click to rename"}
@@ -7573,6 +7672,58 @@ export default function CanvasPage() {
                             {(n as QueryNode).synthesis.slice(0,120)}
                           </p>
                         )}
+                        {/* Causal fingerprint on query cards */}
+                        {n.nodeType === "query" && (() => {
+                          const cgChild = nodes.find(c => c.parentId === n.id && c.nodeType === "causalgraph") as DerivedNode | undefined;
+                          if (!cgChild?.causalEdges?.length) return null;
+                          const fpNames = cgChild.causalTrendNames ?? {};
+                          const fpCounts = new Map<string, number>();
+                          cgChild.causalEdges.forEach(e => {
+                            fpCounts.set(e.from, (fpCounts.get(e.from) ?? 0) + 1);
+                            fpCounts.set(e.to, (fpCounts.get(e.to) ?? 0) + 1);
+                          });
+                          const fingerprint = Array.from(fpCounts.entries())
+                            .sort((a, b) => b[1] - a[1]).slice(0, 3)
+                            .map(([id]) => fpNames[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
+                          return fingerprint.length > 0 ? (
+                            <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 4 }}>
+                              {fingerprint.map(t => (
+                                <span key={t} style={{ fontSize: 8, padding: "1px 5px", borderRadius: 4, background: "#1A9E5A14", color: "#1A9E5A", fontWeight: 600, fontFamily: "var(--font-code, monospace)" }}>{t}</span>
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
+                        {/* Causal preview on causalgraph cards */}
+                        {n.nodeType === "causalgraph" && (() => {
+                          const cgNode = n as DerivedNode;
+                          const edges = cgNode.causalEdges ?? [];
+                          if (!edges.length) return null;
+                          const names = cgNode.causalTrendNames ?? {};
+                          const topTrends = Array.from(new Set(
+                            edges.flatMap(e => [e.from, e.to])
+                          )).slice(0, 4).map(id => names[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
+                          const typeCounts = new Map<string, number>();
+                          edges.forEach(e => typeCounts.set(e.type, (typeCounts.get(e.type) ?? 0) + 1));
+                          return (
+                            <div style={{ marginTop: 4 }}>
+                              <div style={{ fontSize: 10, color: EDGE_STYLE.drives.color, fontWeight: 600, marginBottom: 2 }}>
+                                {edges.length} {de ? "Beziehungen" : "relations"}
+                              </div>
+                              {topTrends.length > 0 && (
+                                <div style={{ fontSize: 10, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+                                  {topTrends.join(", ")}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 9, color: "var(--color-text-muted)", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                {Array.from(typeCounts.entries()).map(([type, count]) => (
+                                  <span key={type} style={{ color: EDGE_STYLE[type]?.color ?? "var(--color-text-muted)" }}>
+                                    {count}× {de ? (EDGE_STYLE[type]?.labelDe ?? type) : (EDGE_STYLE[type]?.labelEn ?? type)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 9, color: "var(--color-text-muted)" }}>
                           <span>{formatNodeTime(n.createdAt)}</span>
                           {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
@@ -7617,6 +7768,11 @@ export default function CanvasPage() {
                       {grpLabel && (
                         <span style={{ fontSize: 8, padding: "0 5px", borderRadius: 3, background: `${grpColor}18`, color: grpColor, fontWeight: 600, fontFamily: "var(--font-code, monospace)" }}>{grpLabel}</span>
                       )}
+                      {n.nodeType === "causalgraph" && ((n as DerivedNode).causalEdges?.length ?? 0) > 0 && (
+                        <span style={{ fontSize: 8, padding: "0 5px", borderRadius: 3, background: `${EDGE_STYLE.drives.color}14`, color: EDGE_STYLE.drives.color, fontWeight: 600, fontFamily: "var(--font-code, monospace)" }}>
+                          {(n as DerivedNode).causalEdges!.length} {de ? "Kanten" : "edges"}
+                        </span>
+                      )}
                       {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
                         <span style={{ fontSize: 8, color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color }}>{NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon}</span>
                       )}
@@ -7627,6 +7783,14 @@ export default function CanvasPage() {
                        : n.nodeType === "note" ? (n as NoteNode).content.slice(0,100)
                        : n.nodeType === "idea" ? (n as IdeaNode).title
                        : n.nodeType === "list" ? (n as ListNode).title
+                       : n.nodeType === "causalgraph" && ((n as DerivedNode).causalEdges?.length ?? 0) > 0
+                         ? (() => {
+                             const cgNames = (n as DerivedNode).causalTrendNames ?? {};
+                             const cgEdges = (n as DerivedNode).causalEdges ?? [];
+                             const topTrends = Array.from(new Set(cgEdges.flatMap(e => [e.from, e.to])))
+                               .slice(0, 3).map(id => cgNames[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
+                             return `${(n as DerivedNode).label || "Kausalnetz"} — ${topTrends.join(", ")}`;
+                           })()
                        : (n as DerivedNode).label || (n as DerivedNode).content.slice(0,100)}
                     </div>
                   </div>
