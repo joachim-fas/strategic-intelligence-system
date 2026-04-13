@@ -193,7 +193,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   const [activeFilter, setActiveFilter] = useState<CategoryKey>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
-  const [sortCol, setSortCol] = useState<"name" | "category" | "type" | "status">("status");
+  const [sortCol, setSortCol] = useState<"name" | "category" | "type" | "status">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const handleSort = useCallback((col: "name" | "category" | "type" | "status") => {
@@ -503,7 +503,16 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           {de ? "Kategorie" : "Category"}
         </span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
-          {(Object.keys(CATEGORIES) as CategoryKey[]).map((key) => {
+          {(Object.keys(CATEGORIES) as CategoryKey[]).sort((a, b) => {
+            // "all" and "forschung" always first/last
+            if (a === "all") return -1;
+            if (b === "all") return 1;
+            if (a === "forschung") return 1;
+            if (b === "forschung") return -1;
+            const labelA = de ? CATEGORIES[a].de : CATEGORIES[a].en;
+            const labelB = de ? CATEGORIES[b].de : CATEGORIES[b].en;
+            return labelA.localeCompare(labelB, de ? "de" : "en");
+          }).map((key) => {
             // Always show "all" and "forschung" regardless of macro scope.
             if (key !== "all" && key !== "forschung") {
               const count = categoryCounts.get(key) ?? 0;
