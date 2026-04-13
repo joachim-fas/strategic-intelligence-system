@@ -20,6 +20,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { connectors } from "@/connectors";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { PLANNED_CONNECTORS } from "@/lib/planned-connectors";
@@ -205,7 +206,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   }, [sortCol]);
 
   useEffect(() => {
-    fetch("/api/v1/sources/status")
+    fetchWithTimeout("/api/v1/sources/status")
       .then((r) => r.json())
       .then((data) => {
         const list = data?.connectors || data?.sources || [];

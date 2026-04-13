@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { IntelligenceBriefing } from "@/lib/intelligence-engine";
 import { TrendDot } from "@/types";
 import { Locale } from "@/lib/i18n";
@@ -81,7 +82,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
     if (!activeProjectId || saving || saved) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/projects/${activeProjectId}/queries`, {
+      const res = await fetchWithTimeout(`/api/v1/projects/${activeProjectId}/queries`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -428,7 +429,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 onRating={(perspectiveId, rating) => {
                   const queryHash = btoa(entry.query.slice(0, 64) + entry.timestamp.toISOString().slice(0, 16))
                     .replace(/[^a-z0-9]/gi, "").slice(0, 32);
-                  fetch("/api/v1/bsc-ratings", {
+                  fetchWithTimeout("/api/v1/bsc-ratings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ queryHash, perspectiveId, rating }),

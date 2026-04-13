@@ -7,6 +7,7 @@
 // This page should be a Server Component with only interactive islands as "use client".
 
 import { useState } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import Image from "next/image";
 import { useLocale } from "@/lib/locale-context";
 
@@ -22,7 +23,7 @@ export default function SignInPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/signin/email", {
+      const res = await fetchWithTimeout("/api/auth/signin/email", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -37,8 +38,12 @@ export default function SignInPage() {
       } else {
         setError("Sign-in failed. Your email may not be on the allowlist.");
       }
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out. Please try again.");
+      } else {
+        setError("Network error. Please try again.");
+      }
     }
   }
 
@@ -117,7 +122,7 @@ export default function SignInPage() {
 }
 
 async function getCsrfToken(): Promise<string> {
-  const res = await fetch("/api/auth/csrf");
+  const res = await fetchWithTimeout("/api/auth/csrf");
   const data = await res.json();
   return data.csrfToken;
 }

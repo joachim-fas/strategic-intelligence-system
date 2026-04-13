@@ -30,6 +30,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { TrendDot } from "@/types";
 import {
   VoltAccordion,
@@ -131,7 +132,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
 
   const load = () => {
     const window = TIME_WINDOWS.find(w => w.key === timeWindow)!;
-    fetch(`/api/v1/feed/ticker?limit=200&hours=${window.hours}`)
+    fetchWithTimeout(`/api/v1/feed/ticker?limit=200&hours=${window.hours}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -259,7 +260,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
     });
 
     try {
-      const res = await fetch(`/api/v1/og-image?url=${encodeURIComponent(url)}`);
+      const res = await fetchWithTimeout(`/api/v1/og-image?url=${encodeURIComponent(url)}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { imageUrl: string | null; status: string };
       const ok = data.status === "ok" && data.imageUrl;

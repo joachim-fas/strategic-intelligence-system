@@ -12,6 +12,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useActivityStream } from "@/lib/use-activity-stream";
 import type { ActivityEvent } from "@/lib/use-activity-stream";
 import { useLocale } from "@/lib/locale-context";
@@ -116,7 +117,7 @@ export function ActivityPanel() {
   useEffect(() => {
     if (!open) return;
     const fetchData = () => {
-      fetch("/api/v1/monitor")
+      fetchWithTimeout("/api/v1/monitor")
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (d) setMonitorData(d); })
         .catch(() => {});

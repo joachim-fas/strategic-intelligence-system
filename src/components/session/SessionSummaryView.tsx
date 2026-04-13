@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -82,7 +83,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
       setLoadingState("loading");
       try {
         // Load canvas name
-        const canvasRes = await fetch(`/api/v1/canvas/${projectId}`);
+        const canvasRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}`);
         if (canvasRes.ok) {
           const json = await canvasRes.json();
           if (!cancelled) setProjectName(json.canvas?.name || "");
@@ -101,7 +102,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         }
 
         // Load cached summary
-        const summaryRes = await fetch(`/api/v1/canvas/${projectId}/summary`);
+        const summaryRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}/summary`);
         if (!summaryRes.ok) {
           if (!cancelled) {
             setError(de ? "Projekt nicht gefunden" : "Project not found");

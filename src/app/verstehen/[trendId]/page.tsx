@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { useParams } from "next/navigation";
@@ -22,7 +23,7 @@ export default function TrendDetailPage() {
 
   useEffect(() => {
     // Try API first, fallback to megaTrends
-    fetch(`/api/v1/trends/${trendId}`)
+    fetchWithTimeout(`/api/v1/trends/${trendId}`)
       .then(r => r.json())
       .then(data => {
         if (data.trend) {
