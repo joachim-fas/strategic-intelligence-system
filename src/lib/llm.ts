@@ -44,6 +44,14 @@ interface LLMBriefingResponse {
   keyInsights: string[];
   regulatoryContext: string[];
   causalAnalysis: string[];
+  steepV?: {
+    S?: string | null;
+    T?: string | null;
+    E_economy?: string | null;
+    E_environment?: string | null;
+    P?: string | null;
+    V?: string | null;
+  };
   confidence: number;
   balancedScorecard?: {
     perspectives: Array<{
@@ -74,7 +82,7 @@ export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignal
       const regs = getRegulationsForTrend(t.id);
       const edges = getEdgesForTrend(t.id);
       const sources = getTrendSources(t.tags);
-      return `- ${t.name} [${t.category}] Ring:${t.ring} Rel:${(t.relevance*100).toFixed(0)}% Conf:${(t.confidence*100).toFixed(0)}% Imp:${(t.impact*100).toFixed(0)}% ${t.velocity}↕ Dur:${cls.duration} Dir:${cls.direction} Focus:${cls.focus.join(",")} Signals:${t.signalCount} Sources:${sources.map(s=>s.shortName).join(",")} Regs:${regs.map(r=>r.shortName).join(",")} Edges:${edges.length}`;
+      return `- ID:"${t.id}" | ${t.name} [${t.category}] Ring:${t.ring} Rel:${(t.relevance*100).toFixed(0)}% Conf:${(t.confidence*100).toFixed(0)}% Imp:${(t.impact*100).toFixed(0)}% ${t.velocity}↕ Dur:${cls.duration} Dir:${cls.direction} Focus:${cls.focus.join(",")} Signals:${t.signalCount} Sources:${sources.map(s=>s.shortName).join(",")} Regs:${regs.map(r=>r.shortName).join(",")} Edges:${edges.length}`;
     })
     .join("\n");
 
@@ -128,7 +136,30 @@ Orientiere dich an den 14 EU JRC Megatrends (European Commission Joint Research 
 4. Verwende die Trends als HINTERGRUND-KONTEXT — sie sind Signalgeber, nicht deine Antwort.
 5. VERBOTE: Schreibe NIEMALS Saetze wie "X ist ein Megatrend mit Y% Relevanz" — das ist Datendump, keine Analyse.
 6. scenarios IMMER generieren — GENAU 3 Szenarien: optimistic, baseline, pessimistic. Niemals null, niemals weniger, niemals mehr. Die Summe der Wahrscheinlichkeiten MUSS ungefaehr 100% ergeben.
-7. TRANSPARENZ: Jede faktische Aussage MUSS eine Quelle haben: [Quellenname, Datum]. Wo du keine Quelle zitieren kannst, schreibe explizit [LLM-Einschaetzung]. Das references-Array darf NIEMALS leer sein — fuege mindestens 2 echte Quellen mit URLs ein. Wo die Datenlage duenn ist, sage es.
+7. TRANSPARENZ & QUELLENHERKUNFT (Provenance Tagging):
+   - Fakten aus Live-Signalen: [SIGNAL: Quellenname, Datum]
+   - Fakten aus Trend-Daten: [TREND: Trendname]
+   - Eigenes Wissen ohne externe Quelle: [LLM-Einschaetzung]
+   - ERFINDE NIEMALS URLs oder Verordnungsnummern. Wenn du eine konkrete URL nicht kennst, lasse sie weg.
+   - Das references-Array darf NIEMALS leer sein — fuege mindestens 2 ECHTE, VERIFIZIERTE Quellen ein.
+   - Wo die Datenlage duenn ist, sage es explizit.
+
+═══ SZENARIO-WAHRSCHEINLICHKEITEN ═══
+KRITISCH: Die drei Szenario-Wahrscheinlichkeiten muessen sich aus der ANALYSE ERGEBEN — NICHT aus einem Default-Schema.
+- VERBOTEN: Identische Verteilungen wie 0.20/0.55/0.25 oder 0.25/0.50/0.25 fuer jede Frage
+- Wahrscheinlichkeiten MUESSEN themenspezifisch sein. Beispiele:
+  * Ein reifer Markt → baseline hoeher (z.B. 0.65), Extremszenarien niedriger
+  * Ein volatiles Thema → breitere Verteilung, pessimistic kann hoeher sein
+  * Ein politisch getriebenes Thema → baseline niedriger weil unsicherer
+- Begruende in der description WARUM du diese Wahrscheinlichkeit vergibst
+- Summe muss ~100% sein (95-105% akzeptabel durch Rundung)
+
+═══ TREND-MATCHING (matchedTrendIds) ═══
+Mappe deine Analyse IMMER zurueck auf konkrete Trend-IDs aus der TRENDS-Liste oben.
+- Pruefe JEDEN Trend in der Liste: Ist er DIREKT relevant fuer diese Frage?
+- Gib NUR die trend-IDs zurueck (z.B. "mega-ai-transformation"), NICHT die Namen
+- Erwartete Anzahl: 3-8 matched Trends pro Query — nicht 0, nicht alle 40
+- FEHLERMELDUNG an dich selbst: matchedTrendIds = [] ist IMMER ein Fehler
 
 ═══ FRAGTYPEN ═══
 STRATEGISCH ("Wie entwickelt sich X in 5 Jahren?", "Welche Chancen bei Y?") → Tiefe STEEP+V-Analyse + BSC-Kandidat
@@ -170,7 +201,15 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
 {
   "synthesis": "6-10 substanzielle Saetze. Beantworte die Kernfrage vollstaendig. Erklaere strukturelle Ursachen und Dynamiken. Nenne konkrete Beispiele, Zahlen, Zeitrahmen. Belege mit [Quelle, Datum]. VERBOTEN: Saetze wie 'X ist ein Megatrend mit Y% Relevanz'.",
   "reasoningChains": ["Kausale Kette: Ausgangsfaktor → Zwischenschritt → Strategische Implikation", "..."],
-  "matchedTrendIds": ["nur-IDs-die-direkt-relevant-sind — lieber wenige als viele falsche"],
+  "steepV": {
+    "S": "Society-Dimension: 1-2 Saetze wie diese Frage die Gesellschaft betrifft (oder null wenn irrelevant)",
+    "T": "Technology-Dimension: 1-2 Saetze (oder null)",
+    "E_economy": "Economy-Dimension: 1-2 Saetze (oder null)",
+    "E_environment": "Environment-Dimension: 1-2 Saetze (oder null)",
+    "P": "Politics-Dimension: 1-2 Saetze (oder null)",
+    "V": "Values-Dimension: 1-2 Saetze (oder null)"
+  },
+  "matchedTrendIds": ["mega-ai-transformation", "mega-climate-sustainability", "mega-geopolitical-shifts"],
   "keyInsights": [
     "Konkrete, nicht-triviale Erkenntnis mit Begruendung und Konsequenz",
     "Zweite Erkenntnis — anderer Aspekt, konkret",
@@ -182,25 +221,25 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     {
       "type": "optimistic",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Konkretes Szenario mit Zeitrahmen und Bedingungen — mindestens 2 Saetze. Nenne konkrete Akteure, Zahlen, Zeitpunkte.",
-      "probability": 0.25,
-      "timeframe": "2025–2027",
+      "description": "Konkretes Szenario mit Zeitrahmen und Bedingungen — mindestens 2 Saetze. Nenne konkrete Akteure, Zahlen, Zeitpunkte. Begruende die Wahrscheinlichkeit.",
+      "probability": "<BERECHNE themenspezifisch, NICHT 0.25>",
+      "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2", "Treiber 3"]
     },
     {
       "type": "baseline",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Was passiert wenn aktuelle Dynamiken anhalten — mindestens 2 Saetze. Konkreter als 'Weiterentwicklung'.",
-      "probability": 0.5,
-      "timeframe": "2025–2028",
+      "description": "Was passiert wenn aktuelle Dynamiken anhalten — mindestens 2 Saetze. Konkreter als 'Weiterentwicklung'. Begruende die Wahrscheinlichkeit.",
+      "probability": "<BERECHNE themenspezifisch, NICHT 0.50>",
+      "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2", "Treiber 3"]
     },
     {
       "type": "pessimistic",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Worst Case mit konkreten Ausloesern — mindestens 2 Saetze. Erklaere den Kipppunkt.",
-      "probability": 0.2,
-      "timeframe": "2025–2026",
+      "description": "Worst Case mit konkreten Ausloesern — mindestens 2 Saetze. Erklaere den Kipppunkt. Begruende die Wahrscheinlichkeit.",
+      "probability": "<BERECHNE themenspezifisch, NICHT 0.20>",
+      "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2"]
     }
   ],
@@ -240,9 +279,17 @@ export async function queryLLM(request: LLMBriefingRequest): Promise<LLMBriefing
 
   const systemPrompt = buildSystemPrompt(request.trends, request.locale, request.liveSignalsContext);
 
+  // SEC-08: Sanitize contextProfile fields to prevent prompt injection
   let userMessage = request.query;
   if (request.contextProfile) {
-    userMessage += `\n\n[Kontext: ${request.contextProfile.role} / ${request.contextProfile.industry} / ${request.contextProfile.region}]`;
+    const sf = (v: string | undefined): string =>
+      (v || "").slice(0, 100).replace(/[\n\r]/g, " ").replace(/<\/?[a-zA-Z][^>]*>/g, "").replace(/\b(system|assistant|human)\s*:/gi, "").trim();
+    const role = sf(request.contextProfile.role);
+    const industry = sf(request.contextProfile.industry);
+    const region = sf(request.contextProfile.region);
+    if (role || industry || region) {
+      userMessage += `\n\n[Kontext: ${role} / ${industry} / ${region}]`;
+    }
   }
 
   const MAX_RETRIES = 3;

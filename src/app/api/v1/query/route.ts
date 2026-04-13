@@ -227,6 +227,12 @@ const RL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+  // M4-FIX: Prune expired entries every 50 calls to prevent unbounded map growth
+  if (_rl.size > 50) {
+    for (const [key, entry] of _rl) {
+      if (now - entry.windowStart > RL_WINDOW_MS) _rl.delete(key);
+    }
+  }
   const entry = _rl.get(ip);
   if (!entry || now - entry.windowStart > RL_WINDOW_MS) {
     _rl.set(ip, { count: 1, windowStart: now });
@@ -302,14 +308,27 @@ export async function POST(req: Request) {
     fetch(`${base}/api/v1/pipeline`, { method: "POST" }).catch(() => {});
   }
 
+  // SEC-09: Validate locale — only "de" and "en" are accepted
+  const validLocale = locale === "en" ? "en" : "de";
+
   const relevantSignals = getRelevantSignals(query, 12);
   const liveSignalsContext = formatSignalsForPrompt(relevantSignals);
 
-  const systemPrompt = buildSystemPrompt(trends, locale || "de", liveSignalsContext || undefined);
+  const systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined);
 
+  // SEC-08: Sanitize contextProfile fields — prevent prompt injection via role/industry/region
   let userMessage = query;
   if (contextProfile) {
-    userMessage += `\n\n[Kontext: ${contextProfile.role} / ${contextProfile.industry} / ${contextProfile.region}]`;
+    const sanitizeField = (v: unknown): string => {
+      if (typeof v !== "string") return "";
+      return v.slice(0, 100).replace(/[\n\r]/g, " ").replace(/<\/?[a-zA-Z][^>]*>/g, "").replace(/\b(system|assistant|human)\s*:/gi, "").trim();
+    };
+    const role = sanitizeField(contextProfile.role);
+    const industry = sanitizeField(contextProfile.industry);
+    const region = sanitizeField(contextProfile.region);
+    if (role || industry || region) {
+      userMessage += `\n\n[Kontext: ${role} / ${industry} / ${region}]`;
+    }
   }
 
   const encoder = new TextEncoder();
@@ -321,6 +340,28 @@ export async function POST(req: Request) {
       };
 
       try {
+        // SEC-10: Sanitize previousContext to prevent prompt injection.
+        // The client can pass arbitrary text as previousContext.synthesis,
+        // which gets injected as an assistant message — a potent injection vector.
+        let messages: Array<{ role: string; content: string }>;
+        if (previousContext?.synthesis && typeof previousContext.synthesis === "string") {
+          const prevQuery = sanitizeQuery(
+            typeof previousContext.query === "string" ? previousContext.query : ""
+          ) || "";
+          // Truncate synthesis to prevent abuse and strip injection patterns
+          const prevSynthesis = previousContext.synthesis
+            .slice(0, 6000)
+            .replace(/<\/?[a-zA-Z_|][^>]{0,80}>/g, "")
+            .replace(/\b(system|user|assistant|human)\s*:/gi, "");
+          messages = [
+            { role: "user", content: prevQuery },
+            { role: "assistant", content: prevSynthesis },
+            { role: "user", content: userMessage },
+          ];
+        } else {
+          messages = [{ role: "user", content: userMessage }];
+        }
+
         const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -332,13 +373,7 @@ export async function POST(req: Request) {
             model: "claude-sonnet-4-6",
             max_tokens: 12000,
             system: systemPrompt,
-            messages: previousContext?.synthesis
-              ? [
-                  { role: "user", content: previousContext.query },
-                  { role: "assistant", content: previousContext.synthesis },
-                  { role: "user", content: userMessage },
-                ]
-              : [{ role: "user", content: userMessage }],
+            messages,
             stream: true,
           }),
         });
@@ -427,6 +462,38 @@ export async function POST(req: Request) {
         }
 
         try {
+          // ── VAL-01: Validate & normalize LLM output via Zod schema ─────
+          const { validateLLMResponse, computeBlendedConfidence } = await import("@/lib/validation");
+          const validTrendIds = new Set(trends.map((t: TrendDot) => t.id));
+          const { data: validated, warnings } = validateLLMResponse(result, validTrendIds);
+
+          // Log validation warnings server-side for monitoring
+          if (warnings.length > 0) {
+            console.warn("[query] LLM output validation warnings:", warnings);
+          }
+
+          // VAL-03: Compute evidence-based blended confidence score
+          const uniqueSources = new Set(relevantSignals.map((s: any) => s.source)).size;
+          validated.confidence = computeBlendedConfidence(
+            validated.confidence,
+            validated.matchedTrendIds.length,
+            relevantSignals.length,
+            uniqueSources,
+            validated.references.length > 0
+          );
+
+          // Data quality warnings
+          const qualityWarnings: string[] = [];
+          if (relevantSignals.length === 0) {
+            qualityWarnings.push("Keine thematisch relevanten Live-Signale gefunden. Analyse basiert auf Trend-Daten und LLM-Wissen.");
+          }
+          if (warnings.some(w => w.includes("hallucinated matchedTrendIds"))) {
+            qualityWarnings.push("Einige Trend-Zuordnungen konnten nicht verifiziert werden.");
+          }
+          if (warnings.some(w => w.includes("probability"))) {
+            qualityWarnings.push("Szenario-Wahrscheinlichkeiten wurden normalisiert.");
+          }
+
           const signalsMeta = relevantSignals.map((s: any) => ({
             source: s.source,
             title: s.title,
@@ -436,7 +503,7 @@ export async function POST(req: Request) {
           }));
 
           // Augment: matched trend details for radar + demographics
-          const matchedIds: string[] = result.matchedTrendIds || [];
+          const matchedIds: string[] = validated.matchedTrendIds || [];
           const matchedIdSet = new Set(matchedIds);
           const matchedTrends = matchedIds
             .map((id: string) => trends.find((t: TrendDot) => t.id === id))
@@ -465,17 +532,20 @@ export async function POST(req: Request) {
               strength: e.strength, description: e.description,
             }));
 
-          // API-03: Flag repaired results so the client can detect incomplete data
+          // API-03 + VAL-01: Final result with validation metadata
           const finalResult = {
-            ...result,
+            ...validated,
             usedSignals: signalsMeta,
             matchedTrends,
             matchedEdges,
             ...(wasRepaired ? { _repaired: true } : {}),
+            ...(qualityWarnings.length > 0 ? { _dataQualityWarnings: qualityWarnings } : {}),
+            ...(warnings.length > 0 ? { _validationWarnings: warnings } : {}),
           };
           send({ type: "complete", result: finalResult });
-        } catch {
-          send({ type: "error", error: "JSON parse failed" });
+        } catch (parseErr) {
+          console.error("[query] Post-processing error:", parseErr);
+          send({ type: "error", error: "Ergebnis konnte nicht verarbeitet werden. Bitte erneut versuchen." });
         }
 
         controller.close();

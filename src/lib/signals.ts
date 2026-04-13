@@ -171,14 +171,11 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const keywords = Array.from(expandedSet).slice(0, 12); // Allow more keywords after expansion
 
   if (keywords.length === 0) {
-    // Fallback: return most recent high-strength signals
-    const rows = d.prepare(`
-      SELECT * FROM live_signals
-      ORDER BY strength DESC, fetched_at DESC
-      LIMIT ?
-    `).all(limit) as LiveSignal[];
+    // No meaningful keywords extracted — return empty instead of
+    // irrelevant noise (FIX: previously returned top signals by strength
+    // regardless of topic, causing e.g. football bets for mobility queries)
     d.close();
-    return rows;
+    return [];
   }
 
   // Score each signal using parameterized LIKE queries (no string interpolation).
@@ -192,19 +189,22 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // Bind each keyword as a `%keyword%` pattern for title, topic, and content
   const likeParams = keywords.flatMap(kw => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
 
+  // M1-FIX: Add HAVING clause so the DB filters zero-score rows instead of
+  // fetching LIMIT rows and filtering in JS. Also require score >= 2 to avoid
+  // noise from single content-only matches.
   const rows = d.prepare(`
     SELECT *,
       (${scoreExpr}) as relevance_score
     FROM live_signals
     WHERE fetched_at > datetime('now', '-336 hours')
+      AND (${scoreExpr}) >= 2
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
-  `).all([...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
+  `).all([...likeParams, ...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
 
   d.close();
 
-  // Only return signals with at least some relevance (score > 0)
-  return rows.filter((r) => r.relevance_score > 0);
+  return rows;
 }
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────

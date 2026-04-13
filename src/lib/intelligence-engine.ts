@@ -208,7 +208,7 @@ export async function queryIntelligenceAsync(
       usedSignals: llmResult.usedSignals,
       balancedScorecard: llmResult.balancedScorecard,
       signalSummary: `${totalSignals} signals across ${matchedTrends.length} trends`,
-      confidence: llmResult.confidence || 0.5,
+      confidence: llmResult.confidence ?? 0.5,
       dataPoints: totalSignals,
     };
   } catch {
