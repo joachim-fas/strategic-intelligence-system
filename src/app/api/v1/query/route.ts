@@ -305,7 +305,7 @@ export async function POST(req: Request) {
 
   emitActivity({ type: "query", phase: "start", message: `Abfrage: "${query.slice(0, 80)}${query.length > 80 ? "…" : ""}"`, meta: { queryLength: query.length, locale: validLocale } });
 
-  const relevantSignals = getRelevantSignals(query, 12);
+  const relevantSignals = getRelevantSignals(query, 16);
   const liveSignalsContext = formatSignalsForPrompt(relevantSignals);
   const uniqueSources = new Set(relevantSignals.map((s: any) => s.source)).size;
 

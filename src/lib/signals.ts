@@ -104,16 +104,67 @@ export function getSignalAge(): { count: number; oldestHours: number; newestHour
 // ─── Retrieve relevant signals for a query ───────────────────────────────────
 
 /**
- * Finds live signals relevant to a query using keyword matching.
- * Returns top N signals, ordered by strength DESC then recency.
+ * ALG-22: Source-topic incoherence filter.
+ * Certain sources produce signals whose topic fields are ambiguous.
+ * A Polymarket signal tagged "Mobility & Autonomous Transport" might actually
+ * be about football match betting if the topic-matcher caught a stray keyword.
+ */
+const NOISE_SOURCE_TOPICS: Record<string, Set<string>> = {
+  polymarket: new Set([
+    "sports", "betting", "football", "soccer", "basketball", "baseball",
+    "nfl", "nba", "mlb", "nhl", "ufc", "tennis", "boxing", "cricket",
+    "f1", "formula 1", "premier league", "champions league", "bundesliga",
+    "serie a", "la liga", "world cup",
+  ]),
+  kalshi: new Set([
+    "sports", "betting", "football", "soccer", "basketball", "baseball",
+    "nfl", "nba", "mlb", "nhl", "ufc", "tennis",
+  ]),
+  manifold: new Set([
+    "sports", "betting", "football", "soccer", "basketball",
+  ]),
+};
+
+function isNoiseSignal(
+  signal: LiveSignal & { relevance_score: number },
+  queryKeywords: string[]
+): boolean {
+  const sourceNoise = NOISE_SOURCE_TOPICS[signal.source];
+  if (!sourceNoise) return false;
+
+  // If the user's query is actually about sports/betting, don't filter
+  const sportTerms = new Set([
+    "sport", "sports", "fußball", "football", "soccer", "basketball",
+    "tennis", "betting", "wetten", "bundesliga", "nfl", "nba",
+  ]);
+  if (queryKeywords.some((kw) => sportTerms.has(kw))) return false;
+
+  const signalText = [
+    signal.title, signal.topic, signal.tags, signal.content?.slice(0, 500),
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  for (const noiseWord of sourceNoise) {
+    if (signalText.includes(noiseWord)) return true;
+  }
+  return false;
+}
+
+/**
+ * Finds live signals relevant to a query using keyword + phrase matching
+ * with post-retrieval coherence filtering.
+ *
+ * ALG-22 improvements:
+ *  1. Bigram phrase matching — adjacent keywords form 2-word phrases
+ *     that score higher than single-word matches
+ *  2. Raised SQL threshold to >= 3 (single keyword match not enough)
+ *  3. Source-topic coherence filter removes prediction-market noise
+ *  4. Keyword overlap ratio check (30% minimum)
+ *  5. Over-fetches 3x from SQL then post-filters to requested limit
  */
 export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const d = db();
 
   // ALG-21: Cross-language alias map for common DE<>EN term pairs.
-  // When a keyword matches any alias group, all aliases in that group
-  // are added to the keyword list so "Cybersicherheit" also matches
-  // signals tagged with "cybersecurity" and vice versa.
   const CROSS_LANG_ALIASES: Record<string, string[]> = {
     "ki": ["ai", "artificial intelligence", "künstliche intelligenz"],
     "klimawandel": ["climate change", "global warming"],
@@ -124,9 +175,11 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "migration": ["immigration", "refugees"],
     "geopolitik": ["geopolitics"],
     "kryptowährung": ["cryptocurrency", "crypto"],
+    "mobilität": ["mobility", "transport", "transportation", "verkehr"],
+    "nachhaltigkeit": ["sustainability", "sustainable"],
+    "digitalisierung": ["digitalization", "digital transformation"],
   };
 
-  // Build a reverse lookup: any alias term -> all terms in its group
   const aliasLookup = new Map<string, string[]>();
   for (const [key, aliases] of Object.entries(CROSS_LANG_ALIASES)) {
     const group = [key, ...aliases];
@@ -152,6 +205,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "und", "oder", "aber", "also", "noch", "schon", "sehr", "nach", "vor",
     "nicht", "kein", "keine", "nur", "mehr", "dass", "wenn", "weil", "dann",
     "dort", "hier", "alle", "viel", "viele", "etwa", "erst", "bereits",
+    "im", "am", "zum", "zur", "als",
     // EN question words
     "the", "how", "what", "where", "when", "why", "which", "who",
     // EN common
@@ -160,7 +214,6 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "into", "than", "then", "some", "such", "also", "most", "much", "many",
   ]);
 
-  // Important short terms that must bypass the minimum-length filter
   const importantShortTerms = new Set([
     "ki", "ai", "eu", "un", "us", "uk", "it", "ml", "ar", "vr", "xr",
     "5g", "6g", "iot", "llm", "rag", "api", "b2b", "b2c", "esg", "gdp",
@@ -172,9 +225,14 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     .split(/\s+/)
     .filter((w) => !stopWords.has(w) && (w.length >= 4 || importantShortTerms.has(w)));
 
+  // ALG-22: Extract bigrams for phrase matching
+  const bigrams: string[] = [];
+  for (let i = 0; i < baseKeywords.length - 1; i++) {
+    bigrams.push(`${baseKeywords[i]} ${baseKeywords[i + 1]}`);
+  }
+
   // ALG-21: Expand keywords with cross-language aliases
   const expandedSet = new Set(baseKeywords);
-  // Also check multi-word phrases from the query against alias keys
   const lowerQuery = query.toLowerCase().replace(/[^\w\säöüß]/g, " ");
   for (const [aliasKey, group] of aliasLookup) {
     if (lowerQuery.includes(aliasKey) || baseKeywords.includes(aliasKey)) {
@@ -183,46 +241,65 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
       }
     }
   }
-  const keywords = Array.from(expandedSet).slice(0, 12); // Allow more keywords after expansion
+  const keywords = Array.from(expandedSet).slice(0, 14);
 
   if (keywords.length === 0) {
-    // No meaningful keywords extracted — return empty instead of
-    // irrelevant noise (FIX: previously returned top signals by strength
-    // regardless of topic, causing e.g. football bets for mobility queries)
     d.close();
     return [];
   }
 
-  // Score each signal using parameterized LIKE queries (no string interpolation).
-  // Each keyword generates three CASE clauses (title, topic, content).
-  const caseParts = keywords.map(() =>
+  // ── Build SQL scoring expression ──────────────────────────────────────
+  // Single-word: title=2, topic=3, content=1
+  // Bigram phrase: title=5, topic=4, content=2
+  const singleCaseParts = keywords.map(() =>
     `(CASE WHEN lower(title)   LIKE ? THEN 2 ELSE 0 END +
-      CASE WHEN lower(topic)   LIKE ? THEN 2 ELSE 0 END +
+      CASE WHEN lower(topic)   LIKE ? THEN 3 ELSE 0 END +
       CASE WHEN lower(content) LIKE ? THEN 1 ELSE 0 END)`
   );
-  const scoreExpr = caseParts.join(" + ");
-  // Bind each keyword as a `%keyword%` pattern for title, topic, and content
-  const likeParams = keywords.flatMap(kw => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
+  const bigramCaseParts = bigrams.map(() =>
+    `(CASE WHEN lower(title)   LIKE ? THEN 5 ELSE 0 END +
+      CASE WHEN lower(topic)   LIKE ? THEN 4 ELSE 0 END +
+      CASE WHEN lower(content) LIKE ? THEN 2 ELSE 0 END)`
+  );
+  const scoreExpr = [...singleCaseParts, ...bigramCaseParts].join(" + ");
 
-  // Require score >= 4 so a single keyword match in title/topic alone
-  // is not enough. Signals must match 2+ keywords or match in multiple
-  // fields to be considered relevant. This prevents generic words from
-  // pulling in completely unrelated signals (e.g. football odds for
-  // a mobility query).
-  const MIN_RELEVANCE = 4;
+  const singleParams = keywords.flatMap(kw => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
+  const bigramParams = bigrams.flatMap(bg => [`%${bg}%`, `%${bg}%`, `%${bg}%`]);
+  const likeParams = [...singleParams, ...bigramParams];
+
+  // Over-fetch 3x to leave room for post-filtering
+  const sqlLimit = limit * 3;
+
   const rows = d.prepare(`
     SELECT *,
       (${scoreExpr}) as relevance_score
     FROM live_signals
     WHERE fetched_at > datetime('now', '-336 hours')
-      AND (${scoreExpr}) >= ${MIN_RELEVANCE}
+      AND (${scoreExpr}) >= 3
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
-  `).all([...likeParams, ...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
+  `).all([...likeParams, ...likeParams, sqlLimit]) as (LiveSignal & { relevance_score: number })[];
 
   d.close();
 
-  return rows;
+  // ── Post-SQL filtering ────────────────────────────────────────────────
+
+  // Filter 1: Remove prediction market sports/betting noise
+  let filtered = rows.filter((row) => !isNoiseSignal(row, baseKeywords));
+
+  // Filter 2: Keyword overlap ratio — require 30% of keywords to appear
+  const minOverlapCount = Math.max(1, Math.ceil(baseKeywords.length * 0.3));
+  filtered = filtered.filter((row) => {
+    const signalText = [row.title, row.topic, row.content?.slice(0, 1000), row.tags]
+      .filter(Boolean).join(" ").toLowerCase();
+    let matchedCount = 0;
+    for (const kw of baseKeywords) {
+      if (signalText.includes(kw)) matchedCount++;
+    }
+    return matchedCount >= minOverlapCount;
+  });
+
+  return filtered.slice(0, limit);
 }
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────
