@@ -137,12 +137,27 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
 
   // Extract meaningful keywords from query (skip short/common words)
   const stopWords = new Set([
+    // DE question words
     "wie", "was", "wo", "wer", "wann", "warum", "welche", "welcher", "welches",
+    // DE articles & pronouns
+    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
+    "sich", "ich", "du", "er", "sie", "es", "wir", "ihr", "mein", "dein", "sein",
+    "diese", "dieser", "dieses", "diesen", "diesem", "jede", "jeder", "jedes",
+    // DE common verbs & auxiliaries
     "ist", "sind", "hat", "haben", "wird", "werden", "kann", "können",
+    "sein", "war", "waren", "wurde", "würde", "soll", "sollen", "muss", "müssen",
+    "gibt", "geben", "macht", "machen", "geht", "gehen", "kommt", "kommen",
+    // DE prepositions & conjunctions
     "für", "von", "mit", "bei", "auf", "an", "in", "zu", "über", "unter",
+    "und", "oder", "aber", "also", "noch", "schon", "sehr", "nach", "vor",
+    "nicht", "kein", "keine", "nur", "mehr", "dass", "wenn", "weil", "dann",
+    "dort", "hier", "alle", "viel", "viele", "etwa", "erst", "bereits",
+    // EN question words
     "the", "how", "what", "where", "when", "why", "which", "who",
+    // EN common
     "is", "are", "has", "have", "will", "can", "for", "with", "from",
-    "und", "oder", "aber", "und", "also", "noch", "schon", "sehr",
+    "and", "but", "not", "this", "that", "these", "those", "been", "does",
+    "into", "than", "then", "some", "such", "also", "most", "much", "many",
   ]);
 
   // Important short terms that must bypass the minimum-length filter
@@ -155,7 +170,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     .toLowerCase()
     .replace(/[^\w\säöüß]/g, " ")
     .split(/\s+/)
-    .filter((w) => !stopWords.has(w) && (w.length >= 2 || importantShortTerms.has(w)));
+    .filter((w) => !stopWords.has(w) && (w.length >= 4 || importantShortTerms.has(w)));
 
   // ALG-21: Expand keywords with cross-language aliases
   const expandedSet = new Set(baseKeywords);
@@ -189,15 +204,18 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // Bind each keyword as a `%keyword%` pattern for title, topic, and content
   const likeParams = keywords.flatMap(kw => [`%${kw}%`, `%${kw}%`, `%${kw}%`]);
 
-  // M1-FIX: Add HAVING clause so the DB filters zero-score rows instead of
-  // fetching LIMIT rows and filtering in JS. Also require score >= 2 to avoid
-  // noise from single content-only matches.
+  // Require score >= 4 so a single keyword match in title/topic alone
+  // is not enough. Signals must match 2+ keywords or match in multiple
+  // fields to be considered relevant. This prevents generic words from
+  // pulling in completely unrelated signals (e.g. football odds for
+  // a mobility query).
+  const MIN_RELEVANCE = 4;
   const rows = d.prepare(`
     SELECT *,
       (${scoreExpr}) as relevance_score
     FROM live_signals
     WHERE fetched_at > datetime('now', '-336 hours')
-      AND (${scoreExpr}) >= 2
+      AND (${scoreExpr}) >= ${MIN_RELEVANCE}
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
   `).all([...likeParams, ...likeParams, limit]) as (LiveSignal & { relevance_score: number })[];
