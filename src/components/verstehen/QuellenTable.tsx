@@ -1,8 +1,5 @@
 "use client";
 
-// TODO: PERF-08 — All list items rendered to DOM. At 500+ entries, UI becomes sluggish.
-// FIX: Use react-virtual or react-window for lists with >50 items.
-
 /**
  * QuellenTable — Implements the Volt UI "Quellen-Tabelle" template.
  *
@@ -22,6 +19,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { connectors } from "@/connectors";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { PLANNED_CONNECTORS } from "@/lib/planned-connectors";
@@ -195,6 +193,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<"name" | "category" | "type" | "status">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleSort = useCallback((col: "name" | "category" | "type" | "status") => {
     if (sortCol === col) {
@@ -395,6 +394,13 @@ export default function QuellenTable({ de }: QuellenTableProps) {
 
   const showResearch = activeFilter === "forschung";
 
+  const rowVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 68,
+    overscan: 8,
+  });
+
   return (
     <div style={{ padding: "24px", maxWidth: 1360, margin: "0 auto" }}>
       {/* Section header */}
@@ -495,7 +501,8 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         {/* Divider */}
         <div style={{ borderTop: "1px solid var(--color-border, #E8E8E8)", margin: "10px 0" }} />
 
-        {/* Row 2: Fine category pills */}
+        {/* Row 2: Fine category pills — only shown when a STEEP+V macro is selected */}
+        {activeMacro !== "all" && (
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
           <span style={{
             fontFamily: "var(--font-mono)",
@@ -520,7 +527,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
               if (key !== "all" && key !== "forschung") {
                 const count = categoryCounts.get(key) ?? 0;
                 if (count === 0) return null;
-                if (activeMacro !== "all" && CATEGORY_TO_MACRO[key] !== activeMacro) return null;
+                if (CATEGORY_TO_MACRO[key] !== activeMacro) return null;
               }
               return (
                 <VoltFilterPill
@@ -535,6 +542,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             })}
           </div>
         </div>
+        )}
 
         {/* Row 3: Status + Search — only shown when not in research mode */}
         {!showResearch && (
@@ -658,137 +666,155 @@ export default function QuellenTable({ de }: QuellenTableProps) {
               <div style={{ textAlign: "center" }}>Docs</div>
             </div>
 
-            {/* Data rows */}
-            {sorted.map((r, idx) => {
-              const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
-              const isActiveRow = r.status === "aktiv";
-              const macroKey =
-                r.category !== "forschung" && r.category !== "all"
-                  ? CATEGORY_TO_MACRO[r.category]
-                  : undefined;
-              const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
-              const MacroIcon = macroMeta?.icon;
-              const desc = de ? r.descDe : r.descEn;
-              return (
-                <div
-                  key={r.key}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: GRID_COLS,
-                    gap: 12,
-                    alignItems: "center",
-                    padding: "12px 20px",
-                    borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
-                    transition: "background-color 120ms ease",
-                    borderLeft: isActiveRow
-                      ? "3px solid var(--signal-positive, #1A9E5A)"
-                      : "3px solid transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(79,99,138,0.07)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  {/* Col 1: Source — name, description, doc link */}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 5,
-                      fontFamily: "var(--font-display)",
-                      fontSize: 13, fontWeight: 600,
-                      color: "var(--foreground)",
-                      lineHeight: 1.3,
-                    }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {r.displayName}
-                      </span>
-                      {isPlanned && r.priority === "high" && (
-                        <span
-                          title={de ? "Hohe Priorit\u00e4t" : "High priority"}
-                          style={{ fontSize: 7, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
-                        >&#9679;</span>
-                      )}
-                    </div>
-                    {desc && (
-                      <div style={{
-                        fontSize: 11,
-                        color: "var(--muted-foreground)",
-                        fontFamily: "var(--font-ui)",
-                        lineHeight: 1.4,
-                        marginTop: 2,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical" as const,
-                        overflow: "hidden",
-                      }}>
-                        {desc}
+            {/* Data rows — virtualized for performance at 500+ entries */}
+            <div ref={scrollRef} style={{ maxHeight: "min(72vh, 800px)", overflowY: "auto" }}>
+              <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const idx = virtualRow.index;
+                  const r = sorted[idx];
+                  const isPlanned = r.status === "geplant" || r.status === "backlog" || r.status === "needs-key";
+                  const isActiveRow = r.status === "aktiv";
+                  const macroKey =
+                    r.category !== "forschung" && r.category !== "all"
+                      ? CATEGORY_TO_MACRO[r.category]
+                      : undefined;
+                  const macroMeta = macroKey ? STEEP_V_META[macroKey] : undefined;
+                  const MacroIcon = macroMeta?.icon;
+                  const desc = de ? r.descDe : r.descEn;
+                  return (
+                    <div
+                      key={r.key}
+                      data-index={idx}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: GRID_COLS,
+                          gap: 12,
+                          alignItems: "center",
+                          padding: "12px 20px",
+                          borderBottom: idx === sorted.length - 1 ? "none" : "1px solid var(--color-border)",
+                          transition: "background-color 120ms ease",
+                          borderLeft: isActiveRow
+                            ? "3px solid var(--signal-positive, #1A9E5A)"
+                            : "3px solid transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(79,99,138,0.07)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        {/* Col 1: Source — name, description, doc link */}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 5,
+                            fontFamily: "var(--font-display)",
+                            fontSize: 13, fontWeight: 600,
+                            color: "var(--foreground)",
+                            lineHeight: 1.3,
+                          }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {r.displayName}
+                            </span>
+                            {isPlanned && r.priority === "high" && (
+                              <span
+                                title={de ? "Hohe Priorit\u00e4t" : "High priority"}
+                                style={{ fontSize: 7, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
+                              >&#9679;</span>
+                            )}
+                          </div>
+                          {desc && (
+                            <div style={{
+                              fontSize: 11,
+                              color: "var(--muted-foreground)",
+                              fontFamily: "var(--font-ui)",
+                              lineHeight: 1.4,
+                              marginTop: 2,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical" as const,
+                              overflow: "hidden",
+                            }}>
+                              {desc}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Col 2: Kategorie — macro icon + fine category label */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          {MacroIcon && macroMeta && (
+                            <span
+                              style={{
+                                width: 22, height: 22, borderRadius: 5,
+                                background: macroMeta.bg,
+                                color: macroMeta.text,
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <MacroIcon size={12} strokeWidth={2.25} />
+                            </span>
+                          )}
+                          <span style={{
+                            fontSize: 12,
+                            color: "var(--muted-foreground)",
+                            fontFamily: "var(--font-ui)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
+                          </span>
+                        </div>
+
+                        {/* Col 3: Typ */}
+                        <div>
+                          <VoltTypeBadge kind={r.type} />
+                        </div>
+
+                        {/* Col 4: Status */}
+                        <div>
+                          <VoltStatusBadge kind={r.status} />
+                        </div>
+
+                        {/* Col 5: Docs link */}
+                        <div style={{ textAlign: "center" }}>
+                          {r.docUrl ? (
+                            <a
+                              href={r.docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title={r.docUrl}
+                              style={{
+                                fontSize: 11, fontWeight: 600,
+                                color: "var(--signal-positive, #1A9E5A)",
+                                textDecoration: "none",
+                                fontFamily: "var(--font-mono)",
+                              }}
+                            >
+                              Docs&thinsp;&#8599;
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 11, color: "var(--muted-foreground)", opacity: 0.3 }}>—</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Col 2: Kategorie — macro icon + fine category label */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    {MacroIcon && macroMeta && (
-                      <span
-                        style={{
-                          width: 22, height: 22, borderRadius: 5,
-                          background: macroMeta.bg,
-                          color: macroMeta.text,
-                          display: "inline-flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <MacroIcon size={12} strokeWidth={2.25} />
-                      </span>
-                    )}
-                    <span style={{
-                      fontSize: 12,
-                      color: "var(--muted-foreground)",
-                      fontFamily: "var(--font-ui)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}>
-                      {de ? CATEGORIES[r.category].de : CATEGORIES[r.category].en}
-                    </span>
-                  </div>
-
-                  {/* Col 3: Typ */}
-                  <div>
-                    <VoltTypeBadge kind={r.type} />
-                  </div>
-
-                  {/* Col 4: Status */}
-                  <div>
-                    <VoltStatusBadge kind={r.status} />
-                  </div>
-
-                  {/* Col 5: Docs link */}
-                  <div style={{ textAlign: "center" }}>
-                    {r.docUrl ? (
-                      <a
-                        href={r.docUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title={r.docUrl}
-                        style={{
-                          fontSize: 11, fontWeight: 600,
-                          color: "var(--signal-positive, #1A9E5A)",
-                          textDecoration: "none",
-                          fontFamily: "var(--font-mono)",
-                        }}
-                      >
-                        Docs&thinsp;&#8599;
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: 11, color: "var(--muted-foreground)", opacity: 0.3 }}>—</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {sorted.length === 0 && (
               <div style={{

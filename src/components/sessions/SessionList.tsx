@@ -1,8 +1,5 @@
 "use client";
 
-// TODO: PERF-08 — All list items rendered to DOM. At 500+ entries, UI becomes sluggish.
-// FIX: Use react-virtual or react-window for lists with >50 items.
-
 // TODO: ARC-12 — Namespace collision: src/components/session/ and src/components/sessions/ both active.
 
 /**
@@ -12,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   FRAMEWORK_CATEGORIES,
   type FrameworkCategory,
@@ -93,6 +91,7 @@ export function SessionList({ mode, de }: Props) {
   });
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+  const sessionScrollRef = useRef<HTMLDivElement>(null);
   // Inline rename state — only one row can be edited at a time.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>("");
@@ -292,6 +291,13 @@ export function SessionList({ mode, de }: Props) {
     // selected sort key just like every other row.
     return [...filtered].sort(compare);
   }, [filtered, sortKey, de]);
+
+  const sessionVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => sessionScrollRef.current,
+    estimateSize: () => 72,
+    overscan: 6,
+  });
 
   if (loading) {
     return (
@@ -574,49 +580,60 @@ export function SessionList({ mode, de }: Props) {
         <div style={{ textAlign: "right" }} />
       </div>
 
-      {sorted.map((s, idx) => {
-        const isActive = mode === "active" && s.id === activeCanvasId;
-        const hasContent = s.nodeCount > 0;
-        const isLast = idx === sorted.length - 1;
-        const isBusy = busyId === s.id;
-        const secondDate = mode === "active" ? s.updated_at : (s.archived_at ?? s.updated_at);
-        const displayTitle = cleanSessionTitle(s.name) || (de ? "Unbenanntes Projekt" : "Untitled project");
+      <div ref={sessionScrollRef} style={{ maxHeight: "min(72vh, 800px)", overflowY: "auto" }}>
+        <div style={{ height: sessionVirtualizer.getTotalSize(), position: "relative" }}>
+          {sessionVirtualizer.getVirtualItems().map((virtualRow) => {
+            const idx = virtualRow.index;
+            const s = sorted[idx];
+            const isActive = mode === "active" && s.id === activeCanvasId;
+            const hasContent = s.nodeCount > 0;
+            const isLast = idx === sorted.length - 1;
+            const isBusy = busyId === s.id;
+            const secondDate = mode === "active" ? s.updated_at : (s.archived_at ?? s.updated_at);
+            const displayTitle = cleanSessionTitle(s.name) || (de ? "Unbenanntes Projekt" : "Untitled project");
+            const activeBg = "rgba(228,255,151,0.16)";
+            const hoverBg  = "rgba(228,255,151,0.04)";
 
-        // Row backgrounds:
-        //   active session → lime tint  (rgba(228,255,151,0.16))
-        //   hover          → cool slate (rgba(79,99,138,0.07))  — clearly different from the lime active tint
-        const activeBg = "rgba(228,255,151,0.16)";
-        const hoverBg  = "rgba(228,255,151,0.04)";
-
-        return (
-          <div
-            key={s.id}
-            className="sis-session-row"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(280px, 1fr) 150px 128px 128px 96px 120px",
-              gap: 16,
-              alignItems: "center",
-              padding: "12px 20px",
-              borderBottom: isLast ? "none" : "1px solid var(--volt-border, #EEE)",
-              background: isActive ? activeBg : "transparent",
-              transition: "background-color 120ms ease",
-              position: "relative",
-              opacity: isBusy ? 0.5 : 1,
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLDivElement;
-              if (!isActive && !isBusy) el.style.background = hoverBg;
-              const actions = el.querySelector<HTMLDivElement>(".sis-session-actions");
-              if (actions) actions.style.opacity = "1";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLDivElement;
-              el.style.background = isActive ? activeBg : "transparent";
-              const actions = el.querySelector<HTMLDivElement>(".sis-session-actions");
-              if (actions) actions.style.opacity = "0";
-            }}
-          >
+            return (
+              <div
+                key={s.id}
+                data-index={idx}
+                ref={sessionVirtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div
+                  className="sis-session-row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(280px, 1fr) 150px 128px 128px 96px 120px",
+                    gap: 16,
+                    alignItems: "center",
+                    padding: "12px 20px",
+                    borderBottom: isLast ? "none" : "1px solid var(--volt-border, #EEE)",
+                    background: isActive ? activeBg : "transparent",
+                    transition: "background-color 120ms ease",
+                    position: "relative",
+                    opacity: isBusy ? 0.5 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLDivElement;
+                    if (!isActive && !isBusy) el.style.background = hoverBg;
+                    const actions = el.querySelector<HTMLDivElement>(".sis-session-actions");
+                    if (actions) actions.style.opacity = "1";
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLDivElement;
+                    el.style.background = isActive ? activeBg : "transparent";
+                    const actions = el.querySelector<HTMLDivElement>(".sis-session-actions");
+                    if (actions) actions.style.opacity = "0";
+                  }}
+                >
             {/* Active rail on the left edge */}
             {isActive && (
               <span
@@ -815,10 +832,13 @@ export function SessionList({ mode, de }: Props) {
                   />
                 </>
               )}
+              </div>
             </div>
           </div>
         );
       })}
+        </div>
+      </div>
       </div>
       )}
     </div>
