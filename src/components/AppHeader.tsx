@@ -19,10 +19,12 @@ const NAV_ITEMS: Array<{
   labelEn: string;
   matchAlso?: string[];
 }> = [
-  { href: "/",          labelDe: "Start",              labelEn: "Home"               },
-  { href: "/sessions",  labelDe: "Projekte",           labelEn: "Projects"          },
-  { href: "/canvas",    labelDe: "Canvas",             labelEn: "Canvas"             },
-  { href: "/verstehen", labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
+  { href: "/",              labelDe: "Start",              labelEn: "Home"               },
+  { href: "/sessions",      labelDe: "Projekte",           labelEn: "Projects"          },
+  { href: "/canvas",        labelDe: "Canvas",             labelEn: "Canvas"             },
+  { href: "/verstehen",     labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
+  { href: "/monitor",       labelDe: "Monitor",            labelEn: "Monitor"            },
+  { href: "/dokumentation", labelDe: "Dokumentation",      labelEn: "Documentation"      },
 ];
 
 /**
