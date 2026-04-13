@@ -116,8 +116,8 @@ export const GrainStat: React.FC<GrainStatProps> = ({
     <div
       className={cn(
         "relative rounded-2xl p-5 grain overflow-hidden",
-        "transition-all duration-300 hover:-translate-y-0.5",
-        "ring-1 ring-border hover:ring-[#E4FF97]/40",
+        "transition-all duration-300",
+        "ring-1 ring-border",
         variantStyles[variant] ?? variantStyles.default,
         className
       )}

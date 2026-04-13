@@ -19,9 +19,6 @@ const cardVariants = cva(
         default: [
           "bg-card text-card-foreground",
           "border border-border",
-          "hover:-translate-y-0.5",
-          "hover:border-primary/30",
-          "hover:bg-accent/30",
         ],
         glass: [
           "glass text-card-foreground",

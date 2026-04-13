@@ -48,10 +48,10 @@ export const GrainInput = React.forwardRef<HTMLInputElement, GrainInputProps>(
       : "bg-transparent border-0 border-b border-border rounded-none px-0";
 
     const stateClass = computedState === "error"
-      ? "border-[#E8402A] focus:border-[#E8402A]"
+      ? "border-[var(--signal-negative)] focus:border-[var(--signal-negative)]"
       : computedState === "success"
-      ? "border-[#1A9E5A] focus:border-[#1A9E5A]"
-      : "focus:border-[#000000]";
+      ? "border-[var(--signal-positive)] focus:border-[var(--signal-positive)]"
+      : "focus:border-foreground";
 
     return (
       <div className="flex flex-col gap-1 w-full group">
@@ -78,7 +78,7 @@ export const GrainInput = React.forwardRef<HTMLInputElement, GrainInputProps>(
               sizeClass,
               variantClass,
               stateClass,
-              leftElement && (variant === "default" || variant === "glass" ? "pl-6" : "pl-10"),
+              leftElement && (variant === "default" || variant === "glass" ? "pl-9" : "pl-10"),
               rightElement && (variant === "default" || variant === "glass" ? "pr-6" : "pr-10"),
               "disabled:opacity-40 disabled:cursor-not-allowed",
               className
@@ -95,14 +95,14 @@ export const GrainInput = React.forwardRef<HTMLInputElement, GrainInputProps>(
             <div className={cn(
               "absolute bottom-0 left-0 h-[1.5px] w-0 transition-all duration-300 ease-out",
               "group-focus-within:w-full",
-              computedState === "error" ? "bg-[#E8402A]" : computedState === "success" ? "bg-[#1A9E5A]" : "bg-[#000000]"
+              computedState === "error" ? "bg-[var(--signal-negative)]" : computedState === "success" ? "bg-[var(--signal-positive)]" : "bg-foreground"
             )} />
           )}
         </div>
         {(hint || error) && (
           <p className={cn(
             "text-[11px] font-body mt-0.5",
-            hasError ? "text-[#E8402A]" : "text-muted-foreground/70"
+            hasError ? "text-[var(--signal-negative)]" : "text-muted-foreground/70"
           )}>
             {error || hint}
           </p>
@@ -154,7 +154,7 @@ export const GrainTextarea = React.forwardRef<HTMLTextAreaElement, GrainTextarea
               "transition-all duration-200 ease-out",
               "disabled:opacity-40 disabled:cursor-not-allowed",
               variantClass,
-              hasError && "border-[#E8402A]",
+              hasError && "border-[var(--signal-negative)]",
               className
             )}
             {...props}
@@ -163,14 +163,14 @@ export const GrainTextarea = React.forwardRef<HTMLTextAreaElement, GrainTextarea
             <div className={cn(
               "absolute bottom-0 left-0 h-[1.5px] w-0 transition-all duration-300 ease-out",
               "group-focus-within:w-full",
-              hasError ? "bg-[#E8402A]" : "bg-[#000000]"
+              hasError ? "bg-[var(--signal-negative)]" : "bg-foreground"
             )} />
           )}
         </div>
         {(hint || error) && (
           <p className={cn(
             "text-[11px] font-body mt-0.5",
-            hasError ? "text-[#E8402A]" : "text-muted-foreground/70"
+            hasError ? "text-[var(--signal-negative)]" : "text-muted-foreground/70"
           )}>
             {error || hint}
           </p>
@@ -221,7 +221,7 @@ export const GrainSelect = React.forwardRef<HTMLSelectElement, GrainSelectProps>
               "transition-all duration-200 ease-out",
               "disabled:opacity-40 disabled:cursor-not-allowed",
               variantClass,
-              hasError && "border-[#E8402A]",
+              hasError && "border-[var(--signal-negative)]",
               className
             )}
             {...props}
@@ -236,7 +236,7 @@ export const GrainSelect = React.forwardRef<HTMLSelectElement, GrainSelectProps>
           </div>
         </div>
         {(hint || error) && (
-          <p className={cn("text-[11px] font-body mt-0.5", hasError ? "text-[#E8402A]" : "text-muted-foreground/70")}>
+          <p className={cn("text-[11px] font-body mt-0.5", hasError ? "text-[var(--signal-negative)]" : "text-muted-foreground/70")}>
             {error || hint}
           </p>
         )}
