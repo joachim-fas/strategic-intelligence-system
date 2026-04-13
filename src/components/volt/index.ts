@@ -11,7 +11,23 @@ export * from "./VoltBadge";
 export * from "./VoltBubbleMap";
 export * from "./VoltButton";
 export * from "./VoltCard";
-export * from "./VoltChart";
+// VoltChart: explicit re-exports to avoid VoltRadarChart conflict
+// (VoltChart.tsx has a simple recharts wrapper, VoltRadarChart.tsx has the full D3 version)
+export {
+  VOLT_HEX, VOLT_NEON, VOLT_PASTEL, VOLT_CHART_COLORS,
+  type VoltPalette, getPalette,
+  ChartWrapper, LiveBadge,
+  type VoltAreaChartProps, VoltAreaChart,
+  type VoltBarChartProps, VoltBarChart,
+  type VoltLineChartProps, VoltLineChart,
+  type VoltDonutChartProps, VoltDonutChart,
+  type VoltScatterChartProps, VoltScatterChart,
+  type VoltComposedChartProps, VoltComposedChart,
+  type VoltRadialBarChartProps, VoltRadialBarChart,
+  type VoltFunnelChartProps, VoltFunnelChart,
+  type VoltTrendChartProps, VoltTrendChart,
+  VoltStackedAreaChart, VoltStackedBarChart,
+} from "./VoltChart";
 export * from "./VoltCodeBlock";
 export * from "./VoltCommandBar";
 export * from "./VoltCursor";
