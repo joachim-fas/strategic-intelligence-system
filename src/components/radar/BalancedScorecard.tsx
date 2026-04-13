@@ -531,10 +531,10 @@ function NodeView({
       <g transform="translate(20, 358)">
         <line x1={0} y1={4} x2={18} y2={4} stroke="var(--signal-positive, #1A9E5A)" strokeWidth={2} />
         <polygon points="16,1 16,7 22,4" fill="var(--signal-positive, #1A9E5A)" fillOpacity="0.7" />
-        <text x={26} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">verstärkt</text>
+        <text x={26} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">{locale === "de" ? "verstärkt" : "amplifies"}</text>
         <line x1={90} y1={4} x2={108} y2={4} stroke="var(--signal-negative, #E8402A)" strokeWidth={2} strokeDasharray="5 3" />
         <polygon points="106,1 106,7 112,4" fill="var(--signal-negative, #E8402A)" fillOpacity="0.7" />
-        <text x={116} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">hemmt</text>
+        <text x={116} y={8} fontSize={10} fill="var(--volt-text-muted, #6B7280)" fontFamily="inherit">{locale === "de" ? "hemmt" : "dampens"}</text>
       </g>
     </svg>
   );
