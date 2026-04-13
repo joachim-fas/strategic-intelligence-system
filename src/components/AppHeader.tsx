@@ -75,7 +75,7 @@ export function AppHeader() {
         transition: "all 0.3s",
       }}
     >
-      <div style={{ position: "relative", maxWidth: 1400, margin: "0 auto", padding: "0 32px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+      <div style={{ position: "relative", width: "100%", padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
         {/* Logo — GrainUI: flex-shrink-0 flex items-center, gap-2 (8px) */}
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <Link href="/" aria-label="SIS Startseite" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
@@ -97,7 +97,7 @@ export function AppHeader() {
         >&#x2261;</button>
 
         {/* Nav — Desktop (GrainUI: flex items-center gap-1 flex-1) */}
-        <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+        <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flex: 1 }}>
           {NAV_ITEMS.map(({ href, labelDe, labelEn }) => {
             const label = de ? labelDe : labelEn;
             const active = isActive(href);
