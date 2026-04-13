@@ -1,10 +1,6 @@
 "use client";
 
-// TODO: PERF-05 — This component removes and recreates all SVG elements on every render.
-// Causes flickering and GC pressure. FIX: Use D3 enter/update/exit pattern
-// or switch to React-based SVG rendering for declarative updates.
-
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { select, pointer } from "d3-selection";
 import { zoom, zoomIdentity } from "d3-zoom";
 import { drag } from "d3-drag";
@@ -128,12 +124,16 @@ export default function RadarChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const internalSvgRef = useRef<SVGSVGElement>(null);
   const svgRef = externalSvgRef || internalSvgRef;
+  const zoomLayerRef = useRef<SVGGElement>(null);
+  const dotLayerRef = useRef<SVGGElement>(null);
   const [tooltip, setTooltip] = useState<{
     trend: TrendDot;
     x: number;
     y: number;
   } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 800 });
+  const [showZoomHint, setShowZoomHint] = useState(true);
+  const currentKRef = useRef(1);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -146,116 +146,79 @@ export default function RadarChart({
     return () => observer.disconnect();
   }, []);
 
+  // Fade out zoom hint after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setShowZoomHint(false), 7000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const width = propWidth ?? dimensions.width;
   const height = propHeight ?? dimensions.height;
   const cx = width / 2;
   const cy = height / 2;
   const maxR = Math.min(cx, cy) - 70;
 
-  const drawRadar = useCallback(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const svg = select(svgEl);
-    svg.selectAll("*").remove();
-
-    // ── Background layer (zooms with content) ──
-    const zoomG = svg.append("g").attr("class", "zoom-layer");
-    const bgG = zoomG.append("g").attr("transform", `translate(${cx},${cy})`);
-
-    // ── Dot layer (zooms position but NOT size — semantic zoom) ──
-    const dotLayer = zoomG.append("g").attr("transform", `translate(${cx},${cy})`);
-
-    // ── Current zoom scale (for inverse-scaling dots) ──
-    let currentK = 1;
-
-    // Background grid pattern (Volt-style)
+  // ── Memoized grid lines ──
+  const gridLines = useMemo(() => {
+    const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
     const gridStep = 40;
     for (let gx = -maxR; gx <= maxR; gx += gridStep) {
-      bgG.append("line")
-        .attr("x1", gx).attr("y1", -maxR)
-        .attr("x2", gx).attr("y2", maxR)
-        .attr("stroke", "var(--color-border, rgba(0,0,0,0.04))").attr("stroke-width", 0.5).attr("stroke-opacity", 0.25);
+      lines.push({ x1: gx, y1: -maxR, x2: gx, y2: maxR });
     }
     for (let gy = -maxR; gy <= maxR; gy += gridStep) {
-      bgG.append("line")
-        .attr("x1", -maxR).attr("y1", gy)
-        .attr("x2", maxR).attr("y2", gy)
-        .attr("stroke", "var(--color-border, rgba(0,0,0,0.04))").attr("stroke-width", 0.5).attr("stroke-opacity", 0.25);
+      lines.push({ x1: -maxR, y1: gy, x2: maxR, y2: gy });
     }
+    return lines;
+  }, [maxR]);
 
-    // Ring backgrounds
-    RING_RADII.slice()
+  // ── Memoized ring data ──
+  const ringData = useMemo(() => {
+    // Reversed for painting order (outer first so inner overlaps)
+    return RING_RADII.slice()
       .reverse()
-      .forEach((r, i) => {
+      .map((r, i) => {
         const ringIndex = RINGS.length - 1 - i;
-        bgG.append("circle")
-          .attr("r", r * maxR)
-          .attr("fill", RING_COLORS[RINGS[ringIndex]])
-          .attr("fill-opacity", 0.06);
-        bgG.append("circle")
-          .attr("r", r * maxR)
-          .attr("fill", "none")
-          .attr("stroke", RING_COLORS[RINGS[ringIndex]])
-          .attr("stroke-opacity", 0.15)
-          .attr("stroke-width", 1)
-          .attr("stroke-dasharray", "3 5");
+        const ring = RINGS[ringIndex];
+        return { r: r * maxR, ring, color: RING_COLORS[ring] };
       });
+  }, [maxR]);
 
-    // Ring labels
-    RINGS.forEach((ring, i) => {
+  // ── Memoized ring labels ──
+  const ringLabels = useMemo(() => {
+    return RINGS.map((ring, i) => {
       const labelR = i === 0 ? RING_RADII[0] / 2 : (RING_RADII[i - 1] + RING_RADII[i]) / 2;
       const labelText = getRingLabel(locale, ring).toUpperCase();
       const tw = labelText.length * 5.5 + 14;
-
-      bgG.append("rect")
-        .attr("x", -tw / 2).attr("y", -labelR * maxR - 7)
-        .attr("width", tw).attr("height", 14).attr("rx", 7)
-        .attr("fill", "var(--color-surface, #fff)").attr("fill-opacity", 0.9);
-
-      bgG.append("text")
-        .attr("x", 0).attr("y", -labelR * maxR)
-        .attr("text-anchor", "middle").attr("dy", "0.35em")
-        .attr("fill", RING_COLORS[ring]).attr("fill-opacity", 0.65)
-        .attr("font-size", "10px").attr("font-weight", "700")
-        .attr("letter-spacing", "0.06em")
-        .text(labelText);
+      return { ring, y: -labelR * maxR, text: labelText, tw, color: RING_COLORS[ring] };
     });
+  }, [maxR, locale]);
 
-    // Quadrant dividers
-    for (let i = 0; i < 4; i++) {
+  // ── Memoized quadrant dividers ──
+  const quadrantDividers = useMemo(() => {
+    return Array.from({ length: 4 }, (_, i) => {
       const angle = (i * Math.PI) / 2;
-      bgG.append("line")
-        .attr("x1", 0).attr("y1", 0)
-        .attr("x2", Math.cos(angle) * maxR * 1.05)
-        .attr("y2", Math.sin(angle) * maxR * 1.05)
-        .attr("stroke", "var(--color-border, #ddd)")
-        .attr("stroke-width", 1).attr("stroke-dasharray", "4,4");
-    }
+      return {
+        x2: Math.cos(angle) * maxR * 1.05,
+        y2: Math.sin(angle) * maxR * 1.05,
+      };
+    });
+  }, [maxR]);
 
-    // Quadrant labels
-    quadrants.forEach((label, i) => {
+  // ── Memoized quadrant labels ──
+  const quadrantLabelData = useMemo(() => {
+    return quadrants.map((label, i) => {
       const angle = (i * Math.PI) / 2 + Math.PI / 4;
       const lr = maxR * 0.85;
       const lx = Math.cos(angle) * lr;
       const ly = Math.sin(angle) * lr;
       const tw = label.length * 5.5 + 16;
-
-      bgG.append("rect")
-        .attr("x", lx - tw / 2).attr("y", ly - 9)
-        .attr("width", tw).attr("height", 18).attr("rx", 9)
-        .attr("fill", "var(--color-surface, #fff)").attr("fill-opacity", 0.92)
-        .attr("stroke", "var(--color-border, #ddd)").attr("stroke-opacity", 0.4);
-
-      bgG.append("text")
-        .attr("x", lx).attr("y", ly)
-        .attr("text-anchor", "middle").attr("dy", "0.35em")
-        .attr("fill", "var(--color-text-secondary, #555)")
-        .attr("font-size", "11px").attr("font-weight", "600")
-        .text(label);
+      return { label, lx, ly, tw };
     });
+  }, [quadrants, maxR]);
 
-    // ── Compute dot positions ──
-    const positions = trends.map((d) => {
+  // ── Memoized dot positions and labels ──
+  const { positions, labelCandidates, showLabel } = useMemo(() => {
+    const pos = trends.map((d) => {
       const angleJ = jitterSeed(d.id, 0);
       const radiusJ = jitterSeed(d.id, 42);
       const angle = getAngleForQuadrant(d.quadrant, angleJ);
@@ -263,133 +226,55 @@ export default function RadarChart({
       return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
     });
 
-    // Label collision avoidance
-    const labelCandidates = trends.map((d, i) => ({
-      x: positions[i].x,
-      y: positions[i].y + getDotSize(d.impact) + 12,
-      text: d.name.length > 20 ? d.name.slice(0, 18) + "…" : d.name,
+    const candidates = trends.map((d, i) => ({
+      x: pos[i].x,
+      y: pos[i].y + getDotSize(d.impact) + 12,
+      text: d.name.length > 20 ? d.name.slice(0, 18) + "\u2026" : d.name,
       priority: d.impact + (d.id === selectedTrendId ? 2 : 0),
     }));
-    const showLabel = avoidLabelCollisions(labelCandidates);
+    const show = avoidLabelCollisions(candidates);
 
-    // ── Radial gradients (Volt-style pastell) ──
-    const defs = zoomG.append("defs");
-    trends.forEach((d) => {
+    return { positions: pos, labelCandidates: candidates, showLabel: show };
+  }, [trends, maxR, selectedTrendId]);
+
+  // ── Memoized gradient defs ──
+  const gradientDefs = useMemo(() => {
+    return trends.map((d) => {
       const color = getDotColor(d.timeHorizon);
       const gradId = `grad-${d.id.replace(/[^a-z0-9]/gi, "-")}`;
-      const grad = defs.append("radialGradient")
-        .attr("id", gradId)
-        .attr("cx", "35%").attr("cy", "30%").attr("r", "72%");
-      grad.append("stop").attr("offset", "0%").attr("stop-color", "var(--color-surface, #FFFFFF)").attr("stop-opacity", "0.60");
-      grad.append("stop").attr("offset", "40%").attr("stop-color", color + "EE").attr("stop-opacity", "0.90");
-      grad.append("stop").attr("offset", "100%").attr("stop-color", color).attr("stop-opacity", "0.70");
+      return { gradId, color };
     });
+  }, [trends]);
 
-    // ── Draw dots ──
-    const dots = dotLayer
-      .selectAll<SVGGElement, TrendDot>(".trend-dot")
-      .data(trends, (d) => d.id)
-      .join("g")
-      .attr("class", "trend-dot")
-      .style("cursor", "pointer");
+  // ── D3 zoom behavior (imperative — must manipulate DOM transforms) ──
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    const zoomLayer = zoomLayerRef.current;
+    if (!svgEl || !zoomLayer) return;
 
-    dots.each(function (d, i) {
-      const dotG = select(this);
-      const { x, y } = positions[i];
-      const size = getDotSize(d.impact);
-      const opacity = getDotOpacity(d.confidence);
-      const color = getDotColor(d.timeHorizon);
-      const isSelected = d.id === selectedTrendId;
-      const gradId = `grad-${d.id.replace(/[^a-z0-9]/gi, "-")}`;
+    const svg = select(svgEl);
 
-      dotG.attr("transform", `translate(${x},${y})`);
-
-      // Selection glow
-      if (isSelected) {
-        dotG.append("circle")
-          .attr("r", size + 4).attr("fill", "none")
-          .attr("stroke", color).attr("stroke-width", 2)
-          .attr("stroke-opacity", 0.5).classed("glow", true);
-      }
-
-      // Live-signal heat glow — outer halo whose radius scales with the
-      // number of signals matched to this trend in the last 72h. Only shown
-      // when /api/v1/feed has supplied counts (signalCount72h is set).
-      const live = d.signalCount72h ?? 0;
-      if (live > 0) {
-        const heatR = size + 4 + Math.min(14, Math.log2(1 + live) * 3);
-        dotG.append("circle")
-          .attr("r", heatR)
-          .attr("fill", color)
-          .attr("fill-opacity", 0.10 + Math.min(0.25, live / 200))
-          .attr("stroke", "none")
-          .classed("heat-glow", true);
-      }
-
-      // Velocity ring — green dashed for rising, red solid for falling, none
-      // for stable. Sized just outside the dot.
-      if (d.velocity === "rising") {
-        dotG.append("circle")
-          .attr("r", size + 2).attr("fill", "none")
-          .attr("stroke", "#1A9E5A").attr("stroke-width", 1.4)
-          .attr("stroke-opacity", 0.6).attr("stroke-dasharray", "2,2");
-      } else if (d.velocity === "falling") {
-        dotG.append("circle")
-          .attr("r", size + 2).attr("fill", "none")
-          .attr("stroke", "#E8402A").attr("stroke-width", 1.2)
-          .attr("stroke-opacity", 0.55);
-      }
-
-      // Main dot — Volt-style radial gradient
-      dotG.append("circle")
-        .attr("r", size)
-        .attr("fill", `url(#${gradId})`)
-        .attr("fill-opacity", opacity)
-        .attr("stroke", isSelected ? "var(--foreground, #0A0A0A)" : "var(--color-border, rgba(0,0,0,0.12))")
-        .attr("stroke-width", isSelected ? 2 : 1)
-        .attr("stroke-opacity", isSelected ? 1 : 0.35)
-        .classed("main-dot", true);
-
-      // Label
-      if (showLabel[i] || isSelected) {
-        const text = labelCandidates[i].text;
-        const tw = text.length * 4.5 + 6;
-        dotG.append("rect")
-          .attr("x", -tw / 2).attr("y", size + 4)
-          .attr("width", tw).attr("height", 13).attr("rx", 3)
-          .attr("fill", "var(--color-surface, #fff)")
-          .attr("fill-opacity", 0.88)
-          .classed("label-bg", true);
-        dotG.append("text")
-          .attr("y", size + 13).attr("text-anchor", "middle")
-          .attr("fill", "var(--color-text-secondary, #555)")
-          .attr("font-size", "9px")
-          .attr("font-weight", isSelected ? "700" : "500")
-          .classed("label-text", true)
-          .text(text);
-      }
-    });
-
-    // ── Semantic zoom: space grows, dots stay small ──
     function applySemanticZoom(k: number) {
-      currentK = k;
+      currentKRef.current = k;
+      if (!dotLayerRef.current) return;
       const invK = 1 / k;
-      dots.each(function () {
-        // Counter-scale each dot group so it stays the same visual size
-        const el = select(this);
-        const currentTransform = el.attr("transform");
-        // Extract translate values
-        const match = currentTransform.match(/translate\(([^,]+),([^)]+)\)/);
-        if (match) {
-          el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
-        }
-      });
+      // Counter-scale each dot group so they stay the same visual size
+      select(dotLayerRef.current)
+        .selectAll<SVGGElement, unknown>(".trend-dot")
+        .each(function () {
+          const el = select(this);
+          const currentTransform = el.attr("transform");
+          const match = currentTransform?.match(/translate\(([^,]+),([^)]+)\)/);
+          if (match) {
+            el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+          }
+        });
     }
 
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.8, 8])
       .on("zoom", (event) => {
-        zoomG.attr("transform", event.transform.toString());
+        select(zoomLayer).attr("transform", event.transform.toString());
         applySemanticZoom(event.transform.k);
       });
 
@@ -398,65 +283,71 @@ export default function RadarChart({
       svg.transition().duration(400).call(zoomBehavior.transform, zoomIdentity);
     });
 
-    // ── Interactions ──
+    return () => {
+      svg.on(".zoom", null);
+      svg.on("dblclick.zoom", null);
+    };
+  }, [svgRef, width, height]);
 
-    // Hover: raise to front + enlarge slightly
-    dots.on("mouseenter", function (event, d) {
-      // Raise this dot to the top of the stack
-      (this as SVGGElement).parentNode?.appendChild(this as SVGGElement);
+  // ── D3 drag behavior (imperative — must manipulate individual dot transforms) ──
+  useEffect(() => {
+    if (!onTrendDrag || !dotLayerRef.current) return;
 
-      const [mx, my] = pointer(event, svgEl);
-      setTooltip({ trend: d, x: mx, y: my });
+    const dotGroups = select(dotLayerRef.current)
+      .selectAll<SVGGElement, TrendDot>(".trend-dot");
 
-      const size = getDotSize(d.impact);
-      select(this).select(".main-dot")
-        .transition().duration(120)
-        .attr("r", size + 2)
-        .attr("stroke-width", 2)
-        .attr("stroke-opacity", 0.8);
-    });
+    const dragBehavior = drag<SVGGElement, TrendDot>()
+      .on("drag", function (event) {
+        select(this).attr("transform", `translate(${event.x},${event.y}) scale(${1 / currentKRef.current})`);
+      })
+      .on("end", function (event, d) {
+        const dist = Math.sqrt(event.x ** 2 + event.y ** 2) / maxR;
+        const newRing = ringFromDistance(dist);
+        onTrendDrag(d.id, newRing);
+      });
 
-    dots.on("mouseleave", function (_event, d) {
-      setTooltip(null);
-      const size = getDotSize(d.impact);
-      const isSelected = d.id === selectedTrendId;
-      select(this).select(".main-dot")
-        .transition().duration(120)
-        .attr("r", size)
-        .attr("stroke-width", isSelected ? 2 : 0.8)
-        .attr("stroke-opacity", isSelected ? 1 : 0.4);
-    });
+    dotGroups.data(trends).call(dragBehavior);
 
-    dots.on("click", function (_event, d) {
-      onTrendClick?.(d);
-    });
+    return () => {
+      dotGroups.on(".drag", null);
+    };
+  }, [onTrendDrag, trends, maxR]);
 
-    // Drag to change ring
-    if (onTrendDrag) {
-      const dragBehavior = drag<SVGGElement, TrendDot>()
-        .on("drag", function (event) {
-          select(this).attr("transform", `translate(${event.x},${event.y}) scale(${1 / currentK})`);
-        })
-        .on("end", function (event, d) {
-          const dist = Math.sqrt(event.x ** 2 + event.y ** 2) / maxR;
-          const newRing = ringFromDistance(dist);
-          onTrendDrag(d.id, newRing);
-        });
-      dots.call(dragBehavior);
-    }
+  // ── Hover handlers (keep D3-transitions for smooth enter/leave) ──
+  const handleDotMouseEnter = useCallback((event: React.MouseEvent<SVGGElement>, d: TrendDot) => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const el = event.currentTarget;
 
-    // Zoom hint
-    svg.append("text")
-      .attr("x", width - 12).attr("y", height - 10)
-      .attr("text-anchor", "end")
-      .attr("fill", "var(--color-text-muted, #999)")
-      .attr("font-size", "10px").attr("opacity", 0.5)
-      .text("Scroll = Zoom · Doppelklick = Reset")
-      .transition().delay(5000).duration(2000).attr("opacity", 0).remove();
+    // Raise to front
+    el.parentNode?.appendChild(el);
 
-  }, [trends, quadrants, width, height, cx, cy, maxR, selectedTrendId, onTrendClick, onTrendDrag, locale, svgRef]);
+    const [mx, my] = pointer(event.nativeEvent, svgEl);
+    setTooltip({ trend: d, x: mx, y: my });
 
-  useEffect(() => { drawRadar(); }, [drawRadar]);
+    const size = getDotSize(d.impact);
+    select(el).select(".main-dot")
+      .transition().duration(120)
+      .attr("r", size + 2)
+      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.8);
+  }, [svgRef]);
+
+  const handleDotMouseLeave = useCallback((_event: React.MouseEvent<SVGGElement>, d: TrendDot) => {
+    const el = _event.currentTarget;
+    setTooltip(null);
+    const size = getDotSize(d.impact);
+    const isSelected = d.id === selectedTrendId;
+    select(el).select(".main-dot")
+      .transition().duration(120)
+      .attr("r", size)
+      .attr("stroke-width", isSelected ? 2 : 0.8)
+      .attr("stroke-opacity", isSelected ? 1 : 0.4);
+  }, [selectedTrendId]);
+
+  const handleDotClick = useCallback((_event: React.MouseEvent<SVGGElement>, d: TrendDot) => {
+    onTrendClick?.(d);
+  }, [onTrendClick]);
 
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
@@ -466,7 +357,205 @@ export default function RadarChart({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         style={{ display: "block", margin: "0 auto", cursor: "grab" }}
-      />
+      >
+        <g ref={zoomLayerRef} className="zoom-layer">
+          {/* ── Background layer ── */}
+          <g transform={`translate(${cx},${cy})`}>
+            {/* Grid */}
+            {gridLines.map((l, i) => (
+              <line
+                key={i}
+                x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                stroke="var(--color-border, rgba(0,0,0,0.04))"
+                strokeWidth={0.5}
+                strokeOpacity={0.25}
+              />
+            ))}
+
+            {/* Ring backgrounds */}
+            {ringData.map(({ r, ring, color }) => (
+              <React.Fragment key={ring}>
+                <circle r={r} fill={color} fillOpacity={0.06} />
+                <circle
+                  r={r} fill="none"
+                  stroke={color} strokeOpacity={0.15}
+                  strokeWidth={1} strokeDasharray="3 5"
+                />
+              </React.Fragment>
+            ))}
+
+            {/* Ring labels */}
+            {ringLabels.map(({ ring, y, text, tw, color }) => (
+              <React.Fragment key={ring}>
+                <rect
+                  x={-tw / 2} y={y - 7}
+                  width={tw} height={14} rx={7}
+                  fill="var(--color-surface, #fff)" fillOpacity={0.9}
+                />
+                <text
+                  x={0} y={y}
+                  textAnchor="middle" dy="0.35em"
+                  fill={color} fillOpacity={0.65}
+                  fontSize="10px" fontWeight="700"
+                  letterSpacing="0.06em"
+                >
+                  {text}
+                </text>
+              </React.Fragment>
+            ))}
+
+            {/* Quadrant dividers */}
+            {quadrantDividers.map((d, i) => (
+              <line
+                key={i}
+                x1={0} y1={0} x2={d.x2} y2={d.y2}
+                stroke="var(--color-border, #ddd)"
+                strokeWidth={1} strokeDasharray="4,4"
+              />
+            ))}
+
+            {/* Quadrant labels */}
+            {quadrantLabelData.map(({ label, lx, ly, tw }) => (
+              <React.Fragment key={label}>
+                <rect
+                  x={lx - tw / 2} y={ly - 9}
+                  width={tw} height={18} rx={9}
+                  fill="var(--color-surface, #fff)" fillOpacity={0.92}
+                  stroke="var(--color-border, #ddd)" strokeOpacity={0.4}
+                />
+                <text
+                  x={lx} y={ly}
+                  textAnchor="middle" dy="0.35em"
+                  fill="var(--color-text-secondary, #555)"
+                  fontSize="11px" fontWeight="600"
+                >
+                  {label}
+                </text>
+              </React.Fragment>
+            ))}
+          </g>
+
+          {/* ── Gradient defs ── */}
+          <defs>
+            {gradientDefs.map(({ gradId, color }) => (
+              <radialGradient key={gradId} id={gradId} cx="35%" cy="30%" r="72%">
+                <stop offset="0%" stopColor="var(--color-surface, #FFFFFF)" stopOpacity="0.60" />
+                <stop offset="40%" stopColor={color + "EE"} stopOpacity="0.90" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.70" />
+              </radialGradient>
+            ))}
+          </defs>
+
+          {/* ── Dot layer ── */}
+          <g ref={dotLayerRef} transform={`translate(${cx},${cy})`}>
+            {trends.map((d, i) => {
+              const { x, y } = positions[i];
+              const size = getDotSize(d.impact);
+              const opacity = getDotOpacity(d.confidence);
+              const color = getDotColor(d.timeHorizon);
+              const isSelected = d.id === selectedTrendId;
+              const gradId = `grad-${d.id.replace(/[^a-z0-9]/gi, "-")}`;
+              const live = d.signalCount72h ?? 0;
+              const labelVisible = showLabel[i] || isSelected;
+              const labelText = labelCandidates[i].text;
+              const labelTw = labelText.length * 4.5 + 6;
+
+              return (
+                <g
+                  key={d.id}
+                  className="trend-dot"
+                  transform={`translate(${x},${y})`}
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={(e) => handleDotMouseEnter(e, d)}
+                  onMouseLeave={(e) => handleDotMouseLeave(e, d)}
+                  onClick={(e) => handleDotClick(e, d)}
+                >
+                  {/* Selection glow */}
+                  {isSelected && (
+                    <circle
+                      className="glow"
+                      r={size + 4} fill="none"
+                      stroke={color} strokeWidth={2} strokeOpacity={0.5}
+                    />
+                  )}
+
+                  {/* Live-signal heat glow */}
+                  {live > 0 && (
+                    <circle
+                      className="heat-glow"
+                      r={size + 4 + Math.min(14, Math.log2(1 + live) * 3)}
+                      fill={color}
+                      fillOpacity={0.10 + Math.min(0.25, live / 200)}
+                      stroke="none"
+                    />
+                  )}
+
+                  {/* Velocity ring */}
+                  {d.velocity === "rising" && (
+                    <circle
+                      r={size + 2} fill="none"
+                      stroke="#1A9E5A" strokeWidth={1.4}
+                      strokeOpacity={0.6} strokeDasharray="2,2"
+                    />
+                  )}
+                  {d.velocity === "falling" && (
+                    <circle
+                      r={size + 2} fill="none"
+                      stroke="#E8402A" strokeWidth={1.2}
+                      strokeOpacity={0.55}
+                    />
+                  )}
+
+                  {/* Main dot */}
+                  <circle
+                    className="main-dot"
+                    r={size}
+                    fill={`url(#${gradId})`}
+                    fillOpacity={opacity}
+                    stroke={isSelected ? "var(--foreground, #0A0A0A)" : "var(--color-border, rgba(0,0,0,0.12))"}
+                    strokeWidth={isSelected ? 2 : 1}
+                    strokeOpacity={isSelected ? 1 : 0.35}
+                  />
+
+                  {/* Label */}
+                  {labelVisible && (
+                    <>
+                      <rect
+                        className="label-bg"
+                        x={-labelTw / 2} y={size + 4}
+                        width={labelTw} height={13} rx={3}
+                        fill="var(--color-surface, #fff)"
+                        fillOpacity={0.88}
+                      />
+                      <text
+                        className="label-text"
+                        y={size + 13} textAnchor="middle"
+                        fill="var(--color-text-secondary, #555)"
+                        fontSize="9px"
+                        fontWeight={isSelected ? "700" : "500"}
+                      >
+                        {labelText}
+                      </text>
+                    </>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </g>
+
+        {/* Zoom hint (fades out via CSS transition) */}
+        <text
+          x={width - 12} y={height - 10}
+          textAnchor="end"
+          fill="var(--color-text-muted, #999)"
+          fontSize="10px"
+          opacity={showZoomHint ? 0.5 : 0}
+          style={{ transition: "opacity 2s ease" }}
+        >
+          Scroll = Zoom · Doppelklick = Reset
+        </text>
+      </svg>
 
       {/* Tooltip */}
       {tooltip && (
