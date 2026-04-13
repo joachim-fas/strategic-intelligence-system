@@ -132,6 +132,7 @@ const LAYER_LABELS: Record<CanvasLayer, { de: string; color: string }> = {
 // ── View Mode ──────────────────────────────────────────────────────────────
 
 type ViewMode = "canvas" | "board" | "timeline" | "orbit";
+type SortMode = "tree" | "time" | "type" | "status";
 
 // ── Canvas Group ───────────────────────────────────────────────────────────
 
@@ -1827,6 +1828,20 @@ function DerivedNodeCard({
               ))}
             </div>
           )}
+          {/* Tag pills on card surface */}
+          {node.tags && node.tags.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
+            <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 6 }}>
+              {node.tags.slice(0, 3).map((tag, i) => {
+                const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                return (
+                  <span key={i} style={{ fontSize: 8, padding: "1px 5px", borderRadius: 10, background: `hsl(${hue}, 55%, 94%)`, border: `1px solid hsl(${hue}, 45%, 82%)`, color: `hsl(${hue}, 55%, 38%)`, fontWeight: 500, whiteSpace: "nowrap" }}>
+                    {tag.length > 12 ? tag.slice(0, 12) + "…" : tag}
+                  </span>
+                );
+              })}
+              {node.tags.length > 3 && <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 500, alignSelf: "center" }}>+{node.tags.length - 3}</span>}
+            </div>
+          )}
           {/* Fade gradient */}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 32, background: "linear-gradient(to bottom, transparent, var(--color-surface))", pointerEvents: "none" }} />
         </div>
@@ -1974,6 +1989,20 @@ function QueryNodeCard({
                 <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontSize: 7, color: "var(--color-text-muted)", fontWeight: 600, letterSpacing: "0.06em" }}>SIGNALE</span>
                   <SignalSparkline signals={node.result.usedSignals} width={80} height={16} />
+                </div>
+              )}
+              {/* Tag pills on card surface */}
+              {node.tags && node.tags.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 6 }}>
+                  {node.tags.slice(0, 3).map((tag, i) => {
+                    const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                    return (
+                      <span key={i} style={{ fontSize: 8, padding: "1px 6px", borderRadius: 10, background: `hsl(${hue}, 55%, 94%)`, border: `1px solid hsl(${hue}, 45%, 82%)`, color: `hsl(${hue}, 55%, 38%)`, fontWeight: 500, whiteSpace: "nowrap" }}>
+                        {tag.length > 14 ? tag.slice(0, 14) + "…" : tag}
+                      </span>
+                    );
+                  })}
+                  {node.tags.length > 3 && <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 500, alignSelf: "center" }}>+{node.tags.length - 3}</span>}
                 </div>
               )}
               {/* Fade gradient at bottom to signal more content */}
@@ -4318,6 +4347,19 @@ export default function CanvasPage() {
   // UX-12: Copy/paste clipboard for nodes
   const clipboardRef = useRef<CanvasNode[]>([]);
 
+  // Feature: Sort/Arrange dropdown
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+
+  // Feature: Manual groups + multi-select
+  const [userGroups, setUserGroups] = useState<CanvasGroup[]>([]);
+  const userGroupsRef = useRef(userGroups);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
+  const shiftHeldRef = useRef(false);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+
+  // Feature: Tag filter
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+
   const de = locale === "de";
   const queryNodes = useMemo(() => nodes.filter((n): n is QueryNode => n.nodeType === "query"), [nodes]);
   const isEmpty = nodes.length === 0;
@@ -4336,6 +4378,7 @@ export default function CanvasPage() {
   useEffect(() => { connectionsRef.current = connections; }, [connections]);
   useEffect(() => { projectIdRef.current = projectId; }, [projectId]);
   useEffect(() => { iterateCtxRef.current = iterateCtx; }, [iterateCtx]);
+  useEffect(() => { userGroupsRef.current = userGroups; }, [userGroups]);
   // UX-11: Snap-to-grid ref for pointer handler closure
   const snapToGridRef = useRef(snapToGrid);
   useEffect(() => { snapToGridRef.current = snapToGrid; }, [snapToGrid]);
@@ -4438,6 +4481,7 @@ export default function CanvasPage() {
         zoom: zoomRef.current,
         v: 2,
         _schemaVersion: CANVAS_SCHEMA_VERSION, // FIXED: EDGE-08 — Include schema version in saved state
+        userGroups: userGroupsRef.current.length > 0 ? userGroupsRef.current : undefined,
       };
       await fetch(`/api/v1/canvas/${id}`, {
         method: "PATCH",
@@ -4554,6 +4598,7 @@ export default function CanvasPage() {
             if (Array.isArray(state.conns)) setConnections(state.conns); else setConnections([]);
             if (state.pan) { setPanX(state.pan.x); setPanY(state.pan.y); }
             if (state.zoom) setZoom(state.zoom);
+            if (Array.isArray(state.userGroups)) setUserGroups(state.userGroups); else setUserGroups([]);
           }
         } catch (parseErr) {
           console.error("[SIS Canvas] Failed to parse canvas_state:", parseErr);
@@ -4714,6 +4759,13 @@ export default function CanvasPage() {
   const visibleNodes = useMemo(() =>
     nodes.filter(n => !hiddenLayers.has(NODE_LAYER[n.nodeType] ?? "karte")),
   [nodes, hiddenLayers]);
+
+  // Collect all unique tags across all nodes
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    nodes.forEach(n => { (n.tags ?? []).forEach(t => tagSet.add(t)); });
+    return Array.from(tagSet).sort();
+  }, [nodes]);
 
   const canvasGroups = useMemo<CanvasGroup[]>(() => {
     const doneQueries = queryNodes.filter(n => n.status === "done" && (n.result?.matchedTrendIds?.length ?? 0) > 0);
@@ -4895,7 +4947,7 @@ export default function CanvasPage() {
     }, 2000);
     return () => clearTimeout(dbSaveTimerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, connections, panX, panY, zoom, projectId]);
+  }, [nodes, connections, panX, panY, zoom, projectId, userGroups]);
 
   // Flush pending DB save immediately (used by unload, visibility, and unmount handlers)
   const flushPendingSave = useCallback(() => {
@@ -4910,7 +4962,7 @@ export default function CanvasPage() {
     // Synchronous localStorage save as last resort
     saveToStorage(doneNodes, connectionsRef.current, { x: panXRef.current, y: panYRef.current }, zoomRef.current);
     // Best-effort DB save via sendBeacon (works even during unload)
-    const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2 };
+    const state = { nodes: doneNodes, conns: connectionsRef.current, pan: { x: panXRef.current, y: panYRef.current }, zoom: zoomRef.current, v: 2, userGroups: userGroupsRef.current.length > 0 ? userGroupsRef.current : undefined };
     try { navigator.sendBeacon(`/api/v1/canvas/${pid}`, new Blob([JSON.stringify({ canvasState: state })], { type: "application/json" })); } catch {}
   }, []);
 
@@ -5037,7 +5089,7 @@ export default function CanvasPage() {
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); setDetailNodeId(null); setDeleteConfirmId(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; portDragRef.current = null; setPortDragPreview(null);
+        setCmdVisible(false); setCmdPrefill(""); setProjectDropdownOpen(false); setNodePickerVisible(false); setIterateCtx(null); setDetailNodeId(null); setDeleteConfirmId(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; portDragRef.current = null; setPortDragPreview(null); setSortMenuOpen(false); setMultiSelectedIds(new Set()); setEditingGroupId(null); setActiveTagFilter(null);
         // Also abort any active streams on Escape
         activeStreamsRef.current.forEach(ctrl => ctrl.abort());
         activeStreamsRef.current.clear();
@@ -5090,8 +5142,13 @@ export default function CanvasPage() {
         setNodes(prev => [...prev, ...pasted]);
       }
     };
+    const trackShiftDown = (e: KeyboardEvent) => { if (e.key === "Shift") shiftHeldRef.current = true; };
+    const trackShiftUp = (e: KeyboardEvent) => { if (e.key === "Shift") shiftHeldRef.current = false; };
     window.addEventListener("keydown", kd);
-    return () => window.removeEventListener("keydown", kd);
+    window.addEventListener("keydown", trackShiftDown);
+    window.addEventListener("keyup", trackShiftUp);
+    window.addEventListener("blur", () => { shiftHeldRef.current = false; });
+    return () => { window.removeEventListener("keydown", kd); window.removeEventListener("keydown", trackShiftDown); window.removeEventListener("keyup", trackShiftUp); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, cmdVisible, deleteConfirmId, undo, redo, pushHistory]);
 
@@ -5344,6 +5401,17 @@ export default function CanvasPage() {
   deleteNodeRef.current = deleteNode;
 
   const handleSelectNode = useCallback((id: string) => {
+    if (shiftHeldRef.current) {
+      // Multi-select mode
+      setMultiSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      return;
+    }
+    // Normal select — clear multi-select
+    setMultiSelectedIds(new Set());
     setSelectedId(id);
     setDetailNodeId(id);
   }, []);
@@ -5588,10 +5656,82 @@ export default function CanvasPage() {
 
   // ── Auto-reorganize layout ────────────────────────────────────────────────
 
-  const reorganizeCanvas = useCallback(() => {
+  const reorganizeCanvas = useCallback((mode: SortMode = "tree") => {
     const ns = nodesRef.current;
     const conns = connectionsRef.current;
     if (ns.length === 0) return;
+
+    // ── Time-based layout ──
+    if (mode === "time") {
+      const sorted = [...ns].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+      const COL_W = 340;
+      const ROW_H = 220;
+      const COLS = Math.max(3, Math.ceil(Math.sqrt(sorted.length)));
+      setNodes(prev => prev.map(n => {
+        const idx = sorted.findIndex(s => s.id === n.id);
+        if (idx < 0) return n;
+        return { ...n, x: 80 + (idx % COLS) * COL_W, y: 80 + Math.floor(idx / COLS) * ROW_H };
+      }));
+      setPanX(20); setPanY(20);
+      setZoom(Math.min(0.85, window.innerWidth / (COLS * COL_W + 160)));
+      return;
+    }
+
+    // ── Type-based layout (columns by nodeType) ──
+    if (mode === "type") {
+      const TYPE_ORDER: string[] = ["query", "insight", "decision", "scenario", "followup", "dimensions", "causalgraph", "note", "idea", "list", "file"];
+      const groups = new Map<string, CanvasNode[]>();
+      for (const n of ns) {
+        const t = n.nodeType;
+        if (!groups.has(t)) groups.set(t, []);
+        groups.get(t)!.push(n);
+      }
+      const COL_W = 340;
+      const ROW_GAP = 24;
+      let colX = 80;
+      const newPos = new Map<string, { x: number; y: number }>();
+      for (const t of TYPE_ORDER) {
+        const items = groups.get(t);
+        if (!items || items.length === 0) continue;
+        items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+        let y = 80;
+        for (const n of items) {
+          newPos.set(n.id, { x: colX, y });
+          y += 200 + ROW_GAP;
+        }
+        colX += COL_W;
+      }
+      setNodes(prev => prev.map(n => { const p = newPos.get(n.id); return p ? { ...n, x: p.x, y: p.y } : n; }));
+      setPanX(20); setPanY(20);
+      setZoom(Math.min(0.85, window.innerWidth / (colX + 80)));
+      return;
+    }
+
+    // ── Status-based layout (columns by nodeStatus) ──
+    if (mode === "status") {
+      const STATUS_ORDER: NodeStatus[] = ["active", "open", "decided", "pinned"];
+      const COL_W = 340;
+      const ROW_GAP = 24;
+      let colX = 80;
+      const newPos = new Map<string, { x: number; y: number }>();
+      for (const status of STATUS_ORDER) {
+        const items = ns.filter(n => (n.nodeStatus ?? "open") === status);
+        if (items.length === 0) continue;
+        items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+        let y = 80;
+        for (const n of items) {
+          newPos.set(n.id, { x: colX, y });
+          y += 200 + ROW_GAP;
+        }
+        colX += COL_W;
+      }
+      setNodes(prev => prev.map(n => { const p = newPos.get(n.id); return p ? { ...n, x: p.x, y: p.y } : n; }));
+      setPanX(20); setPanY(20);
+      setZoom(Math.min(0.85, window.innerWidth / (colX + 80)));
+      return;
+    }
+
+    // ── Tree layout (default, original code) ──
 
     const nodeMap = new Map(ns.map(n => [n.id, n]));
     const allIds  = new Set(ns.map(n => n.id));
@@ -5751,9 +5891,11 @@ export default function CanvasPage() {
   const handleViewportPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.target !== viewportRef.current) return;
     setProjectDropdownOpen(false);
+    setSortMenuOpen(false);
     panningRef.current = { sx: e.clientX, sy: e.clientY, opx: panXRef.current, opy: panYRef.current };
     setSelectedId(null);
     setDetailNodeId(null);
+    setMultiSelectedIds(new Set());
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -5943,14 +6085,70 @@ export default function CanvasPage() {
 
           <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
 
-          {/* Reorganize */}
+          {/* Sort/Arrange dropdown */}
           {nodes.length > 1 && (
-            <button onClick={reorganizeCanvas}
-              title={de ? "Alle Karten automatisch neu anordnen" : "Auto-arrange all cards"}
-              style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
-            >⊞ {de ? "Ordnen" : "Arrange"}</button>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setSortMenuOpen(v => !v)}
+                title={de ? "Karten sortieren und anordnen" : "Sort and arrange cards"}
+                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: sortMenuOpen ? "var(--color-page-bg)" : "transparent", color: sortMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                onMouseLeave={e => { if (!sortMenuOpen) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; } }}
+              >⊞ {de ? "Ordnen" : "Arrange"} ▾</button>
+              {sortMenuOpen && (
+                <>
+                  <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
+                  <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
+                    {([
+                      { mode: "tree" as SortMode, icon: "🌳", label: de ? "Baum (Standard)" : "Tree (Default)" },
+                      { mode: "time" as SortMode, icon: "🕐", label: de ? "Zeitlich" : "By Time" },
+                      { mode: "type" as SortMode, icon: "📋", label: de ? "Nach Typ" : "By Type" },
+                      { mode: "status" as SortMode, icon: "🏷", label: de ? "Nach Status" : "By Status" },
+                    ] as const).map(item => (
+                      <button key={item.mode}
+                        onClick={() => { reorganizeCanvas(item.mode); setSortMenuOpen(false); }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 14px", border: "none", background: "transparent", color: "var(--color-text-secondary)", fontSize: 12, fontWeight: 500, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"; }}
+                      >
+                        <span style={{ fontSize: 13 }}>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Group button (when multi-selected) */}
+          {multiSelectedIds.size >= 2 && (
+            <button
+              onClick={() => {
+                const ids = [...multiSelectedIds];
+                const gNodes = nodes.filter(n => ids.includes(n.id));
+                if (gNodes.length < 2) return;
+                const xs = gNodes.map(n => n.x);
+                const ys = gNodes.map(n => n.y);
+                const PAD = 40;
+                const colors = ["#2563EB", "#8B5CF6", "#F97316", "#1A9E5A", "#0369A1", "#D4A017"];
+                const newGroup: CanvasGroup = {
+                  id: `ug-${Date.now()}`,
+                  nodeIds: ids,
+                  label: de ? "Neue Gruppe" : "New Group",
+                  color: colors[userGroups.length % colors.length],
+                  bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2, h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2 },
+                };
+                setUserGroups(prev => [...prev, newGroup]);
+                setMultiSelectedIds(new Set());
+                setEditingGroupId(newGroup.id);
+              }}
+              title={de ? "Ausgewählte Karten gruppieren" : "Group selected cards"}
+              style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: "1px solid #2563EB40", background: "#2563EB14", color: "#2563EB", cursor: "pointer", transition: "all 0.12s" }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB"; el.style.color = "#fff"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB14"; el.style.color = "#2563EB"; }}
+            >
+              ⊞ {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
+            </button>
           )}
 
           <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
@@ -5968,6 +6166,37 @@ export default function CanvasPage() {
               }}
             >{LAYER_LABELS[layer].de}</button>
           ))}
+
+          {/* Tag filter pills */}
+          {allTags.length > 0 && (
+            <>
+              <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "nowrap", overflow: "hidden" }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: "var(--color-text-muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginRight: 1, flexShrink: 0 }}>Tags</span>
+                {allTags.slice(0, 8).map(tag => {
+                  const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
+                  const isActive = activeTagFilter === tag;
+                  return (
+                    <button key={tag}
+                      onClick={() => setActiveTagFilter(prev => prev === tag ? null : tag)}
+                      style={{
+                        fontSize: 9, padding: "1px 7px", borderRadius: 10, border: `1px solid ${isActive ? `hsl(${hue}, 55%, 50%)` : `hsl(${hue}, 45%, 80%)`}`,
+                        background: isActive ? `hsl(${hue}, 55%, 92%)` : `hsl(${hue}, 55%, 96%)`, color: `hsl(${hue}, 55%, ${isActive ? 30 : 45}%)`,
+                        fontWeight: isActive ? 700 : 500, cursor: "pointer", transition: "all 0.12s", whiteSpace: "nowrap", flexShrink: 0,
+                        boxShadow: isActive ? `0 0 0 2px hsl(${hue}, 55%, 80%)` : "none",
+                      }}
+                    >{tag}</button>
+                  );
+                })}
+                {activeTagFilter && (
+                  <button onClick={() => setActiveTagFilter(null)}
+                    style={{ fontSize: 9, padding: "1px 5px", borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
+                    title={de ? "Tag-Filter aufheben" : "Clear tag filter"}
+                  >✕</button>
+                )}
+              </div>
+            </>
+          )}
 
           <span style={{ color: "var(--color-border)", fontSize: 14 }}>|</span>
           {/* Volt UI boxed-tab pattern: gray container with white active tab */}
@@ -6665,7 +6894,7 @@ export default function CanvasPage() {
               </svg>
             )}
 
-            {/* Group blobs */}
+            {/* Auto-computed group blobs */}
             {canvasGroups.map(g => (
               <div key={g.id} style={{
                 position: "absolute",
@@ -6685,8 +6914,84 @@ export default function CanvasPage() {
               </div>
             ))}
 
+            {/* User-created group blobs */}
+            {userGroups.map(g => {
+              // Recompute bounds dynamically from current node positions
+              const gNodes = g.nodeIds.map(id => nodes.find(n => n.id === id)).filter(Boolean) as CanvasNode[];
+              if (gNodes.length < 2) return null;
+              const xs = gNodes.map(n => n.x);
+              const ys = gNodes.map(n => n.y);
+              const PAD = 40;
+              const bounds = {
+                x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD,
+                w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2,
+                h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2,
+              };
+              return (
+                <div key={g.id} style={{
+                  position: "absolute",
+                  left: bounds.x, top: bounds.y,
+                  width: bounds.w, height: bounds.h,
+                  background: `${g.color}0C`,
+                  border: `2px dashed ${g.color}55`,
+                  borderRadius: 20,
+                }}>
+                  {/* Editable label */}
+                  <div style={{ position: "absolute", top: 8, left: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                    {editingGroupId === g.id ? (
+                      <input
+                        autoFocus
+                        defaultValue={g.label}
+                        onBlur={e => {
+                          setUserGroups(prev => prev.map(gg => gg.id === g.id ? { ...gg, label: e.target.value || g.label } : gg));
+                          setEditingGroupId(null);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setEditingGroupId(null); } }}
+                        style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", color: g.color, background: "transparent", border: `1px solid ${g.color}50`, borderRadius: 4, padding: "1px 6px", outline: "none", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => setEditingGroupId(g.id)}
+                        style={{
+                          fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
+                          color: `${g.color}BB`, cursor: "pointer",
+                          fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                        }}
+                        title={de ? "Klicken zum Umbenennen" : "Click to rename"}
+                      >{g.label}</span>
+                    )}
+                    <button
+                      onClick={() => setUserGroups(prev => prev.filter(gg => gg.id !== g.id))}
+                      title={de ? "Gruppe auflösen" : "Remove group"}
+                      style={{ fontSize: 10, color: `${g.color}88`, background: "none", border: "none", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = `${g.color}88`; }}
+                    >✕</button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Multi-select outlines */}
+            {multiSelectedIds.size > 0 && visibleNodes.filter(n => multiSelectedIds.has(n.id)).map(n => {
+              const nw = n.nodeType === "query" ? ((n as QueryNode).customWidth ?? QUERY_NODE_W) : ((n as DerivedNode).customWidth ?? DERIVED_W);
+              const nh = n.nodeType === "query" ? ((n as QueryNode).customHeight ?? QUERY_NODE_W) : ((n as DerivedNode).customHeight ?? DERIVED_W);
+              return (
+                <div key={`ms-${n.id}`} style={{
+                  position: "absolute", left: n.x - 4, top: n.y - 4,
+                  width: nw + 8, height: nh + 8,
+                  border: "2px dashed #2563EB", borderRadius: 14,
+                  pointerEvents: "none",
+                  boxShadow: "0 0 0 2px rgba(37,99,235,0.15)",
+                }} />
+              );
+            })}
+
             {visibleNodes.map(n => {
-              const isDimmed = selectedId !== null && !pipelineChain.has(n.id);
+              const isDimmedBySelection = selectedId !== null && !pipelineChain.has(n.id);
+              const isDimmedByTag = activeTagFilter !== null && !(n.tags ?? []).includes(activeTagFilter);
+              const isDimmed = isDimmedBySelection || isDimmedByTag;
+              const isMultiSelected = multiSelectedIds.has(n.id);
               if (n.nodeType === "query") {
                 const qNode = n as QueryNode;
                 return (
