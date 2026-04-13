@@ -438,25 +438,33 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         )}
       </p>
 
-      {/* ── Row 1: STEEP+V macro filter + search ──────────────────────
-           Six wide chips grouping the 24 fine categories under the
-           Social/Technological/Economic/Environmental/Political/Values
-           buckets from source-taxonomy.ts. Clicking a macro chip scopes
-           the fine pill row below. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, flex: 1 }}>
+      {/* ── Filter container ──────────────────────────────────────── */}
+      <div style={{
+        background: "var(--card, #fff)",
+        border: "1px solid var(--color-border, #E8E8E8)",
+        borderRadius: 12,
+        padding: "14px 16px",
+        marginBottom: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 0,
+      }}>
+        {/* Row 1: STEEP+V macro chips */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <MacroChip
             active={activeMacro === "all"}
             onClick={() => {
               setActiveMacro("all");
-              // Reset fine filter to "all" so the scoped pill row doesn't
-              // end up pointing at a pill that's about to disappear.
               if (activeFilter !== "all" && activeFilter !== "forschung") setActiveFilter("all");
             }}
             label={de ? "Alle" : "All"}
             count={allRows.length}
           />
-          {STEEP_V_ORDER.map((key) => {
+          {[...STEEP_V_ORDER].sort((a, b) => {
+            const la = de ? STEEP_V_META[a].labelDe : STEEP_V_META[a].labelEn;
+            const lb = de ? STEEP_V_META[b].labelDe : STEEP_V_META[b].labelEn;
+            return la.localeCompare(lb, de ? "de" : "en");
+          }).map((key) => {
             const meta = STEEP_V_META[key];
             const Icon = meta.icon;
             const count = macroCounts.get(key) ?? 0;
@@ -466,8 +474,6 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                 active={activeMacro === key}
                 onClick={() => {
                   setActiveMacro(key);
-                  // If the current fine filter doesn't belong to the new macro,
-                  // reset it to "all" so the pill row scope makes sense.
                   if (
                     activeFilter !== "all" &&
                     activeFilter !== "forschung" &&
@@ -485,108 +491,111 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             );
           })}
         </div>
-        <SearchBox value={search} onChange={setSearch} de={de} />
-      </div>
 
-      {/* ── Row 2: Fine category pills (scoped by active macro) ───────
-           When a macro chip is active, only the fine categories
-           belonging to that macro render here. "Alle" and "Forschung"
-           are always visible so the user can leave scoped mode cleanly. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-        <span style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "var(--volt-text-faint, #999)",
-          marginRight: 2,
-        }}>
-          {de ? "Kategorie" : "Category"}
-        </span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
-          {(Object.keys(CATEGORIES) as CategoryKey[]).sort((a, b) => {
-            // "all" and "forschung" always first/last
-            if (a === "all") return -1;
-            if (b === "all") return 1;
-            if (a === "forschung") return 1;
-            if (b === "forschung") return -1;
-            const labelA = de ? CATEGORIES[a].de : CATEGORIES[a].en;
-            const labelB = de ? CATEGORIES[b].de : CATEGORIES[b].en;
-            return labelA.localeCompare(labelB, de ? "de" : "en");
-          }).map((key) => {
-            // Always show "all" and "forschung" regardless of macro scope.
-            if (key !== "all" && key !== "forschung") {
-              const count = categoryCounts.get(key) ?? 0;
-              if (count === 0) return null;
-              // Scope: hide fine pills that don't belong to the active macro.
-              if (activeMacro !== "all" && CATEGORY_TO_MACRO[key] !== activeMacro) return null;
-            }
-            return (
-              <VoltFilterPill
-                key={key}
-                active={activeFilter === key}
-                onClick={() => setActiveFilter(key)}
-                size="sm"
-              >
-                {de ? CATEGORIES[key].de : CATEGORIES[key].en}
-              </VoltFilterPill>
-            );
-          })}
-        </div>
-      </div>
+        {/* Divider */}
+        <div style={{ borderTop: "1px solid var(--color-border, #E8E8E8)", margin: "10px 0" }} />
 
-      {/* Status segmented control — only shown when not in research mode */}
-      {!showResearch && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Row 2: Fine category pills */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
           <span style={{
             fontFamily: "var(--font-mono)",
             fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
             textTransform: "uppercase",
             color: "var(--volt-text-faint, #999)",
-            marginRight: 4,
+            marginRight: 2,
+            flexShrink: 0,
           }}>
-            {de ? "Status" : "Status"}
+            {de ? "Kategorie" : "Category"}
           </span>
-          {(["all", "aktiv", "geplant"] as const).map((k) => {
-            const active = statusFilter === k;
-            const label = k === "all"
-              ? (de ? "Alle" : "All")
-              : k === "aktiv"
-                ? (de ? "Live (aktiv)" : "Live (active)")
-                : (de ? "Geplant (Roadmap)" : "Planned (roadmap)");
-            const count = k === "all"
-              ? allRows.length
-              : k === "aktiv"
-                ? activeCount
-                : plannedCount;
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setStatusFilter(k)}
-                style={{
-                  fontSize: 11, fontWeight: 600,
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  border: active ? "1px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
-                  background: active ? "var(--volt-text, #0A0A0A)" : "var(--volt-surface-raised, #fff)",
-                  color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
-                  cursor: "pointer",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                  transition: "all 120ms ease",
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                }}
-              >
-                {label}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
+            {(Object.keys(CATEGORIES) as CategoryKey[]).sort((a, b) => {
+              if (a === "all") return -1;
+              if (b === "all") return 1;
+              if (a === "forschung") return 1;
+              if (b === "forschung") return -1;
+              const labelA = de ? CATEGORIES[a].de : CATEGORIES[a].en;
+              const labelB = de ? CATEGORIES[b].de : CATEGORIES[b].en;
+              return labelA.localeCompare(labelB, de ? "de" : "en");
+            }).map((key) => {
+              if (key !== "all" && key !== "forschung") {
+                const count = categoryCounts.get(key) ?? 0;
+                if (count === 0) return null;
+                if (activeMacro !== "all" && CATEGORY_TO_MACRO[key] !== activeMacro) return null;
+              }
+              return (
+                <VoltFilterPill
+                  key={key}
+                  active={activeFilter === key}
+                  onClick={() => setActiveFilter(key)}
+                  size="sm"
+                >
+                  {de ? CATEGORIES[key].de : CATEGORIES[key].en}
+                </VoltFilterPill>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Row 3: Status + Search — only shown when not in research mode */}
+        {!showResearch && (
+          <>
+            <div style={{ borderTop: "1px solid var(--color-border, #E8E8E8)", margin: "10px 0" }} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span style={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  opacity: active ? 0.8 : 0.5,
-                }}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--volt-text-faint, #999)",
+                  marginRight: 4,
+                }}>
+                  {de ? "Status" : "Status"}
+                </span>
+                {(["all", "aktiv", "geplant"] as const).map((k) => {
+                  const active = statusFilter === k;
+                  const label = k === "all"
+                    ? (de ? "Alle" : "All")
+                    : k === "aktiv"
+                      ? (de ? "Live (aktiv)" : "Live (active)")
+                      : (de ? "Geplant (Roadmap)" : "Planned (roadmap)");
+                  const count = k === "all"
+                    ? allRows.length
+                    : k === "aktiv"
+                      ? activeCount
+                      : plannedCount;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setStatusFilter(k)}
+                      style={{
+                        fontSize: 11, fontWeight: 600,
+                        padding: "5px 12px",
+                        borderRadius: 999,
+                        border: active ? "1px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
+                        background: active ? "var(--volt-text, #0A0A0A)" : "var(--volt-surface-raised, #fff)",
+                        color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
+                        cursor: "pointer",
+                        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                        transition: "all 120ms ease",
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                      }}
+                    >
+                      {label}
+                      <span style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 10,
+                        opacity: active ? 0.8 : 0.5,
+                      }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <SearchBox value={search} onChange={setSearch} de={de} />
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Connectors grid — 4-column layout with sortable headers.
            Columns: Source | Kategorie | Typ | Status */}
@@ -936,7 +945,7 @@ function MacroChip({
         border: active
           ? `1px solid ${text ?? "var(--foreground, #0A0A0A)"}`
           : "1px solid var(--color-border, #E8E8E8)",
-        background: active ? (bg ?? "var(--foreground, #0A0A0A)") : "transparent",
+        background: active ? (bg ?? "var(--foreground, #0A0A0A)") : "var(--card, #fff)",
         color: active ? (text ?? "var(--background, #fff)") : "var(--muted-foreground, #6B6B6B)",
         fontFamily: "var(--font-ui)",
         fontSize: 12,

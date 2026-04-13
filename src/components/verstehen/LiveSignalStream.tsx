@@ -31,6 +31,12 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { TrendDot } from "@/types";
+import {
+  VoltAccordion,
+  VoltAccordionItem,
+  VoltAccordionTrigger,
+  VoltAccordionContent,
+} from "@/components/volt/VoltAccordion";
 
 interface RawSignal {
   id: string;
@@ -198,6 +204,35 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
     return map;
   }, [trends]);
 
+  // View mode: "evidenz" groups signals by trend, "feed" shows flat card grid
+  type ViewMode = "evidenz" | "feed";
+  const [viewMode, setViewMode] = useState<ViewMode>("evidenz");
+
+  // Group signals by their matching trend (for evidence view)
+  const groupedByTrend = useMemo(() => {
+    if (viewMode !== "evidenz") return [];
+    const groups = new Map<string, { trend: TrendDot | null; signals: RawSignal[] }>();
+    for (const signal of displaySignals) {
+      const trendName = signal.topic
+        ? trendNameByLower.get(signal.topic.toLowerCase())
+        : undefined;
+      const key = trendName?.toLowerCase() ?? "__unmatched__";
+      if (!groups.has(key)) {
+        const matchedTrend = trendName
+          ? trends.find(t => t.name.toLowerCase() === key) ?? null
+          : null;
+        groups.set(key, { trend: matchedTrend, signals: [] });
+      }
+      groups.get(key)!.signals.push(signal);
+    }
+    return Array.from(groups.entries())
+      .sort(([keyA, a], [keyB, b]) => {
+        if (keyA === "__unmatched__") return 1;
+        if (keyB === "__unmatched__") return -1;
+        return b.signals.length - a.signals.length;
+      });
+  }, [viewMode, displaySignals, trendNameByLower, trends]);
+
   // Above-the-fold priority load: after displaySignals changes, kick off
   // og-image fetches for the first 12 entries immediately. Two reasons:
   //   1) Guarantees visible cards show real previews without waiting for
@@ -306,7 +341,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
       {/* Filter row */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1fr 1fr auto auto",
+        gridTemplateColumns: "1fr 1fr auto auto auto",
         gap: 12,
         marginBottom: 20,
         alignItems: "center",
@@ -387,6 +422,42 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
             );
           })}
         </div>
+
+        {/* View mode toggle */}
+        <div style={{
+          display: "inline-flex",
+          border: "1px solid var(--volt-border, #E8E8E8)",
+          borderRadius: 999,
+          padding: 2,
+          background: "var(--volt-surface-raised, #fff)",
+        }}>
+          {(["evidenz", "feed"] as ViewMode[]).map((key) => {
+            const active = viewMode === key;
+            const label = key === "evidenz"
+              ? (de ? "Evidenz" : "Evidence")
+              : (de ? "Feed" : "Feed");
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setViewMode(key)}
+                style={{
+                  fontSize: 11, fontWeight: 600,
+                  padding: "5px 12px",
+                  border: "none",
+                  borderRadius: 999,
+                  background: active ? "var(--volt-text, #0A0A0A)" : "transparent",
+                  color: active ? "var(--background, #fff)" : "var(--volt-text-muted, #6B6B6B)",
+                  cursor: "pointer",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  transition: "all 120ms ease",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Empty state */}
@@ -429,8 +500,132 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         </div>
       )}
 
-      {/* Card grid */}
-      {displaySignals.length > 0 && (
+      {/* ── Evidence view (grouped by trend) ─────────────────────── */}
+      {viewMode === "evidenz" && displaySignals.length > 0 && (
+        <VoltAccordion
+          type="multiple"
+          defaultValue={groupedByTrend.slice(0, 3).map(([key]) => key)}
+          style={{
+            border: "1px solid var(--color-border, #E8E8E8)",
+            borderRadius: 12,
+            overflow: "hidden",
+            background: "var(--card, #fff)",
+          }}
+        >
+          {groupedByTrend.map(([key, { trend, signals: groupSignals }]) => {
+            const isUnmatched = key === "__unmatched__";
+            // Source breakdown for this group
+            const srcBreakdown = new Map<string, number>();
+            for (const s of groupSignals) srcBreakdown.set(s.source, (srcBreakdown.get(s.source) ?? 0) + 1);
+            const srcEntries = Array.from(srcBreakdown.entries()).sort((a, b) => b[1] - a[1]);
+
+            return (
+              <VoltAccordionItem key={key} value={key} className="border-b border-[var(--color-border,#E8E8E8)] last:border-b-0">
+                <VoltAccordionTrigger className="hover:no-underline px-4 gap-3">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+                    {/* Row 1: Ring + Name + Velocity + Count */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      {trend && !isUnmatched && (
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, letterSpacing: "0.05em",
+                          textTransform: "uppercase",
+                          padding: "2px 8px", borderRadius: 999,
+                          background: RING_BG[trend.ring] ?? "#F5F5F5",
+                          color: RING_TEXT[trend.ring] ?? "#666",
+                          fontFamily: "var(--font-mono)",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {trend.ring}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (trend) onTrendClick(trend.name);
+                        }}
+                        disabled={!trend}
+                        style={{
+                          fontSize: 14, fontWeight: 700, color: "var(--foreground)",
+                          fontFamily: "var(--font-display)",
+                          background: "none", border: "none", padding: 0, cursor: trend ? "pointer" : "default",
+                          textAlign: "left",
+                        }}
+                      >
+                        {isUnmatched
+                          ? (de ? "Unzugeordnete Signale" : "Unmatched Signals")
+                          : (trend?.name ?? key)}
+                      </button>
+                      {trend && trend.velocity !== "stable" && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700,
+                          color: trend.velocity === "rising" ? "var(--signal-positive, #1A9E5A)" : "var(--signal-negative, #E53935)",
+                        }}>
+                          {trend.velocity === "rising" ? "▲" : "▼"}
+                        </span>
+                      )}
+                      <span style={{
+                        fontSize: 10, fontWeight: 700,
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--muted-foreground)",
+                        marginLeft: "auto",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {groupSignals.length} {de ? "Signale" : "signals"}
+                      </span>
+                    </div>
+
+                    {/* Row 2: Score bars + Source dots */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      {trend && !isUnmatched && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <MiniScore label="R" value={trend.relevance} />
+                          <MiniScore label="C" value={trend.confidence} />
+                          <MiniScore label="I" value={trend.impact} />
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {srcEntries.slice(0, 6).map(([src, count]) => (
+                          <span key={src} style={{
+                            display: "inline-flex", alignItems: "center", gap: 3,
+                            fontSize: 10, color: "var(--muted-foreground)",
+                            fontFamily: "var(--font-mono)",
+                          }}>
+                            <span style={{
+                              width: 5, height: 5, borderRadius: "50%",
+                              background: sourceColor(src), flexShrink: 0,
+                            }} />
+                            {count}
+                          </span>
+                        ))}
+                        {srcEntries.length > 6 && (
+                          <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }}>
+                            +{srcEntries.length - 6}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </VoltAccordionTrigger>
+
+                <VoltAccordionContent className="px-4">
+                  <div style={{
+                    display: "flex", flexDirection: "column",
+                    borderTop: "1px solid var(--color-border, #E8E8E8)",
+                  }}>
+                    {groupSignals.map((s) => (
+                      <EvidenceSignalRow key={s.id} signal={s} de={de} />
+                    ))}
+                  </div>
+                </VoltAccordionContent>
+              </VoltAccordionItem>
+            );
+          })}
+        </VoltAccordion>
+      )}
+
+      {/* ── Feed view (flat card grid) ─────────────────────────── */}
+      {viewMode === "feed" && displaySignals.length > 0 && (
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
@@ -743,6 +938,116 @@ function SignalCard({
     </div>
   );
 }
+
+// ─── Evidence Signal Row (compact, inside accordion) ───────────────────
+function EvidenceSignalRow({ signal: s, de }: { signal: RawSignal; de: boolean }) {
+  const color = sourceColor(s.source);
+  return (
+    <a
+      href={s.url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "auto 1fr auto",
+        gap: 10,
+        alignItems: "center",
+        padding: "8px 0",
+        borderBottom: "1px solid var(--color-border, #F0F0F0)",
+        textDecoration: "none",
+        color: "inherit",
+        transition: "background 100ms ease",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--volt-surface, #FAFAFA)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+    >
+      {/* Source + age */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 5,
+        minWidth: 130, flexShrink: 0,
+      }}>
+        <span style={{
+          width: 5, height: 5, borderRadius: "50%",
+          background: color, flexShrink: 0,
+        }} />
+        <span style={{
+          fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700,
+          textTransform: "uppercase", letterSpacing: "0.04em",
+          color, whiteSpace: "nowrap",
+        }}>
+          {s.source}
+        </span>
+        <span style={{
+          fontFamily: "var(--font-mono)", fontSize: 9,
+          color: "var(--muted-foreground)", whiteSpace: "nowrap",
+        }}>
+          · {ageLabel(s.hoursAgo, de)}
+        </span>
+      </div>
+
+      {/* Title */}
+      <span style={{
+        fontSize: 12, fontWeight: 500, lineHeight: 1.3,
+        color: "var(--foreground)",
+        fontFamily: "var(--font-ui)",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {s.title}
+      </span>
+
+      {/* Strength pill */}
+      {s.strength > 0 && (
+        <span style={{
+          fontSize: 9, fontWeight: 700,
+          fontFamily: "var(--font-mono)",
+          padding: "2px 6px", borderRadius: 999,
+          background: `rgba(${s.strength > 0.7 ? "26,158,90" : s.strength > 0.4 ? "122,92,0" : "107,122,154"},0.12)`,
+          color: s.strength > 0.7 ? "var(--signal-positive, #1A9E5A)" : s.strength > 0.4 ? "#7A5C00" : "var(--muted-foreground)",
+          whiteSpace: "nowrap",
+        }}>
+          {Math.round(s.strength * 100)}
+        </span>
+      )}
+    </a>
+  );
+}
+
+// ─── Mini Score Bar (inline in evidence group header) ──────────────────
+function MiniScore({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(value * 100);
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 3,
+    }}>
+      <span style={{
+        fontSize: 8, fontWeight: 700, color: "var(--muted-foreground)",
+        fontFamily: "var(--font-mono)", letterSpacing: "0.05em",
+      }}>{label}</span>
+      <div style={{
+        width: 32, height: 3, borderRadius: 2,
+        background: "var(--color-border, #E8E8E8)",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          width: `${pct}%`, height: "100%", borderRadius: 2,
+          background: pct > 70 ? "var(--signal-positive, #1A9E5A)" : pct > 40 ? "#C4A21B" : "var(--muted-foreground)",
+        }} />
+      </div>
+      <span style={{
+        fontSize: 8, fontWeight: 600, color: "var(--muted-foreground)",
+        fontFamily: "var(--font-mono)",
+      }}>{pct}</span>
+    </div>
+  );
+}
+
+// Ring badge colors
+const RING_BG: Record<string, string> = {
+  adopt: "#E4FF9714", trial: "#FFF3E014", assess: "#E0F2FE14", hold: "#F5F5F514",
+};
+const RING_TEXT: Record<string, string> = {
+  adopt: "#4D7C0F", trial: "#92400E", assess: "#0369A1", hold: "#737373",
+};
 
 const selectStyle: React.CSSProperties = {
   fontSize: 12,

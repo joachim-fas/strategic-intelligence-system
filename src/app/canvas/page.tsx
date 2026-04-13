@@ -17,7 +17,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -326,9 +326,9 @@ function estimateCardHeight(
 ): number {
   if (type === "dimensions") return DIMENSIONS_CARD_H;
   if (type === "causalgraph") return CAUSAL_GRAPH_CARD_H;
-  const CHARS_PER_LINE = 29;
+  const CHARS_PER_LINE = 32;
   const LINE_H   = 20;
-  const MAX_LINES = 4;
+  const MAX_LINES = 6;
 
   const contentLines = Math.min(MAX_LINES, Math.max(1, Math.ceil(content.length / CHARS_PER_LINE)));
   const labelLines   = label ? Math.min(2, Math.ceil(label.length / CHARS_PER_LINE)) : 0;
@@ -348,6 +348,33 @@ function estimateCardHeight(
     return Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
   }
   return HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
+}
+
+// ── Universal node dimension helpers (used by layout algorithms) ───────────
+
+function getNodeWidth(n: CanvasNode): number {
+  if (n.customWidth) return n.customWidth;
+  if (n.nodeType === "query") return QUERY_NODE_W;
+  if (n.nodeType === "list") return LIST_NODE_W;
+  if (n.nodeType === "note") return 280;
+  if (n.nodeType === "idea") return 300;
+  if (n.nodeType === "file") return FILE_NODE_W;
+  return DERIVED_W;
+}
+
+function getNodeHeight(n: CanvasNode): number {
+  if (n.customHeight) return n.customHeight;
+  if (n.nodeType === "query") return QUERY_NODE_H;
+  if (n.nodeType === "dimensions") return DIMENSIONS_CARD_H;
+  if (n.nodeType === "causalgraph") return CAUSAL_GRAPH_CARD_H;
+  if (n.nodeType === "list") return 200;
+  if (n.nodeType === "note") return 160;
+  if (n.nodeType === "idea") return 300;
+  if (n.nodeType === "file") return FILE_NODE_H;
+  // Derived nodes: use content-based estimation
+  const dn = n as DerivedNode;
+  const hasSrc = (dn.sources?.length ?? 0) > 0;
+  return estimateCardHeight(dn.nodeType as DerivedType, dn.content || "", dn.label, hasSrc);
 }
 
 const STORAGE_KEY = "sis-canvas-v2";
@@ -1609,20 +1636,20 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         <marker id="arr-q" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.50)" />
         </marker>
-        <marker id="arr-d" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="rgba(0,0,0,0.35)" />
+        <marker id="arr-d" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.40)" />
         </marker>
-        <marker id="arr-r" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#F5A623AA" />
+        <marker id="arr-r" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="#F5A623AA" />
         </marker>
-        <marker id="arr-builds" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#1A9E5A" />
+        <marker id="arr-builds" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="#1A9E5A" />
         </marker>
-        <marker id="arr-contradicts" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#E8402A" />
+        <marker id="arr-contradicts" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="#E8402A" />
         </marker>
-        <marker id="arr-validates" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#2563EB" />
+        <marker id="arr-validates" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="#2563EB" />
         </marker>
       </defs>
       {connections.map(c => {
@@ -1630,31 +1657,10 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         const to = nodeMap.get(c.to);
         if (!from || !to) return null;
 
-        const nodeDefaultW = (n: CanvasNode) => {
-          if (n.nodeType === "query") return QUERY_NODE_W;
-          if (n.nodeType === "list") return LIST_NODE_W;
-          if (n.nodeType === "note") return 280;
-          if (n.nodeType === "idea") return 300;
-          if (n.nodeType === "file") return FILE_NODE_W;
-          return DERIVED_W;
-        };
-        const fromW = from.customWidth ?? nodeDefaultW(from);
-
-
-        const nodeDefaultH = (n: CanvasNode) => {
-          if (n.nodeType === "query") return QUERY_NODE_H;
-          if (n.nodeType === "dimensions") return DIMENSIONS_CARD_H;
-          if (n.nodeType === "causalgraph") return CAUSAL_GRAPH_CARD_H;
-          if (n.nodeType === "list") return 200;
-          if (n.nodeType === "note") return 160;
-          if (n.nodeType === "idea") return 300;
-          if (n.nodeType === "file") return FILE_NODE_H;
-          return DERIVED_W;
-        };
-        const x1 = from.x + fromW;
-        const y1 = from.y + (from.customHeight ?? nodeDefaultH(from)) / 2;
+        const x1 = from.x + getNodeWidth(from);
+        const y1 = from.y + getNodeHeight(from) / 2;
         const x2 = to.x;
-        const y2 = to.y + (to.customHeight ?? nodeDefaultH(to)) / 2;
+        const y2 = to.y + getNodeHeight(to) / 2;
         const cp = Math.min(Math.abs(x2 - x1) * 0.45, 120);
 
         const inChain = !selId || !pipelineChain || pipelineChain.has(c.from) || pipelineChain.has(c.to);
@@ -1663,7 +1669,7 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId }
         // Connection type styling
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":     { stroke: "rgba(0,0,0,0.25)", dash: "4 3", width: 1.2, marker: "url(#arr-d)" },
+          "derived":     { stroke: "rgba(0,0,0,0.35)", dash: "4 3", width: 1.5, marker: "url(#arr-d)" },
           "refreshed":   { stroke: "#F5A62388",        dash: "4 3", width: 1, marker: "url(#arr-r)" },
           "builds-on":   { stroke: "#1A9E5A",          dash: "",    width: 1.8, marker: "url(#arr-builds)" },
           "contradicts":  { stroke: "#E8402A",          dash: "5 3", width: 1.5, marker: "url(#arr-contradicts)" },
@@ -5045,8 +5051,8 @@ export default function CanvasPage() {
       const bounds = {
         x: Math.min(...xs) - PAD,
         y: Math.min(...ys) - PAD,
-        w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2,
-        h: Math.max(...ys) + 100 - Math.min(...ys) + PAD * 2,
+        w: Math.max(...gNodes.map(n => n.x + getNodeWidth(n))) - Math.min(...xs) + PAD * 2,
+        h: Math.max(...gNodes.map(n => n.y + getNodeHeight(n))) - Math.min(...ys) + PAD * 2,
       };
       const allIds = gNodeIds.flatMap(id => {
         const q = doneQueries.find(n => n.id === id);
@@ -5059,6 +5065,15 @@ export default function CanvasPage() {
       return { id: `group-${i}`, nodeIds: gNodeIds, label, color: colors[i % colors.length], bounds };
     });
   }, [queryNodes, nodes]);
+
+  // Merged group lookup: nodeId → group color (auto + user groups)
+  const nodeGroupColor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of canvasGroups) { for (const id of g.nodeIds) map.set(id, g.color); }
+    // User groups override auto groups
+    for (const g of userGroups) { for (const id of g.nodeIds) map.set(id, g.color); }
+    return map;
+  }, [canvasGroups, userGroups]);
 
   // ── Canvas Export ────────────────────────────────────────────────────────
 
@@ -5948,15 +5963,35 @@ export default function CanvasPage() {
 
     // ── Time-based layout ──
     if (mode === "time") {
-      const sorted = [...ns].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-      const COL_W = 340;
-      const ROW_H = 220;
+      // Group-aware: keep grouped nodes adjacent, then sort by time
+      const allGroups = [...(canvasGroups ?? []), ...userGroupsRef.current];
+      const nodeToGroupIdx = new Map<string, number>();
+      allGroups.forEach((g, i) => { g.nodeIds.forEach(id => nodeToGroupIdx.set(id, i)); });
+      const sorted = [...ns].sort((a, b) => {
+        const gA = nodeToGroupIdx.get(a.id) ?? 999;
+        const gB = nodeToGroupIdx.get(b.id) ?? 999;
+        if (gA !== gB) return gA - gB;
+        return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+      });
+      const COL_W = 460;
+      const ROW_GAP = 24;
+      const GROUP_GAP = 40;
       const COLS = Math.max(3, Math.ceil(Math.sqrt(sorted.length)));
-      setNodes(prev => prev.map(n => {
-        const idx = sorted.findIndex(s => s.id === n.id);
-        if (idx < 0) return n;
-        return { ...n, x: 80 + (idx % COLS) * COL_W, y: 80 + Math.floor(idx / COLS) * ROW_H };
-      }));
+      const colYs = Array(COLS).fill(80);
+      const newPos = new Map<string, { x: number; y: number }>();
+      let prevGroupIdx = -1;
+      for (const n of sorted) {
+        const curGroupIdx = nodeToGroupIdx.get(n.id) ?? -1;
+        let bestCol = 0;
+        for (let c = 1; c < COLS; c++) { if (colYs[c] < colYs[bestCol]) bestCol = c; }
+        if (prevGroupIdx >= 0 && curGroupIdx !== prevGroupIdx && curGroupIdx >= 0) {
+          colYs[bestCol] += GROUP_GAP;
+        }
+        newPos.set(n.id, { x: 80 + bestCol * COL_W, y: colYs[bestCol] });
+        colYs[bestCol] += getNodeHeight(n) + ROW_GAP;
+        prevGroupIdx = curGroupIdx;
+      }
+      setNodes(prev => prev.map(n => { const p = newPos.get(n.id); return p ? { ...n, x: p.x, y: p.y } : n; }));
       setPanX(20); setPanY(20);
       setZoom(Math.min(0.85, window.innerWidth / (COLS * COL_W + 160)));
       return;
@@ -5971,20 +6006,34 @@ export default function CanvasPage() {
         if (!groups.has(t)) groups.set(t, []);
         groups.get(t)!.push(n);
       }
-      const COL_W = 340;
       const ROW_GAP = 24;
+      const COL_GAP = 40;
       let colX = 80;
       const newPos = new Map<string, { x: number; y: number }>();
       for (const t of TYPE_ORDER) {
         const items = groups.get(t);
         if (!items || items.length === 0) continue;
-        items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+        // Group-aware sort: grouped nodes stay together within each column
+        const allGrps = [...(canvasGroups ?? []), ...userGroupsRef.current];
+        const toGIdx = new Map<string, number>();
+        allGrps.forEach((g, i) => { g.nodeIds.forEach(id => toGIdx.set(id, i)); });
+        items.sort((a, b) => {
+          const gA = toGIdx.get(a.id) ?? 999;
+          const gB = toGIdx.get(b.id) ?? 999;
+          if (gA !== gB) return gA - gB;
+          return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+        });
+        const colW = Math.max(...items.map(n => getNodeWidth(n)));
         let y = 80;
+        let prevGIdx = -1;
         for (const n of items) {
+          const gIdx = toGIdx.get(n.id) ?? -1;
+          if (prevGIdx >= 0 && gIdx !== prevGIdx && gIdx >= 0) y += 40;
           newPos.set(n.id, { x: colX, y });
-          y += 200 + ROW_GAP;
+          y += getNodeHeight(n) + ROW_GAP;
+          prevGIdx = gIdx;
         }
-        colX += COL_W;
+        colX += colW + COL_GAP;
       }
       setNodes(prev => prev.map(n => { const p = newPos.get(n.id); return p ? { ...n, x: p.x, y: p.y } : n; }));
       setPanX(20); setPanY(20);
@@ -5995,20 +6044,33 @@ export default function CanvasPage() {
     // ── Status-based layout (columns by nodeStatus) ──
     if (mode === "status") {
       const STATUS_ORDER: NodeStatus[] = ["active", "open", "decided", "pinned"];
-      const COL_W = 340;
       const ROW_GAP = 24;
+      const COL_GAP = 40;
+      const allGrps = [...(canvasGroups ?? []), ...userGroupsRef.current];
+      const toGIdx = new Map<string, number>();
+      allGrps.forEach((g, i) => { g.nodeIds.forEach(id => toGIdx.set(id, i)); });
       let colX = 80;
       const newPos = new Map<string, { x: number; y: number }>();
       for (const status of STATUS_ORDER) {
         const items = ns.filter(n => (n.nodeStatus ?? "open") === status);
         if (items.length === 0) continue;
-        items.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+        items.sort((a, b) => {
+          const gA = toGIdx.get(a.id) ?? 999;
+          const gB = toGIdx.get(b.id) ?? 999;
+          if (gA !== gB) return gA - gB;
+          return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+        });
+        const colW = Math.max(...items.map(n => getNodeWidth(n)));
         let y = 80;
+        let prevGIdx = -1;
         for (const n of items) {
+          const gIdx = toGIdx.get(n.id) ?? -1;
+          if (prevGIdx >= 0 && gIdx !== prevGIdx && gIdx >= 0) y += 40;
           newPos.set(n.id, { x: colX, y });
-          y += 200 + ROW_GAP;
+          y += getNodeHeight(n) + ROW_GAP;
+          prevGIdx = gIdx;
         }
-        colX += COL_W;
+        colX += colW + COL_GAP;
       }
       setNodes(prev => prev.map(n => { const p = newPos.get(n.id); return p ? { ...n, x: p.x, y: p.y } : n; }));
       setPanX(20); setPanY(20);
@@ -6119,9 +6181,15 @@ export default function CanvasPage() {
       globalY = bottom + TREE_GAP_Y;
     }
 
-    // Orphaned nodes (no position assigned yet)
-    ns.filter(n => !newPos.has(n.id)).forEach((n, i) => {
-      newPos.set(n.id, { x: MARGIN_X + (i % 3) * (curQW + 60), y: globalY + Math.floor(i / 3) * 200 });
+    // Orphaned nodes (no position assigned yet) — use actual heights
+    const orphans = ns.filter(n => !newPos.has(n.id));
+    const ORPHAN_COLS = 3;
+    const orphanColYs = Array(ORPHAN_COLS).fill(globalY);
+    orphans.forEach(n => {
+      let bestCol = 0;
+      for (let c = 1; c < ORPHAN_COLS; c++) { if (orphanColYs[c] < orphanColYs[bestCol]) bestCol = c; }
+      newPos.set(n.id, { x: MARGIN_X + bestCol * (curQW + 60), y: orphanColYs[bestCol] });
+      orphanColYs[bestCol] += getNodeHeight(n) + DERIVED_ROW_GAP;
     });
 
     // Apply positions
@@ -6134,7 +6202,7 @@ export default function CanvasPage() {
     setPanX(20);
     setPanY(20);
     setZoom(Math.min(0.85, window.innerWidth / (curQW + curDW * 2 + DERIVED_COL_GAP_X + DERIVED_COL_GAP + 200)));
-  }, []);
+  }, [canvasGroups]);
 
   // ── Drag / pan / zoom ────────────────────────────────────────────────────
 
@@ -7168,15 +7236,16 @@ export default function CanvasPage() {
                 position: "absolute",
                 left: g.bounds.x, top: g.bounds.y,
                 width: g.bounds.w, height: g.bounds.h,
-                background: `${g.color}08`,
-                border: `1.5px dashed ${g.color}40`,
+                background: `${g.color}12`,
+                border: `2px dashed ${g.color}70`,
                 borderRadius: 20,
                 pointerEvents: "none",
+                boxShadow: `inset 0 0 24px ${g.color}08`,
               }}>
                 <div style={{
                   position: "absolute", top: 8, left: 14,
-                  fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase",
-                  color: `${g.color}AA`,
+                  fontSize: 10, fontWeight: 600, letterSpacing: "0.10em", textTransform: "uppercase",
+                  color: `${g.color}CC`,
                   fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
                 }}>{g.label}</div>
               </div>
@@ -7192,16 +7261,17 @@ export default function CanvasPage() {
               const PAD = 40;
               const bounds = {
                 x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD,
-                w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2,
-                h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2,
+                w: Math.max(...gNodes.map(n => n.x + getNodeWidth(n))) - Math.min(...xs) + PAD * 2,
+                h: Math.max(...gNodes.map(n => n.y + getNodeHeight(n))) - Math.min(...ys) + PAD * 2,
               };
               return (
                 <div key={g.id} style={{
                   position: "absolute",
                   left: bounds.x, top: bounds.y,
                   width: bounds.w, height: bounds.h,
-                  background: `${g.color}0C`,
-                  border: `2px dashed ${g.color}55`,
+                  background: `${g.color}14`,
+                  border: `2px dashed ${g.color}80`,
+                  boxShadow: `inset 0 0 24px ${g.color}08`,
                   borderRadius: 20,
                 }}>
                   {/* Editable label */}
@@ -7260,10 +7330,22 @@ export default function CanvasPage() {
               const isDimmedByTag = activeTagFilter !== null && !(n.tags ?? []).includes(activeTagFilter);
               const isDimmed = isDimmedBySelection || isDimmedByTag;
               const isMultiSelected = multiSelectedIds.has(n.id);
+              const grpColor = nodeGroupColor.get(n.id);
+              // Group membership left-border indicator
+              const groupStripe = grpColor ? (
+                <div key={`grp-${n.id}`} style={{
+                  position: "absolute", left: n.x - 5, top: n.y + 4,
+                  width: 3, height: getNodeHeight(n) - 8,
+                  background: grpColor, borderRadius: 2,
+                  pointerEvents: "none", opacity: isDimmed ? 0.15 : 0.7,
+                  transition: "opacity 0.2s",
+                }} />
+              ) : null;
               if (n.nodeType === "query") {
                 const qNode = n as QueryNode;
-                return (
-                  <QueryNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <QueryNodeCard
                     node={qNode} de={de}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7296,12 +7378,13 @@ export default function CanvasPage() {
                     onAddTag={handleAddTag}
                     onSetStatus={handleSetNodeStatus}
                   />
-                );
+                </React.Fragment>);
               }
               if (n.nodeType === "note") {
                 const nNode = n as NoteNode;
-                return (
-                  <NoteNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <NoteNodeCard
                     node={nNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7316,12 +7399,13 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                );
+                </React.Fragment>);
               }
               if (n.nodeType === "idea") {
                 const iNode = n as IdeaNode;
-                return (
-                  <IdeaNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <IdeaNodeCard
                     node={iNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7336,12 +7420,13 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                );
+                </React.Fragment>);
               }
               if (n.nodeType === "list") {
                 const lNode = n as ListNode;
-                return (
-                  <ListNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <ListNodeCard
                     node={lNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7355,12 +7440,13 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                );
+                </React.Fragment>);
               }
               if (n.nodeType === "file") {
                 const fNode = n as FileNode;
-                return (
-                  <FileNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <FileNodeCard
                     node={fNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7374,12 +7460,13 @@ export default function CanvasPage() {
                     dimmed={isDimmed}
                     zoom={zoom}
                   />
-                );
+                </React.Fragment>);
               }
               const dNode = n as DerivedNode;
               if (dNode.nodeType === "dimensions") {
-                return (
-                  <DimensionsNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <DimensionsNodeCard
                     node={dNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7391,11 +7478,12 @@ export default function CanvasPage() {
                     nodeW={dNode.customWidth ?? DERIVED_W}
                     dimmed={isDimmed}
                   />
-                );
+                </React.Fragment>);
               }
               if (dNode.nodeType === "causalgraph") {
-                return (
-                  <CausalGraphNodeCard key={n.id}
+                return (<React.Fragment key={n.id}>
+                  {groupStripe}
+                  <CausalGraphNodeCard
                     node={dNode}
                     selected={selectedId === n.id}
                     onSelect={handleSelectNode}
@@ -7407,10 +7495,11 @@ export default function CanvasPage() {
                     nodeW={dNode.customWidth ?? DERIVED_W}
                     dimmed={isDimmed}
                   />
-                );
+                </React.Fragment>);
               }
-              return (
-                <DerivedNodeCard key={n.id}
+              return (<React.Fragment key={n.id}>
+                {groupStripe}
+                <DerivedNodeCard
                   node={dNode} de={de}
                   selected={selectedId === n.id}
                   onSelect={handleSelectNode}
@@ -7426,7 +7515,7 @@ export default function CanvasPage() {
                   dimmed={isDimmed}
                   zoom={zoom}
                 />
-              );
+              </React.Fragment>);
             })}
           </div>
           </ErrorBoundary>
@@ -7436,7 +7525,15 @@ export default function CanvasPage() {
         {viewMode === "board" && (
           <div style={{ display: "flex", gap: 0, height: "100%", overflowX: "auto" }}>
             {BOARD_COLUMNS.map(col => {
-              const colNodes = nodes.filter(n => col.types.includes(n.nodeType));
+              const allGroups = [...canvasGroups, ...userGroups];
+              const colNodes = nodes.filter(n => col.types.includes(n.nodeType))
+                .sort((a, b) => {
+                  // Group members together, then by createdAt
+                  const gA = allGroups.findIndex(g => g.nodeIds.includes(a.id));
+                  const gB = allGroups.findIndex(g => g.nodeIds.includes(b.id));
+                  if (gA !== gB) return gA - gB;
+                  return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+                });
               return (
                 <div key={col.key} style={{ minWidth: 280, flex: 1, borderRight: "1px solid var(--color-border)", display: "flex", flexDirection: "column" }}>
                   <div style={{ padding: "12px 16px 10px", borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)", flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -7445,17 +7542,25 @@ export default function CanvasPage() {
                     <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", fontWeight: 600, color: "var(--color-text-muted)", background: "var(--color-page-bg)", padding: "1px 6px", borderRadius: 10, border: "1px solid var(--color-border)" }}>{colNodes.length}</span>
                   </div>
                   <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                    {colNodes.map(n => (
+                    {colNodes.map(n => {
+                      const grpColor = nodeGroupColor.get(n.id);
+                      return (
                       <div key={n.id}
                         onClick={() => handleSelectNode(n.id)}
                         style={{
                           padding: "10px 12px", borderRadius: 10, border: `1px solid ${selectedId === n.id ? col.color : "var(--color-border)"}`,
+                          borderLeft: grpColor ? `3px solid ${grpColor}` : undefined,
                           background: "var(--color-surface)", cursor: "pointer", transition: "all 0.12s",
                           boxShadow: selectedId === n.id ? `0 0 0 2px ${col.color}40` : "0 1px 4px rgba(0,0,0,0.06)",
                         }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = col.color}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = selectedId === n.id ? col.color : "var(--color-border)"}
                       >
+                        {grpColor && (
+                          <div style={{ fontSize: 8, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: grpColor, marginBottom: 3, fontFamily: "var(--font-code, monospace)" }}>
+                            {allGroups.find(g => g.nodeIds.includes(n.id))?.label}
+                          </div>
+                        )}
                         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.35, marginBottom: 3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                           {n.nodeType === "query" ? (n as QueryNode).query
                            : n.nodeType === "note" ? (n as NoteNode).content.slice(0,80)
@@ -7478,7 +7583,7 @@ export default function CanvasPage() {
                           )}
                         </div>
                       </div>
-                    ))}
+                    );})}
                   </div>
                 </div>
               );
@@ -7494,20 +7599,25 @@ export default function CanvasPage() {
             </div>
             {[...nodes].sort((a,b) => a.createdAt - b.createdAt).map((n, i) => {
               const color = NODE_MINIMAP_COLOR[n.nodeType] ?? "#888";
+              const grpColor = nodeGroupColor.get(n.id);
+              const grpLabel = grpColor ? [...canvasGroups, ...userGroups].find(g => g.nodeIds.includes(n.id))?.label : undefined;
               return (
                 <div key={n.id} style={{ display: "flex", gap: 16, marginBottom: 4 }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 16 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, marginTop: 4 }} />
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: grpColor || color, flexShrink: 0, marginTop: 4, border: grpColor ? `2px solid ${grpColor}` : undefined }} />
                     {i < nodes.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 20, background: "var(--color-border)", marginTop: 3 }} />}
                   </div>
                   <div
                     onClick={() => { handleSelectNode(n.id); switchViewMode("canvas"); }}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
+                    style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", borderLeft: grpColor ? `3px solid ${grpColor}` : undefined, background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                       <span style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{n.nodeType}</span>
+                      {grpLabel && (
+                        <span style={{ fontSize: 8, padding: "0 5px", borderRadius: 3, background: `${grpColor}18`, color: grpColor, fontWeight: 600, fontFamily: "var(--font-code, monospace)" }}>{grpLabel}</span>
+                      )}
                       {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
                         <span style={{ fontSize: 8, color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color }}>{NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon}</span>
                       )}

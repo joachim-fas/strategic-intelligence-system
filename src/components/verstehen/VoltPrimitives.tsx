@@ -188,7 +188,7 @@ export function VoltFilterPill({
         border: active
           ? "1px solid var(--foreground, #0A0A0A)"
           : "1px solid var(--color-border, #E8E8E8)",
-        background: active ? "var(--foreground, #0A0A0A)" : "transparent",
+        background: active ? "var(--foreground, #0A0A0A)" : "var(--card, #fff)",
         color: active ? "var(--background, #fff)" : "var(--muted-foreground, #6B6B6B)",
         fontFamily: "var(--font-ui)",
         fontSize: isSmall ? 11 : 12,
