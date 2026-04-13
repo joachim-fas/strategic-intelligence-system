@@ -545,7 +545,7 @@ export default function Home() {
   const isFirstVisit = history.length === 0;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <AppHeader />
 
       {/* ── Full Radar / Graph ───────────────────────────────────── */}
@@ -565,9 +565,8 @@ export default function Home() {
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        // Vertically center the framework grid + command line in the empty state
-        // so they sit in the visual middle instead of being pinned to top/bottom.
-        justifyContent: isFirstVisit && !showFullRadar ? "center" : "flex-start",
+        justifyContent: "flex-start",
+        paddingTop: isFirstVisit && !showFullRadar ? "8vh" : 0,
         position: "relative",
       }}>
 
@@ -1024,7 +1023,7 @@ export default function Home() {
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
               fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const,
               color: "var(--volt-text-faint, #AAA)",
-              textAlign: "center", marginBottom: 28,
+              textAlign: "center", marginBottom: 20,
             }}>
               {liveStats ? liveStats.sources : "…"} {locale === "de" ? "Quellen" : "Sources"} · {liveStats ? liveStats.trends : "…"} Trends · STEEP+V · EU-Fokus
             </div>
@@ -1137,7 +1136,7 @@ export default function Home() {
         {isFirstVisit && !showFullRadar && (
           <div style={{
             position: "relative",
-            marginTop: 36,
+            marginTop: 24,
             paddingTop: 0,
             paddingBottom: 0,
             paddingLeft: 24,

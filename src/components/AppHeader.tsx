@@ -28,7 +28,7 @@ export function AppHeader() {
   const de = locale === "de";
   const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -147,43 +147,7 @@ export function AppHeader() {
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted, #6B6B6B)"; el.style.background = "transparent"; }}
           >{locale.toUpperCase()}</button>
-          {/* UX-13: Keyboard shortcuts help button */}
-          <button
-            onClick={() => setShowShortcuts(!showShortcuts)}
-            aria-label={de ? "Tastenkürzel anzeigen" : "Show keyboard shortcuts"}
-            aria-expanded={showShortcuts}
-            title={de ? "Tastenkürzel" : "Keyboard shortcuts"}
-            style={{ fontSize: 11, fontWeight: 700, width: 24, height: 24, borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
-          >?</button>
         </div>
-        {showShortcuts && (
-          <div style={{
-            position: "absolute", right: 32, top: 64,
-            background: "var(--volt-surface-raised, #fff)",
-            border: "1px solid var(--volt-border, #E8E8E8)",
-            borderRadius: 12,
-            padding: "16px 20px",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            zIndex: 40, minWidth: 220,
-            fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-            fontSize: 13,
-          }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>
-              {de ? "Tastenkürzel" : "Keyboard Shortcuts"}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
-              <kbd>Ctrl+Z</kbd><span>{de ? "Rückgängig" : "Undo"}</span>
-              <kbd>Ctrl+Y</kbd><span>{de ? "Wiederherstellen" : "Redo"}</span>
-              <kbd>Del</kbd><span>{de ? "Node löschen" : "Delete node"}</span>
-              <kbd>Esc</kbd><span>{de ? "Abbrechen" : "Cancel"}</span>
-              <kbd>Ctrl+C</kbd><span>{de ? "Node kopieren" : "Copy node"}</span>
-              <kbd>Ctrl+V</kbd><span>{de ? "Node einfügen" : "Paste node"}</span>
-              <kbd>/</kbd><span>{de ? "Slash-Befehle" : "Slash commands"}</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Mobile dropdown menu */}

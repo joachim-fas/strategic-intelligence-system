@@ -4811,7 +4811,10 @@ export default function CanvasPage() {
 
   // ── Canvas Export ────────────────────────────────────────────────────────
 
-  const exportCanvas = useCallback((format: "markdown" | "json") => {
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  const exportCanvas = useCallback((format: "markdown" | "json" | "pdf") => {
+    setExportMenuOpen(false);
     if (format === "json") {
       const state = { nodes, conns: connections, pan: { x: panX, y: panY }, zoom, v: 2 };
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -4856,6 +4859,37 @@ export default function CanvasPage() {
       lines.push("---", "");
     });
     const md = lines.join("\n");
+
+    if (format === "pdf") {
+      // PDF export: render markdown as styled HTML, open print dialog
+      const printWin = window.open("", "_blank");
+      if (printWin) {
+        printWin.document.write(`<!DOCTYPE html><html><head><title>SIS Export</title><style>
+          body { font-family: 'DM Sans', 'Helvetica Neue', sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; font-size: 13px; }
+          h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+          h2 { font-size: 16px; font-weight: 700; margin-top: 28px; border-bottom: 1px solid #E8E8E8; padding-bottom: 6px; }
+          h3 { font-size: 13px; font-weight: 700; margin-top: 16px; color: #555; }
+          hr { border: none; border-top: 1px solid #E8E8E8; margin: 20px 0; }
+          ul { padding-left: 20px; }
+          li { margin-bottom: 6px; }
+          em { color: #777; font-size: 11px; }
+          @media print { body { margin: 0; } }
+        </style></head><body>${md
+          .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+          .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+          .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+          .replace(/^---$/gm, "<hr>")
+          .replace(/^_(.+)_$/gm, "<p><em>$1</em></p>")
+          .replace(/^- \*\*(.+?)\*\*(.*)$/gm, "<li><strong>$1</strong>$2</li>")
+          .replace(/^- (.+)$/gm, "<li>$1</li>")
+          .replace(/\n\n/g, "</p><p>")
+        }</body></html>`);
+        printWin.document.close();
+        setTimeout(() => printWin.print(), 400);
+      }
+      return;
+    }
+
     const blob = new Blob([md], { type: "text/markdown" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -6151,47 +6185,40 @@ export default function CanvasPage() {
             </Tooltip>
           )}
 
-          {/* Export dropdown-style: md, json, clear */}
+          {/* Export dropdown */}
           {nodes.length > 0 && (
-            <>
-              <Tooltip content={de ? "Canvas als Markdown exportieren" : "Export canvas as Markdown"} placement="bottom">
-                <button onClick={() => exportCanvas("markdown")}
-                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
-                >⬇ .md</button>
-              </Tooltip>
-              <Tooltip content={de ? "Canvas-State als JSON sichern" : "Save canvas state as JSON"} placement="bottom">
-                <button onClick={() => exportCanvas("json")}
-                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
-                >⬇ .json</button>
-              </Tooltip>
-              <button onClick={clearCanvas}
-                title={de ? "Canvas komplett leeren" : "Clear entire canvas"}
-                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; (e.currentTarget as HTMLElement).style.borderColor = "#FCA5A5"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; }}
-              >{de ? "Leeren" : "Clear"}</button>
-            </>
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setExportMenuOpen(prev => !prev)}
+                style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: exportMenuOpen ? "var(--volt-surface-raised, #fff)" : "transparent", color: exportMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s", fontWeight: 500 }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(0,0,0,0.3)"; el.style.color = "var(--color-text-heading)"; }}
+                onMouseLeave={e => { if (!exportMenuOpen) { const el = e.currentTarget as HTMLElement; el.style.borderColor = "var(--color-border)"; el.style.color = "var(--color-text-muted)"; }}}
+              >Export ▾</button>
+              {exportMenuOpen && (
+                <>
+                  <div style={{ position: "fixed", inset: 0, zIndex: 199 }} onClick={() => setExportMenuOpen(false)} />
+                  <div style={{
+                    position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 200,
+                    background: "var(--volt-surface-raised, #fff)", border: "1px solid var(--color-border)",
+                    borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.10)", minWidth: 150,
+                    padding: "4px 0", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  }}>
+                    {([
+                      { label: "Markdown (.md)", format: "markdown" as const },
+                      { label: "JSON (.json)", format: "json" as const },
+                      { label: "PDF (.pdf)", format: "pdf" as const },
+                    ]).map(opt => (
+                      <button key={opt.format} onClick={() => exportCanvas(opt.format)}
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 14px", fontSize: 12, background: "transparent", border: "none", color: "var(--color-text-primary, #333)", cursor: "pointer", transition: "background 0.1s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.4)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      >{opt.label}</button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
-
-          {/* Snap-to-grid toggle */}
-          <Tooltip content={de ? "Am Raster ausrichten (20px)" : "Snap to grid (20px)"} placement="bottom">
-            <button
-              onClick={() => setSnapToGrid(prev => !prev)}
-              style={{
-                fontSize: 11, padding: "3px 9px", borderRadius: 6,
-                border: snapToGrid ? "1px solid #86EFAC" : "1px solid var(--color-border)",
-                background: snapToGrid ? "#F0FDF4" : "transparent",
-                color: snapToGrid ? "#166534" : "var(--color-text-muted)",
-                cursor: "pointer", transition: "all 0.12s", fontWeight: snapToGrid ? 600 : 400,
-              }}
-              onMouseEnter={e => { if (!snapToGrid) { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}}
-              onMouseLeave={e => { if (!snapToGrid) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}}
-            >{snapToGrid ? "# Raster" : "# Raster"}</button>
-          </Tooltip>
         </div>
       </div>
 
@@ -6832,9 +6859,11 @@ export default function CanvasPage() {
         style={{
           flex: 1, position: "relative", overflow: "hidden",
           background: "var(--color-page-bg)",
-          backgroundImage: `radial-gradient(var(--color-border) 1.5px, transparent 1.5px)`,
-          backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-          backgroundPosition: `${panX % (20 * zoom)}px ${panY % (20 * zoom)}px`,
+          ...(viewMode === "canvas" ? {
+            backgroundImage: "radial-gradient(rgba(0, 0, 0, 0.18) 0.85px, transparent 0.85px)",
+            backgroundSize: "24px 24px",
+            backgroundAttachment: "fixed",
+          } : {}),
         }}
       >
         {/* FIXED: UX-09 — Empty state / onboarding guidance */}
