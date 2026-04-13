@@ -1353,7 +1353,7 @@ function DimensionsNodeCard({
         {/* Header */}
         <div
           onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
-          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid rgba(0,0,0,0.08)" }}
+          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid var(--color-border, rgba(0,0,0,0.08))" }}
         >
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", color: accentColor, background: `${accentColor}18`, border: `1px solid ${accentColor}40`, borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>DIMENSIONEN</span>
           <span style={{ fontSize: 10, color: "var(--color-text-muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dimData.filter(d => d.trends.length > 0).length} aktiv</span>
@@ -1469,7 +1469,7 @@ function CausalGraphNodeCard({
         {/* Header */}
         <div
           onPointerDown={e => { e.stopPropagation(); onDragStart(e, node.id); }}
-          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid rgba(0,0,0,0.08)" }}
+          style={{ height: 38, padding: "0 12px", cursor: "grab", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, background: `${accentColor}08`, borderBottom: "1px solid var(--color-border, rgba(0,0,0,0.08))" }}
         >
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", color: accentColor, background: `${accentColor}18`, border: `1px solid ${accentColor}40`, borderRadius: 5, padding: "2px 7px", flexShrink: 0 }}>KAUSALNETZ</span>
           <span style={{ fontSize: 10, color: "var(--color-text-muted)", flex: 1 }}>{trendIds.length} Trends · {visibleEdges.length} Kanten</span>
@@ -2011,7 +2011,7 @@ function DerivedNodeCard({
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden",
           background: isScenario ? (scenCfg?.bg ?? "var(--color-surface)") : cfg.bg,
-          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          border: `1px solid ${selected ? "#0A0A0A" : "var(--color-border, rgba(0,0,0,0.08))"}`,
           borderRadius: 6,
           boxShadow: `inset 3px 0 0 ${isScenario ? (scenCfg?.color ?? "#1D4ED8") : isFollowup ? "var(--color-border)" : cfg.accent}`,
           userSelect: "none", cursor: "pointer",
@@ -2530,7 +2530,7 @@ function NoteNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         style={{
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-butter)",
-          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          border: `1px solid ${selected ? "#0A0A0A" : "var(--color-border, rgba(0,0,0,0.08))"}`,
           borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
@@ -2613,7 +2613,7 @@ function IdeaNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         style={{
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-peach)",
-          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          border: `1px solid ${selected ? "#0A0A0A" : "var(--color-border, rgba(0,0,0,0.08))"}`,
           borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
@@ -2701,7 +2701,7 @@ function ListNodeCard({ node, selected, onSelect, onDragStart, onDelete, onResiz
         style={{
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-mint)",
-          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          border: `1px solid ${selected ? "#0A0A0A" : "var(--color-border, rgba(0,0,0,0.08))"}`,
           borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
@@ -2815,7 +2815,7 @@ function FileNodeCard({
         style={{
           position: "absolute", left: node.x, top: node.y, width: nodeW,
           height: 24, overflow: "hidden", background: "var(--pastel-blue)",
-          border: `1px solid ${selected ? "#0A0A0A" : "rgba(0,0,0,0.08)"}`,
+          border: `1px solid ${selected ? "#0A0A0A" : "var(--color-border, rgba(0,0,0,0.08))"}`,
           borderRadius: 6,
           userSelect: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 5, padding: "0 7px",
