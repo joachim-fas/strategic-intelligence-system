@@ -298,7 +298,7 @@ const LIST_NODE_W        = 280;
 const FILE_NODE_W        = 300;
 const FILE_NODE_H        = 300; // default height matches width for square-ish file cards
 const DERIVED_COL_GAP_X  = 64;
-const DERIVED_COL_GAP    = 28;
+const DERIVED_COL_GAP    = 32;
 const DERIVED_ROW_GAP    = 36;
 const DIMENSIONS_CARD_H  = 192;
 const CAUSAL_GRAPH_CARD_H = 222;
@@ -1628,9 +1628,9 @@ function CommandLine({
 
 // ── ConnectionsSVG ────────────────────────────────────────────────────────
 
-function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, zoom, activeTagFilter, nodeTagMap, nodeGroupMap, connVisMode }: {
+function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, zoom, activeTagFilter, nodeTagMap, nodeGroupMap, connVisMode, de }: {
   nodes: CanvasNode[]; connections: Connection[]; pipelineChain?: Set<string>; selectedId?: string | null;
-  zoom: number; activeTagFilter: string | null; nodeTagMap: Map<string, string[]>; nodeGroupMap: Map<string, string>; connVisMode: "auto" | "show" | "hide";
+  zoom: number; activeTagFilter: string | null; nodeTagMap: Map<string, string[]>; nodeGroupMap: Map<string, string>; connVisMode: "auto" | "show" | "hide"; de: boolean;
 }) {
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
 
@@ -1712,27 +1712,43 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, 
 
         // Connection type styling — derived is solid (no dash) to prevent moiré at scale
         const ct = c.connectionType;
-        const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string }> = {
-          "derived":      { stroke: "rgba(0,0,0,0.35)", dash: "",    width: 1.2, marker: "url(#arr-d)" },
-          "refreshed":    { stroke: "#F5A62344",         dash: "6 4", width: 1,   marker: "url(#arr-r)" },
-          "builds-on":    { stroke: "#1A9E5A",           dash: "",    width: 1.8, marker: "url(#arr-builds)" },
-          "contradicts":  { stroke: "#E8402A",           dash: "3 2", width: 1.2, marker: "url(#arr-contradicts)" },
-          "validates":    { stroke: "#2563EB",           dash: "",    width: 1.5, marker: "url(#arr-validates)" },
+        const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string; label: string; labelColor: string }> = {
+          "derived":      { stroke: "rgba(0,0,0,0.35)", dash: "",    width: 1.2, marker: "url(#arr-d)", label: "", labelColor: "" },
+          "refreshed":    { stroke: "#F5A623",           dash: "6 4", width: 1,   marker: "url(#arr-r)", label: "↻", labelColor: "#F5A623" },
+          "builds-on":    { stroke: "#1A9E5A",           dash: "",    width: 2.0, marker: "url(#arr-builds)", label: de ? "baut auf" : "builds on", labelColor: "#1A9E5A" },
+          "contradicts":  { stroke: "#E8402A",           dash: "3 2", width: 1.8, marker: "url(#arr-contradicts)", label: de ? "widerspricht" : "contradicts", labelColor: "#E8402A" },
+          "validates":    { stroke: "#2563EB",           dash: "",    width: 1.8, marker: "url(#arr-validates)", label: de ? "bestätigt" : "validates", labelColor: "#2563EB" },
         };
 
-        const style = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived
+        const cStyle = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived
           : c.refreshed ? CONN_STYLES.refreshed
           : c.derived   ? CONN_STYLES.derived
-          : { stroke: "rgba(0,0,0,0.35)", dash: "", width: 1.2, marker: "url(#arr-q)" };
+          : { stroke: "rgba(0,0,0,0.35)", dash: "", width: 1.2, marker: "url(#arr-q)", label: "", labelColor: "" };
+
+        // Semantic connections get higher minimum opacity
+        const isSemanticType = ct && ct !== "derived";
+        const effectiveOpacity = isSemanticType ? Math.max(finalOpacity, 0.35) : finalOpacity;
+
+        // Midpoint for label positioning (on the Bézier curve at t=0.5)
+        const mx = 0.125 * x1 + 0.375 * (x1 + cp) + 0.375 * (x2 - cp) + 0.125 * x2;
+        const my = 0.125 * y1 + 0.375 * y1 + 0.375 * y2 + 0.125 * y2;
+        const showLabel = cStyle.label && effectiveOpacity > 0.2 && zoom >= 0.5;
 
         return (
-          <path key={`${c.from}-${c.to}`}
-            d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
-            fill="none" stroke={style.stroke} strokeWidth={style.width} strokeLinecap="round"
-            strokeDasharray={style.dash || "none"}
-            markerEnd={style.marker} opacity={finalOpacity}
-            style={{ transition: "opacity 0.2s" }}
-          />
+          <g key={`${c.from}-${c.to}`}>
+            <path
+              d={`M ${x1} ${y1} C ${x1 + cp} ${y1} ${x2 - cp} ${y2} ${x2} ${y2}`}
+              fill="none" stroke={cStyle.stroke} strokeWidth={cStyle.width} strokeLinecap="round"
+              strokeDasharray={cStyle.dash || "none"}
+              markerEnd={cStyle.marker} opacity={effectiveOpacity}
+              style={{ transition: "opacity 0.2s" }}
+            />
+            {showLabel && (
+              <text x={mx} y={my - 6} textAnchor="middle" fill={cStyle.labelColor} opacity={Math.min(effectiveOpacity + 0.2, 1)} fontSize={9} fontWeight={600} fontFamily="var(--font-code, 'JetBrains Mono'), monospace" style={{ pointerEvents: "none" }}>
+                {cStyle.label}
+              </text>
+            )}
+          </g>
         );
       })}
     </svg>
@@ -1865,6 +1881,83 @@ function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag
         </VoltDropdownMenuItem>
       </VoltDropdownMenuContent>
     </VoltDropdownMenu>
+  );
+}
+
+// ── FormattedText — structured text rendering with paragraphs & provenance ──
+
+function FormattedText({ text, fontSize = 13, lineHeight = 1.65, color = "var(--color-text-secondary)", maxLines, compact }: {
+  text: string; fontSize?: number; lineHeight?: number; color?: string; maxLines?: number; compact?: boolean;
+}) {
+  if (!text) return null;
+
+  // Parse inline provenance tags and bold markers into React elements
+  const renderInline = (line: string, keyPrefix: string) => {
+    const parts: React.ReactNode[] = [];
+    // Match [SIGNAL: ...], [TREND: ...], [LLM-Einschätzung], [Source, Date], and **bold**
+    const regex = /(\[SIGNAL:\s*[^\]]+\]|\[TREND:\s*[^\]]+\]|\[LLM-Einschätzung\]|\[[A-Za-zÄÖÜäöüß][^\]]{1,40},\s*\d{2,4}[^\]]*\]|\*\*[^*]+\*\*)/g;
+    let lastIdx = 0;
+    let match: RegExpExecArray | null;
+    let i = 0;
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > lastIdx) {
+        parts.push(line.slice(lastIdx, match.index));
+      }
+      const m = match[0];
+      if (m.startsWith("[SIGNAL:")) {
+        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#2563EB10", color: "#2563EB", border: "1px solid #2563EB20", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
+      } else if (m.startsWith("[TREND:")) {
+        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#1A9E5A10", color: "#1A9E5A", border: "1px solid #1A9E5A20", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
+      } else if (m === "[LLM-Einschätzung]") {
+        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#F5A62310", color: "#F5A623", border: "1px solid #F5A62320", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>LLM</span>);
+      } else if (m.startsWith("[") && m.endsWith("]")) {
+        // Citation: [Source, Date]
+        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 500, padding: "0px 3px", borderRadius: 3, background: "var(--color-page-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
+      } else if (m.startsWith("**") && m.endsWith("**")) {
+        parts.push(<strong key={`${keyPrefix}-${i}`} style={{ fontWeight: 700, color: "var(--color-text-heading)" }}>{m.slice(2, -2)}</strong>);
+      }
+      lastIdx = match.index + m.length;
+      i++;
+    }
+    if (lastIdx < line.length) parts.push(line.slice(lastIdx));
+    return parts;
+  };
+
+  // Split into paragraphs by double newline
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+
+  // For compact mode (card previews), render as single clamped block
+  if (compact && maxLines) {
+    return (
+      <p style={{ fontSize, lineHeight, color, margin: 0, overflow: "hidden", wordBreak: "break-word", display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical" as const }}>
+        {renderInline(text.replace(/\n\n+/g, " — ").replace(/\n/g, " "), "c")}
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ fontSize, lineHeight, color }}>
+      {paragraphs.map((para, pi) => {
+        const trimmed = para.trim();
+        // Check for heading-like lines (short, no period, possibly bold)
+        const isHeading = trimmed.length < 80 && !trimmed.endsWith(".") && !trimmed.endsWith(":") && !trimmed.includes("[") && pi > 0;
+        if (isHeading && !compact) {
+          return <div key={pi} style={{ fontWeight: 700, fontSize: fontSize + 1, color: "var(--color-text-heading)", marginTop: pi > 0 ? 14 : 0, marginBottom: 4 }}>{renderInline(trimmed, `h${pi}`)}</div>;
+        }
+        // Split by single newlines within paragraph for soft line breaks
+        const lines = trimmed.split(/\n/);
+        return (
+          <p key={pi} style={{ margin: pi > 0 ? "10px 0 0" : 0 }}>
+            {lines.map((line, li) => (
+              <React.Fragment key={li}>
+                {li > 0 && <br />}
+                {renderInline(line, `p${pi}l${li}`)}
+              </React.Fragment>
+            ))}
+          </p>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2004,14 +2097,11 @@ function DerivedNodeCard({
               {node.label}
             </div>
           )}
-          <p style={{
-            fontSize: 12, fontStyle: isFollowup ? "italic" : "normal",
-            color: "var(--color-text-secondary)",
-            margin: 0, lineHeight: 1.6, overflow: "hidden", wordBreak: "break-word",
-            display: "-webkit-box", WebkitLineClamp: Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19)), WebkitBoxOrient: "vertical",
-          }}>
-            {isFollowup ? `→ ${node.content}` : node.content}
-          </p>
+          <FormattedText
+            text={isFollowup ? `→ ${node.content}` : node.content}
+            fontSize={12} lineHeight={1.6} compact
+            maxLines={Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19))}
+          />
           {/* Driver pills (scenario only, max 2) */}
           {isScenario && node.keyDrivers && node.keyDrivers.length > 0 && (
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 7 }}>
@@ -2188,9 +2278,7 @@ function QueryNodeCard({
                   </span>
                 </div>
               )}
-              <p style={{ fontSize: 12.5, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: 0, overflow: "hidden", wordBreak: "break-word" }}>
-                {node.synthesis}
-              </p>
+              <FormattedText text={node.synthesis ?? ""} fontSize={12.5} lineHeight={1.65} compact maxLines={Math.max(4, Math.floor(((node.customHeight ?? QUERY_NODE_W) - 140) / 20))} />
               {/* Causal fingerprint pills */}
               {causalFingerprint && causalFingerprint.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
                 <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 8 }}>
@@ -3544,7 +3632,9 @@ function DetailPanel({
       const qNode = node as QueryNode;
       return (
         <div>
-          <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 5, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>ABFRAGE</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#0A0A0A", background: "#E4FF97", padding: "1px 6px", borderRadius: 4, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{de ? "IHRE FRAGE" : "YOUR QUERY"}</span>
+          </div>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, fontFamily: "var(--font-heading, 'Bricolage Grotesque'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.025em" }}>{qNode.query}</h2>
         </div>
       );
@@ -3613,7 +3703,10 @@ function DetailPanel({
       : "#6B7280";
     return (
       <div>
-        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: accentColor, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{badge}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: accentColor, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{badge}</span>
+          <span style={{ fontSize: 7, fontWeight: 600, padding: "0px 4px", borderRadius: 3, background: "rgba(0,0,0,0.05)", color: "var(--color-text-muted)", fontFamily: "var(--font-code, monospace)", letterSpacing: "0.05em" }}>KI</span>
+        </div>
         {type === "scenario" && dNode.label && (
           <h2 style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 700, color: SCEN[dNode.colorKey ?? "baseline"]?.color ?? "#1D4ED8", lineHeight: 1.4 }}>{dNode.label}</h2>
         )}
@@ -3758,17 +3851,17 @@ function DetailPanel({
 
           {/* ── Synthese ──────────────────────────────────────────── */}
           {(qNode.synthesis || isLoading) && (
-            <CollapsibleSection title={de ? "Synthese" : "Synthesis"}>
+            <CollapsibleSection title={de ? "Synthese — KI-Analyse" : "Synthesis — AI Analysis"}>
               {r?.confidence != null && r.confidence > 0 && (
                 <div style={{ marginBottom: 8 }}><ConfidenceBadge value={r.confidence} de={de} /></div>
               )}
-              <p style={{ fontSize: 14, lineHeight: 1.78, color: "var(--color-text-primary)", margin: "0 0 4px" }}>
-                {qNode.synthesis}
+              <div style={{ marginBottom: 4 }}>
+                <FormattedText text={qNode.synthesis ?? ""} fontSize={14} lineHeight={1.78} color="var(--color-text-primary)" />
                 {qNode.status === "streaming" && (
                   <span style={{ display: "inline-block", width: 2, height: "0.9em", background: "#0A0A0A", marginLeft: 2, animation: "cur-blink 0.8s steps(1) infinite", verticalAlign: "text-bottom" }} />
                 )}
                 {qNode.status === "loading" && <span style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Analysiere…" : "Analyzing…"}</span>}
-              </p>
+              </div>
             </CollapsibleSection>
           )}
 
@@ -3811,7 +3904,9 @@ function DetailPanel({
               {r?.causalAnalysis && r.causalAnalysis.length > 0 && (
                 <div style={{ marginTop: 10 }}>
                   {r.causalAnalysis.map((chain, i) => (
-                    <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8 }}>{chain}</div>
+                    <div key={i} style={{ marginBottom: 5, paddingLeft: 8 }}>
+                      <FormattedText text={chain} fontSize={12} lineHeight={1.55} />
+                    </div>
                   ))}
                 </div>
               )}
@@ -3824,7 +3919,7 @@ function DetailPanel({
               {r.keyInsights.map((ins, i) => (
                 <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: "#0F6038", marginTop: 3 }}>◉</span>
-                  <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--color-text-secondary)", margin: 0 }}>{ins}</p>
+                  <FormattedText text={ins} fontSize={13} lineHeight={1.6} />
                 </div>
               ))}
             </CollapsibleSection>
@@ -3850,7 +3945,7 @@ function DetailPanel({
                       </div>
                     )}
                     {s.name && <div style={{ fontSize: 12, fontWeight: 600, color: sc.color, marginBottom: 4 }}>{s.name}</div>}
-                    <p style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", margin: 0 }}>{s.description}</p>
+                    <FormattedText text={s.description} fontSize={12} lineHeight={1.55} />
                     {s.keyDrivers && s.keyDrivers.length > 0 && (
                       <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {s.keyDrivers.map((d, j) => (
@@ -4151,9 +4246,9 @@ function DetailPanel({
             <span style={{ fontSize: 11, color: scenCfg?.color ?? "#1D4ED8", fontWeight: 600 }}>{Math.round(dNode.probability * 100)}% {de ? "Wahrscheinlichkeit" : "probability"}</span>
           </div>
         )}
-        <p style={{ fontSize: 14, lineHeight: 1.78, color: isScenario ? (scenCfg?.color ?? "var(--color-text-secondary)") : "var(--color-text-secondary)", margin: "0 0 14px", fontStyle: type === "followup" ? "italic" : "normal" }}>
-          {type === "followup" ? `→ ${dNode.content}` : dNode.content}
-        </p>
+        <div style={{ marginBottom: 14, fontStyle: type === "followup" ? "italic" : "normal" }}>
+          <FormattedText text={type === "followup" ? `→ ${dNode.content}` : dNode.content} fontSize={14} lineHeight={1.78} color={isScenario ? (scenCfg?.color ?? "var(--color-text-secondary)") : "var(--color-text-secondary)"} />
+        </div>
         {dNode.sources && dNode.sources.length > 0 && (
           <div style={{ marginBottom: 12 }}><SourceChips sources={dNode.sources} de={de} /></div>
         )}
@@ -5540,7 +5635,7 @@ export default function CanvasPage() {
     }
     const last = [...nodesRef.current].filter(n => n.nodeType === "query").sort((a, b) => b.createdAt - a.createdAt)[0];
     if (!last) return { x: 80, y: 80 };
-    return { x: last.x, y: last.y + 320 };
+    return { x: last.x, y: last.y + getNodeHeight(last) + 60 };
   }, []);
 
   // ── Query submission ──────────────────────────────────────────────────────
@@ -5939,7 +6034,7 @@ export default function CanvasPage() {
       return;
     }
 
-    // Position near parent if we have context
+    // Position near parent if we have context — stack siblings vertically
     const getCtxPos = () => {
       if (portDropCanvasPosRef.current) {
         const p = portDropCanvasPosRef.current;
@@ -5956,7 +6051,13 @@ export default function CanvasPage() {
         : parent.nodeType === "file"
         ? ((parent as FileNode).customWidth ?? FILE_NODE_W)
         : ((parent as DerivedNode | NoteNode | IdeaNode).customWidth ?? DERIVED_W);
-      return { x: parent.x + parentW + 64, y: parent.y + 80 };
+      // Count existing non-query siblings to stack vertically with 30px gap
+      const siblings = nodesRef.current.filter(n => n.parentId === ctx.parentId && n.nodeType !== "query");
+      let yOffset = 0;
+      for (const sib of siblings) {
+        yOffset += getNodeHeight(sib) + 30;
+      }
+      return { x: parent.x + parentW + 64, y: parent.y + yOffset };
     };
 
     const pos = getCtxPos();
@@ -6035,7 +6136,7 @@ export default function CanvasPage() {
         return (a.createdAt ?? 0) - (b.createdAt ?? 0);
       });
       const COL_W = 460;
-      const ROW_GAP = 24;
+      const ROW_GAP = 30;
       const GROUP_GAP = 40;
       const COLS = Math.max(3, Math.ceil(Math.sqrt(sorted.length)));
       const colYs = Array(COLS).fill(80);
@@ -6067,7 +6168,7 @@ export default function CanvasPage() {
         if (!groups.has(t)) groups.set(t, []);
         groups.get(t)!.push(n);
       }
-      const ROW_GAP = 24;
+      const ROW_GAP = 30;
       const COL_GAP = 40;
       let colX = 80;
       const newPos = new Map<string, { x: number; y: number }>();
@@ -6105,7 +6206,7 @@ export default function CanvasPage() {
     // ── Status-based layout (columns by nodeStatus) ──
     if (mode === "status") {
       const STATUS_ORDER: NodeStatus[] = ["active", "open", "decided", "pinned"];
-      const ROW_GAP = 24;
+      const ROW_GAP = 30;
       const COL_GAP = 40;
       const allGrps = [...(canvasGroups ?? []), ...userGroupsRef.current];
       const toGIdx = new Map<string, number>();
@@ -6620,21 +6721,32 @@ export default function CanvasPage() {
         {/* RIGHT: Layer toggles + Tag filters + Gruppieren */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
 
-          {/* Layer toggles */}
-          {(["analyse", "karte", "datei"] as CanvasLayer[]).map(layer => (
-            <button key={layer}
-              onClick={() => toggleLayer(layer)}
-              title={`Layer ${LAYER_LABELS[layer].de} ${hiddenLayers.has(layer) ? "einblenden" : "ausblenden"}`}
-              style={{
-                fontSize: 10, padding: "1px 7px", borderRadius: 20,
-                border: `1px solid ${hiddenLayers.has(layer) ? "var(--color-border)" : LAYER_LABELS[layer].color}`,
-                background: hiddenLayers.has(layer) ? "transparent" : `${LAYER_LABELS[layer].color}18`,
-                color: hiddenLayers.has(layer) ? "var(--color-text-muted)" : LAYER_LABELS[layer].color,
-                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
-                textDecoration: hiddenLayers.has(layer) ? "line-through" : "none",
-              }}
-            >{LAYER_LABELS[layer].de}</button>
-          ))}
+          {/* Layer toggles — with counts and eye icon for clear affordance */}
+          {(["analyse", "karte", "datei"] as CanvasLayer[]).map(layer => {
+            const count = nodes.filter(n => NODE_LAYER[n.nodeType] === layer).length;
+            if (count === 0) return null;
+            const hidden = hiddenLayers.has(layer);
+            return (
+              <button key={layer}
+                onClick={() => toggleLayer(layer)}
+                title={de
+                  ? `${LAYER_LABELS[layer].de} (${count}) ${hidden ? "einblenden" : "ausblenden"} — Klicken zum Umschalten`
+                  : `${LAYER_LABELS[layer].de} (${count}) ${hidden ? "show" : "hide"} — Click to toggle`}
+                style={{
+                  fontSize: 10, padding: "1px 7px", borderRadius: 20, display: "flex", alignItems: "center", gap: 3,
+                  border: `1px solid ${hidden ? "var(--color-border)" : LAYER_LABELS[layer].color}`,
+                  background: hidden ? "transparent" : `${LAYER_LABELS[layer].color}18`,
+                  color: hidden ? "var(--color-text-muted)" : LAYER_LABELS[layer].color,
+                  cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
+                  opacity: hidden ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontSize: 10 }}>{hidden ? "◻" : "◼"}</span>
+                {LAYER_LABELS[layer].de}
+                <span style={{ fontSize: 8, fontWeight: 400, opacity: 0.7 }}>({count})</span>
+              </button>
+            );
+          })}
 
           {/* Connection visibility toggle */}
           {connections.length > 0 && (
@@ -7285,7 +7397,7 @@ export default function CanvasPage() {
         {viewMode === "canvas" && (
           <ErrorBoundary>
           <div style={{ position: "absolute", top: 0, left: 0, transform: `translate(${panX}px, ${panY}px) scale(${zoom})`, transformOrigin: "0 0" }}>
-            <ConnectionsSVG nodes={visibleNodes} connections={connections} pipelineChain={pipelineChain} selectedId={selectedId} zoom={zoom} activeTagFilter={activeTagFilter} nodeTagMap={nodeTagMap} nodeGroupMap={nodeGroupMap} connVisMode={connVisMode} />
+            <ConnectionsSVG nodes={visibleNodes} connections={connections} pipelineChain={pipelineChain} selectedId={selectedId} zoom={zoom} activeTagFilter={activeTagFilter} nodeTagMap={nodeTagMap} nodeGroupMap={nodeGroupMap} connVisMode={connVisMode} de={de} />
 
             {/* Port drag preview line */}
             {portDragPreview && (
