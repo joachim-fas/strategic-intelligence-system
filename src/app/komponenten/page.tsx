@@ -547,25 +547,30 @@ export default function KomponentenPage() {
   const [activeSectionId, setActiveSectionId] = useState("foundations-colors");
   const isScrollingToRef = useRef(false);
 
+  const allSectionIds = useRef(TOC.flatMap(g => g.items.map(i => i.id)));
+
   useEffect(() => {
-    const allIds = TOC.flatMap(g => g.items.map(i => i.id));
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isScrollingToRef.current) return;
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSectionId(entry.target.id);
-            break;
-          }
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking || isScrollingToRef.current) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const threshold = 120; // px from top of viewport
+        let found: string | null = null;
+        for (const id of allSectionIds.current) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          const top = el.getBoundingClientRect().top;
+          if (top <= threshold) found = id;
+          else break; // sections are in DOM order, so first one below threshold stops search
         }
-      },
-      { rootMargin: "-80px 0px -65% 0px", threshold: 0 }
-    );
-    allIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
+        if (found) setActiveSectionId(found);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll(); // initial check
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const handleSidebarSelect = useCallback((id: string) => {
