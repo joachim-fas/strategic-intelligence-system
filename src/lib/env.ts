@@ -14,12 +14,8 @@
 // Currently 7 routes use Drizzle ORM (radars/*), 19 routes use raw new Database() + SQL.
 // FIX: Migrate all raw SQL to Drizzle, or create a unified getDb() wrapper.
 
-// TODO: ARC-11 — resolveEnv() is duplicated in:
-// - src/lib/env.ts (canonical)
-// - src/app/api/v1/query/route.ts
-// - src/app/api/v1/frameworks/analyze/route.ts
-// - src/app/api/v1/canvas/[id]/summary/route.ts
-// FIX: Import from here everywhere. Remove local copies.
+// ARC-11 — RESOLVED: All resolveEnv() duplicates now import from here.
+// Consolidated in commit 3bc9eef (2026-04-13).
 
 import { readFileSync } from "fs";
 import path from "path";
