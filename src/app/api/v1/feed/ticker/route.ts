@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 /**
  * GET /api/v1/feed/ticker — Live-Signal Ticker Feed
@@ -86,22 +87,18 @@ export async function GET(req: Request) {
 
     db.close();
 
-    return NextResponse.json({
+    return apiSuccess({
       signals,
       meta: {
         count: signals.length,
         windowHours: hours,
         timestamp: new Date().toISOString(),
       },
-    }, {
-      headers: {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=120",
-      },
-    });
+    }, 200, CACHE_HEADERS.short);
   } catch (err: unknown) {
     db.close();
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[/api/v1/feed/ticker]", msg);
-    return NextResponse.json({ signals: [], meta: { count: 0, windowHours: hours, error: msg } }, { status: 500 });
+    return apiError(msg, 500);
   }
 }

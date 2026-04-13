@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { storeSignals, pruneOldSignals, getSignalAge } from "@/lib/signals";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
+import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 
 // Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
 ensureEnvLoaded();
@@ -13,12 +14,12 @@ export async function GET(request: Request) {
     return tooManyRequests();
   }
   const age = getSignalAge();
-  return NextResponse.json({
+  return apiSuccess({
     signalCount: age.count,
     newestAgeHours: age.newestHours,
     oldestAgeHours: age.oldestHours,
     stale: age.newestHours > 6,
-  });
+  }, 200, CACHE_HEADERS.short);
 }
 
 // POST — run connectors and persist signals

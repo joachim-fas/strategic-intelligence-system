@@ -85,10 +85,11 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         const canvasRes = await fetch(`/api/v1/canvas/${projectId}`);
         if (canvasRes.ok) {
           const json = await canvasRes.json();
-          if (!cancelled) setProjectName(json.canvas?.name || "");
+          const canvasData = (json.data ?? json);
+          if (!cancelled) setProjectName(canvasData.canvas?.name || "");
           // Extract queries from canvas state for reference display
           try {
-            const state = json.canvas?.canvas_state ? JSON.parse(json.canvas.canvas_state) : null;
+            const state = canvasData.canvas?.canvas_state ? JSON.parse(canvasData.canvas.canvas_state) : null;
             const qs: QueryPreview[] = [];
             if (state?.nodes) {
               const queryNodes = state.nodes

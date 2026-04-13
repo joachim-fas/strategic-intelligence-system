@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { saveQueryVersion, getVersionsForNode, getVersionCounts } from "@/lib/query-versions";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -14,15 +15,15 @@ export async function GET(req: Request) {
   if (nodeIds) {
     const ids = nodeIds.split(",").filter(Boolean).slice(0, 100);
     const counts = getVersionCounts(ids);
-    return NextResponse.json({ counts });
+    return apiSuccess({ counts }, 200, CACHE_HEADERS.short);
   }
 
   if (!nodeId) {
-    return NextResponse.json({ error: "nodeId required" }, { status: 400 });
+    return apiError("nodeId required", 400, "VALIDATION_ERROR");
   }
 
   const versions = getVersionsForNode(nodeId);
-  return NextResponse.json({ versions });
+  return apiSuccess({ versions }, 200, CACHE_HEADERS.short);
 }
 
 export async function POST(req: Request) {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { canvasNodeId, radarId, queryText, locale, result } = body;
     if (!canvasNodeId || !queryText || !result) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return apiError("Missing required fields", 400, "VALIDATION_ERROR");
     }
     const id = saveQueryVersion({
       canvasNodeId,
@@ -42,8 +43,8 @@ export async function POST(req: Request) {
       matchedTrendCount: Array.isArray(result.matchedTrends) ? result.matchedTrends.length : null,
       signalCount: Array.isArray(result.usedSignals) ? result.usedSignals.length : null,
     });
-    return NextResponse.json({ id }, { status: 201 });
+    return apiSuccess({ id }, 201);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return apiError(String(err), 500);
   }
 }

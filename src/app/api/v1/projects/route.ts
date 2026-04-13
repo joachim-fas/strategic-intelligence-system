@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -20,7 +20,7 @@ export async function GET() {
         (SELECT COUNT(*) FROM project_notes WHERE radar_id = r.id) as note_count
       FROM radars r ORDER BY r.updated_at DESC
     `).all();
-    return NextResponse.json({ projects });
+    return apiSuccess({ projects }, 200, CACHE_HEADERS.short);
   } finally {
     d.close();
   }
@@ -33,23 +33,14 @@ export async function POST(req: Request) {
 
   // Validate title: required, max 200 chars
   if (!name || typeof name !== "string" || !name.trim()) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "Title is required", status: 400 } },
-      { status: 400 }
-    );
+    return apiError("Title is required", 400, "VALIDATION_ERROR");
   }
   if (name.trim().length > 200) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "Title must be 200 characters or fewer", status: 400 } },
-      { status: 400 }
-    );
+    return apiError("Title must be 200 characters or fewer", 400, "VALIDATION_ERROR");
   }
   // Validate description: optional, max 2000 chars
   if (description !== undefined && description !== null && typeof description === "string" && description.length > 2000) {
-    return NextResponse.json(
-      { success: false, error: { code: "VALIDATION_ERROR", message: "Description must be 2000 characters or fewer", status: 400 } },
-      { status: 400 }
-    );
+    return apiError("Description must be 2000 characters or fewer", 400, "VALIDATION_ERROR");
   }
 
   // DAT-13: Ensure DB handle is always closed
@@ -62,7 +53,7 @@ export async function POST(req: Request) {
     `).run(id, name.trim(), description || null);
 
     const project = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
-    return NextResponse.json({ project }, { status: 201 });
+    return apiSuccess({ project }, 201);
   } finally {
     d.close();
   }

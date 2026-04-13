@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { eq, and, or } from "drizzle-orm";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 type Params = { params: Promise<{ id: string }> };
@@ -40,7 +40,7 @@ export async function GET(_request: Request, context: Params) {
       .limit(1);
 
     if (radar.length === 0) {
-      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
+      return apiError("Radar not found", 404, "NOT_FOUND");
     }
 
     // Get radar trends with full trend details
@@ -59,7 +59,7 @@ export async function GET(_request: Request, context: Params) {
       trend: row.trend,
     }));
 
-    return NextResponse.json({ data });
+    return apiSuccess({ radarTrends: data }, 200, CACHE_HEADERS.medium);
   } else {
     const schema = await import("@/db/schema-sqlite");
 
@@ -78,7 +78,7 @@ export async function GET(_request: Request, context: Params) {
       .get();
 
     if (!radar) {
-      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
+      return apiError("Radar not found", 404, "NOT_FOUND");
     }
 
     const result = db
@@ -96,6 +96,6 @@ export async function GET(_request: Request, context: Params) {
       trend: row.trend,
     }));
 
-    return NextResponse.json({ data });
+    return apiSuccess({ radarTrends: data }, 200, CACHE_HEADERS.medium);
   }
 }

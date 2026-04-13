@@ -43,9 +43,10 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/v1/trends")
       .then((res) => res.json())
-      .then((data) => {
-        if (data.trends?.length > 0) {
-          setBaseTrends(classifyTrends(data.trends as TrendDot[]));
+      .then((json) => {
+        const d = json.data ?? json; // support envelope or legacy shape
+        if (d.trends?.length > 0) {
+          setBaseTrends(classifyTrends(d.trends as TrendDot[]));
         }
       })
       .catch(() => { /* keep megaTrends as fallback */ });
@@ -66,8 +67,8 @@ export default function Home() {
   const [liveStats, setLiveStats] = useState<{ sources: number; trends: number; sessions: number } | null>(null);
   useEffect(() => {
     Promise.all([
-      fetch("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
-      fetch("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? []).length).catch(() => 0),
+      fetch("/api/v1/trends").then(r => r.json()).then(j => (j.data ?? j).trends?.length ?? 0).catch(() => 0),
+      fetch("/api/v1/canvas").then(r => r.json()).then(j => ((j.data ?? j).canvases ?? []).length).catch(() => 0),
     ]).then(([trendCount, sessionCount]) => {
       setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
     });
@@ -112,7 +113,8 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/v1/canvas")
       .then(r => r.json())
-      .then(data => {
+      .then(json => {
+        const data = json.data ?? json;
         const list = (data?.canvases || []) as Array<any>;
         const sessions = list
           .filter((c: any) => (c.queryCount || 0) > 0)
@@ -222,7 +224,8 @@ export default function Home() {
         });
         if (!res.ok) return;
         const json = await res.json();
-        projectId = json.canvas?.id;
+        const created = json.data ?? json;
+        projectId = created.canvas?.id;
         if (!projectId) return;
         activeProjectIdRef.current = projectId;
         setActiveProjectId(projectId);
@@ -234,8 +237,9 @@ export default function Home() {
       let existingConns: any[] = [];
       if (existingRes.ok) {
         const json = await existingRes.json();
-        if (json.canvas?.canvas_state) {
-          const state = JSON.parse(json.canvas.canvas_state);
+        const loaded = json.data ?? json;
+        if (loaded.canvas?.canvas_state) {
+          const state = JSON.parse(loaded.canvas.canvas_state);
           existingNodes = state.nodes ?? [];
           existingConns = state.conns ?? [];
           // Offset new nodes below existing ones
@@ -296,7 +300,7 @@ export default function Home() {
             body: JSON.stringify({ name: `Szenario: ${topic.substring(0, 50)}` }),
           });
           const json = await res.json();
-          const pid = json.canvas?.id;
+          const pid = (json.data ?? json).canvas?.id;
           if (pid) {
             activeProjectIdRef.current = pid;
             setActiveProjectId(pid);
@@ -788,7 +792,7 @@ export default function Home() {
                           });
                           if (!res.ok) { setFrameworkLoading(false); return; }
                           const json = await res.json();
-                          const pid = json.canvas?.id;
+                          const pid = (json.data ?? json).canvas?.id;
                           if (!pid) { setFrameworkLoading(false); return; }
                           await fetch(`/api/v1/canvas/${pid}`, {
                             method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -958,7 +962,7 @@ export default function Home() {
                               });
                               if (!res.ok) { setFrameworkLoading(false); alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project."); return; }
                               const json = await res.json();
-                              const pid = json.canvas?.id;
+                              const pid = (json.data ?? json).canvas?.id;
                               if (!pid) { setFrameworkLoading(false); return; }
                               await fetch(`/api/v1/canvas/${pid}`, {
                                 method: "PATCH", headers: { "Content-Type": "application/json" },

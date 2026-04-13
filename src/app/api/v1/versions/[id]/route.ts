@@ -1,14 +1,14 @@
 /**
  * GET /api/v1/versions/[id] — get a single version with full result
  */
-import { NextResponse } from "next/server";
 import { getVersion } from "@/lib/query-versions";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const version = getVersion(id);
   if (!version) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return apiError("Version not found", 404, "NOT_FOUND");
   }
-  return NextResponse.json({ version });
+  return apiSuccess({ version }, 200, CACHE_HEADERS.long);
 }

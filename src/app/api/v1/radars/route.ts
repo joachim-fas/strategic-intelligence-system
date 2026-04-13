@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { eq, or } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, parseBody } from "@/lib/api-helpers";
+import { requireAuth, parseBody, apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ export async function GET() {
       )
     );
 
-  return NextResponse.json({ data: result });
+  return apiSuccess({ radars: result }, 200, CACHE_HEADERS.short);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    return NextResponse.json({ data: result[0] }, { status: 201 });
+    return apiSuccess({ radar: result[0] }, 201);
   } else {
     const schema = await import("@/db/schema-sqlite");
     const id = crypto.randomUUID();
@@ -106,6 +106,6 @@ export async function POST(request: Request) {
       .where(eq(schema.radars.id, id))
       .get();
 
-    return NextResponse.json({ data: created }, { status: 201 });
+    return apiSuccess({ radar: created }, 201);
   }
 }

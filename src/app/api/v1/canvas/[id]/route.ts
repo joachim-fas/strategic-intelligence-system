@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -33,8 +34,8 @@ export async function GET(_req: Request, { params }: Params) {
       "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
     ).get(id) as { id: string; name: string; description: string | null; canvas_state: string | null; created_at: string; updated_at: string; archived_at: string | null } | undefined;
 
-    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ canvas: row });
+    if (!row) return apiError("Canvas not found", 404, "NOT_FOUND");
+    return apiSuccess({ canvas: row }, 200, CACHE_HEADERS.short);
   } finally {
     d.close();
   }
@@ -78,10 +79,7 @@ export async function POST(req: Request, { params }: Params) {
     const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
     if (!existing) {
       d.close();
-      return NextResponse.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Canvas not found", status: 404 } },
-        { status: 404 }
-      );
+      return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
     applyCanvasUpdate(d, id, body);
@@ -90,14 +88,11 @@ export async function POST(req: Request, { params }: Params) {
       "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
     ).get(id);
     d.close();
-    return NextResponse.json({ canvas: updated });
+    return apiSuccess({ canvas: updated });
   } catch (err) {
     d.close();
     console.error("POST /api/v1/canvas/[id] error:", err);
-    return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to save canvas", status: 500 } },
-      { status: 500 }
-    );
+    return apiError("Failed to save canvas", 500, "INTERNAL_ERROR");
   }
 }
 
@@ -115,10 +110,7 @@ export async function PATCH(req: Request, { params }: Params) {
     const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
     if (!existing) {
       d.close();
-      return NextResponse.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Canvas not found", status: 404 } },
-        { status: 404 }
-      );
+      return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
     applyCanvasUpdate(d, id, body);
@@ -127,14 +119,11 @@ export async function PATCH(req: Request, { params }: Params) {
       "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
     ).get(id);
     d.close();
-    return NextResponse.json({ canvas: updated });
+    return apiSuccess({ canvas: updated });
   } catch (err) {
     d.close();
     console.error("PATCH /api/v1/canvas/[id] error:", err);
-    return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to update canvas", status: 500 } },
-      { status: 500 }
-    );
+    return apiError("Failed to update canvas", 500, "INTERNAL_ERROR");
   }
 }
 
@@ -147,10 +136,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
     if (!existing) {
       d.close();
-      return NextResponse.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Canvas not found", status: 404 } },
-        { status: 404 }
-      );
+      return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
     d.prepare("DELETE FROM radars WHERE id = ?").run(id);
@@ -160,9 +146,6 @@ export async function DELETE(_req: Request, { params }: Params) {
   } catch (err) {
     d.close();
     console.error("DELETE /api/v1/canvas/[id] error:", err);
-    return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to delete canvas", status: 500 } },
-      { status: 500 }
-    );
+    return apiError("Failed to delete canvas", 500, "INTERNAL_ERROR");
   }
 }

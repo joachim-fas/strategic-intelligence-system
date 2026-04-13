@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
+import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 
 ensureEnvLoaded();
 
@@ -55,7 +55,7 @@ export async function GET() {
   const stale = result.filter((c) => c.status === "stale").length;
   const inactive = result.filter((c) => c.status === "inactive").length;
 
-  return NextResponse.json({ connectors: result, totalSignals, healthy, stale, inactive });
+  return apiSuccess({ connectors: result, totalSignals, healthy, stale, inactive }, 200, CACHE_HEADERS.short);
 }
 
 function getStatus(newestHours: number | null, count: number): "ok" | "stale" | "inactive" {

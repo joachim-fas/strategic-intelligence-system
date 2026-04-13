@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -22,15 +23,15 @@ export async function GET(_req: Request, { params }: Params) {
   const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
   d.close();
 
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!row) return apiError("Scenario not found", 404, "NOT_FOUND");
 
-  return NextResponse.json({
+  return apiSuccess({
     scenario: {
       ...row,
       key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
       impacts: row.impacts ? JSON.parse(row.impacts) : [],
     },
-  });
+  }, 200, CACHE_HEADERS.short);
 }
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -57,9 +58,9 @@ export async function PATCH(req: Request, { params }: Params) {
   const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
   d.close();
 
-  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!row) return apiError("Scenario not found", 404, "NOT_FOUND");
 
-  return NextResponse.json({
+  return apiSuccess({
     scenario: {
       ...row,
       key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
@@ -73,5 +74,5 @@ export async function DELETE(_req: Request, { params }: Params) {
   const d = db();
   d.prepare("DELETE FROM scenarios WHERE id = ?").run(id);
   d.close();
-  return NextResponse.json({ success: true });
+  return new NextResponse(null, { status: 204 });
 }

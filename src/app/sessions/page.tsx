@@ -29,7 +29,7 @@ export default function SessionsPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      const id = json?.canvas?.id;
+      const id = (json.data ?? json)?.canvas?.id;
       if (id) {
         try { localStorage.setItem("sis-active-canvas", id); } catch {}
         window.location.href = `/canvas?project=${id}`;

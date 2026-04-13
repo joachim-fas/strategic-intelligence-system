@@ -330,10 +330,46 @@ export async function POST(req: Request) {
 
   const encoder = new TextEncoder();
 
+  // API-10: Keepalive + idle timeout state (shared between stream & cleanup)
+  let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
+  let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+  const KEEPALIVE_MS = 15_000; // ping every 15s
+  const IDLE_TIMEOUT_MS = 60_000; // close after 60s of inactivity
+
   const stream = new ReadableStream({
     async start(controller) {
+      /** Reset the idle timeout — called on every data write. */
+      const resetIdleTimeout = () => {
+        if (idleTimeout) clearTimeout(idleTimeout);
+        idleTimeout = setTimeout(() => {
+          console.warn("[query] SSE idle timeout — closing stream after 60s of inactivity");
+          cleanup();
+          try { controller.close(); } catch { /* already closed */ }
+        }, IDLE_TIMEOUT_MS);
+      };
+
+      /** Tear down keepalive + idle timers. */
+      const cleanup = () => {
+        if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
+        if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+      };
+
+      // Start the 15s keepalive ping
+      keepaliveInterval = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(":ping\n\n"));
+        } catch {
+          // Stream already closed — clean up
+          cleanup();
+        }
+      }, KEEPALIVE_MS);
+
+      // Start the initial idle timeout
+      resetIdleTimeout();
+
       const send = (obj: object) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+        resetIdleTimeout(); // data was sent — reset idle clock
       };
 
       try {
@@ -393,6 +429,7 @@ export async function POST(req: Request) {
                 ? "AI service is temporarily unavailable."
                 : "Unable to process your request. Please try again.";
           send({ type: "error", error: clientError });
+          cleanup();
           controller.close();
           return;
         }
@@ -559,6 +596,7 @@ export async function POST(req: Request) {
           send({ type: "error", error: "Ergebnis konnte nicht verarbeitet werden. Bitte erneut versuchen." });
         }
 
+        cleanup();
         controller.close();
       } catch (err) {
         // SECURITY: Log full error server-side, send generic message to client.
@@ -566,12 +604,17 @@ export async function POST(req: Request) {
         console.error("[query] Stream processing error:", err);
         emitActivity({ type: "query", phase: "error", message: "Stream-Fehler aufgetreten" });
         send({ type: "error", error: "An unexpected error occurred. Please try again." });
+        cleanup();
         controller.close();
       }
     },
+    cancel() {
+      // Client disconnected — clean up timers
+      if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
+      if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+    },
   });
 
-  // TODO: API-10 — Add 60s idle timeout on SSE stream. Send keepalive ':ping' every 15s.
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",

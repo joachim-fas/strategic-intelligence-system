@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { calculateRing } from "@/lib/scoring";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 interface DbTrend {
   id: string;
@@ -64,11 +65,11 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ trends, source: "sqlite", count: trends.length });
+    return apiSuccess({ trends, source: "sqlite", count: trends.length }, 200, CACHE_HEADERS.medium);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Failed to read trends from DB:", message);
-    return NextResponse.json({ trends: [], source: "error", error: message }, { status: 500 });
+    return apiError(message, 500, "DB_ERROR");
   }
 }
 

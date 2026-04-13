@@ -60,8 +60,9 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
     let cancelled = false;
     fetch("/api/v1/feed")
       .then((r) => r.json())
-      .then((data) => {
+      .then((json) => {
         if (cancelled) return;
+        const data = json.data ?? json;
         const list = (data?.trends ?? []) as LiveFeedTrend[];
         if (Array.isArray(list)) {
           // Build a lookup map keyed by id AND name (lowercase) so we match

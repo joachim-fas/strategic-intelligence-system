@@ -90,7 +90,8 @@ export default function VerstehenPage() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(data => {
+      .then(json => {
+        const data = json.data ?? json;
         if (data.trends?.length > 0) {
           const dbTrends = data.trends as TrendDot[];
           const dbByName = new Map(dbTrends.map((t: TrendDot) => [t.name.toLowerCase(), t]));
@@ -116,7 +117,8 @@ export default function VerstehenPage() {
   useEffect(() => {
     fetch("/api/v1/feed")
       .then(r => r.json())
-      .then(data => {
+      .then(json => {
+        const data = json.data ?? json;
         const list = data?.sourceStatus ?? [];
         if (Array.isArray(list) && list.length > 0) setSourcesCount(list.length);
       })
@@ -394,7 +396,7 @@ export default function VerstehenPage() {
                     });
                     if (!res.ok) return;
                     const json = await res.json();
-                    const pid = json.canvas?.id;
+                    const pid = (json.data ?? json).canvas?.id;
                     if (!pid) return;
                     await fetch(`/api/v1/canvas/${pid}`, {
                       method: "PATCH",
