@@ -1,6 +1,6 @@
 // TODO: ARC-09 – GrainAlert is not imported anywhere. Consider deleting.
 /**
- * GrainAlert – Atmospheric Grain Design System
+ * GrainAlert – Volt UI Design System
  * Benachrichtigungs-Komponente mit Grain-Textur.
  */
 

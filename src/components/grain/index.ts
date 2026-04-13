@@ -1,4 +1,4 @@
-// Grain UI — Component Library
+// Volt UI — Component Library
 // Atmospheric Design System · SIS Edition
 
 export * from "./GrainButton";

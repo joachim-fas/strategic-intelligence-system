@@ -66,7 +66,7 @@ export default function SessionsPage() {
             }}>
               Projekte
             </h1>
-            {/* GrainUI Primary Button: 14px/600, h-36, px-20, rounded-lg (8px), bg-lime, tracking-tight */}
+            {/* Volt UI Primary Button: 14px/600, h-36, px-20, rounded-lg (8px), bg-lime, tracking-tight */}
             <button
               onClick={createNewSession}
               disabled={creating}

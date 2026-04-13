@@ -65,7 +65,7 @@ export function SessionsSubNav({ active, de }: Props) {
             }}
           >
             {t.label}
-            {/* GrainUI active indicator: absolute bottom-0 inset-x-3 h-[2px] rounded-full */}
+            {/* Volt UI active indicator: absolute bottom-0 inset-x-3 h-[2px] rounded-full */}
             {isActive && (
               <span style={{
                 position: "absolute", bottom: 0, left: 12, right: 12,

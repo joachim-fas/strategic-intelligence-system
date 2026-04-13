@@ -1,6 +1,6 @@
 // TODO: ARC-09 – GrainStat is not imported anywhere. Consider deleting.
 /**
- * GrainStat / GrainKPI – Atmospheric Grain Design System
+ * GrainStat / GrainKPI – Volt UI Design System
  * Kennzahlen-Karten für Dashboards.
  * Farbsystem: Lime+Schwarz primär, Pastell sekundär, Signale für Trends
  */

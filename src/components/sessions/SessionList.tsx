@@ -550,7 +550,7 @@ export function SessionList({ mode, de }: Props) {
           overflow: "hidden",
         }}
       >
-      {/* Column headers — GrainUI table: font-mono 11px/600, #6B6B6B, bg-muted/30 */}
+      {/* Column headers — Volt UI table: font-mono 11px/600, #6B6B6B, bg-muted/30 */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "minmax(280px, 1fr) 150px 128px 128px 96px 120px",
@@ -836,7 +836,7 @@ function FilterPill({
   onClick: () => void;
   color?: FrameworkCategory;
 }) {
-  // GrainUI FilterPill spec: rounded-full, text-[11px], font-mono
+  // Volt UI FilterPill spec: rounded-full, text-[11px], font-mono
   // Active "Alle": bg-foreground (#0A0A0A) text-background (#fff) font-semibold
   // Inactive: transparent bg, border-border, text-muted-foreground
   // Active with color: use framework color

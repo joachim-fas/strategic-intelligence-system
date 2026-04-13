@@ -11,7 +11,7 @@ import { getRegulationsForTrend, getRegulatoryPressure } from "@/lib/regulations
 import { getClusterForTrend } from "@/lib/trend-clusters";
 import { Tooltip } from "@/components/ui/Tooltip";
 
-// ─── Grain pastel palette ──────────────────────────────────────────────
+// ─── Volt UI pastel palette ────────────────────────────────────────────
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
   adopt:  { color: "var(--pastel-mint-text, #0F6038)", background: "var(--pastel-mint, #C3F4D3)" },
   trial:  { color: "var(--pastel-sky-text, #1A4A8A)", background: "var(--pastel-sky, #D4E8FF)" },

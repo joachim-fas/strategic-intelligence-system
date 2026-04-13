@@ -1,6 +1,6 @@
 // TODO: ARC-09 – GrainButton is not imported anywhere. Consider deleting.
 /**
- * GrainButton – Grain UI
+ * GrainButton – Volt UI
  * Primär: Lime (#E4FF97) + Schwarz (#0A0A0A)
  * Kein box-shadow – Tiefe durch Farbe und Border
  */

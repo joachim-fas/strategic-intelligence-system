@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════
-   GRAIN UI — DESIGN TOKENS
+   VOLT UI — DESIGN TOKENS
    Primärfarbe:  #E4FF97  Neon Yellow / Lime
    Pastell:      Rose · Peach · Mint · Orchid · Blue · Butter · Orange · Aqua
    Signale:      Smaragd (↑) · Koralle (↓) · Slate (→)
@@ -15,11 +15,11 @@
   --font-family-sans:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
   --font-family-mono:    var(--font-mono, "JetBrains Mono"), monospace;
   --font-family-serif:   var(--font-sans, "DM Sans"), system-ui, sans-serif;
-  /* Grain UI font aliases */
+  /* Volt UI font aliases */
   --font-family-ui:      var(--font-sans, "DM Sans"), system-ui, sans-serif;
   --font-family-body:    var(--font-sans, "DM Sans"), system-ui, sans-serif;
 
-  /* Grain UI Color-Mapping → Tailwind --color-* */
+  /* Volt UI Color-Mapping → Tailwind --color-* */
   --color-background:          #FFFFFF;
   --color-foreground:          #0A0A0A;
   --color-card:                #FFFFFF;
@@ -73,7 +73,7 @@
   --color-brand-mid:    var(--volt-lime-deep, #C8F060);
   --color-brand-text:   #0A0A0A;
 
-  /* ── Grain UI 8 Pastell-Farben ── */
+  /* ── Volt UI 8 Pastell-Farben ── */
   --pastel-rose:    #FFD6E0;   /* Rose Quartz   */
   --pastel-peach:   #FFECD2;   /* Peach Cream   */
   --pastel-mint:    #C3F4D3;   /* Mint Green    */
@@ -103,7 +103,7 @@
   --pastel-orange-border: #F0A870;
   --pastel-aqua-border:   #80D0D0;
 
-  /* ── Signal-Farben (Grain UI) ── */
+  /* ── Signal-Farben (Volt UI) ── */
   --signal-positive:        #1A9E5A;
   --signal-positive-light:  #E8F8EF;
   --signal-positive-border: #7DD4A8;
@@ -138,7 +138,7 @@
   --color-assess:    #C8820A;
   --color-hold:      var(--signal-neutral);
 
-  /* ── Border-Radius (Grain + Volt aliases) ── */
+  /* ── Border-Radius (Volt UI aliases) ── */
   --radius-xs:   3px;
   --radius-sm:   6px;
   --radius-md:   8px;
@@ -152,7 +152,7 @@
   --volt-radius-xl:   var(--radius-xl);
   --volt-radius-full: var(--radius-full);
 
-  /* ── Font Aliases (Volt ↔ Grain) ── */
+  /* ── Font Aliases (Volt UI) ── */
   --volt-font-mono: var(--font-code);
   --volt-font-ui:   var(--font-ui);
   --volt-font-display: var(--font-heading);
@@ -189,7 +189,7 @@
   --pastel-rose-border:  #FCA5A5;
   --pastel-amber-text:   #C8820A;
 
-  /* ── Grain UI Shadows (minimalist, kein heavy shadow) ── */
+  /* ── Volt UI Shadows (minimalist, kein heavy shadow) ── */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 3px 8px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
@@ -308,7 +308,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ═══════════════════════════════════════════════════════
-   CARD — Grain UI style (kein Grey-Header, border-only)
+   CARD — Volt UI style (kein Grey-Header, border-only)
 ═══════════════════════════════════════════════════════ */
 /* .card inherits from volt-card spec */
 .card {
@@ -330,7 +330,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: 24px;
 }
 
-/* Section label — font-mono per Grain UI spec */
+/* Section label — font-mono per Volt UI spec */
 .section-label {
   font-family: var(--font-code, "JetBrains Mono"), monospace;
   font-size: 0.6875rem;
@@ -342,7 +342,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BUTTONS — Grain UI: solid schwarz + lime-Accent
+   BUTTONS — Volt UI: solid schwarz + lime-Accent
 ═══════════════════════════════════════════════════════ */
 .btn {
   display: inline-flex;
@@ -398,7 +398,7 @@ h1, h2, h3, h4, h5, h6 {
 .btn-ghost:hover { background: var(--color-surface-2); color: var(--color-text-primary); }
 
 /* ═══════════════════════════════════════════════════════
-   BADGES — Grain UI: rounded-full, pastell
+   BADGES — Volt UI: rounded-full, pastell
 ═══════════════════════════════════════════════════════ */
 .badge {
   display: inline-flex;
@@ -436,7 +436,7 @@ h1, h2, h3, h4, h5, h6 {
 .ring-hold   { background: var(--signal-neutral-light); color: var(--signal-neutral-text); border: 1px solid var(--signal-neutral-border); }
 
 /* ═══════════════════════════════════════════════════════
-   CHIPS — Grain UI: outline-style, farbig
+   CHIPS — Volt UI: outline-style, farbig
 ═══════════════════════════════════════════════════════ */
 .chip {
   display: inline-flex;
@@ -516,7 +516,7 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb:hover { background: #A0A0A0; }
 
 /* ═══════════════════════════════════════════════════════
-   GRAIN UI FONT UTILITY CLASSES
+   VOLT UI FONT UTILITY CLASSES
 ═══════════════════════════════════════════════════════ */
 .font-display { font-family: var(--font-heading, "Space Grotesk"), system-ui, sans-serif; }
 .font-ui      { font-family: var(--font-ui, "DM Sans"), system-ui, sans-serif; }
@@ -552,7 +552,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BACKGROUND PATTERNS — Grain UI
+   BACKGROUND PATTERNS — Volt UI
 ═══════════════════════════════════════════════════════ */
 .pattern-grid {
   background-image:
@@ -579,7 +579,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BACKGROUND UTILITIES — Grain UI
+   BACKGROUND UTILITIES — Volt UI
 ═══════════════════════════════════════════════════════ */
 .bg-grain-hero {
   background-color: #E4FF97;
@@ -615,7 +615,7 @@ h1, h2, h3, h4, h5, h6 {
 .bg-pastel-aqua    { background-color: #D6F5F5; color: #000000; }
 
 /* ═══════════════════════════════════════════════════════
-   SIGNAL BADGE & DOT UTILITIES — Grain UI
+   SIGNAL BADGE & DOT UTILITIES — Volt UI
    Positiv (Smaragd) · Negativ (Koralle) · Neutral (Slate)
 ═══════════════════════════════════════════════════════ */
 .signal-positive-badge {
@@ -658,7 +658,7 @@ h1, h2, h3, h4, h5, h6 {
 .value-neutral  { color: var(--signal-neutral-text);  font-family: var(--font-code); font-variant-numeric: tabular-nums; }
 
 /* ═══════════════════════════════════════════════════════
-   ANIMATIONEN — Grain UI
+   ANIMATIONEN — Volt UI
 ═══════════════════════════════════════════════════════ */
 @keyframes breathe {
   0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.8; }

@@ -29,7 +29,7 @@ interface BalancedScorecardProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Grain UI Pastell-Palette — Baby Blue · Mint · Butter · Orchid
+// Volt UI Pastell-Palette — Baby Blue · Mint · Butter · Orchid
 const PERSPECTIVE_COLORS = [
   { color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)" },  // Baby Blue
   { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)" },  // Mint Green

@@ -69,7 +69,7 @@ export function AppHeader() {
       }}
     >
       <div style={{ position: "relative", width: "100%", padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
-        {/* Logo — GrainUI: flex-shrink-0 flex items-center, gap-2 (8px) */}
+        {/* Logo — Volt UI: flex-shrink-0 flex items-center, gap-2 (8px) */}
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <Link href="/" aria-label="SIS Startseite" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
             <Image src="/icons/volt-signet.svg" alt="SIS" width={28} height={18} priority />
@@ -77,7 +77,7 @@ export function AppHeader() {
           </Link>
         </div>
 
-        {/* Hamburger — Mobile only (GrainUI: md:hidden w-9 h-9 rounded-lg) */}
+        {/* Hamburger — Mobile only (Volt UI: md:hidden w-9 h-9 rounded-lg) */}
         <button className="sis-nav-mobile"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label={de ? "Hauptnavigation öffnen" : "Open main navigation"}
@@ -111,7 +111,7 @@ export function AppHeader() {
                 onMouseLeave={e => { if (!active) { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted, #6B6B6B)"; el.style.background = "transparent"; } }}
               >
                 {label}
-                {/* GrainUI active indicator: absolute bottom-0 inset-x-3 h-[2px] rounded-full bg-foreground/70 */}
+                {/* Volt UI active indicator: absolute bottom-0 inset-x-3 h-[2px] rounded-full bg-foreground/70 */}
                 {active && (
                   <span style={{
                     position: "absolute", bottom: 0, left: 12, right: 12,
