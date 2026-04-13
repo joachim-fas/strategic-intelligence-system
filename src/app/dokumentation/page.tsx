@@ -690,6 +690,62 @@ export default function Dokumentation() {
                       L("mega-geopolitical --dampens(70%)--> mega-connectivity"),
                     ]}
                   />
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Framework-System-Prompt (analyze/route.ts)" : "Framework System Prompt (analyze/route.ts)"}</SubH>
+                  <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Alle 6 Analyse-Frameworks verwenden diesen kompakten System-Prompt als Basis. Schritt-spezifische Prompts werden als User-Message übergeben."
+                      : "All 6 analysis frameworks use this compact system prompt as base. Step-specific prompts are sent as user message."}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Framework System Prompt"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="120px"
+                    lines={[
+                      L("Du bist ein Senior-Strategieberater im Strategic Intelligence", "info"),
+                      L("System (SIS). Du lieferst strukturierte, datengestützte Analysen.", "info"),
+                      L("Antworte IMMER als valides JSON — kein Markdown-Codefence,", "info"),
+                      L("kein Fließtext davor/danach, NUR das JSON-Objekt.", "info"),
+                      L("Sei konkret: nenne echte Unternehmen, echte Zahlen,", "info"),
+                      L("echte Regulierungen. Sprache: ${locale}.", "info"),
+                    ]}
+                  />
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Meta-Synthese-Prompt (Canvas-Briefing)" : "Meta-Synthesis Prompt (Canvas Briefing)"}</SubH>
+                  <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Wird für das Canvas-Briefing (\"Strategisches Memo\") verwendet. Analysiert alle Queries einer Session und findet übergreifende Muster, Widersprüche und blinde Flecken."
+                      : "Used for canvas briefing (\"Strategic Memo\"). Analyzes all queries of a session to find overarching patterns, contradictions and blind spots."}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Meta-Synthesis"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="300px"
+                    lines={[
+                      L("Aufgabe: NICHT nochmal zusammenfassen. Sondern:", "warning"),
+                      L("Den ROTEN FADEN zwischen den Queries finden.", "warning"),
+                      L(""),
+                      L("5 Ergebnis-Dimensionen:", "comment"),
+                      L("1. Roter Faden       -- impliziter Sinn der Fragen (2-4 Sätze)", "success"),
+                      L("2. Cross-Query-Muster -- Beobachtungen in MEHREREN Briefings", "success"),
+                      L("3. Widersprüche       -- Wo sich Briefings widersprechen", "success"),
+                      L("4. Meta-Entscheidung  -- 3-5 nicht-verhandelbare Prinzipien", "success"),
+                      L("5. Offene Flanken     -- Fragen die NICHT gestellt wurden", "success"),
+                      L(""),
+                      L("Output-Schema:", "comment"),
+                      L("{ sessionTitle, realQuestion, redThread,"),
+                      L("  crossQueryPatterns[{pattern, explanation, queryRefs}],"),
+                      L("  tensions[{tension, between[], implication}],"),
+                      L("  metaDecisionFramework[{principle, rationale}],"),
+                      L("  openFlanks[{question, why}],"),
+                      L("  confidence: 0-1, critique: \"Ehrliche Bewertung\" }"),
+                    ]}
+                  />
                 </VoltCardContent>
               </VoltCard>
             </section>
@@ -837,61 +893,342 @@ export default function Dokumentation() {
                 ══════════════════════════════════════════════════ */}
             <section id="frameworks" className="scroll-mt-20">
               <SectionHeading num="06">
-                {de ? "Analyse-Frameworks (6)" : "Analysis Frameworks (6)"}
+                {de ? "Analyse-Frameworks (6) — Vollständige Dokumentation" : "Analysis Frameworks (6) — Complete Documentation"}
               </SectionHeading>
               <VoltCard>
-                <VoltCardContent className="space-y-4 p-6">
-                  <p className="text-sm leading-relaxed mb-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                <VoltCardContent className="space-y-6 p-6">
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Neben der Standard-Analyse (STEEP+V) können 6 spezialisierte Frameworks gewählt werden:"
-                      : "Beyond the default analysis (STEEP+V), 6 specialized frameworks can be selected:"}
+                      ? "Neben der Standard-Analyse (STEEP+V) bietet SIS 6 spezialisierte Frameworks. Jedes Framework besteht aus 3-5 sequenziellen Schritten mit eigenen System-Prompts, Ausgabe-Schemata und Abhängigkeiten. Quelle: canvas-templates.ts (Definitionen) + api/v1/frameworks/analyze/route.ts (Prompts + Schemata)."
+                      : "Beyond the default analysis (STEEP+V), SIS offers 6 specialized frameworks. Each consists of 3-5 sequential steps with their own system prompts, output schemas and dependencies. Source: canvas-templates.ts (definitions) + api/v1/frameworks/analyze/route.ts (prompts + schemas)."}
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      {
-                        num: "1", title: de ? "Marktanalyse" : "Market Analysis", method: "SWOT + PESTEL",
-                        desc: de ? "Stärken/Schwächen/Chancen/Risiken und PESTEL-Umfeldanalyse für Markt- und Wettbewerbsfragen." : "Strengths/Weaknesses/Opportunities/Threats and PESTEL for market and competitive questions.",
-                      },
-                      {
-                        num: "2", title: "War-Gaming", method: "RAND + Shell Scenarios",
-                        desc: de ? "Strategische Simulation mit Akteursanalyse, Zügen und Gegenzügen. Geopolitik & Konkurrenzstrategie." : "Strategic simulation with actor analysis, moves and counter-moves. Geopolitics & competitive strategy.",
-                      },
-                      {
-                        num: "3", title: "Pre-Mortem", method: "Gary Klein (1998)",
-                        desc: de ? "Proaktive Risikoanalyse: 'Stell dir vor, das Projekt ist gescheitert. Warum?' Blinde Flecken erkennen." : "Proactive risk analysis: 'Imagine the project has failed. Why?' Identify blind spots.",
-                      },
-                      {
-                        num: "4", title: "Post-Mortem", method: "Toyota 5-Whys",
-                        desc: de ? "Ursachenanalyse: Fuenffaches 'Warum?' bis zur Wurzelursache. Fuer Vorfallanalyse." : "Root cause analysis: five times 'Why?' to the root cause. For incident analysis.",
-                      },
-                      {
-                        num: "5", title: "Trend Deep-Dive", method: "STEEP+V Extended",
-                        desc: de ? "Systemische Analyse entlang aller 6 Dimensionen mit Wechselwirkungen und Kaskadeneffekten." : "Systemic analysis along all 6 dimensions with interactions and cascade effects.",
-                      },
-                      {
-                        num: "6", title: "Stakeholder", method: "Mitchell Salience Model (1997)",
-                        desc: de ? "Einfluss-Mapping nach Power/Legitimacy/Urgency. Dominante, abhängige und fordernde Stakeholder." : "Influence mapping by Power/Legitimacy/Urgency. Dominant, dependent and demanding stakeholders.",
-                      },
-                    ].map((fw) => (
-                      <VoltCard key={fw.num} variant="outlined">
-                        <VoltCardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <span
-                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-mono text-sm font-bold"
-                              style={{ background: "#E4FF97", color: "#0A0A0A" }}
-                            >
-                              {fw.num}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-bold text-sm mb-0.5" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>{fw.title}</div>
-                              <div className="font-mono text-[11px] mb-1.5" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{fw.method}</div>
-                              <div className="text-[12px] leading-relaxed" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>{fw.desc}</div>
-                            </div>
-                          </div>
-                        </VoltCardContent>
-                      </VoltCard>
-                    ))}
+
+                  {/* ── 1. MARKTANALYSE ── */}
+                  <VoltSeparator />
+                  <SubH>1. {de ? "Strategische Marktanalyse" : "Strategic Market Analysis"}</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">SWOT + PESTEL</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">5 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">Humphrey, Stanford 1960s</VoltBadge>
                   </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "Erweiterte SWOT + PESTEL. Analysiert interne Stärken/Schwächen und externe Chancen/Risiken systematisch."
+                      : "Extended SWOT + PESTEL. Systematically analyzes internal strengths/weaknesses and external opportunities/risks."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="360px"
+                    lines={[
+                      L("Schritt 1: Marktstruktur-Analyse (market-structure)", "command"),
+                      L("  abhängig von: —"),
+                      L("  Prompt: \"Marktstruktur-Analyse für '{topic}'\""),
+                      L("  Output: { tam, sam, som, cagr, segments[], keyPlayers[], synthesis }"),
+                      L("  Min: 4-6 Segmente, 5-8 echte Unternehmen"),
+                      L(""),
+                      L("Schritt 2: Wettbewerber-Radar (competitor-radar)", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Wettbewerber-Radar für '{topic}'\""),
+                      L("  Output: { positioning[{name, x, y}], competitors[], synthesis }"),
+                      L("  Min: 6 Wettbewerber, x/y 0-5, threatLevel: high|medium|low"),
+                      L(""),
+                      L("Schritt 3: Trends, Regulierung & Szenarien (trends-regulation)", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Trends, Regulierung und Szenarien für '{topic}'\""),
+                      L("  Output: { megatrends[], regulations[], scenarios[3], synthesis }"),
+                      L("  category: social|technological|economic|environmental|political"),
+                      L("  status: active|planned|draft"),
+                      L(""),
+                      L("Schritt 4: Benchmarking", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Benchmarking für '{topic}'\""),
+                      L("  Output: { metrics[], players[], caption, synthesis }"),
+                      L("  Min: 5 Kennzahlen, 5-7 echte Unternehmen"),
+                      L(""),
+                      L("Schritt 5: Strategische Optionen & Priorisierung", "command"),
+                      L("  abhängig von: Schritt 2, 3, 4"),
+                      L("  Prompt: \"3-5 strategische Optionen ableiten\""),
+                      L("  Output: { options[], prioritization, synthesis }"),
+                    ]}
+                  />
+                  <VoltAlert variant="info" title={de ? "Guidance" : "Guidance"}>
+                    <div className="text-[12px] mt-1 space-y-1">
+                      <div><strong>{de ? "Ideale Frage:" : "Ideal question:"}</strong> {de ? "Konkrete Frage zu einem abgegrenzten Markt mit Region und Zeithorizont." : "Concrete question about a defined market with region and time horizon."}</div>
+                      <div><strong>{de ? "Beispiele:" : "Examples:"}</strong> {de ? "\"Elektroauto-Markt in DACH bis 2027\", \"B2B-SaaS für Supply-Chain-Visibility in Europa\"" : "\"EV market in DACH by 2027\", \"B2B SaaS for supply chain visibility in Europe\""}</div>
+                      <div><strong>{de ? "Vermeiden:" : "Avoid:"}</strong> {de ? "Zu generisch (\"Automotive\") oder zu eng (\"Firma XY\")" : "Too generic (\"Automotive\") or too narrow (\"Company XY\")"}</div>
+                    </div>
+                  </VoltAlert>
+
+                  {/* ── 2. WAR-GAMING ── */}
+                  <VoltSeparator />
+                  <SubH>2. War-Gaming</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">RAND + Shell Scenarios</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">5 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">RAND 1960s, Shell 1970s</VoltBadge>
+                  </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "Szenario-basierte Strategieplanung. Prämisse: Die Zukunft ist nicht vorhersagbar, aber man kann sich auf mehrere Zukünfte vorbereiten."
+                      : "Scenario-based strategy planning. Premise: The future is unpredictable, but you can prepare for multiple futures."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="360px"
+                    lines={[
+                      L("Schritt 1: Akteurs-Modellierung (actors)", "command"),
+                      L("  abhängig von: —"),
+                      L("  Prompt: \"Modelliere strategische Akteure für '{topic}'\""),
+                      L("  Output: { actors[{name, type, resources[], goals[], threatLevel}] }"),
+                      L("  type: competitor|regulator|partner|disruptor|customer"),
+                      L("  Min: 6 Akteure"),
+                      L(""),
+                      L("Schritt 2: Züge & Gegenzüge (moves)", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Simuliere strategische Züge und Gegenzüge\""),
+                      L("  Output: { moves[{actor, action, response, impact}] }"),
+                      L(""),
+                      L("Schritt 3: Optimistisches Szenario", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Realistisches Best-Case-Szenario\""),
+                      L("  Output: { scenario, probability, keyDrivers[], earlyWarnings[] }"),
+                      L(""),
+                      L("Schritt 4: Pessimistisches Szenario", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Worst-Case: Kipppunkte, Kaskadeneffekte\""),
+                      L(""),
+                      L("Schritt 5: Robuste Strategie", "command"),
+                      L("  abhängig von: Schritt 2, 3, 4"),
+                      L("  Prompt: \"No-Regret-Moves + Real Options + Signposts\""),
+                      L("  Output: { noRegretMoves[], realOptions[], signposts[], top3 }"),
+                    ]}
+                  />
+                  <VoltAlert variant="info" title={de ? "Guidance" : "Guidance"}>
+                    <div className="text-[12px] mt-1 space-y-1">
+                      <div><strong>{de ? "Ideale Frage:" : "Ideal question:"}</strong> {de ? "Konkrete strategische Frage mit benannten Akteuren und offenem Ausgang." : "Concrete strategic question with named actors and open outcome."}</div>
+                      <div><strong>{de ? "Beispiele:" : "Examples:"}</strong> {de ? "\"Wie reagieren wir auf Temus Preiskampf im DACH-E-Commerce?\", \"EU Cloud-Souveränität: SAP vs. AWS\"" : "\"How do we respond to Temu's pricing attack?\", \"EU cloud sovereignty: SAP vs AWS\""}</div>
+                      <div><strong>{de ? "Felder:" : "Fields:"}</strong> {de ? "Gegner/Wettbewerber (Pflicht), Zeithorizont (optional)" : "Opponent/competitor (required), time horizon (optional)"}</div>
+                    </div>
+                  </VoltAlert>
+
+                  {/* ── 3. PRE-MORTEM ── */}
+                  <VoltSeparator />
+                  <SubH>3. Pre-Mortem</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">Prospective Hindsight</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">3 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">Gary Klein, 1989</VoltBadge>
+                  </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "Wissenschaftlich belegt: Menschen identifizieren 30% mehr Risiken wenn sie sich das Scheitern als bereits eingetreten vorstellen."
+                      : "Scientifically proven: People identify 30% more risks when imagining failure as already occurred."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="320px"
+                    lines={[
+                      L("Schritt 1: Scheitern vorstellen (risks)", "command"),
+                      L("  abhängig von: —"),
+                      L("  Prompt: \"VERSETZE DICH IN DIE ZUKUNFT. Es ist 18 Monate"),
+                      L("  später. '{topic}' ist VOLLSTÄNDIG GESCHEITERT.\""),
+                      L("  Output: { risks[{name, category, probability(1-5),"),
+                      L("    impact(1-5), riskScore, earlyWarnings[]}], blindSpots[] }"),
+                      L("  category: technology|market|regulation|organization|financial|social"),
+                      L("  Min: 8 Risiken"),
+                      L(""),
+                      L("Schritt 2: Risiko-Bewertung", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Bewerte jedes Risiko: Wahrscheinlichkeit x Schaden\""),
+                      L("  Output: sortiert nach Score (höchste zuerst)"),
+                      L(""),
+                      L("Schritt 3: Risiko-Mitigation", "command"),
+                      L("  abhängig von: Schritt 2"),
+                      L("  Prompt: \"Mitigationsplan für Top-3 Risiken:"),
+                      L("  Prävention, Notfallplan, Verantwortlicher, Trigger-Punkt\""),
+                    ]}
+                  />
+                  <VoltAlert variant="info" title={de ? "Guidance" : "Guidance"}>
+                    <div className="text-[12px] mt-1 space-y-1">
+                      <div><strong>{de ? "Ideale Frage:" : "Ideal question:"}</strong> {de ? "Konkretes Vorhaben das noch NICHT gestartet ist, mit Zielzeitpunkt." : "Concrete initiative that hasn't started yet, with target date."}</div>
+                      <div><strong>{de ? "Beispiele:" : "Examples:"}</strong> {de ? "\"Markteintritt USA mit B2B-SaaS bis Q4 2026\", \"SAP S/4HANA Migration in 18 Monaten\"" : "\"US market entry with B2B SaaS by Q4 2026\", \"SAP S/4HANA migration in 18 months\""}</div>
+                      <div><strong>{de ? "Felder:" : "Fields:"}</strong> {de ? "Zielzeitpunkt, Erfolgskriterium" : "Target date, success criterion"}</div>
+                    </div>
+                  </VoltAlert>
+
+                  {/* ── 4. POST-MORTEM ── */}
+                  <VoltSeparator />
+                  <SubH>4. Post-Mortem</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">5-Whys + Ishikawa</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">3 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">Toyota, Taiichi Ohno</VoltBadge>
+                  </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "Unterscheidet strukturelle, konjunkturelle und situative Ursachen. Fünffaches 'Warum?' bis zur Wurzelursache."
+                      : "Distinguishes structural, cyclical and situational causes. Five times 'Why?' to the root cause."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="280px"
+                    lines={[
+                      L("Schritt 1: Chronologie & Fakten", "command"),
+                      L("  abhängig von: —"),
+                      L("  Prompt: \"Rekonstruiere die Chronologie von '{topic}':"),
+                      L("  Timeline, Schlüsselentscheidungen, externe Auslöser\""),
+                      L("  User-Input: Was genau ist passiert? Wann? Wer betroffen?"),
+                      L(""),
+                      L("Schritt 2: Ursachen auf 3 Ebenen", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  STRUKTURELL: langfristig, systemisch (Megatrends, Regulierung)"),
+                      L("  KONJUNKTURELL: mittelfristig (Wirtschaftszyklen, Politik)"),
+                      L("  SITUATIV: kurzfristig (Entscheidungen, Personen, Zufall)"),
+                      L(""),
+                      L("Schritt 3: Lessons Learned", "command"),
+                      L("  abhängig von: Schritt 2"),
+                      L("  1) Was hätte man WISSEN können?"),
+                      L("  2) Was hätte man ANDERS machen können?"),
+                      L("  3) Welche SYSTEMISCHEN VERÄNDERUNGEN sind nötig?"),
+                    ]}
+                  />
+
+                  {/* ── 5. TREND DEEP-DIVE ── */}
+                  <VoltSeparator />
+                  <SubH>5. Trend Deep-Dive</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">STEEP+V Extended</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">5 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">EU JRC 14 Megatrends</VoltBadge>
+                  </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "STEEP+V-Framework angewendet auf einen einzelnen Trend. Systemische Analyse mit Wechselwirkungen und Kaskadeneffekten."
+                      : "STEEP+V framework applied to a single trend. Systemic analysis with interactions and cascade effects."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="340px"
+                    lines={[
+                      L("Schritt 1: Definition & Status", "command"),
+                      L("  Prompt: \"Umfassendes Briefing: Definition, Entstehung,"),
+                      L("  aktueller Stand (Zahlen!), Top 5 Akteure, STEEP+V-Einordnung,"),
+                      L("  Position auf der S-Kurve\""),
+                      L(""),
+                      L("Schritt 2: Evidenz & Daten", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Live-Signale, quantitative Belege,"),
+                      L("  Gegenbeweise, Datenlücken\""),
+                      L(""),
+                      L("Schritt 3: Treiber & Bremser", "command"),
+                      L("  abhängig von: Schritt 2"),
+                      L("  Prompt: \"Kausale Kräfte: TREIBER (Technologie, Ökonomie,"),
+                      L("  Regulierung) + BREMSER (Hürden, Kosten, Akzeptanz)\""),
+                      L(""),
+                      L("Schritt 4: Impact-Analyse", "command"),
+                      L("  abhängig von: Schritt 3"),
+                      L("  Prompt: \"Wirtschaft, Gesellschaft, Geopolitik,"),
+                      L("  Technologie, Umwelt. Gewinner/Verlierer, Zeitrahmen\""),
+                      L(""),
+                      L("Schritt 5: Handlungsoptionen", "command"),
+                      L("  abhängig von: Schritt 4"),
+                      L("  Output-Priorisierung:"),
+                      L("  SOFORT (90 Tage) | VORBEREITEN (6-12 Mo) | BEOBACHTEN", "success"),
+                    ]}
+                  />
+
+                  {/* ── 6. STAKEHOLDER-MAPPING ── */}
+                  <VoltSeparator />
+                  <SubH>6. Stakeholder-Mapping</SubH>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <VoltBadge variant="muted" size="sm">Mitchell Salience Model</VoltBadge>
+                    <VoltBadge variant="neutral" size="sm">4 {de ? "Schritte" : "Steps"}</VoltBadge>
+                    <VoltBadge variant="blue" size="sm">Mitchell et al., 1997</VoltBadge>
+                  </div>
+                  <p className="text-[13px] leading-relaxed mb-3" style={{ color: "var(--color-text-muted, #6B6B6B)" }}>
+                    {de
+                      ? "Power x Legitimacy x Urgency. Kombiniert mit Interest/Influence-Matrix für Engagement-Strategie."
+                      : "Power x Legitimacy x Urgency. Combined with Interest/Influence Matrix for engagement strategy."}
+                  </p>
+                  <VoltTerminalStatic
+                    title={de ? "Schritte & Prompts" : "Steps & Prompts"}
+                    variant="dark"
+                    size="sm"
+                    maxHeight="320px"
+                    lines={[
+                      L("Schritt 1: Stakeholder identifizieren", "command"),
+                      L("  Prompt: \"7-10 wichtigste Stakeholder bei '{topic}':"),
+                      L("  Name, Rolle, primäres Interesse, sekundäres Interesse\""),
+                      L("  Gruppierung: Entscheider | Beeinflusser | Betroffene | Beobachter"),
+                      L(""),
+                      L("Schritt 2: Macht & Einfluss bewerten", "command"),
+                      L("  abhängig von: Schritt 1"),
+                      L("  Prompt: \"Macht (1-5), Interesse (1-5), Haltung,"),
+                      L("  Vorhersagbarkeit\""),
+                      L("  Matrix: Key Players | Keep Satisfied | Keep Informed | Monitor"),
+                      L(""),
+                      L("Schritt 3: Dynamiken & Koalitionen", "command"),
+                      L("  abhängig von: Schritt 2"),
+                      L("  Prompt: \"Allianzen, Konflikte, Einflussketten (A→B→C),"),
+                      L("  mögliche Positionswechsel\""),
+                      L(""),
+                      L("Schritt 4: Engagement-Strategie", "command"),
+                      L("  abhängig von: Schritt 3"),
+                      L("  Prompt: \"Kommunikationsansatz, Timing, Kernbotschaft"),
+                      L("  je Key Stakeholder. Konkreter 4-Wochen-Plan.\""),
+                    ]}
+                  />
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Framework-Architektur (Zusammenfassung)" : "Framework Architecture (Summary)"}</SubH>
+                  <div className="overflow-x-auto">
+                    <VoltTableRoot>
+                      <VoltTableHeader>
+                        <VoltTableRow>
+                          <VoltTableHead>Framework</VoltTableHead>
+                          <VoltTableHead>{de ? "Methode" : "Method"}</VoltTableHead>
+                          <VoltTableHead>{de ? "Schritte" : "Steps"}</VoltTableHead>
+                          <VoltTableHead>{de ? "Ausgabe-Format" : "Output"}</VoltTableHead>
+                        </VoltTableRow>
+                      </VoltTableHeader>
+                      <VoltTableBody>
+                        {[
+                          [de ? "Marktanalyse" : "Market Analysis", "SWOT + PESTEL", "5", "JSON: TAM/SAM/SOM, Segments, Competitors, Scenarios"],
+                          ["War-Gaming", "RAND + Shell", "5", "JSON: Actors, Moves, 3 Scenarios, Robust Strategy"],
+                          ["Pre-Mortem", "Gary Klein", "3", "JSON: Risks (8+), Risk Scores, Mitigation Plans"],
+                          ["Post-Mortem", "5-Whys + Ishikawa", "3", "JSON: Timeline, 3-Layer Causes, Lessons Learned"],
+                          ["Trend Deep-Dive", "STEEP+V", "5", "JSON: Definition, Evidence, Drivers, Impact, Actions"],
+                          ["Stakeholder", "Mitchell Salience", "4", "JSON: Actors, Power/Interest, Coalitions, Engagement"],
+                        ].map(([name, method, steps, output]) => (
+                          <VoltTableRow key={name}>
+                            <VoltTableCell className="font-bold text-xs">{name}</VoltTableCell>
+                            <VoltTableCell className="font-mono text-xs">{method}</VoltTableCell>
+                            <VoltTableCell className="text-center text-xs">{steps}</VoltTableCell>
+                            <VoltTableCell className="text-xs">{output}</VoltTableCell>
+                          </VoltTableRow>
+                        ))}
+                      </VoltTableBody>
+                    </VoltTableRoot>
+                  </div>
+
+                  <VoltAlert variant="success" title={de ? "Prompt-Injection-Schutz" : "Prompt Injection Protection"}>
+                    <p className="text-[12px] mt-1">
+                      {de
+                        ? "Alle Framework-Inputs (Topic, Context, Step) werden vor der Prompt-Konstruktion sanitisiert: XML-Tags, Rollen-Marker und Steuerzeichen werden entfernt. Identisch mit dem Schutz in SEC-07 (Query-Route)."
+                        : "All framework inputs (topic, context, step) are sanitized before prompt construction: XML tags, role markers and control characters are removed. Identical to SEC-07 (query route) protection."}
+                    </p>
+                  </VoltAlert>
                 </VoltCardContent>
               </VoltCard>
             </section>

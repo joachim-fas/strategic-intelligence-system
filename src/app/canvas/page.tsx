@@ -29,7 +29,10 @@ import { OrbitGraphView } from "./OrbitGraphView";
 import { OrbitEvidenzView, type EvCanvasNode } from "./OrbitEvidenzView";
 import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
 import { useLocale } from "@/lib/locale-context";
-import { GitBranch } from "lucide-react";
+import {
+  GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
+  TreePine, Tag, Layers, X, Group,
+} from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1055,7 +1058,7 @@ function buildDemoProject(): { nodes: CanvasNode[]; conns: Connection[] } {
         "KARTEN BEWEGEN: Header anfassen und ziehen\n" +
         "VERBINDEN: Am rechten Port ziehen → zu einer anderen Karte\n" +
         "ZOOM: Mausrad oder Toolbar (⊙ = Reset)\n" +
-        "VIEWS: ⊞ Canvas | ☰ Board | ⏱ Timeline | ⬡ Orbit\n" +
+        "VIEWS: Canvas | Board | Zeitlinie | Orbit\n" +
         "LÖSCHEN: Karte auswählen → Delete → Enter\n" +
         "TAGS: Karte anklicken → unten Tags eingeben → Enter\n" +
         "EXPORT: ⬇ .md oder ⬇ .json in der Toolbar\n" +
@@ -4130,7 +4133,7 @@ function DetailPanel({
         borderBottom: "none",
         borderRadius: "16px 16px 0 0",
         boxShadow: "0 -4px 40px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)",
-        zIndex: 150,
+        zIndex: 910,
         display: "flex", flexDirection: "column",
       }}
     >
@@ -4139,10 +4142,10 @@ function DetailPanel({
         <div style={{ flex: 1, minWidth: 0 }}>{renderHeader()}</div>
         <button onClick={onClose}
           title={de ? "Schließen (Esc)" : "Close (Esc)"}
-          style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: "3px 7px", color: "var(--color-text-muted)", fontSize: 15, borderRadius: 6, lineHeight: 1, marginTop: 2 }}
-          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-page-bg)"; }}
-          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "none"; }}
-        >✕</button>
+          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, border: "1px solid var(--color-border, #E8E8E8)", cursor: "pointer", padding: 0, color: "var(--color-text-muted)", borderRadius: 8, background: "var(--color-page-bg, #F5F5F5)", transition: "all 0.15s" }}
+          onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-border, #E8E8E8)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
+          onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "var(--color-page-bg, #F5F5F5)"; el.style.borderColor = "var(--color-border, #E8E8E8)"; }}
+        ><X className="w-4 h-4" /></button>
       </div>
       {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
@@ -6085,7 +6088,12 @@ export default function CanvasPage() {
             border: "1px solid var(--color-border)",
           }}>
             {(["canvas","board","timeline","orbit"] as ViewMode[]).map(mode => {
-              const icons: Record<ViewMode, string> = { canvas: "⊞", board: "☰", timeline: "⏱", orbit: "⬡" };
+              const icons: Record<ViewMode, React.ReactNode> = {
+                canvas: <LayoutGrid className="w-3.5 h-3.5" />,
+                board: <Columns3 className="w-3.5 h-3.5" />,
+                timeline: <Clock className="w-3.5 h-3.5" />,
+                orbit: <Hexagon className="w-3.5 h-3.5" />,
+              };
               const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: de ? "Zeitlinie" : "Timeline", orbit: "Orbit" };
               const tips: Record<ViewMode, string> = {
                 canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
@@ -6113,7 +6121,7 @@ export default function CanvasPage() {
                     onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--foreground)"; }}
                     onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "var(--muted-foreground)"; }}
                   >
-                    <span style={{ fontSize: 11, lineHeight: 1 }}>{icons[mode]}</span>
+                    {icons[mode]}
                     <span>{labels[mode]}</span>
                   </button>
                 </Tooltip>
@@ -6145,16 +6153,16 @@ export default function CanvasPage() {
                 style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: sortMenuOpen ? "var(--color-page-bg)" : "transparent", color: sortMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
                 onMouseLeave={e => { if (!sortMenuOpen) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; } }}
-              >⊞ {de ? "Ordnen" : "Arrange"} ▾</button>
+              ><LayoutGrid className="w-3 h-3 inline-block mr-1 -mt-px" /> {de ? "Ordnen" : "Arrange"} ▾</button>
               {sortMenuOpen && (
                 <>
                   <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
                   <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
                     {([
-                      { mode: "tree" as SortMode, icon: "🌳", label: de ? "Baum (Standard)" : "Tree (Default)" },
-                      { mode: "time" as SortMode, icon: "🕐", label: de ? "Zeitlich" : "By Time" },
-                      { mode: "type" as SortMode, icon: "📋", label: de ? "Nach Typ" : "By Type" },
-                      { mode: "status" as SortMode, icon: "🏷", label: de ? "Nach Status" : "By Status" },
+                      { mode: "tree" as SortMode, icon: <TreePine className="w-3.5 h-3.5" />, label: de ? "Baum (Standard)" : "Tree (Default)" },
+                      { mode: "time" as SortMode, icon: <Clock className="w-3.5 h-3.5" />, label: de ? "Zeitlich" : "By Time" },
+                      { mode: "type" as SortMode, icon: <Layers className="w-3.5 h-3.5" />, label: de ? "Nach Typ" : "By Type" },
+                      { mode: "status" as SortMode, icon: <Tag className="w-3.5 h-3.5" />, label: de ? "Nach Status" : "By Status" },
                     ] as const).map(item => (
                       <button key={item.mode}
                         onClick={() => { reorganizeCanvas(item.mode); setSortMenuOpen(false); }}
@@ -6162,7 +6170,7 @@ export default function CanvasPage() {
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-secondary)"; }}
                       >
-                        <span style={{ fontSize: 13 }}>{item.icon}</span>
+                        <span className="flex-shrink-0 opacity-60">{item.icon}</span>
                         <span>{item.label}</span>
                       </button>
                     ))}
@@ -6306,7 +6314,7 @@ export default function CanvasPage() {
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB"; el.style.color = "#fff"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB14"; el.style.color = "#2563EB"; }}
             >
-              ⊞ {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
+              <Group className="w-3 h-3 inline-block mr-0.5 -mt-px" /> {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
             </button>
           )}
         </div>
@@ -7353,7 +7361,7 @@ export default function CanvasPage() {
         {viewMode === "canvas" && isEmpty && embedded && hydrated && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ textAlign: "center", color: "var(--color-text-muted)", opacity: 0.5 }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>⊞</div>
+              <div style={{ marginBottom: 8 }}><LayoutGrid className="w-7 h-7 mx-auto" /></div>
               <div style={{ fontSize: 12 }}>Starte eine Analyse im Standard-View</div>
               <div style={{ fontSize: 11, marginTop: 4 }}>Die Ergebnisse erscheinen hier als Karten</div>
             </div>
@@ -7551,7 +7559,7 @@ export default function CanvasPage() {
             {/* Backdrop */}
             <div
               onClick={() => setDetailNodeId(null)}
-              style={{ position: "fixed", inset: 0, zIndex: 149, background: "rgba(0,0,0,0.22)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+              style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.22)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
             />
             <DetailPanel
               key={detailNodeId}
