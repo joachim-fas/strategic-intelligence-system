@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltCommandBar is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltCommandBar – AI-Eingabefeld / Command-Bar Komponente
  *

@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltAlert is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltAlert – Atmospheric Volt UI Design System
  * Benachrichtigungs-Komponente mit Volt-Textur.

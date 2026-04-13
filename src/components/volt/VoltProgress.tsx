@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltProgress is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltProgress & VoltSlider – Volt UI
  * Hauptfarben: #E4FF97 Neon Yellow + #000000 Black

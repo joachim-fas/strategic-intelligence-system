@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltCard is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltCard – Volt UI Design System v4
  * Kein box-shadow – Tiefe durch Farbe, Borders und Hintergrundtöne

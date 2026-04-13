@@ -1,28 +1,38 @@
 // Volt UI -- Component Library for SIS
 // Imported from https://github.com/joachim-fas/VoltUI
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Core Components (existing)
+// Reference Components (exact copies from VoltUI)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+export * from "./SkeuomorphicIcons";
+export * from "./VoltAlert";
+export * from "./VoltAvatar";
+export * from "./VoltBadge";
+export * from "./VoltBubbleMap";
 export * from "./VoltButton";
 export * from "./VoltCard";
-export * from "./VoltBadge";
-export * from "./VoltInput";
-export * from "./VoltAlert";
-export * from "./VoltProgress";
-export * from "./VoltToggle";
-export * from "./VoltTabs";
-export * from "./VoltModal";
-export * from "./VoltToast";
-export * from "./VoltTable";
-export * from "./VoltStat";
-export * from "./VoltNavbar";
-export * from "./VoltRankedList";
-export * from "./VoltTrendCard";
+export * from "./VoltChart";
+export * from "./VoltCodeBlock";
 export * from "./VoltCommandBar";
+export * from "./VoltCursor";
+export * from "./VoltInput";
+export * from "./VoltModal";
+export * from "./VoltNavbar";
+export * from "./VoltNodeCanvas";
+export * from "./VoltProgress";
+export * from "./VoltRadarChart";
+export * from "./VoltRankedList";
+export * from "./VoltSidebar";
+export * from "./VoltStat";
+export * from "./VoltTable";
+export * from "./VoltTabs";
+export * from "./VoltTerminal";
+export * from "./VoltToast";
+export * from "./VoltToggle";
+export * from "./VoltTrendCard";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// New Components (from VoltUI reference)
+// SIS-only Components (additional, built for SIS)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Layout & Structure
@@ -38,7 +48,6 @@ export * from "./VoltSpinner";
 
 // Navigation
 export * from "./VoltBreadcrumb";
-export * from "./VoltAvatar";
 
 // Form & Input
 export * from "./VoltField";

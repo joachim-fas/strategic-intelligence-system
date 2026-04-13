@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltTrendCard is not imported anywhere outside the barrel index (verstehen/ uses its own VoltTrendCard from VoltPrimitives). Consider deleting.
 /**
  * VoltTrendCard – Kompakte Trend-Karte
  * Zeigt: Titel (truncated), Richtungspfeil, Status-Badge, Kategorie-Label, Signale + Konfidenz

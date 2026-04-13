@@ -60,7 +60,7 @@ export function VoltTable<T extends Record<string, unknown>>({
                   key={i}
                   className={cn(
                     cellPad,
-                    "text-[11px] font-semibold font-mono text-muted-foreground",
+                    "text-xs font-bold font-body uppercase tracking-widest text-muted-foreground",
                     "section-label",
                     col.align === "center" && "text-center",
                     col.align === "right" && "text-right",

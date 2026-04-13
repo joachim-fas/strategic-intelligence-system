@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltToast is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltToast / VoltTooltip – Atmospheric Volt UI Design System
  * Benachrichtigungs- und Tooltip-Komponenten.

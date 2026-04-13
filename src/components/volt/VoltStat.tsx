@@ -1,4 +1,3 @@
-// TODO: ARC-09 – VoltStat is not imported anywhere outside the barrel index. Consider deleting.
 /**
  * VoltStat / VoltKPI – Atmospheric Volt UI Design System
  * Kennzahlen-Karten für Dashboards.
@@ -47,8 +46,8 @@ export const VoltStat: React.FC<VoltStatProps> = ({
     default:  "bg-card border border-border",
     lime:     "bg-[#E4FF97] border-transparent",   // Lime: schwarzer Text
     solid:    "bg-[#000000] border-transparent",    // Schwarz: weißer Text
-    positive: "bg-[var(--pastel-mint-light,#E8F8EF)] border border-[var(--pastel-mint-border,#7DD4A8)]",
-    negative: "bg-[var(--pastel-rose-light,#FDEEE9)] border border-[var(--pastel-rose-border,#F4A090)]",
+    positive: "bg-[#E8F8EF] border border-[#7DD4A8]",
+    negative: "bg-[#FDEEE9] border border-[#F4A090]",
     blue:     "bg-[#000000] border-transparent",
     red:      "bg-[#E8402A] border-transparent",
     gradient: "bg-[#E4FF97] border-transparent",
@@ -59,8 +58,8 @@ export const VoltStat: React.FC<VoltStatProps> = ({
     default:  "text-muted-foreground",
     lime:     "text-[#3A3A3A]",
     solid:    "text-white/70",
-    positive: "text-[var(--pastel-mint-text,#0F6038)]",
-    negative: "text-[var(--signal-negative,#A01A08)]",
+    positive: "text-[#0F6038]",
+    negative: "text-[#A01A08]",
     blue:     "text-white/70",
     red:      "text-white/70",
     gradient: "text-[#3A3A3A]",
@@ -70,8 +69,8 @@ export const VoltStat: React.FC<VoltStatProps> = ({
     default:  "text-foreground",
     lime:     "text-[#000000]",
     solid:    "text-white",
-    positive: "text-[var(--pastel-mint-text,#0F6038)]",
-    negative: "text-[var(--signal-negative,#A01A08)]",
+    positive: "text-[#0F6038]",
+    negative: "text-[#A01A08]",
     blue:     "text-white",
     red:      "text-white",
     gradient: "text-[#000000]",
@@ -92,8 +91,8 @@ export const VoltStat: React.FC<VoltStatProps> = ({
     default:  trendColor,
     lime:     isPositive ? "text-[#1A5A00]" : isNegative ? "text-[#8B1A00]" : "text-[#3A3A3A]",
     solid:    "text-white/80",
-    positive: "text-[var(--pastel-mint-text,#0F6038)]",
-    negative: "text-[var(--signal-negative,#A01A08)]",
+    positive: "text-[#0F6038]",
+    negative: "text-[#A01A08]",
     blue:     "text-white/80",
     red:      "text-white/80",
     gradient: isPositive ? "text-[#1A5A00]" : isNegative ? "text-[#8B1A00]" : "text-[#3A3A3A]",
