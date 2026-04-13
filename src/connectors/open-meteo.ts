@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * Open-Meteo Connector — Climate & weather data
@@ -37,13 +38,13 @@ export const openMeteoConnector: SourceConnector = {
       const lowMin = Math.min(...minTemps.filter((t: number) => t != null));
       const isExtreme = highMax > 35 || lowMin < -10;
 
-      signals.push({
+      const signal: RawSignal = {
         sourceType: "open_meteo",
         sourceUrl: "https://open-meteo.com/",
         sourceTitle: `Open-Meteo: Vienna 7d range ${lowMin.toFixed(1)}C to ${highMax.toFixed(1)}C`,
         signalType: isExtreme ? "spike" : "mention",
         topic: "Climate Change & Sustainability",
-        rawStrength: isExtreme ? 0.8 : 0.3,
+        rawStrength: 0, // computed below
         rawData: {
           location: "Vienna",
           dates,
@@ -53,7 +54,11 @@ export const openMeteoConnector: SourceConnector = {
           lowMin,
         },
         detectedAt: new Date(),
-      });
+      };
+      // Blend base strength with extreme weather boost
+      const baseStrength = computeSignalStrength(signal);
+      signal.rawStrength = isExtreme ? Math.min(1, baseStrength + 0.25) : baseStrength;
+      signals.push(signal);
     } catch {
       // API unavailable
     }

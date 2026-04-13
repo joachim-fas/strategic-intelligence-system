@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 const SEARCH_QUERIES = [
   { query: "large language model", topic: "LLM" },
@@ -53,16 +54,18 @@ export const arxivConnector: SourceConnector = {
           const parsedDate = new Date(published);
           const detectedAt = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
 
-          signals.push({
+          const signal: RawSignal = {
             sourceType: "arxiv",
             sourceUrl: id,
             sourceTitle: title,
             signalType: "paper",
             topic,
-            rawStrength: 0.6, // TODO: compute strength dynamically from signal data
+            rawStrength: 0, // computed below
             rawData: { query, summary },
             detectedAt,
-          });
+          };
+          signal.rawStrength = computeSignalStrength(signal);
+          signals.push(signal);
         }
 
         // Small delay to be nice to arXiv API

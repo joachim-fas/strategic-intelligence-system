@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * ILO ILOSTAT Connector — free, no API key
@@ -49,13 +50,13 @@ export const iloConnector: SourceConnector = {
         const value = Number(entry.obs_value ?? entry.value ?? 0);
         const time = entry.time || "Unknown";
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "ilo",
           sourceUrl: "https://ilostat.ilo.org/",
           sourceTitle: `ILO: Unemployment rate in ${country} — ${value.toFixed(1)}% (${time})`,
           signalType: "mention",
           topic: "Future of Work",
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             country,
             indicator: "UNE_DEAP_SEX_AGE_RT",
@@ -66,7 +67,9 @@ export const iloConnector: SourceConnector = {
             age: entry.classif1?.label || entry.classif1,
           },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

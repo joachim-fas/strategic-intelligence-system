@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 // Product Hunt doesn't have a free public API anymore,
 // but we can scrape the RSS/Atom feed for recent launches
@@ -41,16 +42,18 @@ export const producthuntConnector: SourceConnector = {
         const topic = detectTopic(title + " " + description);
         if (!topic) continue;
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "producthunt",
           sourceUrl: link,
           sourceTitle: title,
           signalType: "mention",
           topic,
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: { description },
           detectedAt: pubDate ? new Date(pubDate) : new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // Feed unavailable

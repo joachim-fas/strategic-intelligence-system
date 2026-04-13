@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * PatentsView Connector — USPTO Patent Data
@@ -47,21 +48,23 @@ export const patentsviewConnector: SourceConnector = {
           topic = "Security, Trust & Resilience";
         }
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "patentsview",
           sourceUrl: `https://patentsview.org/patent/${patent.patent_id || ""}`,
           sourceTitle: `USPTO: ${title}`,
           signalType: "paper",
           topic,
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             title,
             date: patent.patent_date,
             type: patent.patent_type,
             patentId: patent.patent_id,
           },
-          detectedAt: new Date(),
-        });
+          detectedAt: patent.patent_date ? new Date(patent.patent_date) : new Date(),
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

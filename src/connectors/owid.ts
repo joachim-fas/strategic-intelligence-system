@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * Our World in Data Connector — completely free, no API key
@@ -61,16 +62,18 @@ export const owidConnector: SourceConnector = {
         const value = parseFloat(valueStr);
         if (isNaN(value)) continue;
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "owid",
           sourceUrl: `https://ourworldindata.org/grapher/${ind.slug}`,
           sourceTitle: `OWID: ${ind.label} — ${value.toLocaleString("en-US", { maximumFractionDigits: 1 })} (${year})`,
           signalType: "mention",
           topic: ind.topic,
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: { slug: ind.slug, label: ind.label, value, year, metric: metricCol },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       } catch {
         // Timeout or parse error — skip
       }

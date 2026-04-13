@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * UN SDG Connector — Sustainable Development Goals
@@ -54,16 +55,18 @@ export const unSdgConnector: SourceConnector = {
         const title = goal.title || goal.description || `SDG ${code}`;
         const topic = SDG_TOPICS[code] || "Climate Change & Sustainability";
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "un_sdg",
           sourceUrl: `https://sdgs.un.org/goals/goal${code}`,
           sourceTitle: `UN SDG ${code}: ${title.slice(0, 120)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.4, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: { code, title, description: goal.description },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

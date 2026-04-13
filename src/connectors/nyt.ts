@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * New York Times Connector — Article Search API
@@ -50,13 +51,13 @@ export const nytConnector: SourceConnector = {
         const section = doc.section_name || "World";
         const topic = SECTION_TOPICS[section] || "Geopolitical Fragmentation";
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "nyt",
           sourceUrl: doc.web_url || "https://www.nytimes.com/",
           sourceTitle: `NYT: ${headline.slice(0, 150)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.7, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             headline,
             section,
@@ -64,8 +65,10 @@ export const nytConnector: SourceConnector = {
             publishedAt: doc.pub_date,
             byline: doc.byline?.original,
           },
-          detectedAt: new Date(),
-        });
+          detectedAt: doc.pub_date ? new Date(doc.pub_date) : new Date(),
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

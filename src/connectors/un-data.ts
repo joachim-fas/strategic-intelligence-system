@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * UN Data Connector — United Nations Population Data
@@ -32,20 +33,22 @@ export const unDataConnector: SourceConnector = {
       const keys = Object.keys(datasets).slice(0, 20);
 
       if (keys.length > 0) {
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "un_data",
           sourceUrl: "https://data.un.org/",
           sourceTitle: `UN Data: Population statistics — ${keys.length} observations`,
           signalType: "mention",
           topic: "Demographic Shifts & Aging",
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             observationCount: keys.length,
             period: "2023+",
             indicator: "SP_POP_TOTL",
           },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable
