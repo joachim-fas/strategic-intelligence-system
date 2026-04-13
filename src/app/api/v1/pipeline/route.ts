@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
+import { emitActivity } from "@/lib/activity-bus";
 
 // Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
 ensureEnvLoaded();
@@ -66,6 +67,8 @@ export async function POST() {
     const errors: string[] = [];
     const activeSources: string[] = [];
 
+    emitActivity({ type: "pipeline", phase: "start", message: `Pipeline gestartet — ${connectors.length} Konnektoren`, meta: { connectors: connectors.length } });
+
     const results = await Promise.allSettled(
       connectors.map(async (connector) => {
         try {
@@ -86,6 +89,12 @@ export async function POST() {
       }
     }
 
+    emitActivity({
+      type: "pipeline", phase: "fetch",
+      message: `${allSignals.length} Signale von ${activeSources.length} Quellen geladen${errors.length > 0 ? `, ${errors.length} Fehler` : ""}`,
+      meta: { signals: allSignals.length, sources: activeSources.length, errors: errors.length },
+    });
+
     const liveTrends = processSignals(allSignals);
     const trends = mergeTrends(megaTrends, liveTrends);
     const duration = Date.now() - start;
@@ -98,6 +107,12 @@ export async function POST() {
       errors,
       duration,
     };
+
+    emitActivity({
+      type: "pipeline", phase: "complete",
+      message: `Pipeline fertig in ${duration}ms — ${allSignals.length} Signale, ${trends.length} Trends`,
+      meta: { duration, signals: allSignals.length, trends: trends.length, errors: errors.length },
+    });
 
     return NextResponse.json({
       success: true,

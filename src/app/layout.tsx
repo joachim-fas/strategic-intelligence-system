@@ -3,6 +3,7 @@ import { Space_Grotesk, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/locale-context";
 import SignalTicker from "@/components/SignalTicker";
+import { ActivityPanel } from "@/components/ActivityPanel";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -51,6 +52,7 @@ export default function RootLayout({
         <LocaleProvider>
           {children}
           <SignalTicker />
+          <ActivityPanel />
         </LocaleProvider>
       </body>
     </html>

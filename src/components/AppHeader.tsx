@@ -135,6 +135,15 @@ export function AppHeader() {
 
         {/* Right side actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {/* Activity Monitor toggle (Ctrl+M) */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("sis-toggle-activity-panel"))}
+            aria-label={de ? "Activity Monitor öffnen" : "Open Activity Monitor"}
+            title={de ? "Activity Monitor (Ctrl+M)" : "Activity Monitor (Ctrl+M)"}
+            style={{ fontSize: 14, padding: "2px 8px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
+            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
+          >{"\u25CE"}</button>
           <button onClick={toggleDark}
             aria-label={darkMode ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
             title={darkMode ? "Light Mode" : "Dark Mode"}

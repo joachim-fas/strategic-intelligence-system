@@ -70,6 +70,7 @@ function sanitizeQuery(raw: string): string | null {
 
 // M2-FIX: Use canonical resolveEnv from env.ts instead of duplicated copy
 import { resolveEnv } from "@/lib/env";
+import { emitActivity } from "@/lib/activity-bus";
 
 function loadTrendsFromDB(): TrendDot[] {
   try {
@@ -302,8 +303,13 @@ export async function POST(req: Request) {
   // SEC-09: Validate locale — only "de" and "en" are accepted
   const validLocale = locale === "en" ? "en" : "de";
 
+  emitActivity({ type: "query", phase: "start", message: `Abfrage: "${query.slice(0, 80)}${query.length > 80 ? "…" : ""}"`, meta: { queryLength: query.length, locale: validLocale } });
+
   const relevantSignals = getRelevantSignals(query, 12);
   const liveSignalsContext = formatSignalsForPrompt(relevantSignals);
+  const uniqueSources = new Set(relevantSignals.map((s: any) => s.source)).size;
+
+  emitActivity({ type: "query", phase: "signals", message: `${relevantSignals.length} Signale aus ${uniqueSources} Quellen geladen`, meta: { signals: relevantSignals.length, sources: uniqueSources } });
 
   const systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined);
 
@@ -352,6 +358,8 @@ export async function POST(req: Request) {
         } else {
           messages = [{ role: "user", content: userMessage }];
         }
+
+        emitActivity({ type: "query", phase: "llm-call", message: "Claude API-Aufruf gestartet…" });
 
         const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -464,14 +472,20 @@ export async function POST(req: Request) {
           }
 
           // VAL-03: Compute evidence-based blended confidence score
-          const uniqueSources = new Set(relevantSignals.map((s: any) => s.source)).size;
+          const uniqueSourcesVal = new Set(relevantSignals.map((s: any) => s.source)).size;
           validated.confidence = computeBlendedConfidence(
             validated.confidence,
             validated.matchedTrendIds.length,
             relevantSignals.length,
-            uniqueSources,
+            uniqueSourcesVal,
             validated.references.length > 0
           );
+
+          emitActivity({
+            type: "query", phase: "validation",
+            message: `Validierung: ${warnings.length} Hinweise, Konfidenz ${(validated.confidence * 100).toFixed(0)}%`,
+            meta: { warnings: warnings.length, confidence: validated.confidence, matchedTrends: validated.matchedTrendIds.length },
+          });
 
           // Data quality warnings
           const qualityWarnings: string[] = [];
@@ -534,8 +548,14 @@ export async function POST(req: Request) {
             ...(warnings.length > 0 ? { _validationWarnings: warnings } : {}),
           };
           send({ type: "complete", result: finalResult });
+          emitActivity({
+            type: "query", phase: "complete",
+            message: `Abfrage abgeschlossen — ${(validated.confidence * 100).toFixed(0)}% Konfidenz, ${matchedTrends.length} Trends`,
+            meta: { confidence: validated.confidence, trends: matchedTrends.length, signals: relevantSignals.length, repaired: wasRepaired },
+          });
         } catch (parseErr) {
           console.error("[query] Post-processing error:", parseErr);
+          emitActivity({ type: "query", phase: "error", message: "Post-Processing fehlgeschlagen" });
           send({ type: "error", error: "Ergebnis konnte nicht verarbeitet werden. Bitte erneut versuchen." });
         }
 
@@ -544,6 +564,7 @@ export async function POST(req: Request) {
         // SECURITY: Log full error server-side, send generic message to client.
         // String(err) may contain API keys, file paths, or stack traces.
         console.error("[query] Stream processing error:", err);
+        emitActivity({ type: "query", phase: "error", message: "Stream-Fehler aufgetreten" });
         send({ type: "error", error: "An unexpected error occurred. Please try again." });
         controller.close();
       }
