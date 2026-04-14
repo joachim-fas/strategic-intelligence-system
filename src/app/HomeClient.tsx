@@ -1037,43 +1037,133 @@ export default function HomeClient() {
             </div>
             <div className="sis-framework-grid">
               {([
-                { icon: "/icons/methoden/marktanalyse/marktanalyse-layout-grid.svg", type: locale === "de" ? "Analyse" : "Analysis", label: locale === "de" ? "Marktanalyse" : "Market Analysis", desc: locale === "de" ? "Marktposition · Wettbewerbsdynamik" : "Market position · Competitive dynamics", templateId: "market-analysis", p: { card: "#EEF5FF", icon: "#D4E8FF", border: "#C0D8F4", type: "#1A4A8A" } },
-                { icon: "/icons/methoden/war-gaming/war-gaming-swords.svg", type: locale === "de" ? "Strategie" : "Strategy", label: "War-Gaming", desc: locale === "de" ? "Gegnermodelle · Strategische Reaktion" : "Opponent models · Strategic response", templateId: "war-gaming", p: { card: "#FFF0F4", icon: "#FFD6E0", border: "#F4B8C8", type: "#A0244A" } },
-                { icon: "/icons/methoden/pre-mortem/pre-mortem-triangle-alert.svg", type: locale === "de" ? "Früherkennung" : "Prevention", label: "Pre-Mortem", desc: locale === "de" ? "Risiken · Proaktive Risikoanalyse" : "Risks · Proactive failure analysis", templateId: "pre-mortem", p: { card: "#FFF8F0", icon: "#FFECD2", border: "#F0D4A8", type: "#955A20" } },
-                { icon: "/icons/methoden/post-mortem/post-mortem-search.svg", type: locale === "de" ? "Retrospektive" : "Retrospective", label: "Post-Mortem", desc: locale === "de" ? "Ursachen · Systematische Lernschleifen" : "Root causes · Systematic learning", templateId: "post-mortem", p: { card: "#EEFAF4", icon: "#C3F4D3", border: "#90DCA8", type: "#0F6038" } },
-                { icon: "/icons/methoden/trend-deep-dive/trend-deep-dive-microscope.svg", type: locale === "de" ? "Intelligence" : "Intelligence", label: "Trend Deep-Dive", desc: locale === "de" ? "Treiber · Systemische Trendanalyse" : "Drivers · Systemic trend analysis", templateId: "trend-deep-dive", p: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", type: "#7C1A9E" } },
-                { icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg", type: locale === "de" ? "Mapping" : "Mapping", label: "Stakeholder", desc: locale === "de" ? "Akteure · Koalitionen · Dynamiken" : "Actors · Coalitions · Power dynamics", templateId: "stakeholder-mapping", p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00" } },
-              ] as { icon: string; type: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string } }[]).map(t => (
+                {
+                  icon: "/icons/methoden/marktanalyse/marktanalyse-layout-grid.svg",
+                  type: locale === "de" ? "Analyse" : "Analysis",
+                  label: locale === "de" ? "Marktanalyse" : "Market Analysis",
+                  desc: locale === "de" ? "Marktposition · Wettbewerbsdynamik" : "Market position · Competitive dynamics",
+                  tip: locale === "de"
+                    ? "Systematische SWOT+PESTEL-Analyse zu Marktposition und Wettbewerbsdynamik. Verbindet interne Stärken/Schwächen mit externen Chancen/Risiken."
+                    : "Systematic SWOT+PESTEL analysis on market position and competitive dynamics. Connects internal strengths/weaknesses with external opportunities/risks.",
+                  flow: locale === "de"
+                    ? "Kontext → Intern → Extern → Optionen → Priorisierung"
+                    : "Context → Internal → External → Options → Prioritization",
+                  templateId: "market-analysis",
+                  p: { card: "#EEF5FF", icon: "#D4E8FF", border: "#C0D8F4", type: "#1A4A8A" },
+                },
+                {
+                  icon: "/icons/methoden/war-gaming/war-gaming-swords.svg",
+                  type: locale === "de" ? "Strategie" : "Strategy",
+                  label: "War-Gaming",
+                  desc: locale === "de" ? "Gegnermodelle · Strategische Reaktion" : "Opponent models · Strategic response",
+                  tip: locale === "de"
+                    ? "Szenario-basierte Strategieplanung (RAND, Shell). Prämisse: Die Zukunft ist nicht vorhersagbar — entwickelt robuste Strategien für mehrere mögliche Zukünfte."
+                    : "Scenario-based strategy (RAND, Shell). Premise: the future isn't predictable — build strategies robust across multiple futures.",
+                  flow: locale === "de" ? "Driving Forces → 3 Szenarien → Robuste Strategie" : "Driving Forces → 3 Scenarios → Robust Strategy",
+                  templateId: "war-gaming",
+                  p: { card: "#FFF0F4", icon: "#FFD6E0", border: "#F4B8C8", type: "#A0244A" },
+                },
+                {
+                  icon: "/icons/methoden/pre-mortem/pre-mortem-triangle-alert.svg",
+                  type: locale === "de" ? "Früherkennung" : "Prevention",
+                  label: "Pre-Mortem",
+                  desc: locale === "de" ? "Risiken · Proaktive Risikoanalyse" : "Risks · Proactive failure analysis",
+                  tip: locale === "de"
+                    ? "Prospective Hindsight (Gary Klein, 1989). Teams identifizieren nachweislich 30% mehr Risiken, wenn sie sich das Scheitern als bereits eingetreten vorstellen."
+                    : "Prospective hindsight (Gary Klein, 1989). Teams identify ~30% more risks when imagining failure as already occurred.",
+                  flow: locale === "de"
+                    ? "Scheitern vorstellen → Risiken bewerten → Gegenmaßnahmen"
+                    : "Imagine failure → Assess risks → Countermeasures",
+                  templateId: "pre-mortem",
+                  p: { card: "#FFF8F0", icon: "#FFECD2", border: "#F0D4A8", type: "#955A20" },
+                },
+                {
+                  icon: "/icons/methoden/post-mortem/post-mortem-search.svg",
+                  type: locale === "de" ? "Retrospektive" : "Retrospective",
+                  label: "Post-Mortem",
+                  desc: locale === "de" ? "Ursachen · Systematische Lernschleifen" : "Root causes · Systematic learning",
+                  tip: locale === "de"
+                    ? "Ursachenanalyse mit 5-Whys (Toyota) und Ishikawa-Diagramm. Trennt strukturelle, konjunkturelle und situative Ursachen statt sie zu verwechseln."
+                    : "Root cause analysis with 5-Whys (Toyota) and Ishikawa. Separates structural, cyclical and situational causes rather than conflating them.",
+                  flow: locale === "de"
+                    ? "Chronologie → 3-Ebenen-Ursachen → Lessons Learned"
+                    : "Timeline → 3-layer causes → Lessons learned",
+                  templateId: "post-mortem",
+                  p: { card: "#EEFAF4", icon: "#C3F4D3", border: "#90DCA8", type: "#0F6038" },
+                },
+                {
+                  icon: "/icons/methoden/trend-deep-dive/trend-deep-dive-microscope.svg",
+                  type: locale === "de" ? "Intelligence" : "Intelligence",
+                  label: "Trend Deep-Dive",
+                  desc: locale === "de" ? "Treiber · Systemische Trendanalyse" : "Drivers · Systemic trend analysis",
+                  tip: locale === "de"
+                    ? "STEEP+V-Framework angewendet auf einen einzelnen Trend. Referenz: EU JRC 14 Megatrends der Europäischen Kommission."
+                    : "STEEP+V framework applied to a single trend. Reference: EU JRC 14 Megatrends of the European Commission.",
+                  flow: locale === "de"
+                    ? "Definition → Evidenz → Treiber → Impact → Handlung"
+                    : "Definition → Evidence → Drivers → Impact → Action",
+                  templateId: "trend-deep-dive",
+                  p: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", type: "#7C1A9E" },
+                },
+                {
+                  icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+                  type: locale === "de" ? "Mapping" : "Mapping",
+                  label: "Stakeholder",
+                  desc: locale === "de" ? "Akteure · Koalitionen · Dynamiken" : "Actors · Coalitions · Power dynamics",
+                  tip: locale === "de"
+                    ? "Mitchell Salience Model (1997): Power × Legitimacy × Urgency, kombiniert mit Interest/Influence-Matrix. Zeigt, wer Entscheidungen wirklich bewegt."
+                    : "Mitchell Salience Model (1997): Power × Legitimacy × Urgency, combined with Interest/Influence matrix. Reveals who actually moves decisions.",
+                  flow: locale === "de"
+                    ? "Identifizieren → Bewerten → Dynamiken → Engagement"
+                    : "Identify → Assess → Dynamics → Engagement",
+                  templateId: "stakeholder-mapping",
+                  p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00" },
+                },
+              ] as { icon: string; type: string; label: string; desc: string; tip: string; flow: string; templateId: string; p: { card: string; icon: string; border: string; type: string } }[]).map(t => (
                 <Tooltip
                   key={t.templateId}
                   placement="top"
+                  maxWidth={320}
                   content={
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", marginBottom: 3 }}>{t.type}</div>
-                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>{t.desc}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: t.p.type, marginBottom: 4 }}>
+                        {t.type} · {t.label}
+                      </div>
+                      <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 6 }}>{t.tip}</div>
+                      <div style={{ fontSize: 11, lineHeight: 1.4, color: "rgba(255,255,255,0.65)", fontFamily: "var(--volt-font-mono, monospace)" }}>
+                        {t.flow}
+                      </div>
                     </div>
                   }
                 >
-                  <GrainCard
-                    variant="elevated"
-                    withGrain
+                  <div
                     role="button"
                     tabIndex={0}
                     aria-label={`${t.label} — ${t.desc}`}
                     onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
                     onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
-                    className="cursor-pointer"
-                    style={{ background: t.p.card, borderColor: t.p.border }}
+                    className="sis-framework-btn cursor-pointer"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: 0, background: "transparent", border: "none",
+                      borderRadius: 8, outline: "none",
+                      transition: "transform 140ms ease, opacity 140ms ease",
+                    }}
                   >
-                    <div style={{ padding: "12px 14px", display: "flex", gap: 10, alignItems: "center" }}>
-                      <span style={{ width: 32, height: 32, borderRadius: 8, background: t.p.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
-                      </span>
-                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 13, color: "#0A0A0A", lineHeight: 1.2 }}>
-                        {t.label}
-                      </div>
+                    <span
+                      style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        background: t.p.icon,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.85 }} />
+                    </span>
+                    <div className="font-display font-bold tracking-tight" style={{ fontSize: 13, color: "var(--volt-text, #0A0A0A)", lineHeight: 1 }}>
+                      {t.label}
                     </div>
-                  </GrainCard>
+                  </div>
                 </Tooltip>
               ))}
             </div>
