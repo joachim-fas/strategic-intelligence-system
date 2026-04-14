@@ -26,7 +26,7 @@ import { BOARD_COLUMNS, NODE_COLORS, EDGE_STYLE } from "@/lib/colors";
 import { AppHeader } from "@/components/AppHeader";
 import { WorkflowPanel, type WorkflowState, type WorkflowStep } from "@/components/canvas/WorkflowPanel";
 import { OrbitGraphView } from "./OrbitGraphView";
-import { OrbitEvidenzView, type EvCanvasNode } from "./OrbitEvidenzView";
+import { OrbitDerivationView, type DerivCanvasNode } from "./OrbitDerivationView";
 import { VoltIconBox } from "@/components/verstehen/VoltPrimitives";
 import {
   VoltDropdownMenu,
@@ -4850,7 +4850,7 @@ export default function CanvasPage() {
   const [zoom, setZoom] = useState(1);
   const { locale } = useLocale();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [orbitSubMode, setOrbitSubMode] = useState<"netzwerk" | "evidenz">("netzwerk");
+  const [orbitSubMode, setOrbitSubMode] = useState<"ableitung" | "netzwerk">("ableitung");
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [cmdVisible, setCmdVisible] = useState(false);
@@ -8299,8 +8299,8 @@ export default function CanvasPage() {
           </div>
         )}
 
-        {/* ── Orbit view (Netzwerk / Evidenz sub-modes) ────────── */}
-        {/* Sub-mode toggle (absolute, renders above OrbitGraphView / OrbitEvidenzView) */}
+        {/* ── Orbit view (Ableitung / Netzwerk sub-modes) ────────── */}
+        {/* Sub-mode toggle (absolute, renders above OrbitDerivationView / OrbitGraphView) */}
         {viewMode === "orbit" && (
           <div style={{
             position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
@@ -8308,12 +8308,16 @@ export default function CanvasPage() {
             background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
             borderRadius: 8, border: "1px solid var(--color-border)",
           }}>
-            {(["netzwerk", "evidenz"] as const).map(mode => {
+            {(["ableitung", "netzwerk"] as const).map(mode => {
               const isAct = orbitSubMode === mode;
+              const Icon = mode === "ableitung" ? GitBranch : Hexagon;
+              const label = mode === "ableitung"
+                ? (de ? "Ableitung" : "Derivation")
+                : (de ? "Netzwerk" : "Network");
               return (
                 <button key={mode} onClick={() => setOrbitSubMode(mode)}
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 5,
+                    display: "inline-flex", alignItems: "center", gap: 6,
                     fontSize: 11, padding: "5px 13px", borderRadius: 6, border: "none",
                     background: isAct ? "var(--card, #fff)" : "transparent",
                     color: isAct ? "var(--foreground, #0A0A0A)" : "var(--muted-foreground, #6B6B6B)",
@@ -8323,9 +8327,8 @@ export default function CanvasPage() {
                     cursor: "pointer", transition: "all 0.12s",
                   }}
                 >
-                  {mode === "netzwerk"
-                    ? `\u2B21 ${de ? "Netzwerk" : "Network"}`
-                    : `\u25C9 ${de ? "Evidenz" : "Evidence"}`}
+                  <Icon size={12} strokeWidth={1.8} />
+                  {label}
                 </button>
               );
             })}
@@ -8368,9 +8371,9 @@ export default function CanvasPage() {
             />
           );
         })()}
-        {viewMode === "orbit" && orbitSubMode === "evidenz" && (
-          <OrbitEvidenzView
-            nodes={nodes as unknown as EvCanvasNode[]}
+        {viewMode === "orbit" && orbitSubMode === "ableitung" && (
+          <OrbitDerivationView
+            nodes={nodes as unknown as DerivCanvasNode[]}
             selectedNodeId={selectedId}
             de={de}
             onNavigateToNode={(nodeId) => {
