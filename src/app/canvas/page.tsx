@@ -50,12 +50,23 @@ import type {
 // ── Node Status ────────────────────────────────────────────────────────────
 
 type NodeStatus = "open" | "active" | "decided" | "pinned";
-const NODE_STATUS_META: Record<NodeStatus, { icon: string; color: string; label: string }> = {
-  open:    { icon: "⬜", color: "var(--color-text-muted)", label: "Offen" },
-  active:  { icon: "🔵", color: "#2563EB", label: "Aktiv" },
-  decided: { icon: "✅", color: "#1A9E5A", label: "Entschieden" },
-  pinned:  { icon: "⭐", color: "#F5A623", label: "Gepinnt" },
+const NODE_STATUS_META: Record<NodeStatus, { color: string; label: string }> = {
+  open:    { color: "var(--color-text-muted)", label: "Offen" },
+  active:  { color: "#2563EB", label: "Aktiv" },
+  decided: { color: "#1A9E5A", label: "Entschieden" },
+  pinned:  { color: "#F5A623", label: "Gepinnt" },
 };
+
+function StatusIcon({ status, size = 12 }: { status: NodeStatus; size?: number }) {
+  const color = NODE_STATUS_META[status].color;
+  const s: React.CSSProperties = { color, flexShrink: 0 };
+  switch (status) {
+    case "open":    return <Circle size={size} style={s} />;
+    case "active":  return <Zap size={size} style={s} />;
+    case "decided": return <CheckCircle2 size={size} style={s} />;
+    case "pinned":  return <Pin size={size} style={s} />;
+  }
+}
 
 // ── Layer types ────────────────────────────────────────────────────────────
 
@@ -1769,10 +1780,7 @@ function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag
         <VoltDropdownMenuLabel>{de ? "Status" : "Status"}</VoltDropdownMenuLabel>
         {(["open", "active", "decided", "pinned"] as NodeStatus[]).map(s => (
           <VoltDropdownMenuItem key={s} onClick={() => onSetStatus(nodeId, s)}>
-            {s === "open" && <Circle size={14} />}
-            {s === "active" && <Zap size={14} />}
-            {s === "decided" && <CheckCircle2 size={14} />}
-            {s === "pinned" && <Pin size={14} />}
+            <StatusIcon status={s} size={14} />
             <span style={{ flex: 1 }}>{NODE_STATUS_META[s].label}</span>
             {currentStatus === s && <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>●</span>}
           </VoltDropdownMenuItem>
@@ -4238,7 +4246,7 @@ function DetailPanel({
                 fontWeight: current === s ? 700 : 400,
                 transition: "all 0.1s",
               }}
-            >{meta.icon} {meta.label}</button>
+            ><StatusIcon status={s} size={11} /> {meta.label}</button>
           </Tooltip>
         );
       })}
@@ -7952,8 +7960,8 @@ export default function CanvasPage() {
                         <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 9, color: "var(--color-text-muted)" }}>
                           <span>{formatNodeTime(n.createdAt)}</span>
                           {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
-                            <span style={{ color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color, fontWeight: 600 }}>
-                              {NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon} {NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.label}
+                            <span style={{ color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                              <StatusIcon status={(n as any).nodeStatus as NodeStatus} size={9} /> {NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.label}
                             </span>
                           )}
                         </div>
@@ -7999,7 +8007,7 @@ export default function CanvasPage() {
                         </span>
                       )}
                       {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
-                        <span style={{ fontSize: 8, color: NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.color }}>{NODE_STATUS_META[(n as any).nodeStatus as NodeStatus]?.icon}</span>
+                        <StatusIcon status={(n as any).nodeStatus as NodeStatus} size={10} />
                       )}
                       <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{formatNodeTime(n.createdAt)}</span>
                     </div>
