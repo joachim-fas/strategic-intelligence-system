@@ -1,10 +1,5 @@
 "use client";
 
-// TODO: UX-14 — Technical error messages shown to users (SQLITE_CONSTRAINT, TypeError...).
-// FIX: Map error codes to user-friendly German messages with actionable guidance.
-
-// TODO: UX-16 — Color contrast issues: pastel badges, light gray text fail WCAG AA (4.5:1).
-// FIX: Run contrast audit, darken light text, increase badge text contrast.
 
 import { useRef, useEffect, useCallback, useState, useMemo, type ChangeEvent } from "react";
 import { select } from "d3-selection";
@@ -72,7 +67,7 @@ const RING_FILTER_LABELS: Record<RingFilter, { de: string; en: string; color: st
   adopt:  { de: "Adopt",  en: "Adopt",  color: "#1A9E5A" },
   trial:  { de: "Trial",  en: "Trial",  color: "#7AB8F5" },
   assess: { de: "Assess", en: "Assess", color: "#F5C87A" },
-  hold:   { de: "Hold",   en: "Hold",   color: "#A8A8A8" },
+  hold:   { de: "Hold",   en: "Hold",   color: "#737373" },
 };
 
 // Live signal payload shape — same structure /api/v1/feed returns.
@@ -290,7 +285,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         .attr("text-anchor", "middle")
         .attr("font-family", "var(--volt-font-mono, 'JetBrains Mono', monospace)")
         .attr("font-size", 11)
-        .attr("fill", "var(--volt-text-faint, #999)")
+        .attr("fill", "var(--volt-text-faint, #737373)")
         .text(locale === "de" ? "Keine Treffer für diesen Filter" : "No matches for this filter");
       return;
     }
@@ -651,7 +646,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         <span style={{
           fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
           fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const,
-          color: "var(--volt-text-faint, #999)",
+          color: "var(--volt-text-faint, #737373)",
           marginRight: 6,
         }}>
           {locale === "de" ? "Ring" : "Ring"}
@@ -716,7 +711,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         <span style={{
           fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
           fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const,
-          color: "var(--volt-text-faint, #999)",
+          color: "var(--volt-text-faint, #737373)",
           marginRight: 6,
         }}>
           {locale === "de" ? "Kanten" : "Edges"}
@@ -811,7 +806,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
           />
         )}
         <span style={{ width: 1, height: 14, background: "var(--volt-border, #E8E8E8)" }} />
-        <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--volt-text-faint, #999)" }}>
+        <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const, color: "var(--volt-text-faint, #737373)" }}>
           {locale === "de" ? "Top Hubs" : "Top Hubs"}
         </span>
         {stats.topHubs.map((h, i) => (
@@ -845,7 +840,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         marginBottom: 10,
         fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
         fontSize: 10,
-        color: "var(--volt-text-faint, #AAA)",
+        color: "var(--volt-text-faint, #737373)",
       }}>
         <span>
           {locale === "de"
@@ -899,7 +894,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
           {hoveredEdge.description && (
             <span className="ml-2" style={{ color: "var(--volt-text-muted, #6B6B6B)" }}>{hoveredEdge.description}</span>
           )}
-          <span className="ml-2" style={{ color: "var(--volt-text-faint, #9B9B9B)" }}>({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
+          <span className="ml-2" style={{ color: "var(--volt-text-faint, #737373)" }}>({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
         </div>
       )}
 
@@ -917,7 +912,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         marginTop: 10,
         fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
         fontSize: 9,
-        color: "var(--volt-text-faint, #AAA)",
+        color: "var(--volt-text-faint, #737373)",
       }}>
         <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
           {locale === "de" ? "Knoten" : "Nodes"}
@@ -982,7 +977,7 @@ function StatChip({ label, value, highlight }: { label: string; value: number | 
       <span style={{ fontWeight: 700, color, fontSize: 11 }}>{value}</span>
       <span style={{
         fontSize: 8, textTransform: "uppercase" as const, letterSpacing: "0.1em",
-        color: "var(--volt-text-faint, #999)",
+        color: "var(--volt-text-faint, #737373)",
       }}>
         {label}
       </span>

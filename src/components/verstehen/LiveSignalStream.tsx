@@ -1,7 +1,5 @@
 "use client";
 
-// TODO: UX-14 — Technical error messages shown to users (SQLITE_CONSTRAINT, TypeError...).
-// FIX: Map error codes to user-friendly German messages with actionable guidance.
 
 /**
  * LiveSignalStream — Raw signal feed for the Knowledge Cockpit "Signale" tab.
@@ -142,7 +140,10 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         setError(null);
       })
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : String(e));
+        console.error("LiveSignalStream fetch failed:", e);
+        setError(de
+          ? "Signale konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+          : "Failed to load signals. Please try again.");
       })
       .finally(() => setLoading(false));
   };
@@ -302,7 +303,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
           fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: "var(--volt-text-faint, #999)",
+          color: "var(--volt-text-faint, #737373)",
           display: "inline-flex", alignItems: "center", gap: 8,
         }}>
           <span style={{
@@ -320,17 +321,17 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           {loading
             ? (de ? "Lade Signale…" : "Loading signals…")
             : error
-              ? (de ? `Fehler: ${error}` : `Error: ${error}`)
+              ? error
               : (
                 <>
                   <strong>{displaySignals.length}</strong>{" "}
                   {de ? "Signale" : "signals"}
                   {displaySignals.length !== signals.length && (
-                    <span style={{ color: "var(--volt-text-faint, #AAA)" }}>
+                    <span style={{ color: "var(--volt-text-faint, #737373)" }}>
                       {" "}({de ? `von ${signals.length}` : `of ${signals.length}`})
                     </span>
                   )}
-                  <span style={{ color: "var(--volt-text-faint, #AAA)", marginLeft: 8 }}>
+                  <span style={{ color: "var(--volt-text-faint, #737373)", marginLeft: 8 }}>
                     · {de ? "aktualisiert alle 2 Min" : "refreshes every 2 min"}
                   </span>
                 </>
@@ -491,7 +492,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
             </button>
           )}
           {timeWindow === "168" && signals.length === 0 && (
-            <span style={{ fontSize: 11, color: "var(--volt-text-faint, #AAA)" }}>
+            <span style={{ fontSize: 11, color: "var(--volt-text-faint, #737373)" }}>
               {de
                 ? "Es wurden noch keine Konnektoren ausgeführt. Starte einen Connector-Lauf, um Live-Signale zu sehen."
                 : "No connectors have been run yet. Start a connector run to see live signals."}
@@ -865,7 +866,7 @@ function SignalCard({
             style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
               fontSize: 10,
-              color: "var(--volt-text-faint, #A8A8A8)",
+              color: "var(--volt-text-faint, #737373)",
               marginLeft: "auto",
               whiteSpace: "nowrap",
             }}
@@ -915,7 +916,7 @@ function SignalCard({
               borderRadius: 999,
               border: `1px solid ${topicHasTrend ? "rgba(228,255,151,0.7)" : "var(--volt-border, #E8E8E8)"}`,
               background: topicHasTrend ? "rgba(228,255,151,0.3)" : "var(--volt-surface, #FAFAFA)",
-              color: topicHasTrend ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #AAA)",
+              color: topicHasTrend ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #737373)",
               cursor: topicHasTrend ? "pointer" : "default",
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
               transition: "all 120ms ease",

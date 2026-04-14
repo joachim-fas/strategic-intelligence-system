@@ -1,7 +1,5 @@
 "use client";
 
-// TODO: UX-16 — Color contrast issues: pastel badges, light gray text fail WCAG AA (4.5:1).
-// FIX: Run contrast audit, darken light text, increase badge text contrast.
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -45,11 +43,11 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
           {/* Breadcrumb */}
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
             <Link href="/" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>SIS</Link>
-            <span style={{ opacity: 0.4 }}>/</span>
+            <span style={{ opacity: 0.55 }}>/</span>
             <Link href="/frameworks" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>
               {de ? "Frameworks" : "Frameworks"}
             </Link>
-            <span style={{ opacity: 0.4 }}>/</span>
+            <span style={{ opacity: 0.55 }}>/</span>
             <span style={{ color: meta.color.accent, fontWeight: 600 }}>{name}</span>
           </div>
 
