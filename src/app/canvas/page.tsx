@@ -259,10 +259,9 @@ function estimateCardHeight(
   if (type === "causalgraph") return CAUSAL_GRAPH_CARD_H;
   const CHARS_PER_LINE = 32;
   const LINE_H   = 20;
-  const MAX_LINES = 6;
-
-  const contentLines = Math.min(MAX_LINES, Math.max(1, Math.ceil(content.length / CHARS_PER_LINE)));
-  const labelLines   = label ? Math.min(2, Math.ceil(label.length / CHARS_PER_LINE)) : 0;
+  // Cards render all content without truncation via FormattedText — no cap on lines
+  const contentLines = Math.max(1, Math.ceil(content.length / CHARS_PER_LINE));
+  const labelLines   = label ? Math.min(3, Math.ceil(label.length / CHARS_PER_LINE)) : 0;
 
   const HEADER    = 44;
   const FOOTER    = 44;
@@ -271,14 +270,17 @@ function estimateCardHeight(
   const TIMESTAMP = 18;
   const BUFFER    = 28;
 
+  let h: number;
   if (type === "scenario") {
-    return HEADER + PAD + 42 + labelLines * LINE_H + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
-  }
-  if (type === "decision") {
+    h = HEADER + PAD + 42 + labelLines * LINE_H + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
+  } else if (type === "decision") {
     // Decision cards contain multi-step frameworks — add ~20% extra height vs insight
-    return Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
+    h = Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
+  } else {
+    h = HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
   }
-  return HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
+  // Cards render with minimum height = DERIVED_W; never estimate less than that
+  return Math.max(DERIVED_W, h);
 }
 
 // ── Universal node dimension helpers (used by layout algorithms) ───────────
@@ -1962,7 +1964,7 @@ function DerivedNodeCard({
   const typeColorHex = isScenario
     ? (node.colorKey === "optimistic" ? "#1A9E5A" : node.colorKey === "pessimistic" ? "#E8402A" : node.colorKey === "wildcard" ? "#D4A017" : "#3B82F6")
     : type === "insight" ? "#6B7A00" : type === "decision" ? "#1A9E5A" : "#6B7280";
-  const cardH = node.customHeight ?? DERIVED_W;
+  const cardH = node.customHeight ?? getNodeHeight(node as CanvasNode);
 
   return (
     // Wrapper: positioning + ports (overflow:visible)
@@ -2031,7 +2033,7 @@ function DerivedNodeCard({
           <FormattedText
             text={isFollowup ? `→ ${node.content}` : node.content}
             fontSize={12} lineHeight={1.6} compact
-            maxLines={Math.max(4, Math.floor(((node.customHeight ?? DERIVED_W) - 80) / 19))}
+            maxLines={Math.max(4, Math.floor((cardH - 80) / 19))}
           />
           {/* Driver pills (scenario only, max 2) */}
           {isScenario && node.keyDrivers && node.keyDrivers.length > 0 && (
