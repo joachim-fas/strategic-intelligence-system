@@ -6581,6 +6581,8 @@ export default function CanvasPage() {
                 <>
                   <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
                   <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
+                    {/* ── Layout modes ── */}
+                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{de ? "Anordnen" : "Layout"}</div>
                     {([
                       { mode: "tree" as SortMode, icon: <TreePine className="w-3.5 h-3.5" />, label: de ? "Baum (Standard)" : "Tree (Default)" },
                       { mode: "time" as SortMode, icon: <Clock className="w-3.5 h-3.5" />, label: de ? "Zeitlich" : "By Time" },
@@ -6597,6 +6599,90 @@ export default function CanvasPage() {
                         <span>{item.label}</span>
                       </button>
                     ))}
+
+                    {/* ── Gruppen-Sektion ── */}
+                    <div style={{ height: 1, background: "var(--color-border)", margin: "6px 0" }} />
+                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{de ? "Gruppen" : "Groups"}</div>
+
+                    {/* Hinweis auf Multi-Select */}
+                    {multiSelectedIds.size < 2 && (
+                      <div style={{ padding: "4px 14px 6px", fontSize: 10, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+                        {de ? `⇧ Shift + Klick auf 2+ Karten, dann „Gruppieren"` : `⇧ Shift + click 2+ cards, then "Group"`}
+                      </div>
+                    )}
+
+                    {/* Gruppieren-Button wenn Multi-Select aktiv */}
+                    {multiSelectedIds.size >= 2 && (
+                      <button
+                        onClick={() => {
+                          const ids = [...multiSelectedIds];
+                          const gNodes = nodes.filter(n => ids.includes(n.id));
+                          if (gNodes.length < 2) return;
+                          const xs = gNodes.map(n => n.x);
+                          const ys = gNodes.map(n => n.y);
+                          const PAD = 40;
+                          const colors = ["#2563EB", "#8B5CF6", "#F97316", "#1A9E5A", "#0369A1", "#D4A017"];
+                          const newGroup: CanvasGroup = {
+                            id: `ug-${Date.now()}`,
+                            nodeIds: ids,
+                            label: de ? "Neue Gruppe" : "New Group",
+                            color: colors[userGroups.length % colors.length],
+                            bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...gNodes.map(n => n.x + getNodeWidth(n))) - Math.min(...xs) + PAD * 2, h: Math.max(...gNodes.map(n => n.y + getNodeHeight(n))) - Math.min(...ys) + PAD * 2 },
+                          };
+                          setUserGroups(prev => [...prev, newGroup]);
+                          setMultiSelectedIds(new Set());
+                          setEditingGroupId(newGroup.id);
+                          setSortMenuOpen(false);
+                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 14px", border: "none", background: "#2563EB0C", color: "#2563EB", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#2563EB18"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#2563EB0C"; }}
+                      >
+                        <Group className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{de ? `${multiSelectedIds.size} Karten gruppieren` : `Group ${multiSelectedIds.size} cards`}</span>
+                      </button>
+                    )}
+
+                    {/* Bestehende Gruppen auflisten */}
+                    {[...canvasGroups, ...userGroups].length > 0 && (
+                      <>
+                        {[...canvasGroups, ...userGroups].map(g => {
+                          const isUser = userGroups.some(ug => ug.id === g.id);
+                          return (
+                            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 14px" }}>
+                              <span style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, flexShrink: 0 }} />
+                              <span style={{ flex: 1, fontSize: 11, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.label}</span>
+                              <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{g.nodeIds.length}</span>
+                              {isUser && (
+                                <button
+                                  onClick={() => { setUserGroups(prev => prev.filter(ug => ug.id !== g.id)); }}
+                                  title={de ? "Gruppe auflösen" : "Remove group"}
+                                  style={{ fontSize: 9, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
+                                >✕</button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* Alle Gruppen auflösen */}
+                    {userGroups.length > 0 && (
+                      <>
+                        <div style={{ height: 1, background: "var(--color-border)", margin: "4px 0" }} />
+                        <button
+                          onClick={() => { setUserGroups([]); setSortMenuOpen(false); }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 14px", border: "none", background: "transparent", color: "#E8402A", fontSize: 11, fontWeight: 500, cursor: "pointer", textAlign: "left", transition: "all 0.1s" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FEF2F2"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                        >
+                          <Trash2 className="w-3 h-3 flex-shrink-0" />
+                          <span>{de ? "Alle Gruppen auflösen" : "Remove all groups"}</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}
