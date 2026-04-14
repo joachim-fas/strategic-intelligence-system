@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * CrossRef Connector — Academic publication metadata
@@ -42,13 +43,13 @@ export const crossrefConnector: SourceConnector = {
           : "Artificial Intelligence & Automation";
         const refs = item["is-referenced-by-count"] || 0;
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "crossref",
           sourceUrl: item.URL || "https://www.crossref.org/",
           sourceTitle: `CrossRef: ${title}`,
           signalType: "paper",
           topic,
-          rawStrength: Math.min(1, refs / 50),
+          rawStrength: 0.5,
           rawData: {
             title,
             doi: item.DOI,
@@ -57,8 +58,10 @@ export const crossrefConnector: SourceConnector = {
             publisher: item.publisher,
             deposited: item.deposited?.["date-time"],
           },
-          detectedAt: new Date(),
-        });
+          detectedAt: item.deposited?.["date-time"] ? new Date(item.deposited["date-time"]) : new Date(),
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

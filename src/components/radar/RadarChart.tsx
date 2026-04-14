@@ -553,7 +553,7 @@ export default function RadarChart({
           opacity={showZoomHint ? 0.5 : 0}
           style={{ transition: "opacity 2s ease" }}
         >
-          Scroll = Zoom · Doppelklick = Reset
+          {locale === "de" ? "Scroll = Zoom · Doppelklick = Reset" : "Scroll = Zoom · Double-click = Reset"}
         </text>
       </svg>
 
@@ -695,8 +695,8 @@ export default function RadarChart({
             </span>
           ))}
         </div>
-        <span>● Größe = Impact</span>
-        <span>◐ Deckkraft = Konfidenz</span>
+        <span>{locale === "de" ? "● Größe = Impact" : "● Size = Impact"}</span>
+        <span>{locale === "de" ? "◐ Deckkraft = Konfidenz" : "◐ Opacity = Confidence"}</span>
       </div>
     </div>
   );
