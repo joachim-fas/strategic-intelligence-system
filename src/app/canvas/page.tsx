@@ -41,6 +41,7 @@ import { useLocale } from "@/lib/locale-context";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
+  ArrowDown, ArrowRight, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
 } from "lucide-react";
 import type {
   UsedSignal, Scenario, Reference, MatchedTrend,
@@ -3998,10 +3999,10 @@ function DetailPanel({
             <CollapsibleSection title={de ? "Quellen" : "References"} defaultOpen={false}>
               {r.references.map((ref, i) => (
                 <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: "block", fontSize: 12, color: "var(--color-brand)", textDecoration: "none", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--color-brand)", textDecoration: "none", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = "underline"}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = "none"}
-                >↗ {ref.title}</a>
+                ><ExternalLink size={11} style={{ flexShrink: 0 }} /> {ref.title}</a>
               ))}
             </CollapsibleSection>
           )}
@@ -4272,20 +4273,20 @@ function DetailPanel({
             {qNode.status === "done" && (
               <Tooltip content={de ? "Analyse mit aktuellen Daten neu berechnen" : "Re-run analysis with latest data"} placement="top">
                 <button onClick={() => onRefresh(node.id)}
-                  style={{ ...btnBase, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
+                  style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
                   onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
                   onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
-                >⟳ {de ? "Aktualisieren" : "Refresh"}</button>
+                ><RefreshCw size={12} /> {de ? "Aktualisieren" : "Refresh"}</button>
               </Tooltip>
             )}
             {qNode.status === "error" && (
               <Tooltip content={de ? "Fehlgeschlagene Analyse erneut versuchen" : "Retry failed analysis"} placement="top">
-                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}>↺ Retry</button>
+                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}><RotateCcw size={12} /> Retry</button>
               </Tooltip>
             )}
             {qNode.synthesis && (
               <Tooltip content={de ? "Synthese in Zwischenablage kopieren" : "Copy synthesis to clipboard"} placement="top">
-                <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted }}>{copied ? "✓" : "⎘"}</button>
+                <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
               </Tooltip>
             )}
             <Tooltip content={de ? "Karte und alle Ableitungen entfernen" : "Remove card and all derived nodes"} placement="top">
@@ -4309,7 +4310,7 @@ function DetailPanel({
               >{de ? "Als Abfrage" : "As Query"}</button>
             </Tooltip>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, noteDraft)} style={btnMuted}>↺ rethink</button>
+              <button onClick={() => onIterate(node.id, noteDraft)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4333,7 +4334,7 @@ function DetailPanel({
               >{de ? "Als Abfrage" : "As Query"}</button>
             </Tooltip>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, ideaText)} style={btnMuted}>↺ rethink</button>
+              <button onClick={() => onIterate(node.id, ideaText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4352,7 +4353,7 @@ function DetailPanel({
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, listText)} style={btnMuted}>↺ rethink</button>
+              <button onClick={() => onIterate(node.id, listText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4377,8 +4378,8 @@ function DetailPanel({
             {fNode.fileUrl && (
               <Tooltip content={de ? "Datei in neuem Tab öffnen" : "Open file in new tab"} placement="top">
                 <a href={fNode.fileUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none" }}
-                >↗ {de ? "Öffnen" : "Open"}</a>
+                  style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
+                ><ExternalLink size={12} /> {de ? "Öffnen" : "Open"}</a>
               </Tooltip>
             )}
             {(fNode.textContent || isImage) && (
@@ -4409,23 +4410,23 @@ function DetailPanel({
       const scenName = dNode.label || dNode.content.slice(0, 60);
       const firstDriver = dNode.keyDrivers?.[0] ?? scenName;
       const actionButtons = [
-        { label: "VERTIEFEN ↓", tip: de ? "Tiefenanalyse: Treiber und Implikationen dieses Szenarios genauer untersuchen" : "Deep-dive: Analyze drivers and implications of this scenario", prefill: `Vertiefen: ${scenName} — detaillierte Analyse der Treiber und Implikationen`, color: "#1A9E5A" },
-        { label: "WAS WENN →",  tip: de ? "Sensitivitätstest: Was passiert wenn ein Schlüsseltreiber wegfällt?" : "Sensitivity test: What happens if a key driver disappears?",       prefill: `Was wenn: ${firstDriver} wegfällt — wie verändert sich das Szenario?`,       color: "#2563EB" },
-        { label: "ANGREIFEN ⚡", tip: de ? "Kritische Prüfung: Welche Annahmen könnten falsch sein?" : "Critical review: Which assumptions could be wrong?",             prefill: `Kritisch: Welche Annahmen in '${scenName}' könnten falsch sein?`,             color: "#E8402A" },
-        { label: "STRATEGIE ◇", tip: de ? "Handlungsoptionen: Konkrete Maßnahmen für dieses Szenario ableiten" : "Strategy: Derive concrete actions for this scenario",               prefill: `Spielplan: Gegeben '${scenName}' — konkrete Handlungsoptionen`,               color: "#8B5CF6" },
+        { label: de ? "VERTIEFEN" : "DEEPEN", icon: <Search size={12} />, tip: de ? "Tiefenanalyse: Treiber und Implikationen dieses Szenarios genauer untersuchen" : "Deep-dive: Analyze drivers and implications of this scenario", prefill: `Vertiefen: ${scenName} — detaillierte Analyse der Treiber und Implikationen`, color: "#1A9E5A" },
+        { label: de ? "WAS WENN" : "WHAT IF", icon: <GitBranch size={12} />, tip: de ? "Sensitivitätstest: Was passiert wenn ein Schlüsseltreiber wegfällt?" : "Sensitivity test: What happens if a key driver disappears?",       prefill: `Was wenn: ${firstDriver} wegfällt — wie verändert sich das Szenario?`,       color: "#2563EB" },
+        { label: de ? "ANGREIFEN" : "CHALLENGE", icon: <ShieldAlert size={12} />, tip: de ? "Kritische Prüfung: Welche Annahmen könnten falsch sein?" : "Critical review: Which assumptions could be wrong?",             prefill: `Kritisch: Welche Annahmen in '${scenName}' könnten falsch sein?`,             color: "#E8402A" },
+        { label: de ? "STRATEGIE" : "STRATEGY", icon: <Compass size={12} />, tip: de ? "Handlungsoptionen: Konkrete Maßnahmen für dieses Szenario ableiten" : "Strategy: Derive concrete actions for this scenario",               prefill: `Spielplan: Gegeben '${scenName}' — konkrete Handlungsoptionen`,               color: "#8B5CF6" },
       ];
       return (
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
-            {actionButtons.map(({ label, tip, prefill, color }) => (
+            {actionButtons.map(({ label, icon, tip, prefill, color }) => (
               <Tooltip key={label} content={tip} placement="top">
                 <button
                   onClick={() => onIterate(node.id, prefill)}
-                  style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${color}44`, background: `${color}12`, color, letterSpacing: "0.02em", transition: "all 0.12s" }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${color}44`, background: `${color}12`, color, letterSpacing: "0.02em", transition: "all 0.12s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}22`; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}12`; }}
-                >{label}</button>
+                >{label} {icon}</button>
               </Tooltip>
             ))}
             <Tooltip content={de ? "Szenario-Karte entfernen" : "Remove scenario card"} placement="top">
@@ -4499,7 +4500,7 @@ function DetailPanel({
             >{btnLabel}</button>
           </Tooltip>
           <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-            <button onClick={() => onIterate(node.id, dNode.queryText)} style={btnMuted}>↺ rethink</button>
+            <button onClick={() => onIterate(node.id, dNode.queryText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
           </Tooltip>
           <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
             <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -6993,7 +6994,7 @@ export default function CanvasPage() {
           pointerEvents: "all",
         }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 20, marginBottom: 8, animation: "spin 1s linear infinite" }}>⟳</div>
+            <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}><RefreshCw size={20} style={{ animation: "spin 1s linear infinite", color: "var(--color-text-muted)" }} /></div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)" }}>
               {projectOp === "creating" ? (de ? "Erstelle Projekt…" : "Creating project…") :
                projectOp === "deleting" ? (de ? "Lösche Projekt…" : "Deleting project…") :
