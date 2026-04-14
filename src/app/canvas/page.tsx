@@ -307,9 +307,31 @@ function getNodeWidth(n: CanvasNode): number {
   return DERIVED_W;
 }
 
+// Content-aware query-card height. Without this all QUERY cards would share
+// the 420px square default, which looks uniform/boxy at scale and wastes
+// vertical space for queries with short or empty synthesis. We cap at
+// QUERY_NODE_H so cards never grow taller than the square base — taller
+// than square is unreadable in the canvas.
+function estimateQueryHeight(n: QueryNode): number {
+  const synthesis = n.synthesis ?? "";
+  const HEADER = 44;
+  const PAD_Y = 24;
+  const EXTRAS = 60;      // fingerprint / signals / tags / fade area
+  const CHARS_PER_LINE = 44;
+  const LINE_H = 20;
+  if (!synthesis) {
+    // No synthesis yet — either loading or a placeholder card.
+    // Give just enough room for the compact derivation summary block.
+    return 180;
+  }
+  const lines = Math.min(14, Math.ceil(synthesis.length / CHARS_PER_LINE));
+  const h = HEADER + PAD_Y + lines * LINE_H + EXTRAS;
+  return Math.max(220, Math.min(QUERY_NODE_H, h));
+}
+
 function getNodeHeight(n: CanvasNode): number {
   if (n.customHeight) return n.customHeight;
-  if (n.nodeType === "query") return QUERY_NODE_H;
+  if (n.nodeType === "query") return estimateQueryHeight(n as QueryNode);
   if (n.nodeType === "dimensions") return DIMENSIONS_CARD_H;
   if (n.nodeType === "causalgraph") return CAUSAL_GRAPH_CARD_H;
   if (n.nodeType === "list") return 200;
@@ -1590,20 +1612,27 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, 
     return set;
   }, [selId, connections]);
 
-  // Zoom-adaptive dampening factor
+  // Density-adaptive base opacity — few connections stay clearly readable,
+  // large meshes (50+) fade to background so cards dominate.
+  const density = connections.length <= 20 ? "low"
+    : connections.length <= 50 ? "med"
+    : "high";
+
+  // Zoom-adaptive dampening factor — keep floor at 0.55 so lines stay readable
+  // at typical zoom (50–70%). Only very zoomed-out views fade further.
   const zoomFactor = zoom >= 0.8 ? 1.0
-    : zoom >= 0.5 ? 0.6 + (zoom - 0.5) / 0.3 * 0.4
-    : zoom >= 0.3 ? 0.25 + (zoom - 0.3) / 0.2 * 0.35
-    : 0.1;
+    : zoom >= 0.5 ? 0.75 + (zoom - 0.5) / 0.3 * 0.25
+    : zoom >= 0.3 ? 0.55 + (zoom - 0.3) / 0.2 * 0.20
+    : 0.3;
 
   return (
     <svg style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1, overflow: "visible", pointerEvents: "none" }}>
       <defs>
         <marker id="arr-q" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.40)" />
+          <path d="M0,0 L0,6 L6,3 z" fill="#64748B" />
         </marker>
         <marker id="arr-d" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L0,6 L6,3 z" fill="rgba(0,0,0,0.35)" />
+          <path d="M0,0 L0,6 L6,3 z" fill="#64748B" />
         </marker>
         <marker id="arr-r" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L0,6 L6,3 z" fill="#F5A62388" />
@@ -1629,15 +1658,27 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, 
         const y2 = to.y + getNodeHeight(to) / 2;
         const cp = Math.min(Math.abs(x2 - x1) * 0.45, 120);
 
-        // 4-tier opacity system
+        // Density-adaptive base opacity — high density needs lower baseline
+        // so 70+ connections don't turn the canvas into moiré. Low density
+        // (this project has 10) keeps lines clearly readable by default.
+        const baseByDensity = density === "high"
+          ? { direct: 1.0, chain: 0.55, orphan: 0.08, sameGroup: 0.30, crossGroup: 0.18 }
+          : density === "med"
+          ? { direct: 1.0, chain: 0.65, orphan: 0.15, sameGroup: 0.50, crossGroup: 0.35 }
+          : { direct: 1.0, chain: 0.75, orphan: 0.30, sameGroup: 0.70, crossGroup: 0.55 };
+
+        // 4-tier opacity: direct edge (strongest), pipeline-chain, orphan, default by group
         let baseOpacity: number;
         if (selId) {
           const isDirect = directEdges.has(`${c.from}-${c.to}`);
           const inChain = pipelineChain?.has(c.from) || pipelineChain?.has(c.to);
-          baseOpacity = isDirect ? 1.0 : inChain ? 0.45 : 0.05;
+          baseOpacity = isDirect ? baseByDensity.direct : inChain ? baseByDensity.chain : baseByDensity.orphan;
+        } else if (pipelineChain && (pipelineChain.has(c.from) || pipelineChain.has(c.to))) {
+          // Pipeline chain is highlighted even without selection — derivation flow stays visible
+          baseOpacity = baseByDensity.chain;
         } else {
           const sameGroup = nodeGroupMap.get(c.from) && nodeGroupMap.get(c.from) === nodeGroupMap.get(c.to);
-          baseOpacity = sameGroup ? 0.25 : 0.12;
+          baseOpacity = sameGroup ? baseByDensity.sameGroup : baseByDensity.crossGroup;
         }
 
         // Tag-filter propagation to connections
@@ -1645,34 +1686,46 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, 
           const fromOk = (nodeTagMap.get(c.from) ?? []).includes(activeTagFilter);
           const toOk = (nodeTagMap.get(c.to) ?? []).includes(activeTagFilter);
           if (!fromOk && !toOk) baseOpacity = 0;
-          else if (!fromOk || !toOk) baseOpacity = 0.04;
+          else if (!fromOk || !toOk) baseOpacity = 0.06;
         }
 
         // Apply zoom dampening + visibility mode
         const finalOpacity = connVisMode === "hide" ? 0
-          : connVisMode === "show" ? Math.max(baseOpacity, 0.5)
+          : connVisMode === "show" ? Math.max(baseOpacity, 0.65)
           : baseOpacity * zoomFactor;
 
-        if (finalOpacity <= 0.01) return null;
+        if (finalOpacity <= 0.02) return null;
 
-        // Connection type styling — derived is solid (no dash) to prevent moiré at scale
+        // Connection type colors — coherent semantic palette:
+        //   derived  → slate (neutral flow, the most common type, stays calm)
+        //   refreshed → amber (temporal re-run)
+        //   builds-on → emerald (positive support)
+        //   contradicts → red (conflict)
+        //   validates → blue (confirmation)
         const ct = c.connectionType;
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string; label: string; labelColor: string }> = {
-          "derived":      { stroke: "rgba(0,0,0,0.35)", dash: "",    width: 1.2, marker: "url(#arr-d)", label: "", labelColor: "" },
-          "refreshed":    { stroke: "#F5A623",           dash: "6 4", width: 1,   marker: "url(#arr-r)", label: "↻", labelColor: "#F5A623" },
-          "builds-on":    { stroke: "#1A9E5A",           dash: "",    width: 2.0, marker: "url(#arr-builds)", label: de ? "baut auf" : "builds on", labelColor: "#1A9E5A" },
-          "contradicts":  { stroke: "#E8402A",           dash: "3 2", width: 1.8, marker: "url(#arr-contradicts)", label: de ? "widerspricht" : "contradicts", labelColor: "#E8402A" },
-          "validates":    { stroke: "#2563EB",           dash: "",    width: 1.8, marker: "url(#arr-validates)", label: de ? "bestätigt" : "validates", labelColor: "#2563EB" },
+          "derived":      { stroke: "#64748B", dash: "",    width: 1.4, marker: "url(#arr-d)",          label: "",                             labelColor: "" },
+          "refreshed":    { stroke: "#F5A623", dash: "6 4", width: 1.2, marker: "url(#arr-r)",          label: "↻",                            labelColor: "#F5A623" },
+          "builds-on":    { stroke: "#1A9E5A", dash: "",    width: 2.0, marker: "url(#arr-builds)",     label: de ? "baut auf" : "builds on",  labelColor: "#1A9E5A" },
+          "contradicts":  { stroke: "#E8402A", dash: "3 2", width: 1.8, marker: "url(#arr-contradicts)",label: de ? "widerspricht" : "contradicts", labelColor: "#E8402A" },
+          "validates":    { stroke: "#2563EB", dash: "",    width: 1.8, marker: "url(#arr-validates)",  label: de ? "bestätigt" : "validates", labelColor: "#2563EB" },
         };
 
         const cStyle = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived
           : c.refreshed ? CONN_STYLES.refreshed
           : c.derived   ? CONN_STYLES.derived
-          : { stroke: "rgba(0,0,0,0.35)", dash: "", width: 1.2, marker: "url(#arr-q)", label: "", labelColor: "" };
+          : { stroke: "#64748B", dash: "", width: 1.4, marker: "url(#arr-q)", label: "", labelColor: "" };
 
-        // Semantic connections get higher minimum opacity
+        // Semantic (non-derived) connections get higher minimum opacity — they carry argumentative weight
         const isSemanticType = ct && ct !== "derived";
-        const effectiveOpacity = isSemanticType ? Math.max(finalOpacity, 0.35) : finalOpacity;
+        // Parent→child derivation edges (QUERY → insights/scenarios/decisions/causalgraph/…)
+        // are the backbone of the derivation tree. Even in dense canvases they must
+        // stay readable, otherwise the "where did this come from" story is lost.
+        const isQueryChildEdge = from.nodeType === "query" && to.parentId === from.id;
+        let effectiveOpacity = isSemanticType ? Math.max(finalOpacity, 0.5) : finalOpacity;
+        if (isQueryChildEdge && connVisMode !== "hide") {
+          effectiveOpacity = Math.max(effectiveOpacity, 0.38);
+        }
 
         // Midpoint for label positioning (on the Bézier curve at t=0.5)
         const mx = 0.125 * x1 + 0.375 * (x1 + cp) + 0.375 * (x2 - cp) + 0.125 * x2;
@@ -2115,7 +2168,7 @@ function DerivedNodeCard({
 // ── QueryNodeCard (compact) ───────────────────────────────────────────────
 
 function QueryNodeCard({
-  node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom, causalFingerprint,
+  node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom, causalFingerprint, childCounts, duplicateIndex,
   // unused in compact view (handled by DetailPanel) — kept for API compatibility:
   onFollowUp: _onFollowUp, onFollowUpQ: _onFollowUpQ, onToggleCollapse: _onToggleCollapse, onRefresh: _onRefresh,
   onAddTag, onSetStatus,
@@ -2137,6 +2190,13 @@ function QueryNodeCard({
   dimmed?: boolean;
   zoom?: number;
   causalFingerprint?: string[];
+  // Counts of derived children, used as fallback when synthesis is empty or zoom
+  // is too low for the full body — lets the card still say "something happened"
+  // rather than rendering an empty 420×420 box.
+  childCounts?: { insights: number; scenarios: number; decisions: number; followups: number; causal: number };
+  // If this query shares its text with siblings, `duplicateIndex` is 1,2,3…
+  // (createdAt order). 0/undefined means the title is unique and no badge shows.
+  duplicateIndex?: number;
 }) {
   const isLoading = node.status === "loading" || node.status === "streaming";
   const age = nodeAge(node.createdAt);
@@ -2168,7 +2228,7 @@ function QueryNodeCard({
     : !selected && node.status === "done" ? "nc-success"
     : !selected && node.status === "error" ? "nc-error"
     : "";
-  const cardH = node.customHeight ?? QUERY_NODE_W;
+  const cardH = node.customHeight ?? estimateQueryHeight(node);
 
   return (
     // Wrapper: positioning + ports
@@ -2217,9 +2277,20 @@ function QueryNodeCard({
             color: "#0A0A0A", background: queryTypeColor, border: "1px solid rgba(0,0,0,0.12)",
             borderRadius: 5, padding: "2px 7px",
           }}>QUERY</span>
-          <p style={{ flex: 1, margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "var(--font-display, 'Space Grotesk'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.02em", display: "-webkit-box", WebkitLineClamp: cardZoom !== undefined && cardZoom < 0.7 ? 1 : 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ flex: 1, margin: 0, fontSize: 13, fontWeight: 700, fontFamily: "var(--font-display, 'Space Grotesk'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.02em", display: "-webkit-box", WebkitLineClamp: cardZoom !== undefined && cardZoom < 0.6 ? 1 : 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {node.query}
           </p>
+          {duplicateIndex !== undefined && duplicateIndex > 0 && (
+            <span
+              title={de ? `Wiederholung #${duplicateIndex} dieser Frage` : `Duplicate #${duplicateIndex} of this query`}
+              style={{
+                flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.02em",
+                fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                color: "rgba(0,0,0,0.65)", background: "rgba(0,0,0,0.06)",
+                border: "1px solid rgba(0,0,0,0.12)", borderRadius: 5, padding: "2px 6px",
+              }}
+            >#{duplicateIndex}</span>
+          )}
           {accentColorForStatus && <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
           {(cardZoom === undefined || cardZoom >= 0.6) && (
             <CardActionsMenu nodeId={node.id} nodeType="query" de={de} onDelete={onDelete} onSetStatus={onSetStatus} onAddTag={onAddTag} onFollowUp={_onFollowUp} currentStatus={node.nodeStatus} />
@@ -2227,10 +2298,14 @@ function QueryNodeCard({
         </div>
         {/* Content */}
         <div style={{ padding: "12px 14px 0", flex: 1, overflow: "hidden", position: "relative" }}>
-          {node.synthesis && (cardZoom === undefined || cardZoom >= 0.7) && (
+          {/* Full-body content — shown at zoom ≥ 0.6. Below that, the compact
+              derivation summary takes over (see block below). The progressive
+              collapse is: <0.45 strip · 0.45–0.6 derivation summary ·
+              ≥0.6 full synthesis + signals + fingerprint + tags. */}
+          {node.synthesis && (cardZoom === undefined || cardZoom >= 0.6) && (
             <>
               {/* Source attribution badges */}
-              {node.result?.usedSignals && node.result.usedSignals.length > 0 && (
+              {node.result?.usedSignals && node.result.usedSignals.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
                 <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 8 }}>
                   {[...new Set(node.result.usedSignals.map(s => s.source))].slice(0, 5).map((src, i) => (
                     <span key={i} style={{
@@ -2244,7 +2319,7 @@ function QueryNodeCard({
                   </span>
                 </div>
               )}
-              <FormattedText text={node.synthesis ?? ""} fontSize={12.5} lineHeight={1.65} compact maxLines={Math.max(4, Math.floor(((node.customHeight ?? QUERY_NODE_W) - 140) / 20))} />
+              <FormattedText text={node.synthesis ?? ""} fontSize={12.5} lineHeight={1.65} compact maxLines={Math.max(4, Math.floor(((node.customHeight ?? estimateQueryHeight(node)) - 140) / 20))} />
               {/* Causal fingerprint pills */}
               {causalFingerprint && causalFingerprint.length > 0 && (cardZoom === undefined || cardZoom >= 0.6) && (
                 <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 8 }}>
@@ -2280,6 +2355,54 @@ function QueryNodeCard({
               {/* Fade gradient at bottom to signal more content */}
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 48, background: "linear-gradient(to bottom, transparent, var(--color-surface))", pointerEvents: "none" }} />
             </>
+          )}
+          {/* Fallback derivation summary — shown when synthesis is empty/missing
+              (so the card doesn't render as an empty 420×420 box). Covers two
+              cases: (a) query has children but no saved synthesis yet; (b) zoom
+              is below the synthesis threshold (≥0.6). */}
+          {(!node.synthesis || (cardZoom !== undefined && cardZoom < 0.6)) && !isLoading && node.status !== "error" && childCounts && (childCounts.insights + childCounts.scenarios + childCounts.decisions + childCounts.followups + childCounts.causal) > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
+              <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", color: "var(--color-text-muted)", textTransform: "uppercase" }}>
+                {de ? "Abgeleitet" : "Derived"}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {childCounts.insights > 0 && (
+                  <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(26,158,90,0.08)", color: "#1A9E5A", fontWeight: 600, whiteSpace: "nowrap" }}>
+                    {childCounts.insights} {de ? "Erkenntnisse" : "Insights"}
+                  </span>
+                )}
+                {childCounts.scenarios > 0 && (
+                  <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(37,99,235,0.08)", color: "#2563EB", fontWeight: 600, whiteSpace: "nowrap" }}>
+                    {childCounts.scenarios} {de ? "Szenarien" : "Scenarios"}
+                  </span>
+                )}
+                {childCounts.decisions > 0 && (
+                  <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(124,26,158,0.08)", color: "#7C1A9E", fontWeight: 600, whiteSpace: "nowrap" }}>
+                    {childCounts.decisions} {de ? "Empfehlungen" : "Decisions"}
+                  </span>
+                )}
+                {childCounts.followups > 0 && (
+                  <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(245,166,35,0.10)", color: "#955A20", fontWeight: 600, whiteSpace: "nowrap" }}>
+                    {childCounts.followups} {de ? "Folgefragen" : "Follow-ups"}
+                  </span>
+                )}
+                {childCounts.causal > 0 && (
+                  <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(26,158,90,0.12)", color: "#1A9E5A", fontWeight: 600, whiteSpace: "nowrap", border: "1px solid rgba(26,158,90,0.25)" }}>
+                    {de ? "Kausalnetz" : "Causal graph"}
+                  </span>
+                )}
+              </div>
+              {causalFingerprint && causalFingerprint.length > 0 && (
+                <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 4 }}>
+                  <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 600, letterSpacing: "0.06em", marginRight: 2, alignSelf: "center" }}>⬡</span>
+                  {causalFingerprint.map((t, i) => (
+                    <span key={i} style={{ fontSize: 8, padding: "1px 6px", borderRadius: 10, background: "#1A9E5A10", border: "1px solid #1A9E5A30", color: "#1A9E5A", fontWeight: 500, whiteSpace: "nowrap" }}>
+                      {t.length > 18 ? t.slice(0, 18) + "…" : t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {isLoading && !node.synthesis && (() => {
             const phases = de
@@ -4230,29 +4353,64 @@ function DetailPanel({
     decided: { de: "Analyse abgeschlossen, Entscheidung getroffen", en: "Analysis complete, decision made" },
     pinned: { de: "Wichtig — bleibt sichtbar bei Filterung", en: "Important — stays visible when filtering" },
   };
-  const renderStatusSelector = () => (
-    <div style={{ display: "flex", gap: 4, padding: "0 40px 8px" }}>
-      {(["open","active","decided","pinned"] as NodeStatus[]).map(s => {
-        const meta = NODE_STATUS_META[s];
-        const current = (node as QueryNode & { nodeStatus?: NodeStatus }).nodeStatus ?? "open";
-        return (
-          <Tooltip key={s} content={de ? statusTips[s].de : statusTips[s].en} placement="bottom">
-            <button
-              onClick={() => onSetStatus(node.id, s)}
-              style={{
-                fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
-                border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
-                background: current === s ? `${meta.color}18` : "transparent",
-                color: current === s ? meta.color : "var(--color-text-muted)",
-                fontWeight: current === s ? 700 : 400,
-                transition: "all 0.1s",
-              }}
-            ><StatusIcon status={s} size={11} /> {meta.label}</button>
-          </Tooltip>
-        );
-      })}
-    </div>
-  );
+  const renderStatusSelector = () => {
+    const current = (node as QueryNode & { nodeStatus?: NodeStatus }).nodeStatus ?? "open";
+    // Resolve meta.color to a concrete color for valid alpha-compositing.
+    // "open" uses a CSS variable, which cannot be suffixed with "18" to form a
+    // hex-alpha string — so the old `${meta.color}18` produced invalid CSS.
+    const tintForStatus: Record<NodeStatus, { bg: string; fg: string; border: string }> = {
+      open:    { bg: "rgba(107,107,107,0.08)", fg: "var(--color-text-primary)", border: "rgba(107,107,107,0.35)" },
+      active:  { bg: "rgba(37,99,235,0.10)",   fg: "#2563EB",                    border: "rgba(37,99,235,0.45)"  },
+      decided: { bg: "rgba(26,158,90,0.10)",   fg: "#1A9E5A",                    border: "rgba(26,158,90,0.45)"  },
+      pinned:  { bg: "rgba(245,166,35,0.12)",  fg: "#C97A00",                    border: "rgba(245,166,35,0.55)" },
+    };
+    return (
+      <div
+        role="radiogroup"
+        aria-label={de ? "Status" : "Status"}
+        style={{
+          display: "inline-flex",
+          margin: "0 40px 10px",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          background: "var(--color-surface, #F7F7F7)",
+          overflow: "hidden",
+          fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+        }}
+      >
+        {(["open","active","decided","pinned"] as NodeStatus[]).map((s, i) => {
+          const meta = NODE_STATUS_META[s];
+          const active = current === s;
+          const tint = tintForStatus[s];
+          return (
+            <Tooltip key={s} content={de ? statusTips[s].de : statusTips[s].en} placement="bottom">
+              <button
+                onClick={() => onSetStatus(node.id, s)}
+                role="radio"
+                aria-checked={active}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  height: 28, padding: "0 12px",
+                  fontSize: 11, fontWeight: active ? 600 : 500, letterSpacing: "0.01em",
+                  border: "none",
+                  borderLeft: i === 0 ? "none" : "1px solid var(--color-border)",
+                  background: active ? tint.bg : "transparent",
+                  color: active ? tint.fg : "var(--color-text-muted)",
+                  cursor: "pointer",
+                  transition: "background-color 120ms ease, color 120ms ease",
+                }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
+                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <StatusIcon status={s} size={12} />
+                <span>{meta.label}</span>
+              </button>
+            </Tooltip>
+          );
+        })}
+      </div>
+    );
+  };
 
   // ── Footer ────────────────────────────────────────────────────────────────
   const renderFooter = () => {
@@ -5221,7 +5379,23 @@ export default function CanvasPage() {
     const colors = ["#1A9E5A", "#2563EB", "#8B5CF6", "#F97316", "#0369A1"];
     return groups.filter(g => g.size >= 2).map((g, i) => {
       const gNodeIds = [...g];
-      const gNodes = gNodeIds.map(id => nodes.find(n => n.id === id)!).filter(Boolean);
+      // Bounds must cover the queries AND every descendant (insights,
+      // scenarios, decisions, causalgraph, …). Otherwise the group outline
+      // ends at the query row while the actual derived cards sit outside.
+      // `nodeIds` stays query-only (used for tag dimming / membership checks),
+      // but `boundsNodeIds` includes transitive children.
+      const boundsNodeIds = new Set<string>(gNodeIds);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const n of nodes) {
+          if (n.parentId && boundsNodeIds.has(n.parentId) && !boundsNodeIds.has(n.id)) {
+            boundsNodeIds.add(n.id);
+            added = true;
+          }
+        }
+      }
+      const gNodes = Array.from(boundsNodeIds).map(id => nodes.find(n => n.id === id)!).filter(Boolean);
       const xs = gNodes.map(n => n.x);
       const ys = gNodes.map(n => n.y);
       const PAD = 40;
@@ -5266,6 +5440,29 @@ export default function CanvasPage() {
     });
     return m;
   }, [canvasGroups, userGroups]);
+
+  // Duplicate query-title index: if two queries share the same text
+  // (common when iterating or re-running), assign each a small "#N" suffix
+  // (1,2,3…) ordered by createdAt so headers stay distinguishable.
+  // Unique queries get 0 (rendered as nothing).
+  const queryDupIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    const buckets = new Map<string, QueryNode[]>();
+    nodes.forEach(n => {
+      if (n.nodeType !== "query") return;
+      const q = n as QueryNode;
+      const key = (q.query ?? "").trim().toLowerCase();
+      if (!key) return;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push(q);
+    });
+    buckets.forEach(list => {
+      if (list.length < 2) return;
+      list.sort((a, b) => a.createdAt - b.createdAt);
+      list.forEach((q, i) => m.set(q.id, i + 1));
+    });
+    return m;
+  }, [nodes]);
 
   // ── Canvas Export ────────────────────────────────────────────────────────
 
@@ -6870,23 +7067,60 @@ export default function CanvasPage() {
             );
           })}
 
-          {/* Connection visibility toggle */}
-          {connections.length > 0 && (
-            <button
-              onClick={() => setConnVisMode(prev => prev === "auto" ? "show" : prev === "show" ? "hide" : "auto")}
-              title={de ? "Verbindungslinien: auto / ein / aus" : "Connection lines: auto / show / hide"}
-              style={{
-                fontSize: 10, padding: "1px 7px", borderRadius: 20,
-                border: `1px solid ${connVisMode === "show" ? "rgba(0,0,0,0.30)" : "var(--color-border)"}`,
-                background: connVisMode === "show" ? "rgba(0,0,0,0.06)" : "transparent",
-                color: connVisMode === "hide" ? "var(--color-text-muted)" : "var(--color-text-heading)",
-                cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
-                textDecoration: connVisMode === "hide" ? "line-through" : "none",
-                opacity: connVisMode === "hide" ? 0.5 : 1,
-              }}
-            >{de ? (connVisMode === "auto" ? "Verb. auto" : connVisMode === "show" ? "Verb. ein" : "Verb. aus")
-                : (connVisMode === "auto" ? "Links auto" : connVisMode === "show" ? "Links on" : "Links off")}</button>
-          )}
+          {/* Connection visibility toggle — 3 modes, each with a distinct visual
+              state so the user never has to read the label to know what's on:
+                auto → neutral pill (connections follow zoom/selection heuristics)
+                show → filled dark pill with dot indicator (all connections forced on)
+                hide → strike-through muted pill with dashed border (all off) */}
+          {connections.length > 0 && (() => {
+            const modeColor = connVisMode === "show"
+              ? "#0A0A0A"
+              : connVisMode === "hide"
+              ? "#9CA3AF"
+              : "#4B5563";
+            const isShow = connVisMode === "show";
+            const isHide = connVisMode === "hide";
+            return (
+              <button
+                onClick={() => setConnVisMode(prev => prev === "auto" ? "show" : prev === "show" ? "hide" : "auto")}
+                title={de ? "Verbindungslinien: auto → ein → aus" : "Connection lines: auto → show → hide"}
+                style={{
+                  fontSize: 10, padding: "1px 8px 1px 7px", borderRadius: 20,
+                  border: isHide
+                    ? `1px dashed ${modeColor}`
+                    : isShow
+                    ? `1px solid ${modeColor}`
+                    : "1px solid var(--color-border)",
+                  background: isShow
+                    ? modeColor
+                    : isHide
+                    ? "transparent"
+                    : "transparent",
+                  color: isShow ? "#FFFFFF" : modeColor,
+                  cursor: "pointer", transition: "all 0.12s", fontWeight: 600,
+                  textDecoration: isHide ? "line-through" : "none",
+                  opacity: isHide ? 0.75 : 1,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  boxShadow: isShow ? "0 1px 2px rgba(0,0,0,0.25)" : "none",
+                }}
+              >
+                {/* Mode indicator glyph — encodes the state beyond just the label */}
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: isShow
+                    ? "#E4FF97"
+                    : isHide
+                    ? "transparent"
+                    : modeColor,
+                  border: isHide ? `1.5px solid ${modeColor}` : "none",
+                  flexShrink: 0,
+                }} />
+                {de
+                  ? (connVisMode === "auto" ? "Verb. auto" : connVisMode === "show" ? "Verb. ein" : "Verb. aus")
+                  : (connVisMode === "auto" ? "Links auto" : connVisMode === "show" ? "Links on" : "Links off")}
+              </button>
+            );
+          })()}
 
           {/* Tag filter pills */}
           {allTags.length > 0 && (
@@ -7563,13 +7797,18 @@ export default function CanvasPage() {
                 transition: "opacity 0.2s",
               }}>
                 <div style={{
-                  position: "absolute", top: 8, left: 14,
+                  // Float the label above the group frame so it acts like a
+                  // tab-style header — gives clear breathing room between the
+                  // label pill and the first card inside the group.
+                  position: "absolute", top: -13, left: 14,
                   fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
                   color: g.color,
-                  background: `${g.color}14`,
-                  padding: "2px 10px 2px 8px",
-                  borderRadius: 6,
+                  background: "var(--color-surface, #FFFFFF)",
+                  boxShadow: `0 0 0 1px ${g.color}55, 0 1px 2px rgba(0,0,0,0.04)`,
+                  padding: "3px 10px",
+                  borderRadius: 8,
                   fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+                  lineHeight: 1.2,
                 }}>{g.label}</div>
               </div>
               );
@@ -7577,8 +7816,21 @@ export default function CanvasPage() {
 
             {/* User-created group blobs */}
             {userGroups.map(g => {
-              // Recompute bounds dynamically from current node positions
-              const gNodes = g.nodeIds.map(id => nodes.find(n => n.id === id)).filter(Boolean) as CanvasNode[];
+              // Recompute bounds dynamically from current node positions AND
+              // transitive descendants — otherwise the box only covers the
+              // explicitly-grouped queries and misses their derived cards.
+              const boundsNodeIds = new Set<string>(g.nodeIds);
+              let addedU = true;
+              while (addedU) {
+                addedU = false;
+                for (const n of nodes) {
+                  if (n.parentId && boundsNodeIds.has(n.parentId) && !boundsNodeIds.has(n.id)) {
+                    boundsNodeIds.add(n.id);
+                    addedU = true;
+                  }
+                }
+              }
+              const gNodes = Array.from(boundsNodeIds).map(id => nodes.find(n => n.id === id)).filter(Boolean) as CanvasNode[];
               if (gNodes.length < 2) return null;
               const xs = gNodes.map(n => n.x);
               const ys = gNodes.map(n => n.y);
@@ -7604,8 +7856,8 @@ export default function CanvasPage() {
                   opacity: groupOpacity,
                   transition: "opacity 0.2s",
                 }}>
-                  {/* Editable label */}
-                  <div style={{ position: "absolute", top: 8, left: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                  {/* Editable label — tab-style header floating above frame */}
+                  <div style={{ position: "absolute", top: -13, left: 14, display: "flex", alignItems: "center", gap: 6 }}>
                     {editingGroupId === g.id ? (
                       <input
                         autoFocus
@@ -7615,7 +7867,7 @@ export default function CanvasPage() {
                           setEditingGroupId(null);
                         }}
                         onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setEditingGroupId(null); } }}
-                        style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: g.color, background: `${g.color}14`, border: `1px solid ${g.color}50`, borderRadius: 6, padding: "2px 10px 2px 8px", outline: "none", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}
+                        style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: g.color, background: "var(--color-surface, #FFFFFF)", border: `1px solid ${g.color}50`, borderRadius: 8, padding: "3px 10px", outline: "none", fontFamily: "var(--font-code, 'JetBrains Mono'), monospace", lineHeight: 1.2 }}
                       />
                     ) : (
                       <span
@@ -7623,9 +7875,11 @@ export default function CanvasPage() {
                         style={{
                           fontSize: 11, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
                           color: g.color, cursor: "pointer",
-                          background: `${g.color}14`,
-                          padding: "2px 10px 2px 8px",
-                          borderRadius: 6,
+                          background: "var(--color-surface, #FFFFFF)",
+                          boxShadow: `0 0 0 1px ${g.color}55, 0 1px 2px rgba(0,0,0,0.04)`,
+                          padding: "3px 10px",
+                          borderRadius: 8,
+                          lineHeight: 1.2,
                           fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
                         }}
                         title={de ? "Klicken zum Umbenennen" : "Click to rename"}
@@ -7714,6 +7968,17 @@ export default function CanvasPage() {
                         .slice(0, 3)
                         .map(([id]) => names[id] ?? id.replace(/mega-|macro-|micro-/g, "").replace(/-/g, " "));
                     })()}
+                    childCounts={(() => {
+                      const children = nodes.filter(c => c.parentId === n.id);
+                      return {
+                        insights:  children.filter(c => c.nodeType === "insight").length,
+                        scenarios: children.filter(c => c.nodeType === "scenario").length,
+                        decisions: children.filter(c => c.nodeType === "decision").length,
+                        followups: children.filter(c => c.nodeType === "followup").length,
+                        causal:    children.filter(c => c.nodeType === "causalgraph").length,
+                      };
+                    })()}
+                    duplicateIndex={queryDupIndex.get(n.id) ?? 0}
                     onAddTag={handleAddTag}
                     onSetStatus={handleSetNodeStatus}
                   />
@@ -8265,11 +8530,19 @@ export default function CanvasPage() {
         {viewMode === "canvas" && !embedded && hydrated && nodes.length > 0 && (
           <div style={{
             position: "absolute",
-            bottom: 16, left: 16,
+            // Raised above the floating command line zone so items never clip
+            // on shorter viewports and there's visible gap from the bottom
+            // edge; horizontal padding inside the pill was too tight against
+            // the container edge, so the whole pill shifts 4px in.
+            bottom: 20, left: 20,
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            padding: "8px 14px",
+            flexWrap: "nowrap",
+            whiteSpace: "nowrap",
+            gap: 12,
+            padding: "8px 16px",
+            maxWidth: "calc(100% - 320px)",
+            overflow: "hidden",
             background: "var(--color-surface, rgba(255,255,255,0.96))",
             border: "1px solid var(--color-border)",
             borderRadius: 10,
@@ -8284,7 +8557,7 @@ export default function CanvasPage() {
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
               textTransform: "uppercase" as const, color: "var(--muted-foreground)",
-              marginRight: 2,
+              marginRight: 2, flexShrink: 0,
             }}>
               {de ? "Status" : "Status"}
             </span>
@@ -8294,8 +8567,8 @@ export default function CanvasPage() {
               { dot: "#E8402A", label: de ? "Fehler" : "Error" },
               { dot: "#9CA3AF", label: de ? "Offen" : "Idle" },
             ].map((s, i) => (
-              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot }} />
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
                 <span>{s.label}</span>
               </span>
             ))}
