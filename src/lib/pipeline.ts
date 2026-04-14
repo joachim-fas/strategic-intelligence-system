@@ -32,6 +32,7 @@
 import { connectors, type RawSignal } from "@/connectors";
 import { groupSignalsByTopic, scoreTrend } from "@/lib/scoring";
 import { megaTrends } from "@/lib/mega-trends";
+import { sanitizeConnectorResponse } from "@/lib/api-utils";
 import { eq, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -168,9 +169,12 @@ export async function runPipeline(): Promise<PipelineResult> {
       `[pipeline] Deduplication: ${allSignals.length} → ${dedupedSignals.length} signals`,
     );
 
+    // Phase 1c: Sanitize all signals (SEC-19)
+    const sanitizedSignals = dedupedSignals.map((s) => sanitizeConnectorResponse(s));
+
     // Phase 2: Store signals and update scores in the database
     try {
-      await storeSignalsAndUpdateScores(dedupedSignals);
+      await storeSignalsAndUpdateScores(sanitizedSignals);
     } catch (err) {
       console.error("[pipeline] DB update failed:", err);
       errors.push({
@@ -183,7 +187,7 @@ export async function runPipeline(): Promise<PipelineResult> {
 
     return {
       success: errors.length === 0,
-      signalCount: dedupedSignals.length,
+      signalCount: sanitizedSignals.length,
       trendCount: megaTrends.length,
       sources: activeSources,
       errors,

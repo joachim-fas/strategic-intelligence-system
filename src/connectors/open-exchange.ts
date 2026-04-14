@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * Open Exchange Rates Connector — Currency exchange rates
@@ -39,13 +40,13 @@ export const openExchangeConnector: SourceConnector = {
         const rate = rates[currency];
         if (rate === undefined) continue;
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "open_exchange",
           sourceUrl: "https://openexchangerates.org/",
           sourceTitle: `FX: USD/${currency} = ${rate.toFixed(4)}`,
           signalType: "mention",
           topic: "Economic Trends",
-          rawStrength: 0.4, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             base: "USD",
             currency,
@@ -53,7 +54,9 @@ export const openExchangeConnector: SourceConnector = {
             timestamp: data.timestamp,
           },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

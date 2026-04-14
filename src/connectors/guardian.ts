@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * The Guardian Open Platform Connector
@@ -56,13 +57,13 @@ export const guardianConnector: SourceConnector = {
         const headline = article.fields?.headline || article.webTitle || "Unknown";
         const trailText = article.fields?.trailText || "";
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "guardian",
           sourceUrl: article.webUrl || "https://www.theguardian.com/",
           sourceTitle: `Guardian: ${headline}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.6, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             section,
             headline,
@@ -70,8 +71,10 @@ export const guardianConnector: SourceConnector = {
             publishedAt: article.webPublicationDate,
             type: article.type,
           },
-          detectedAt: new Date(),
-        });
+          detectedAt: article.webPublicationDate ? new Date(article.webPublicationDate) : new Date(),
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

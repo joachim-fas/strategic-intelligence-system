@@ -103,7 +103,67 @@ if (typeof setInterval !== "undefined") {
   }, 60_000);
 }
 
-// TODO: SEC-19 — Add sanitizeConnectorResponse() to validate/sanitize all connector API responses (strip HTML from titles, validate URLs, limit string lengths)
+// === Connector response sanitization (SEC-19) ===
+
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]*>/g, "");
+}
+
+function isValidUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+function truncate(str: string, maxLen: number): string {
+  return str.length > maxLen ? str.slice(0, maxLen) : str;
+}
+
+interface SanitizableSignal {
+  sourceType: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  rawData: Record<string, unknown>;
+}
+
+/**
+ * Sanitizes a connector signal object:
+ * - Strips HTML tags from sourceTitle and summary/description fields in rawData
+ * - Validates URLs (must start with http:// or https://)
+ * - Limits string lengths (title: 500, summary: 2000, source: 200)
+ */
+export function sanitizeConnectorResponse<T extends SanitizableSignal>(signal: T): T {
+  const result = { ...signal };
+
+  // Sanitize sourceTitle
+  result.sourceTitle = truncate(stripHtml(result.sourceTitle), 500);
+
+  // Sanitize sourceType (used as source identifier)
+  result.sourceType = truncate(result.sourceType, 200);
+
+  // Validate sourceUrl
+  if (!isValidUrl(result.sourceUrl)) {
+    result.sourceUrl = "";
+  }
+
+  // Sanitize rawData fields (summary, description, headline, trailText)
+  if (result.rawData && typeof result.rawData === "object") {
+    const rawData = { ...result.rawData };
+
+    for (const key of ["summary", "description", "trailText", "headline", "abstract"] as const) {
+      if (typeof rawData[key] === "string") {
+        rawData[key] = truncate(stripHtml(rawData[key] as string), 2000);
+      }
+    }
+
+    // Validate source field length inside rawData
+    if (typeof rawData.source === "string") {
+      rawData.source = truncate(rawData.source as string, 200);
+    }
+
+    result.rawData = rawData;
+  }
+
+  return result;
+}
 
 // === Safe error logging (strips sensitive data) ===
 export function sanitizeUrl(url: string): string {

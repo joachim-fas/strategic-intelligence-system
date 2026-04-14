@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 // WARNING: This connector returns STATIC DATA - not connected to real V-Dem API
 // The V-Dem website is fetched only to check availability, but the signal
@@ -32,20 +33,22 @@ export const vdemConnector: SourceConnector = {
       if (!res.ok) return signals;
 
       // V-Dem has limited API; generate a status signal
-      signals.push({
+      const signal: RawSignal = {
         sourceType: "vdem",
         sourceUrl: "https://v-dem.net/",
         sourceTitle: "V-Dem: Global democracy monitoring active",
         signalType: "mention",
         topic: "Geopolitical Fragmentation",
-        rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+        rawStrength: 0, // computed below
         rawData: {
           note: "V-Dem dataset available for detailed analysis",
           latestVersion: "v14",
           coverage: "202 countries, 1789-present",
         },
         detectedAt: new Date(),
-      });
+      };
+      signal.rawStrength = computeSignalStrength(signal);
+      signals.push(signal);
     } catch {
       // API unavailable
     }

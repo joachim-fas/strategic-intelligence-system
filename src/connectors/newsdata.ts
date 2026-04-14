@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * NewsData.io Connector — Global news aggregation
@@ -48,13 +49,13 @@ export const newsdataConnector: SourceConnector = {
         const category = (article.category?.[0] || "world").toLowerCase();
         const topic = CATEGORY_TOPICS[category] || "Geopolitical Fragmentation";
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "newsdata",
           sourceUrl: article.link || "https://newsdata.io/",
           sourceTitle: `NewsData: ${title.slice(0, 150)}`,
           signalType: "mention",
           topic,
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             title,
             category,
@@ -63,8 +64,10 @@ export const newsdataConnector: SourceConnector = {
             language: article.language,
             publishedAt: article.pubDate,
           },
-          detectedAt: new Date(),
-        });
+          detectedAt: article.pubDate ? new Date(article.pubDate) : new Date(),
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

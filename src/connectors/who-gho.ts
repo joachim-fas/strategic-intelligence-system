@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 /**
  * WHO Global Health Observatory Connector — free, no API key
@@ -44,20 +45,22 @@ export const whoGhoConnector: SourceConnector = {
         // CON-12: Improve title to be more descriptive about what this data represents
         const descriptiveTitle = `WHO GHO Indicator Definition: ${name} [${code}]`;
 
-        signals.push({
+        const signal: RawSignal = {
           sourceType: "who_gho",
           sourceUrl: `https://www.who.int/data/gho/data/indicators/indicator-details/GHO/${code}`,
           sourceTitle: descriptiveTitle,
           signalType: "mention",
           topic: "Health, Biotech & Longevity",
-          rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+          rawStrength: 0, // computed below
           rawData: {
             indicatorCode: code,
             indicatorName: name,
             language,
           },
           detectedAt: new Date(),
-        });
+        };
+        signal.rawStrength = computeSignalStrength(signal);
+        signals.push(signal);
       }
     } catch {
       // API unavailable

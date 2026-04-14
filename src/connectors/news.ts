@@ -1,4 +1,5 @@
 import { SourceConnector, RawSignal } from "./types";
+import { computeSignalStrength } from "@/lib/signal-strength";
 
 interface NewsArticle {
   title: string;
@@ -61,20 +62,22 @@ export const newsConnector: SourceConnector = {
         for (const article of articles) {
           const topic = mapQueryToTopic(query);
 
-          signals.push({
+          const signal: RawSignal = {
             sourceType: "news",
             sourceUrl: article.url,
             sourceTitle: article.title,
             signalType: "mention",
             topic,
-            rawStrength: 0.5, // TODO: compute strength dynamically from signal data
+            rawStrength: 0, // computed below
             rawData: {
               source: article.source.name,
               description: article.description,
               query,
             },
             detectedAt: new Date(article.publishedAt),
-          });
+          };
+          signal.rawStrength = computeSignalStrength(signal);
+          signals.push(signal);
         }
       } catch (err) {
         console.warn(`News fetch error for "${query}":`, err);
