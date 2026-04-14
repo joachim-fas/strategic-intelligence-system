@@ -39,7 +39,10 @@ export function Tooltip({
     if (disabled || !content) return;
     timerRef.current = setTimeout(() => {
       if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
+      // display:contents makes getBoundingClientRect() return {0,0,0,0},
+      // so measure the first child element instead
+      const target = (triggerRef.current.firstElementChild as HTMLElement) || triggerRef.current;
+      const rect = target.getBoundingClientRect();
       const GAP = 8;
       let top = 0;
       let left = 0;
