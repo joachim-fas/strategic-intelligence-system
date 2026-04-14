@@ -77,7 +77,7 @@ export default function HomeClient() {
   const [inputFocused, setInputFocused] = useState(false);
   // FE-09: Dark mode toggle consolidated into AppHeader — removed duplicate
   // state and effect. AppHeader handles sis-theme persistence and class toggling.
-  const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string } } | null>(null);
+  const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
   const [frameworkTopicFocused, setFrameworkTopicFocused] = useState(false);
@@ -561,12 +561,16 @@ export default function HomeClient() {
       )}
 
       {/* ── Main (Briefing) View ─────────────────────────────────── */}
+      {/* First-visit: vertically center the framework+command-line+projects block
+          so it stays in the optical middle regardless of viewport height.
+          Session/history state anchors to the top as before. */}
       <div style={{
         flex: 1,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "flex-start",
-        paddingTop: isFirstVisit && !showFullRadar ? "8vh" : 0,
+        justifyContent: isFirstVisit && !showFullRadar ? "center" : "flex-start",
+        paddingTop: 0,
+        paddingBottom: isFirstVisit && !showFullRadar ? 60 : 0,
         position: "relative",
       }}>
 
@@ -1015,18 +1019,13 @@ export default function HomeClient() {
 
         </div>
 
-        {/* Framework grid — empty state primary entry point */}
+        {/* Framework grid — empty state primary entry point.
+             Outer div holds the viewport-edge padding (24px) so it sits OUTSIDE
+             the 700px maxWidth — matching the command line container below so
+             the framework buttons and the command line have the same total width. */}
         {isFirstVisit && !showFullRadar && (
-          <div style={{ maxWidth: 700, margin: "0 auto", width: "100%", padding: "0 24px" }}>
-            {/* Tiny mono stats line — was the subtitle before, now the only header */}
-            <div style={{
-              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-              fontSize: 10, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" as const,
-              color: "var(--volt-text-faint, #AAA)",
-              textAlign: "center", marginBottom: 20,
-            }}>
-              {liveStats ? liveStats.sources : "…"} {locale === "de" ? "Quellen" : "Sources"} · {liveStats ? liveStats.trends : "…"} Trends · STEEP+V · EU-Fokus
-            </div>
+          <div style={{ paddingLeft: 24, paddingRight: 24 }}>
+            <div style={{ maxWidth: 700, margin: "0 auto", width: "100%" }}>
             <div style={{
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
               fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
@@ -1049,7 +1048,9 @@ export default function HomeClient() {
                     ? "Kontext → Intern → Extern → Optionen → Priorisierung"
                     : "Context → Internal → External → Options → Prioritization",
                   templateId: "market-analysis",
-                  p: { card: "#EEF5FF", icon: "#D4E8FF", border: "#C0D8F4", type: "#1A4A8A" },
+                  // `type` is tuned for pastel-card backgrounds; `typeBright` is
+                  // the high-contrast variant for the dark tooltip background.
+                  p: { card: "#EEF5FF", icon: "#D4E8FF", border: "#C0D8F4", type: "#1A4A8A", typeBright: "#8EC5FF" },
                 },
                 {
                   icon: "/icons/methoden/war-gaming/war-gaming-swords.svg",
@@ -1061,7 +1062,7 @@ export default function HomeClient() {
                     : "Scenario-based strategy (RAND, Shell). Premise: the future isn't predictable — build strategies robust across multiple futures.",
                   flow: locale === "de" ? "Driving Forces → 3 Szenarien → Robuste Strategie" : "Driving Forces → 3 Scenarios → Robust Strategy",
                   templateId: "war-gaming",
-                  p: { card: "#FFF0F4", icon: "#FFD6E0", border: "#F4B8C8", type: "#A0244A" },
+                  p: { card: "#FFF0F4", icon: "#FFD6E0", border: "#F4B8C8", type: "#A0244A", typeBright: "#FF9AB3" },
                 },
                 {
                   icon: "/icons/methoden/pre-mortem/pre-mortem-triangle-alert.svg",
@@ -1075,7 +1076,7 @@ export default function HomeClient() {
                     ? "Scheitern vorstellen → Risiken bewerten → Gegenmaßnahmen"
                     : "Imagine failure → Assess risks → Countermeasures",
                   templateId: "pre-mortem",
-                  p: { card: "#FFF8F0", icon: "#FFECD2", border: "#F0D4A8", type: "#955A20" },
+                  p: { card: "#FFF8F0", icon: "#FFECD2", border: "#F0D4A8", type: "#955A20", typeBright: "#FFC078" },
                 },
                 {
                   icon: "/icons/methoden/post-mortem/post-mortem-search.svg",
@@ -1089,7 +1090,7 @@ export default function HomeClient() {
                     ? "Chronologie → 3-Ebenen-Ursachen → Lessons Learned"
                     : "Timeline → 3-layer causes → Lessons learned",
                   templateId: "post-mortem",
-                  p: { card: "#EEFAF4", icon: "#C3F4D3", border: "#90DCA8", type: "#0F6038" },
+                  p: { card: "#EEFAF4", icon: "#C3F4D3", border: "#90DCA8", type: "#0F6038", typeBright: "#6EE0A5" },
                 },
                 {
                   icon: "/icons/methoden/trend-deep-dive/trend-deep-dive-microscope.svg",
@@ -1103,7 +1104,7 @@ export default function HomeClient() {
                     ? "Definition → Evidenz → Treiber → Impact → Handlung"
                     : "Definition → Evidence → Drivers → Impact → Action",
                   templateId: "trend-deep-dive",
-                  p: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", type: "#7C1A9E" },
+                  p: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", type: "#7C1A9E", typeBright: "#DCA0FF" },
                 },
                 {
                   icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
@@ -1117,16 +1118,16 @@ export default function HomeClient() {
                     ? "Identifizieren → Bewerten → Dynamiken → Engagement"
                     : "Identify → Assess → Dynamics → Engagement",
                   templateId: "stakeholder-mapping",
-                  p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00" },
+                  p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00", typeBright: "#F5DC5C" },
                 },
-              ] as { icon: string; type: string; label: string; desc: string; tip: string; flow: string; templateId: string; p: { card: string; icon: string; border: string; type: string } }[]).map(t => (
+              ] as { icon: string; type: string; label: string; desc: string; tip: string; flow: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } }[]).map(t => (
                 <Tooltip
                   key={t.templateId}
                   placement="top"
                   maxWidth={320}
                   content={
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: t.p.type, marginBottom: 4 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: t.p.typeBright, marginBottom: 4 }}>
                         {t.type} · {t.label}
                       </div>
                       <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 6 }}>{t.tip}</div>
@@ -1145,22 +1146,23 @@ export default function HomeClient() {
                     className="sis-framework-btn cursor-pointer"
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
-                      padding: 0, background: "transparent", border: "none",
+                      height: 32,
+                      padding: "0 14px 0 8px",
+                      background: t.p.icon,
+                      border: "none",
                       borderRadius: 8, outline: "none",
-                      transition: "transform 140ms ease, opacity 140ms ease",
+                      transition: "transform 140ms ease, filter 140ms ease",
                     }}
                   >
                     <span
                       style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        background: t.p.icon,
+                        width: 20, height: 20, flexShrink: 0,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
                       }}
                     >
-                      <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.85 }} />
+                      <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.9 }} />
                     </span>
-                    <div className="font-display font-bold tracking-tight" style={{ fontSize: 13, color: "var(--volt-text, #0A0A0A)", lineHeight: 1 }}>
+                    <div className="font-display font-bold tracking-tight" style={{ fontSize: 13, color: "var(--volt-text, #0A0A0A)", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {t.label}
                     </div>
                   </div>
@@ -1168,65 +1170,7 @@ export default function HomeClient() {
               ))}
             </div>
 
-            {/* Letzte Projekte — recent projects as clickable cards */}
-            {pastSessions.length > 0 && (
-              <div style={{ marginTop: 28 }}>
-                <div style={{
-                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
-                  color: "var(--volt-text-faint, #BBB)",
-                  marginBottom: 10, textAlign: "center",
-                }}>
-                  {locale === "de" ? "Letzte Projekte" : "Recent Projects"}
-                </div>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                  gap: 10,
-                }}>
-                  {pastSessions.slice(0, 6).map(s => (
-                    <a
-                      key={s.id}
-                      href={`/canvas?project=${s.id}`}
-                      onClick={() => { activeProjectIdRef.current = s.id; setActiveProjectId(s.id); }}
-                      style={{
-                        display: "block",
-                        padding: "12px 14px",
-                        borderRadius: "var(--volt-radius-md, 10px)",
-                        border: "1px solid var(--volt-border, #E8E8E8)",
-                        background: "var(--volt-surface-raised, #fff)",
-                        textDecoration: "none",
-                        transition: "border-color 140ms ease, box-shadow 140ms ease",
-                        cursor: "pointer",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; e.currentTarget.style.boxShadow = "none"; }}
-                    >
-                      <div style={{
-                        fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-                        fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
-                        color: "var(--volt-text, #0A0A0A)",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        marginBottom: 4,
-                      }}>
-                        {s.name}
-                      </div>
-                      <div style={{
-                        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                        fontSize: 9, color: "var(--volt-text-faint, #AAA)",
-                        letterSpacing: "0.04em",
-                        display: "flex", alignItems: "center", gap: 8,
-                      }}>
-                        <span>{s.nodeCount} Nodes</span>
-                        {s.updatedAt && (
-                          <span>{new Date(s.updatedAt).toLocaleDateString(locale === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}</span>
-                        )}
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -1236,7 +1180,7 @@ export default function HomeClient() {
         {isFirstVisit && !showFullRadar && (
           <div style={{
             position: "relative",
-            marginTop: 24,
+            marginTop: 56,
             paddingTop: 0,
             paddingBottom: 0,
             paddingLeft: 24,
@@ -1307,6 +1251,67 @@ export default function HomeClient() {
                   </button>
                 )}
               </div>
+
+              {/* Letzte Projekte — compact list directly below the command line */}
+              {pastSessions.length > 0 && (
+                <div style={{ marginTop: 72 }}>
+                  <div style={{
+                    fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
+                    color: "var(--volt-text-faint, #BBB)",
+                    marginBottom: 8, textAlign: "center",
+                  }}>
+                    {locale === "de" ? "Letzte Projekte" : "Recent Projects"}
+                  </div>
+                  <ul style={{
+                    listStyle: "none", margin: 0, padding: 0,
+                    borderTop: "1px solid var(--volt-border, #E8E8E8)",
+                  }}>
+                    {pastSessions.slice(0, 6).map((s) => (
+                      <li key={s.id} style={{ borderBottom: "1px solid var(--volt-border, #E8E8E8)" }}>
+                        <a
+                          href={`/canvas?project=${s.id}`}
+                          onClick={() => { activeProjectIdRef.current = s.id; setActiveProjectId(s.id); }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 16,
+                            padding: "10px 8px",
+                            textDecoration: "none",
+                            color: "var(--volt-text, #0A0A0A)",
+                            transition: "background-color 120ms ease",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "var(--volt-lime, #E4FF97)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >
+                          <span style={{
+                            fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+                            fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            flex: 1, minWidth: 0,
+                          }}>
+                            {s.name}
+                          </span>
+                          <span style={{
+                            fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                            fontSize: 10, color: "var(--volt-text-faint, #AAA)",
+                            letterSpacing: "0.04em",
+                            display: "flex", alignItems: "center", gap: 10,
+                            flexShrink: 0,
+                          }}>
+                            <span>{s.nodeCount} Nodes</span>
+                            {s.updatedAt && (
+                              <span>{new Date(s.updatedAt).toLocaleDateString(locale === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}</span>
+                            )}
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1427,27 +1432,6 @@ export default function HomeClient() {
         `}</style>
       </div>
 
-      {/* ── Fixed bottom gradient glow ─────────────────────────────
-           Decoupled from the command line so the command line can sit in
-           the visual middle while the lime "horizon" glow stays anchored
-           to the viewport bottom (just above the SignalTicker). Only shown
-           in the empty (first-visit) state. */}
-      {isFirstVisit && !showFullRadar && (
-        <div
-          aria-hidden
-          style={{
-            position: "fixed",
-            left: 0,
-            right: 0,
-            bottom: 34, // sits directly above the 34px-tall SignalTicker
-            height: 360,
-            background:
-              "linear-gradient(to top, rgba(228,255,151,0.62) 0%, rgba(228,255,151,0.36) 28%, rgba(228,255,151,0.16) 55%, rgba(228,255,151,0.05) 80%, transparent 100%)",
-            pointerEvents: "none",
-            zIndex: 1,
-          }}
-        />
-      )}
 
       {/* Trend Detail Panel */}
       {selectedTrend && (

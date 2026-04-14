@@ -1073,10 +1073,34 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 0;
 }
 .sis-framework-btn:hover {
-  transform: translateX(2px);
+  filter: brightness(0.96);
+  transform: translateY(-1px);
 }
 .sis-framework-btn:focus-visible {
   box-shadow: 0 0 0 2px var(--color-brand, #E4FF97);
+}
+
+/* Recent-projects grid — 2 columns that together span the same total width
+   as the 3-column framework grid above. Both grids live in the same parent
+   container and use the same horizontal gap, so 2x minmax(0,1fr) fills the
+   same total width as 3x minmax(0,1fr). minmax(0, ...) prevents nowrap text
+   from forcing a min-content fallback that breaks equal column widths. */
+.sis-projects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+}
+@media (max-width: 600px) {
+  .sis-projects-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+@media (min-width: 601px) and (max-width: 840px) {
+  .sis-projects-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+  }
 }
 
 /* Dark mode adjustments */
