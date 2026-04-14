@@ -9,6 +9,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { checkRateLimit, tooManyRequests, validationError } from "@/lib/api-utils";
 import { validateStringLength } from "@/lib/validation";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       impacts: r.impacts ? JSON.parse(r.impacts) : [],
     }));
 
-    return NextResponse.json({ scenarios });
+    return apiSuccess({ scenarios }, 200, CACHE_HEADERS.short);
   } finally {
     d.close();
   }
@@ -116,13 +117,13 @@ export async function POST(req: Request) {
     const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
 
     // API-18: POST creating a resource should return 201
-    return NextResponse.json({
+    return apiSuccess({
       scenario: {
         ...row,
         key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
         impacts: row.impacts ? JSON.parse(row.impacts) : [],
       },
-    }, { status: 201 });
+    }, 201);
   } finally {
     d.close();
   }

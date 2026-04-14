@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { validationError } from "@/lib/api-utils";
 import { validateStringLength, validateId } from "@/lib/validation";
+import { apiSuccess, apiError } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -43,17 +44,14 @@ export async function PATCH(req: Request, context: Params) {
       d.prepare("UPDATE radars SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?")
         .run(name.trim(), description ?? null, id);
       const updated = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
-      if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
-      return NextResponse.json({ project: updated });
+      if (!updated) return apiError("Project not found", 404, "NOT_FOUND");
+      return apiSuccess({ project: updated });
     } finally {
       d.close();
     }
   } catch (err) {
     console.error("PATCH /api/v1/projects/[id] error:", err);
-    return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to update project", status: 500 } },
-      { status: 500 }
-    );
+    return apiError("Failed to update project", 500, "INTERNAL_ERROR");
   }
 }
 
@@ -66,10 +64,7 @@ export async function DELETE(_req: Request, context: Params) {
     try {
       const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
       if (!existing) {
-        return NextResponse.json(
-          { success: false, error: { code: "NOT_FOUND", message: "Project not found", status: 404 } },
-          { status: 404 }
-        );
+        return apiError("Project not found", 404, "NOT_FOUND");
       }
 
       // Cascade manually (foreign_keys pragma handles it if FK constraints exist,
@@ -84,9 +79,6 @@ export async function DELETE(_req: Request, context: Params) {
     }
   } catch (err) {
     console.error("DELETE /api/v1/projects/[id] error:", err);
-    return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "Failed to delete project", status: 500 } },
-      { status: 500 }
-    );
+    return apiError("Failed to delete project", 500, "INTERNAL_ERROR");
   }
 }

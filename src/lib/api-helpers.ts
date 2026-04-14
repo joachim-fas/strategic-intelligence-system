@@ -8,9 +8,6 @@
 // Some use NextRequest/NextResponse, others use Request/Response.
 // FIX: Create a standardized API handler wrapper with auth + error handling + response typing.
 
-// TODO: FE-12 — Add Cache-Control headers to read-only API endpoints.
-// Example: res.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
-
 // TODO: FE-13 / PERF-07 — 105+ manual useEffect+fetch patterns without caching.
 // No deduplication, no stale-while-revalidate, no error recovery.
 // FIX: Introduce SWR or TanStack Query as the standard data fetching layer.
@@ -18,9 +15,6 @@
 // TODO: PERF-13 — No pagination on any GET endpoint. All results returned at once.
 // FIX: Add cursor-based pagination with limit/offset to all list endpoints.
 
-// TODO: API-06 — 6 different error envelope formats across API routes.
-// TODO: API-07 — Response wrappers inconsistent ({data}, {canvases}, {projects}, raw arrays).
-// FIX: Define standard envelope: { data, meta, error } and migrate all routes.
 
 // TODO: API-09 — 3 different SSE parsing implementations (query, canvas, frameworks).
 // Each has different bugs. FIX: Create shared SSE client utility with [DONE] handling + reconnect.
@@ -35,6 +29,44 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// FE-12: Cache-Control header presets for read-only API endpoints
+// ---------------------------------------------------------------------------
+export const CACHE_HEADERS = {
+  /** Mutation endpoints or real-time data that must never be cached */
+  none: { "Cache-Control": "no-store" },
+  /** Frequently-changing data (signals, queries, user-specific): 60s TTL */
+  short: { "Cache-Control": "private, max-age=60, stale-while-revalidate=30" },
+  /** Semi-stable reference data (trends, frameworks, categories): 5min TTL */
+  medium: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+  /** Stable reference data (rarely changes): 1h TTL */
+  long: { "Cache-Control": "public, max-age=3600, stale-while-revalidate=300" },
+} as const;
+
+// ---------------------------------------------------------------------------
+// API-06 + API-07: Standardized response envelope helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return a success response with a consistent `{ ok, data }` envelope.
+ */
+export function apiSuccess<T>(data: T, status = 200, headers?: Record<string, string>) {
+  return NextResponse.json(
+    { ok: true, data },
+    { status, ...(headers ? { headers } : {}) },
+  );
+}
+
+/**
+ * Return an error response with a consistent `{ ok, error: { message, code } }` envelope.
+ */
+export function apiError(message: string, status = 500, code?: string) {
+  return NextResponse.json(
+    { ok: false, error: { message, ...(code ? { code } : {}) } },
+    { status },
+  );
+}
 
 /**
  * Require an authenticated session. Returns the session or a 401 response.

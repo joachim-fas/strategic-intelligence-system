@@ -119,7 +119,7 @@ export function ActivityPanel() {
     const fetchData = () => {
       fetchWithTimeout("/api/v1/monitor")
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (d) setMonitorData(d); })
+        .then((json) => { if (json) setMonitorData(json.data ?? json); })
         .catch(() => {});
     };
     fetchData();

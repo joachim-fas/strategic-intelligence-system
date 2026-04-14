@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 /**
  * GET /api/v1/feed — Signal-Radar Feed
@@ -163,7 +164,7 @@ export async function GET() {
 
     db.close();
 
-    return NextResponse.json({
+    return apiSuccess({
       topSignals: topSignalsWithAge,
       trends,
       sourceStatus,
@@ -172,11 +173,11 @@ export async function GET() {
         freshSignals: freshRow.fresh,
         timestamp: new Date().toISOString(),
       },
-    });
+    }, 200, CACHE_HEADERS.short);
   } catch (err: unknown) {
     db.close();
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[/api/v1/feed]", msg);
-    return NextResponse.json({ error: msg, topSignals: [], trends: [], sourceStatus: [], meta: { totalSignals: 0, freshSignals: 0 } }, { status: 500 });
+    return apiError(msg, 500);
   }
 }

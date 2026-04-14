@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { getEdgesForTrend } from "@/lib/causal-graph";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 /**
  * GET /api/v1/trends/[id] — Trend detail with connected signals, sources, causal edges
@@ -35,7 +36,7 @@ export async function GET(
 
     if (!trend) {
       db.close();
-      return NextResponse.json({ error: "Trend not found" }, { status: 404 });
+      return apiError("Trend not found", 404, "NOT_FOUND");
     }
 
     const meta = trend.metadata ? JSON.parse(trend.metadata) : {};
@@ -123,7 +124,7 @@ export async function GET(
     const older = sparkline.slice(0, 4).reduce((a, b) => a + b, 0);
     const velocity = meta.velocity ?? (recent > (older / 4) * 1.2 * 3 ? "rising" : recent < (older / 4) * 0.8 * 3 ? "falling" : "stable");
 
-    return NextResponse.json({
+    return apiSuccess({
       trend: {
         id: trend.id,
         slug: trend.slug,
@@ -149,10 +150,10 @@ export async function GET(
       })),
       topSources,
       relatedTrends: relatedWithMeta,
-    });
+    }, 200, CACHE_HEADERS.medium);
   } catch (err: unknown) {
     db.close();
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return apiError(msg, 500);
   }
 }

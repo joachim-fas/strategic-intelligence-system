@@ -16,6 +16,7 @@ import { getSignalAge } from "@/lib/signals";
 import { megaTrends } from "@/lib/mega-trends";
 import { TREND_EDGES } from "@/lib/causal-graph";
 import { GLOBAL_REGULATIONS } from "@/lib/regulations";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"), { readonly: true });
@@ -121,7 +122,7 @@ export async function GET() {
       }
     } catch { /* pipeline not run yet */ }
 
-    return NextResponse.json({
+    return apiSuccess({
       timestamp: new Date().toISOString(),
       signals: {
         total: signalAge.count,
@@ -147,12 +148,9 @@ export async function GET() {
         nodeVersion: process.version,
         uptime: Math.round(process.uptime()),
       },
-    });
+    }, 200, CACHE_HEADERS.short);
   } catch (err) {
     console.error("[monitor] Error:", err);
-    return NextResponse.json(
-      { error: "Monitor data unavailable" },
-      { status: 500 }
-    );
+    return apiError("Monitor data unavailable", 500);
   }
 }

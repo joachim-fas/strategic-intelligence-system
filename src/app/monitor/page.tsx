@@ -146,7 +146,8 @@ export default function MonitorPage() {
     try {
       const res = await fetchWithTimeout("/api/v1/monitor");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const d = await res.json();
+      const json = await res.json();
+      const d = json.data ?? json;
       setData(d);
       setError(null);
       setLastRefresh(new Date());

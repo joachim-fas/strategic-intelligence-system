@@ -128,7 +128,8 @@ export function SessionList({ mode, de }: Props) {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((data) => {
+      .then((json) => {
+        const data = json.data ?? json;
         const list = (data?.canvases ?? []) as SessionRow[];
         setSessions(list);
         setError(null);

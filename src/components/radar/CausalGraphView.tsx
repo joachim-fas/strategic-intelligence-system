@@ -125,7 +125,8 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
       try {
         const res = await fetchWithTimeout("/api/v1/feed", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as LiveFeedResponse;
+        const json = await res.json();
+        const data = (json.data ?? json) as LiveFeedResponse;
         if (cancelled || !data.trends) return;
         const map = new Map<string, LiveFeedTrend>();
         for (const t of data.trends) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -25,14 +26,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     contextProfile: q.context_profile ? JSON.parse(q.context_profile) : null,
   }));
 
-  return NextResponse.json({ queries: parsed });
+  return apiSuccess({ queries: parsed }, 200, CACHE_HEADERS.short);
 }
 
 // POST — save a query result to project
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { query, result, locale, contextProfile } = await req.json();
-  if (!query) return NextResponse.json({ error: "Query required" }, { status: 400 });
+  if (!query) return apiError("Query required", 400, "VALIDATION_ERROR");
 
   const d = db();
   const qid = crypto.randomUUID();
@@ -46,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const saved = d.prepare("SELECT * FROM project_queries WHERE id = ?").get(qid);
   d.close();
-  return NextResponse.json({ query: saved }, { status: 201 });
+  return apiSuccess({ query: saved }, 201);
 }
 
 // DELETE — remove a query (via query param ?qid=xxx)
@@ -54,12 +55,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { id } = await params;
   const url = new URL(req.url);
   const qid = url.searchParams.get("qid");
-  if (!qid) return NextResponse.json({ error: "qid required" }, { status: 400 });
+  if (!qid) return apiError("qid required", 400, "VALIDATION_ERROR");
 
   const d = db();
   d.prepare("DELETE FROM project_queries WHERE id = ? AND radar_id = ?").run(qid, id);
   d.close();
-  return NextResponse.json({ deleted: true });
+  return new NextResponse(null, { status: 204 });
 }
 
 // PATCH — pin/unpin a query (via query param ?qid=xxx)
@@ -67,10 +68,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const url = new URL(req.url);
   const qid = url.searchParams.get("qid");
-  if (!qid) return NextResponse.json({ error: "qid required" }, { status: 400 });
+  if (!qid) return apiError("qid required", 400, "VALIDATION_ERROR");
   const { pinned } = await req.json();
   const d = db();
   d.prepare("UPDATE project_queries SET pinned = ? WHERE id = ? AND radar_id = ?").run(pinned ? 1 : 0, qid, id);
   d.close();
-  return NextResponse.json({ updated: true });
+  return apiSuccess({ updated: true });
 }

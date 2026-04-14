@@ -6,9 +6,9 @@
  * Canvas state (nodes, connections, pan, zoom) is stored in the `canvas_state` column.
  */
 
-import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     };
   });
 
-  return NextResponse.json({ canvases });
+  return apiSuccess({ canvases }, 200, CACHE_HEADERS.short);
 }
 
 // POST — create a new canvas project
@@ -89,5 +89,5 @@ export async function POST(req: Request) {
 
   const canvas = d.prepare("SELECT id, name, description, created_at, updated_at FROM radars WHERE id = ?").get(id);
   d.close();
-  return NextResponse.json({ canvas }, { status: 201 });
+  return apiSuccess({ canvas }, 201);
 }

@@ -208,7 +208,8 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   useEffect(() => {
     fetchWithTimeout("/api/v1/sources/status")
       .then((r) => r.json())
-      .then((data) => {
+      .then((json) => {
+        const data = json.data ?? json;
         const list = data?.connectors || data?.sources || [];
         if (Array.isArray(list)) {
           const map: Record<string, { lastRunAt?: string; status?: string }> = {};

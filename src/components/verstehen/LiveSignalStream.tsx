@@ -135,7 +135,8 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((data) => {
+      .then((json) => {
+        const data = json.data ?? json;
         const list = (data?.signals ?? []) as RawSignal[];
         setSignals(list);
         setError(null);

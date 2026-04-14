@@ -4769,7 +4769,7 @@ export default function CanvasPage() {
       const res = await fetchWithTimeout("/api/v1/canvas");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      setProjects(json.canvases ?? []);
+      setProjects((json.data ?? json).canvases ?? []);
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
         showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
@@ -4822,7 +4822,7 @@ export default function CanvasPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const json = await res.json();
-      const newCanvas = json.canvas;
+      const newCanvas = (json.data ?? json).canvas;
       if (!newCanvas?.id) throw new Error("API returned no canvas ID");
       setProjectId(newCanvas.id);
       setProjectName(name.trim());
@@ -4877,7 +4877,7 @@ export default function CanvasPage() {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      const canvas = json.canvas;
+      const canvas = (json.data ?? json).canvas;
       if (!canvas) throw new Error("Canvas not found");
       setProjectId(id);
       setProjectName(canvas.name);

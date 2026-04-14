@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, parseBody } from "@/lib/api-helpers";
+import { requireAuth, parseBody, apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 // ---------------------------------------------------------------------------
@@ -53,16 +53,16 @@ export async function GET(_request: Request, context: Params) {
   }
 
   if (!radar) {
-    return NextResponse.json({ error: "Radar not found" }, { status: 404 });
+    return apiError("Radar not found", 404, "NOT_FOUND");
   }
 
   // Check ownership or shared
   const userId = session!.user!.id!;
   if (radar.ownerId !== userId && !radar.isShared) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return apiError("Forbidden", 403, "FORBIDDEN");
   }
 
-  return NextResponse.json({ data: radar });
+  return apiSuccess({ radar }, 200, CACHE_HEADERS.short);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ export async function PATCH(request: Request, context: Params) {
       .limit(1);
 
     if (existing.length === 0) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return apiError("Radar not found or not owned by you", 404, "NOT_FOUND");
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -106,7 +106,7 @@ export async function PATCH(request: Request, context: Params) {
       .where(eq(schema.radars.id, id))
       .returning();
 
-    return NextResponse.json({ data: result[0] });
+    return apiSuccess({ radar: result[0] });
   } else {
     const schema = await import("@/db/schema-sqlite");
 
@@ -117,7 +117,7 @@ export async function PATCH(request: Request, context: Params) {
       .get();
 
     if (!existing) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return apiError("Radar not found or not owned by you", 404, "NOT_FOUND");
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -132,7 +132,7 @@ export async function PATCH(request: Request, context: Params) {
       .run();
 
     const updated = db.select().from(schema.radars).where(eq(schema.radars.id, id)).get();
-    return NextResponse.json({ data: updated });
+    return apiSuccess({ radar: updated });
   }
 }
 
@@ -157,7 +157,7 @@ export async function DELETE(_request: Request, context: Params) {
       .limit(1);
 
     if (existing.length === 0) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return apiError("Radar not found or not owned by you", 404, "NOT_FOUND");
     }
 
     await db.delete(schema.radars).where(eq(schema.radars.id, id));
@@ -170,11 +170,11 @@ export async function DELETE(_request: Request, context: Params) {
       .get();
 
     if (!existing) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return apiError("Radar not found or not owned by you", 404, "NOT_FOUND");
     }
 
     db.delete(schema.radars).where(eq(schema.radars.id, id)).run();
   }
 
-  return NextResponse.json({ success: true });
+  return new NextResponse(null, { status: 204 });
 }

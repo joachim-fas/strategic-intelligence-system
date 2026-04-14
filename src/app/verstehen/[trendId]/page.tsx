@@ -25,7 +25,8 @@ export default function TrendDetailPage() {
     // Try API first, fallback to megaTrends
     fetchWithTimeout(`/api/v1/trends/${trendId}`)
       .then(r => r.json())
-      .then(data => {
+      .then(json => {
+        const data = json.data ?? json;
         if (data.trend) {
           setTrend(data.trend);
         } else {

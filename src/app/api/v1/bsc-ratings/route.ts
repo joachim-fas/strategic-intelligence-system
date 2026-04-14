@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { checkRateLimit, tooManyRequests, validationError } from "@/lib/api-utils";
 import { validateStringLength, validateEnum } from "@/lib/validation";
+import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
         ON CONFLICT(query_hash, perspective_id) DO UPDATE SET rating = excluded.rating
       `).run(queryHash, perspectiveId, rating);
     }
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } finally {
     d.close();
   }
@@ -68,7 +69,7 @@ export async function GET(req: Request) {
   }
   const { searchParams } = new URL(req.url);
   const queryHash = searchParams.get("queryHash");
-  if (!queryHash) return NextResponse.json({ ratings: [] });
+  if (!queryHash) return apiSuccess({ ratings: {} });
 
   // DAT-13: Ensure DB handle is always closed
   const d = db();
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
 
     const ratings: Record<string, string> = {};
     for (const row of rows) ratings[row.perspective_id] = row.rating;
-    return NextResponse.json({ ratings });
+    return apiSuccess({ ratings }, 200, CACHE_HEADERS.short);
   } finally {
     d.close();
   }

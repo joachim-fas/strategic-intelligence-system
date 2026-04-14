@@ -60,7 +60,8 @@ export default function SignalTicker() {
     const load = () => {
       fetchWithTimeout("/api/v1/feed/ticker?limit=60&hours=48")
         .then(r => r.json())
-        .then(data => {
+        .then(json => {
+          const data = json.data ?? json;
           const list = (data?.signals ?? []) as TickerSignal[];
           if (Array.isArray(list) && list.length > 0) setSignals(list);
         })
