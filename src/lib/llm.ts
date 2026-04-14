@@ -182,6 +182,14 @@ synthesis muss sein wie ein brillanter Analyst nach 2 Stunden Recherche:
 - Was ist der AKTUELLE STAND der Dinge?
 - Was sind die TREIBENDEN KRÄFTE entlang STEEP+V?
 - Was sind die KRITISCHEN UNSICHERHEITEN?
+
+═══ TEXTFORMATIERUNG ═══
+KRITISCH: Laengere Texte (synthesis, scenarios.description, interpretation) MUESSEN in ABSAETZE gegliedert sein.
+- Verwende \\n\\n zwischen Absaetzen (doppelter Zeilenumbruch im JSON-String)
+- synthesis: 2-3 Absaetze (Lage → Dynamiken → Implikationen)
+- scenarios.description: 2 Absaetze (Entwicklung → Konsequenzen)
+- KEINE Textwuesten — jeder Absatz max. 3-4 Saetze
+- Innerhalb eines Absatzes darf \\n fuer weiche Umbrueche verwendet werden
 - Welche KONKRETEN IMPLIKATIONEN ergeben sich — insbesondere fuer Europa?
 - Wo ist die DATENLAGE DUENN — was wissen wir nicht?
 Belege Aussagen direkt im Fliesstext: [Quellenname, Datum]. Ohne Beleg = Meinung.
@@ -189,7 +197,7 @@ Methodische Transparenz: Benenne die analytische Grundlage (welche Quellen, welc
 
 ANTWORTE NUR als JSON (kein Text ausserhalb):
 {
-  "synthesis": "6-10 substanzielle Saetze. Beantworte die Kernfrage vollstaendig. Erklaere strukturelle Ursachen und Dynamiken. Nenne konkrete Beispiele, Zahlen, Zeitrahmen. Belege mit [Quelle, Datum]. VERBOTEN: Saetze wie 'X ist ein Megatrend mit Y% Relevanz'.",
+  "synthesis": "6-10 substanzielle Saetze, GEGLIEDERT in 2-3 Absaetze (getrennt durch \\n\\n). Erster Absatz: Kernaussage und aktueller Stand. Zweiter Absatz: Treibende Kraefte und Dynamiken. Dritter Absatz: Implikationen und Unsicherheiten. Nenne konkrete Beispiele, Zahlen, Zeitrahmen. Belege mit [Quelle, Datum]. VERBOTEN: Saetze wie 'X ist ein Megatrend mit Y% Relevanz'.",
   "reasoningChains": ["Kausale Kette: Ausgangsfaktor → Zwischenschritt → Strategische Implikation", "..."],
   "steepV": {
     "S": "Society-Dimension: 1-2 Saetze wie diese Frage die Gesellschaft betrifft (oder null wenn irrelevant)",
@@ -211,7 +219,7 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     {
       "type": "optimistic",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Konkretes Szenario mit Zeitrahmen und Bedingungen — mindestens 2 Saetze. Nenne konkrete Akteure, Zahlen, Zeitpunkte. Begruende die Wahrscheinlichkeit.",
+      "description": "Konkretes Szenario mit Zeitrahmen und Bedingungen — mindestens 3-4 Saetze in 2 Absaetzen (getrennt durch \\n\\n). Erster Absatz: Was passiert und warum. Zweiter Absatz: Konkrete Auswirkungen und Akteure. Begruende die Wahrscheinlichkeit.",
       "probability": "<BERECHNE themenspezifisch, NICHT 0.25>",
       "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2", "Treiber 3"]
@@ -219,7 +227,7 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     {
       "type": "baseline",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Was passiert wenn aktuelle Dynamiken anhalten — mindestens 2 Saetze. Konkreter als 'Weiterentwicklung'. Begruende die Wahrscheinlichkeit.",
+      "description": "Was passiert wenn aktuelle Dynamiken anhalten — mindestens 3-4 Saetze in 2 Absaetzen (getrennt durch \\n\\n). Erster Absatz: Verlauf und Dynamik. Zweiter Absatz: Konkrete Konsequenzen. Begruende die Wahrscheinlichkeit.",
       "probability": "<BERECHNE themenspezifisch, NICHT 0.50>",
       "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2", "Treiber 3"]
@@ -227,7 +235,7 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     {
       "type": "pessimistic",
       "name": "Kurzer thematischer Name (max 5 Woerter)",
-      "description": "Worst Case mit konkreten Ausloesern — mindestens 2 Saetze. Erklaere den Kipppunkt. Begruende die Wahrscheinlichkeit.",
+      "description": "Worst Case mit konkreten Ausloesern — mindestens 3-4 Saetze in 2 Absaetzen (getrennt durch \\n\\n). Erster Absatz: Ausloesende Ereignisse und Kipppunkte. Zweiter Absatz: Folgen und Eskalationsdynamik. Begruende die Wahrscheinlichkeit.",
       "probability": "<BERECHNE themenspezifisch, NICHT 0.20>",
       "timeframe": "konkreter Zeitraum",
       "keyDrivers": ["Treiber 1", "Treiber 2"]

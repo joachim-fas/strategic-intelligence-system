@@ -1824,6 +1824,30 @@ function FormattedText({ text, fontSize = 13, lineHeight = 1.65, color = "var(--
 }) {
   if (!text) return null;
 
+  // Smart paragraph splitting: if text has no \n\n but is long, insert breaks at sentence boundaries
+  const ensureParagraphs = (raw: string): string => {
+    // Already has paragraph breaks → use as-is
+    if (raw.includes("\n\n")) return raw;
+    // Short text → no splitting needed
+    if (raw.length < 300) return raw;
+    // Split at sentence boundaries (period/! /? followed by space + uppercase)
+    const sentences = raw.split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ])/);
+    if (sentences.length <= 3) return raw;
+    // Group into paragraphs of ~3 sentences each
+    const paras: string[] = [];
+    let current: string[] = [];
+    for (const s of sentences) {
+      current.push(s);
+      if (current.length >= 3 || current.join(" ").length > 400) {
+        paras.push(current.join(" "));
+        current = [];
+      }
+    }
+    if (current.length > 0) paras.push(current.join(" "));
+    return paras.join("\n\n");
+  };
+  const processedText = ensureParagraphs(text);
+
   // Parse inline provenance tags and bold markers into React elements
   const renderInline = (line: string, keyPrefix: string) => {
     const parts: React.ReactNode[] = [];
@@ -1857,13 +1881,13 @@ function FormattedText({ text, fontSize = 13, lineHeight = 1.65, color = "var(--
   };
 
   // Split into paragraphs by double newline
-  const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+  const paragraphs = processedText.split(/\n\n+/).filter(p => p.trim());
 
   // For compact mode (card previews), render as single clamped block
   if (compact && maxLines) {
     return (
       <p style={{ fontSize, lineHeight, color, margin: 0, overflow: "hidden", wordBreak: "break-word", display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical" as const }}>
-        {renderInline(text.replace(/\n\n+/g, " — ").replace(/\n/g, " "), "c")}
+        {renderInline(processedText.replace(/\n\n+/g, " — ").replace(/\n/g, " "), "c")}
       </p>
     );
   }
@@ -4191,24 +4215,31 @@ function DetailPanel({
   };
 
   // ── Status selector ──────────────────────────────────────────────────────
+  const statusTips: Record<NodeStatus, { de: string; en: string }> = {
+    open: { de: "Noch nicht bearbeitet", en: "Not yet processed" },
+    active: { de: "Wird aktuell bearbeitet oder verfolgt", en: "Currently being worked on or tracked" },
+    decided: { de: "Analyse abgeschlossen, Entscheidung getroffen", en: "Analysis complete, decision made" },
+    pinned: { de: "Wichtig — bleibt sichtbar bei Filterung", en: "Important — stays visible when filtering" },
+  };
   const renderStatusSelector = () => (
     <div style={{ display: "flex", gap: 4, padding: "0 40px 8px" }}>
       {(["open","active","decided","pinned"] as NodeStatus[]).map(s => {
         const meta = NODE_STATUS_META[s];
         const current = (node as QueryNode & { nodeStatus?: NodeStatus }).nodeStatus ?? "open";
         return (
-          <button key={s}
-            onClick={() => onSetStatus(node.id, s)}
-            title={meta.label}
-            style={{
-              fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
-              border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
-              background: current === s ? `${meta.color}18` : "transparent",
-              color: current === s ? meta.color : "var(--color-text-muted)",
-              fontWeight: current === s ? 700 : 400,
-              transition: "all 0.1s",
-            }}
-          >{meta.icon} {meta.label}</button>
+          <Tooltip key={s} content={de ? statusTips[s].de : statusTips[s].en} placement="bottom">
+            <button
+              onClick={() => onSetStatus(node.id, s)}
+              style={{
+                fontSize: 10, padding: "2px 8px", borderRadius: 20, cursor: "pointer",
+                border: `1px solid ${current === s ? meta.color : "var(--color-border)"}`,
+                background: current === s ? `${meta.color}18` : "transparent",
+                color: current === s ? meta.color : "var(--color-text-muted)",
+                fontWeight: current === s ? 700 : 400,
+                transition: "all 0.1s",
+              }}
+            >{meta.icon} {meta.label}</button>
+          </Tooltip>
         );
       })}
     </div>
@@ -4227,24 +4258,34 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <button onClick={() => onFollowUp(node.id)} style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A" }}>{de ? "Weiterdenken" : "Follow up"}</button>
+            <Tooltip content={de ? "Folgefrage generieren und Analyse vertiefen" : "Generate follow-up question to deepen analysis"} placement="top">
+              <button onClick={() => onFollowUp(node.id)} style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A" }}>{de ? "Weiterdenken" : "Follow up"}</button>
+            </Tooltip>
             {qNode.status === "done" && (
-              <button onClick={() => onRefresh(node.id)}
-                style={{ ...btnBase, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
-              >⟳ {de ? "Aktualisieren" : "Refresh"}</button>
+              <Tooltip content={de ? "Analyse mit aktuellen Daten neu berechnen" : "Re-run analysis with latest data"} placement="top">
+                <button onClick={() => onRefresh(node.id)}
+                  style={{ ...btnBase, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
+                >⟳ {de ? "Aktualisieren" : "Refresh"}</button>
+              </Tooltip>
             )}
             {qNode.status === "error" && (
-              <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}>↺ Retry</button>
+              <Tooltip content={de ? "Fehlgeschlagene Analyse erneut versuchen" : "Retry failed analysis"} placement="top">
+                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}>↺ Retry</button>
+              </Tooltip>
             )}
             {qNode.synthesis && (
-              <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted }}>{copied ? "✓" : "⎘"}</button>
+              <Tooltip content={de ? "Synthese in Zwischenablage kopieren" : "Copy synthesis to clipboard"} placement="top">
+                <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted }}>{copied ? "✓" : "⎘"}</button>
+              </Tooltip>
             )}
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Karte und alle Ableitungen entfernen" : "Remove card and all derived nodes"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4254,14 +4295,20 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onPromoteNote(noteDraft)} disabled={!noteDraft.trim()}
-              style={{ ...btnBase, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", opacity: noteDraft.trim() ? 1 : 0.4 }}
-            >{de ? "Als Abfrage" : "As Query"}</button>
-            <button onClick={() => onIterate(node.id, noteDraft)} style={btnMuted}>↺ rethink</button>
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Notiz als strategische Abfrage weiterverarbeiten" : "Convert note into strategic query"} placement="top">
+              <button onClick={() => onPromoteNote(noteDraft)} disabled={!noteDraft.trim()}
+                style={{ ...btnBase, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", opacity: noteDraft.trim() ? 1 : 0.4 }}
+              >{de ? "Als Abfrage" : "As Query"}</button>
+            </Tooltip>
+            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
+              <button onClick={() => onIterate(node.id, noteDraft)} style={btnMuted}>↺ rethink</button>
+            </Tooltip>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4272,14 +4319,20 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onPromoteIdea(ideaText)} disabled={!ideaText.trim()}
-              style={{ ...btnBase, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.08)", color: "#E65100", opacity: ideaText.trim() ? 1 : 0.4 }}
-            >{de ? "Als Abfrage" : "As Query"}</button>
-            <button onClick={() => onIterate(node.id, ideaText)} style={btnMuted}>↺ rethink</button>
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Idee als strategische Abfrage weiterverarbeiten" : "Convert idea into strategic query"} placement="top">
+              <button onClick={() => onPromoteIdea(ideaText)} disabled={!ideaText.trim()}
+                style={{ ...btnBase, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.08)", color: "#E65100", opacity: ideaText.trim() ? 1 : 0.4 }}
+              >{de ? "Als Abfrage" : "As Query"}</button>
+            </Tooltip>
+            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
+              <button onClick={() => onIterate(node.id, ideaText)} style={btnMuted}>↺ rethink</button>
+            </Tooltip>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4290,11 +4343,15 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onIterate(node.id, listText)} style={btnMuted}>↺ rethink</button>
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
+              <button onClick={() => onIterate(node.id, listText)} style={btnMuted}>↺ rethink</button>
+            </Tooltip>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4310,21 +4367,27 @@ function DetailPanel({
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
             {fNode.fileUrl && (
-              <a href={fNode.fileUrl} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none" }}
-              >↗ {de ? "Öffnen" : "Open"}</a>
+              <Tooltip content={de ? "Datei in neuem Tab öffnen" : "Open file in new tab"} placement="top">
+                <a href={fNode.fileUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none" }}
+                >↗ {de ? "Öffnen" : "Open"}</a>
+              </Tooltip>
             )}
             {(fNode.textContent || isImage) && (
-              <button onClick={() => onAnalyzeFile(analyzeText, node.id)}
-                style={{ ...btnBase, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"}
-              >{de ? "Analysieren" : "Analyze"}</button>
+              <Tooltip content={de ? "Dateiinhalt mit KI analysieren" : "Analyze file content with AI"} placement="top">
+                <button onClick={() => onAnalyzeFile(analyzeText, node.id)}
+                  style={{ ...btnBase, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"}
+                >{de ? "Analysieren" : "Analyze"}</button>
+              </Tooltip>
             )}
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4357,10 +4420,12 @@ function DetailPanel({
                 >{label}</button>
               </Tooltip>
             ))}
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Szenario-Karte entfernen" : "Remove scenario card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4372,13 +4437,17 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onIterate(node.id, dNode.queryText)}
-              style={{ ...btnBase, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.08)", color: "#3b82f6" }}
-            >{de ? "Dimensionen vertiefen" : "Deepen dimensions"}</button>
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "STEEP+V-Dimensionen weiter analysieren" : "Further analyze STEEP+V dimensions"} placement="top">
+              <button onClick={() => onIterate(node.id, dNode.queryText)}
+                style={{ ...btnBase, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.08)", color: "#3b82f6" }}
+              >{de ? "Dimensionen vertiefen" : "Deepen dimensions"}</button>
+            </Tooltip>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4390,13 +4459,17 @@ function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={() => onIterate(node.id, dNode.queryText)}
-              style={{ ...btnBase, border: "1px solid rgba(26,158,90,0.3)", background: "rgba(26,158,90,0.08)", color: "#1A9E5A" }}
-            >{de ? "Kausaltreiber vertiefen" : "Explore causal drivers"}</button>
-            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            <Tooltip content={de ? "Kausale Zusammenhänge und Treiber tiefer untersuchen" : "Deep-dive into causal relationships and drivers"} placement="top">
+              <button onClick={() => onIterate(node.id, dNode.queryText)}
+                style={{ ...btnBase, border: "1px solid rgba(26,158,90,0.3)", background: "rgba(26,158,90,0.08)", color: "#1A9E5A" }}
+              >{de ? "Kausaltreiber vertiefen" : "Explore causal drivers"}</button>
+            </Tooltip>
+            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+              <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+              >{de ? "Löschen" : "Delete"}</button>
+            </Tooltip>
           </div>
         </>
       );
@@ -4405,18 +4478,27 @@ function DetailPanel({
     const btnLabel = type === "followup" ? (de ? "Vertiefen" : "Explore")
       : type === "decision" ? (de ? "Umsetzen" : "Implement")
       : (de ? "Analysieren" : "Analyze");
+    const btnTip = type === "followup" ? (de ? "Erkenntnis als neue Abfrage weiterverfolgen" : "Follow up on this insight with a new query")
+      : type === "decision" ? (de ? "Handlungsempfehlung als Abfrage konkretisieren" : "Concretize recommendation as query")
+      : (de ? "Inhalt als neue Analyse weiterverarbeiten" : "Process content as new analysis");
     return (
       <>
         {renderStatusSelector()}
         <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => onExplore(node.id, dNode.queryText)}
-            style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.1)", background: "#E4FF97", color: "#0A0A0A" }}
-          >{btnLabel}</button>
-          <button onClick={() => onIterate(node.id, dNode.queryText)} style={btnMuted}>↺ rethink</button>
-          <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-          >{de ? "Löschen" : "Delete"}</button>
+          <Tooltip content={btnTip} placement="top">
+            <button onClick={() => onExplore(node.id, dNode.queryText)}
+              style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.1)", background: "#E4FF97", color: "#0A0A0A" }}
+            >{btnLabel}</button>
+          </Tooltip>
+          <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
+            <button onClick={() => onIterate(node.id, dNode.queryText)} style={btnMuted}>↺ rethink</button>
+          </Tooltip>
+          <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >{de ? "Löschen" : "Delete"}</button>
+          </Tooltip>
         </div>
       </>
     );
