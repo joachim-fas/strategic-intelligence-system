@@ -3744,7 +3744,7 @@ function DetailPanel({
       // Demographics: trends tagged with demographic/society categories
       const demographicTrends = (r?.matchedTrends ?? []).filter(t =>
         t.tags?.some(tag => ["demographics", "society", "aging", "population", "migration", "work", "education", "health"].includes(tag)) ||
-        t.id.includes("demographic") || t.category === "society"
+        t.id?.includes("demographic") || t.category === "society"
       );
 
       // Trend name lookup
@@ -4494,16 +4494,16 @@ function DetailPanel({
       onPointerDown={e => e.stopPropagation()}
       style={{
         position: "fixed",
-        left: "50%", top: 56, bottom: 0,
+        left: "50%", top: 72,
         transform: "translateX(-50%)",
         width: "min(880px, calc(100vw - 48px))",
+        maxHeight: "calc(100vh - 96px)",
         background: "rgba(255,255,255,0.98)",
         backdropFilter: "blur(24px) saturate(180%)",
         WebkitBackdropFilter: "blur(24px) saturate(180%)",
         border: "1px solid rgba(0,0,0,0.1)",
-        borderBottom: "none",
-        borderRadius: "16px 16px 0 0",
-        boxShadow: "0 -4px 40px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)",
+        borderRadius: 16,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)",
         zIndex: 910,
         display: "flex", flexDirection: "column",
       }}
