@@ -168,8 +168,6 @@ export const DEFAULT_QUADRANTS = [
 ];
 
 // ─── Shared Canvas / Analysis Types ─────────────────────────
-// TODO: ARC-10 — These types are duplicated in canvas/page.tsx, OrbitGraphView.tsx, OrbitEvidenzView.tsx.
-// Import from here instead of re-defining locally.
 
 export interface UsedSignal {
   source: string;
@@ -194,10 +192,51 @@ export interface Reference {
   relevance?: string;
 }
 
+export interface MatchedTrend {
+  id: string;
+  name: string;
+  category: string;
+  tags: string[];
+  relevance: number;
+  confidence: number;
+  impact: number;
+  velocity: string;
+  ring: string;
+  signalCount: number;
+}
+
 export interface MatchedEdge {
   from: string;
   to: string;
   type: "drives" | "amplifies" | "dampens" | "correlates" | string;
   strength: number;
   description?: string;
+}
+
+export interface DimensionEntry {
+  label: string;
+  key: "technology" | "society" | "market_economic" | "political_environment";
+  trends: MatchedTrend[];
+  avgConfidence: number;
+  direction: "up" | "down" | "neutral";
+  color: string;
+}
+
+export interface QueryResult {
+  synthesis?: string;
+  reasoningChains?: string[];
+  matchedTrendIds?: string[];
+  keyInsights?: string[];
+  scenarios?: Scenario[];
+  decisionFramework?: string;
+  references?: Reference[];
+  followUpQuestions?: string[];
+  confidence?: number;
+  interpretation?: string;
+  newsContext?: string;
+  regulatoryContext?: string[];
+  causalAnalysis?: string[];
+  usedSignals?: UsedSignal[];
+  matchedTrends?: MatchedTrend[];
+  matchedEdges?: MatchedEdge[];
 }
