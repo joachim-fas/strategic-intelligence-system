@@ -42,8 +42,9 @@ export default function HomeClient() {
     fetchWithTimeout("/api/v1/trends")
       .then((res) => res.json())
       .then((data) => {
-        if (data.trends?.length > 0) {
-          setBaseTrends(classifyTrends(data.trends as TrendDot[]));
+        const trends = data.data?.trends ?? data.trends;
+        if (trends?.length > 0) {
+          setBaseTrends(classifyTrends(trends as TrendDot[]));
         }
       })
       .catch(() => { /* keep megaTrends as fallback */ });
@@ -64,8 +65,8 @@ export default function HomeClient() {
   const [liveStats, setLiveStats] = useState<{ sources: number; trends: number; sessions: number } | null>(null);
   useEffect(() => {
     Promise.all([
-      fetchWithTimeout("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
-      fetchWithTimeout("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? []).length).catch(() => 0),
+      fetchWithTimeout("/api/v1/trends").then(r => r.json()).then(d => (d.data?.trends ?? d.trends)?.length ?? 0).catch(() => 0),
+      fetchWithTimeout("/api/v1/canvas").then(r => r.json()).then(d => (d.data?.canvases ?? d.canvases ?? []).length).catch(() => 0),
     ]).then(([trendCount, sessionCount]) => {
       setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
     });
@@ -111,7 +112,7 @@ export default function HomeClient() {
     fetchWithTimeout("/api/v1/canvas")
       .then(r => r.json())
       .then(data => {
-        const list = (data?.canvases || []) as Array<any>;
+        const list = (data?.data?.canvases ?? data?.canvases ?? []) as Array<any>;
         const sessions = list
           .filter((c: any) => (c.queryCount || 0) > 0)
           .slice(0, 8)
