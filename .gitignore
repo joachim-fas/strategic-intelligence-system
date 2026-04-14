@@ -10,3 +10,4 @@ drizzle-sqlite
 **/.DS_Store
 tsconfig.tsbuildinfo
 .claude/
+_volt-reference
