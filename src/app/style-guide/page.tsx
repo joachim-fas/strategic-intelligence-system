@@ -1,8 +1,3 @@
-"use client";
-
-// TODO: FE-01 — Remove "use client". Extract interactive parts into Client Components.
-// This page should be a Server Component with only interactive islands as "use client".
-
 // ─────────────────────────────────────────────────────────────────
 // SIS DESIGN SYSTEM — VoltUI Style Guide
 // >_ Design System · Black + Lime · Terminal Aesthetic
