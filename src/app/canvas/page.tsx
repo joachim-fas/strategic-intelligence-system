@@ -8341,9 +8341,14 @@ export default function CanvasPage() {
           const orbitNames: Record<string, string> = {};
           cgNodes.forEach(n => { Object.assign(orbitNames, n.causalTrendNames ?? {}); });
           const trendQueryMap: Record<string, string[]> = {};
+          const queryLabels: Record<string, string> = {};
           cgNodes.forEach(cg => {
             const parentQId = cg.parentId;
             if (!parentQId) return;
+            const parentQ = nodes.find(n => n.id === parentQId);
+            if (parentQ && parentQ.nodeType === "query" && "query" in parentQ) {
+              queryLabels[parentQId] = (parentQ as { query?: string }).query ?? parentQId;
+            }
             (cg.causalEdges ?? []).forEach(e => {
               [e.from, e.to].forEach(tid => {
                 if (!trendQueryMap[tid]) trendQueryMap[tid] = [];
@@ -8352,35 +8357,40 @@ export default function CanvasPage() {
             });
           });
           return (
-            <OrbitGraphView
-              allEdges={orbitEdges}
-              allTrendNames={orbitNames}
-              trendQueryMap={trendQueryMap}
-              de={de}
-              onSelectQuery={(qId) => {
-                if (qId.startsWith("__orbit_deepen__")) {
-                  const trendLabel = qId.replace("__orbit_deepen__", "");
-                  setCmdVisible(true);
-                  setCmdPrefill(`Vertiefen: ${trendLabel} — Wie beeinflusst dieser Trend andere strategische Bereiche?`);
-                  switchViewMode("canvas");
-                } else {
-                  handleSelectNode(qId);
-                  switchViewMode("canvas");
-                }
-              }}
-            />
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
+              <OrbitGraphView
+                allEdges={orbitEdges}
+                allTrendNames={orbitNames}
+                trendQueryMap={trendQueryMap}
+                queryLabels={queryLabels}
+                de={de}
+                onSelectQuery={(qId) => {
+                  if (qId.startsWith("__orbit_deepen__")) {
+                    const trendLabel = qId.replace("__orbit_deepen__", "");
+                    setCmdVisible(true);
+                    setCmdPrefill(`Vertiefen: ${trendLabel} — Wie beeinflusst dieser Trend andere strategische Bereiche?`);
+                    switchViewMode("canvas");
+                  } else {
+                    handleSelectNode(qId);
+                    switchViewMode("canvas");
+                  }
+                }}
+              />
+            </div>
           );
         })()}
         {viewMode === "orbit" && orbitSubMode === "ableitung" && (
-          <OrbitDerivationView
-            nodes={nodes as unknown as DerivCanvasNode[]}
-            selectedNodeId={selectedId}
-            de={de}
-            onNavigateToNode={(nodeId) => {
-              handleSelectNode(nodeId);
-              switchViewMode("canvas");
-            }}
-          />
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}>
+            <OrbitDerivationView
+              nodes={nodes as unknown as DerivCanvasNode[]}
+              selectedNodeId={selectedId}
+              de={de}
+              onNavigateToNode={(nodeId) => {
+                handleSelectNode(nodeId);
+                switchViewMode("canvas");
+              }}
+            />
+          </div>
         )}
 
         {/* ── Empty state ─────────────────────────────────────────── */}

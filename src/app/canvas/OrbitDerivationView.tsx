@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   HelpCircle, Radio, TrendingUp, GitBranch, Lightbulb, GitFork,
   CheckCircle2, ChevronRight, ChevronDown, X, ExternalLink,
+  Link as LinkIcon, Target, ArrowUpRight, Info,
 } from "lucide-react";
 import type { UsedSignal, MatchedTrend, MatchedEdge, QueryResult } from "@/types";
 
@@ -43,14 +44,14 @@ type Stage = "question" | "signals" | "trends" | "edges" | "insights" | "scenari
 
 const STAGE_ORDER: Stage[] = ["question", "signals", "trends", "edges", "insights", "scenarios", "decisions"];
 
-const STAGE_META: Record<Stage, { labelDe: string; labelEn: string; Icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }> = {
-  question:  { labelDe: "Frage",      labelEn: "Question",  Icon: HelpCircle    },
-  signals:   { labelDe: "Signale",    labelEn: "Signals",   Icon: Radio         },
-  trends:    { labelDe: "Trends",     labelEn: "Trends",    Icon: TrendingUp    },
-  edges:     { labelDe: "Kausal",     labelEn: "Causal",    Icon: GitBranch     },
-  insights:  { labelDe: "Erkenntnis", labelEn: "Insight",   Icon: Lightbulb     },
-  scenarios: { labelDe: "Szenario",   labelEn: "Scenario",  Icon: GitFork       },
-  decisions: { labelDe: "Empfehlung", labelEn: "Decision",  Icon: CheckCircle2  },
+const STAGE_META: Record<Stage, { labelDe: string; labelEn: string; color: string; Icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }> = {
+  question:  { labelDe: "Frage",      labelEn: "Question",  color: "#6B7A00", Icon: HelpCircle    },
+  signals:   { labelDe: "Signale",    labelEn: "Signals",   color: "#F59E0B", Icon: Radio         },
+  trends:    { labelDe: "Trends",     labelEn: "Trends",    color: "#1A9E5A", Icon: TrendingUp    },
+  edges:     { labelDe: "Kausal",     labelEn: "Causal",    color: "#2563EB", Icon: GitBranch     },
+  insights:  { labelDe: "Erkenntnis", labelEn: "Insight",   color: "#C58A00", Icon: Lightbulb     },
+  scenarios: { labelDe: "Szenario",   labelEn: "Scenario",  color: "#A855F7", Icon: GitFork       },
+  decisions: { labelDe: "Empfehlung", labelEn: "Decision",  color: "#E8402A", Icon: CheckCircle2  },
 };
 
 // ─── Spine node shape ────────────────────────────────────────────────────────
@@ -444,11 +445,18 @@ export function OrbitDerivationView({
   }, []);
 
   const [focusId, setFocusId] = useState<string | null>(initialFocus);
+  const [detailSpineId, setDetailSpineId] = useState<string | null>(null); // spine-node id for right-hand context panel
+  const [panelPinned, setPanelPinned] = useState(true);                     // show panel by default once focused
   const [threshold, setThreshold] = useState(0.20);
   const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 1200, h: 700 });
+
+  // Reset detail selection when focus changes (panel will default to focus node)
+  useEffect(() => {
+    setDetailSpineId(null);
+  }, [focusId]);
 
   // Resize observer
   useEffect(() => {
@@ -588,6 +596,18 @@ export function OrbitDerivationView({
     return s;
   }, [hoveredId, spine]);
 
+  // ── Context panel: resolve active detail spine-node ──
+  // Default to the focus node's own spine id (query or derived terminal) so
+  // the panel opens pre-populated with the focus's context.
+  const focusSpineId = (() => {
+    if (!focusNode) return null;
+    if (focusNode.nodeType === "query") return `q:${focusNode.id}`;
+    return `d:${focusNode.id}`;
+  })();
+  const activeDetailId = detailSpineId ?? focusSpineId;
+  const activeDetailNode = activeDetailId ? findSpineNode(spine, activeDetailId) : null;
+  const panelOpen = panelPinned && !!activeDetailNode;
+
   // ── Render ──
   return (
     <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -600,10 +620,16 @@ export function OrbitDerivationView({
         onClearFocus={() => setFocusId(null)}
         visible={totalVisible}
         total={totalUnfiltered}
+        onOpenInCanvas={focusNode && onNavigateToNode ? () => onNavigateToNode(focusNode.id) : undefined}
+        panelOpen={panelOpen}
+        onTogglePanel={() => setPanelPinned(p => !p)}
       />
 
+      {/* Body: spine + optional right-hand context panel */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+
       {/* Scrollable spine surface */}
-      <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
+      <div style={{ flex: 1, overflow: "auto", position: "relative", minWidth: 0 }}>
         <div style={{ position: "relative", width: totalW, height: totalH }}>
           {/* SVG edge layer */}
           <svg
@@ -709,9 +735,12 @@ export function OrbitDerivationView({
                       x={p.x + 14} y={p.y}
                       w={COL_WIDTH - 14} h={BUCKET_ITEM_H}
                       chainSet={chainSet}
+                      isSelected={detailSpineId === it.id}
                       onHover={setHoveredId}
                       onClick={() => {
-                        if (it.canvasId) onNavigateToNode?.(it.canvasId);
+                        // Signals never navigate — show detail in-panel
+                        setDetailSpineId(it.id);
+                        setPanelPinned(true);
                       }}
                       small
                     />
@@ -734,13 +763,24 @@ export function OrbitDerivationView({
                     x={p.x} y={p.y}
                     w={COL_WIDTH} h={NODE_ROW_H}
                     chainSet={chainSet}
+                    isSelected={detailSpineId === n.id}
                     onHover={setHoveredId}
                     onClick={() => {
-                      if (n.canvasId && n.canvasId !== focusId) {
-                        // Clicking a different canvas-linked node re-focuses the spine
+                      // Click always selects for the context panel (stays in Orbit).
+                      // Canvas navigation is now an explicit action via the panel button.
+                      setDetailSpineId(n.id);
+                      setPanelPinned(true);
+                      // If the clicked node is canvas-linked AND a valid spine terminal
+                      // (query/insight/scenario/decision), re-focus the spine onto it.
+                      if (
+                        n.canvasId &&
+                        n.canvasId !== focusId &&
+                        (n.stage === "question" ||
+                          n.stage === "insights" ||
+                          n.stage === "scenarios" ||
+                          n.stage === "decisions")
+                      ) {
                         setFocusId(n.canvasId);
-                      } else if (n.canvasId) {
-                        onNavigateToNode?.(n.canvasId);
                       }
                     }}
                     isFocus={n.canvasId === focusId}
@@ -751,6 +791,22 @@ export function OrbitDerivationView({
           ))}
         </div>
       </div>
+
+      {/* Context panel (right-hand) */}
+      {panelOpen && activeDetailNode && (
+        <ContextPanel
+          de={de}
+          spine={spine}
+          detailNode={activeDetailNode}
+          allNodes={nodes}
+          focusNode={focusNode}
+          onClose={() => setPanelPinned(false)}
+          onNavigateToNode={onNavigateToNode}
+          onFocusNode={canvasId => setFocusId(canvasId)}
+        />
+      )}
+
+      </div>{/* /Body */}
 
       {/* Empty-filter hint */}
       {totalVisible === 0 && (
@@ -773,7 +829,7 @@ export function OrbitDerivationView({
 // ─── NodeChip ────────────────────────────────────────────────────────────────
 
 function NodeChip({
-  node, x, y, w, h, chainSet, onHover, onClick, isFocus, small,
+  node, x, y, w, h, chainSet, onHover, onClick, isFocus, isSelected, small,
 }: {
   node: SpineNode;
   x: number; y: number; w: number; h: number;
@@ -781,6 +837,7 @@ function NodeChip({
   onHover: (id: string | null) => void;
   onClick: () => void;
   isFocus?: boolean;
+  isSelected?: boolean;
   small?: boolean;
 }) {
   const dim = chainSet && !chainSet.has(node.id) ? 0.25 : 1;
@@ -788,6 +845,21 @@ function NodeChip({
   const relPct = Math.round(node.chainRel * 100);
   // Relevance as a small left-edge bar (1px..4px depending on strength)
   const barWidth = 2 + node.chainRel * 3;
+  // Border/background priority: focus > selected > in-chain > default
+  const borderColor = isFocus
+    ? "#6B7A00"
+    : isSelected
+    ? "#2563EB"
+    : inChain
+    ? "#E4FF97"
+    : "var(--color-border)";
+  const bgColor = isFocus
+    ? "#E4FF97"
+    : isSelected
+    ? "#EEF4FF"
+    : inChain
+    ? "#FAFFE5"
+    : "var(--color-surface, #FFFFFF)";
 
   return (
     <div
@@ -799,13 +871,17 @@ function NodeChip({
         display: "flex", alignItems: "center", gap: 8,
         padding: small ? "0 8px 0 10px" : "0 10px",
         borderRadius: 8,
-        border: `1px solid ${isFocus ? "#6B7A00" : inChain ? "#E4FF97" : "var(--color-border)"}`,
-        background: isFocus ? "#E4FF97" : inChain ? "#FAFFE5" : "var(--color-surface, #FFFFFF)",
+        border: `1px solid ${borderColor}`,
+        background: bgColor,
         color: "var(--color-text-secondary)",
-        cursor: node.canvasId ? "pointer" : "default",
+        cursor: "pointer",
         opacity: dim,
         transition: "opacity 0.15s, border-color 0.12s, background 0.12s",
-        boxShadow: isFocus ? "0 0 0 2px #6B7A0022" : "none",
+        boxShadow: isFocus
+          ? "0 0 0 2px #6B7A0022"
+          : isSelected
+          ? "0 0 0 2px #2563EB22"
+          : "none",
         overflow: "hidden",
       }}
     >
@@ -848,6 +924,7 @@ function NodeChip({
 
 function TopBar({
   de, focusNode, threshold, onThresholdChange, onClearFocus, visible, total,
+  onOpenInCanvas, panelOpen, onTogglePanel,
 }: {
   de: boolean;
   focusNode: DerivCanvasNode | null;
@@ -856,69 +933,141 @@ function TopBar({
   onClearFocus: () => void;
   visible: number;
   total: number;
+  onOpenInCanvas?: () => void;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 }) {
+  const focusStage = focusNode ? nodeTypeToStage(focusNode.nodeType) : null;
   const focusLabel = focusNode
     ? (focusNode.nodeType === "query"
         ? focusNode.query
         : (focusNode.label ?? focusNode.content?.slice(0, 80) ?? focusNode.nodeType))
     : "";
+  const truncatedFocusLabel = focusLabel && focusLabel.length > 38
+    ? focusLabel.slice(0, 38) + "…"
+    : focusLabel;
 
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 14,
-      padding: "10px 16px 10px 20px",
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "10px 14px 10px 16px",
       borderBottom: "1px solid var(--color-border)",
       background: "rgba(255,255,255,0.9)", backdropFilter: "blur(6px)",
       flexShrink: 0,
+      minHeight: 52,
     }}>
-      {/* Breadcrumb: current focus */}
-      <button
-        onClick={onClearFocus}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          fontSize: 11, padding: "4px 9px",
-          borderRadius: 6, border: "1px solid var(--color-border)",
-          background: "transparent", color: "var(--color-text-muted)",
-          cursor: "pointer",
+      {/* LEFT — breadcrumb + compact focus pill */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, minWidth: 0 }}>
+        <button
+          onClick={onClearFocus}
+          title={de ? "Anderen Knoten als Fokus wählen" : "Pick another focus node"}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            fontSize: 11, padding: "4px 8px",
+            borderRadius: 6, border: "1px solid var(--color-border)",
+            background: "transparent", color: "var(--color-text-muted)",
+            cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          <X size={11} strokeWidth={1.8} />
+          {de ? "Fokus wechseln" : "Change focus"}
+        </button>
+        {focusNode && focusStage && (
+          <div
+            title={focusLabel}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              fontSize: 11, padding: "3px 8px",
+              borderRadius: 5,
+              border: `1px solid ${STAGE_META[focusStage].color}55`,
+              background: `${STAGE_META[focusStage].color}10`,
+              color: STAGE_META[focusStage].color,
+              minWidth: 0, maxWidth: 240,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              flexShrink: 1,
+            }}
+          >
+            <span style={{ fontWeight: 700, letterSpacing: 0.3, fontSize: 9, textTransform: "uppercase", opacity: 0.9 }}>
+              {STAGE_META[focusStage][de ? "labelDe" : "labelEn"]}
+            </span>
+            <span style={{
+              fontWeight: 500, color: "var(--color-text-heading)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {truncatedFocusLabel}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* CENTER — spacer reserving room for floating sub-mode pill */}
+      <div style={{ flex: 1, minWidth: 180 }} />
+
+      {/* RIGHT — counts, threshold, toggles */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div style={{
+          fontSize: 11, color: "var(--color-text-muted)",
+          fontFamily: "var(--font-mono, monospace)",
         }}
-      >
-        <X size={11} strokeWidth={1.8} />
-        {de ? "Anderen Knoten wählen" : "Pick another"}
-      </button>
-      <div style={{
-        flex: 1, minWidth: 0, fontSize: 12.5, color: "var(--color-text-heading)",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-      }}>
-        <span style={{ fontWeight: 600, letterSpacing: 0.2 }}>
-          {focusNode && STAGE_META[nodeTypeToStage(focusNode.nodeType)][de ? "labelDe" : "labelEn"]}:
-        </span>{" "}
-        {focusLabel}
-      </div>
+          title={de ? "Sichtbare / gesamte Knoten auf der Ableitungsspur" : "Visible / total nodes on the derivation spine"}
+        >
+          {visible}/{total}
+        </div>
 
-      {/* Counts */}
-      <div style={{
-        fontSize: 11, color: "var(--color-text-muted)",
-        fontFamily: "var(--font-mono, monospace)", flexShrink: 0,
-      }}>
-        {visible}/{total}
-      </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+            color: "var(--color-text-muted)", textTransform: "uppercase",
+          }}
+            title={de ? "Kettenrelevanz-Schwelle — Knoten unterhalb werden ausgeblendet" : "Chain-relevance threshold — nodes below are hidden"}
+          >{de ? "Schw." : "Thr."}</span>
+          <input
+            type="range" min={0} max={1} step={0.05}
+            value={threshold}
+            onChange={e => onThresholdChange(parseFloat(e.target.value))}
+            style={{ width: 86, accentColor: "#6B7A00" }}
+          />
+          <span style={{
+            fontSize: 11, fontFamily: "var(--font-mono, monospace)",
+            color: "var(--color-text-heading)", fontWeight: 600, minWidth: 32, textAlign: "right",
+          }}>{threshold.toFixed(2)}</span>
+        </div>
 
-      {/* Threshold slider */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-          color: "var(--color-text-muted)", textTransform: "uppercase",
-        }}>{de ? "Schwelle" : "Threshold"}</span>
-        <input
-          type="range" min={0} max={1} step={0.05}
-          value={threshold}
-          onChange={e => onThresholdChange(parseFloat(e.target.value))}
-          style={{ width: 120, accentColor: "#6B7A00" }}
-        />
-        <span style={{
-          fontSize: 11, fontFamily: "var(--font-mono, monospace)",
-          color: "var(--color-text-heading)", fontWeight: 600, minWidth: 36, textAlign: "right",
-        }}>{threshold.toFixed(2)}</span>
+        <button
+          onClick={onTogglePanel}
+          title={panelOpen ? (de ? "Kontext schließen" : "Hide context") : (de ? "Kontext anzeigen" : "Show context")}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            fontSize: 11, padding: "4px 9px",
+            borderRadius: 6,
+            border: `1px solid ${panelOpen ? "#2563EB" : "var(--color-border)"}`,
+            background: panelOpen ? "#EEF4FF" : "transparent",
+            color: panelOpen ? "#1E40AF" : "var(--color-text-muted)",
+            cursor: "pointer",
+            transition: "all 0.12s",
+          }}
+        >
+          <Info size={11} strokeWidth={1.8} />
+          {de ? "Kontext" : "Context"}
+        </button>
+
+        {onOpenInCanvas && (
+          <button
+            onClick={onOpenInCanvas}
+            title={de ? "Fokus-Knoten im Canvas öffnen" : "Open focus node in canvas"}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              fontSize: 11, padding: "4px 9px",
+              borderRadius: 6, border: "1px solid #6B7A0088",
+              background: "#FAFFE5", color: "#445300",
+              cursor: "pointer", fontWeight: 600,
+              transition: "all 0.12s",
+            }}
+          >
+            <ArrowUpRight size={11} strokeWidth={2} />
+            {de ? "Im Canvas" : "In canvas"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1036,4 +1185,485 @@ function findSpineNodeChainRel(spine: Spine, id: string): number | null {
   if (n) return n.chainRel;
   const b = spine.signalBuckets.find(b => b.id === id);
   return b?.chainRel ?? null;
+}
+
+// ─── Context panel ───────────────────────────────────────────────────────────
+
+function ContextPanel({
+  de, spine, detailNode, allNodes, focusNode, onClose, onNavigateToNode, onFocusNode,
+}: {
+  de: boolean;
+  spine: Spine;
+  detailNode: SpineNode;
+  allNodes: DerivCanvasNode[];
+  focusNode: DerivCanvasNode | null;
+  onClose: () => void;
+  onNavigateToNode?: (canvasId: string) => void;
+  onFocusNode: (canvasId: string) => void;
+}) {
+  // Resolve upstream chain: walk back through anchors to the focus
+  const upstream = useMemo(() => {
+    const chain: SpineNode[] = [];
+    const seen = new Set<string>();
+    const walk = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const n = findSpineNode(spine, id);
+      if (!n) return;
+      chain.push(n);
+      n.anchors.sources.forEach(src => walk(src));
+    };
+    detailNode.anchors.sources.forEach(src => walk(src));
+    return chain;
+  }, [detailNode, spine]);
+
+  const stageMeta = STAGE_META[detailNode.stage];
+  const StageIcon = stageMeta.Icon;
+  const canvasNode = detailNode.canvasId ? allNodes.find(n => n.id === detailNode.canvasId) : null;
+  const canRefocus = detailNode.canvasId
+    && detailNode.canvasId !== focusNode?.id
+    && (detailNode.stage === "question" ||
+        detailNode.stage === "insights" ||
+        detailNode.stage === "scenarios" ||
+        detailNode.stage === "decisions");
+
+  return (
+    <div style={{
+      width: 340, flexShrink: 0,
+      borderLeft: "1px solid var(--color-border)",
+      background: "rgba(255,255,255,0.98)", backdropFilter: "blur(10px)",
+      display: "flex", flexDirection: "column",
+      fontSize: 12, color: "var(--color-text-secondary)",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "14px 16px 12px",
+        borderBottom: "1px solid var(--color-border)",
+        background: detailNode.canvasId === focusNode?.id ? "#FAFFE5" : "rgba(255,255,255,0.4)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+            textTransform: "uppercase", color: "var(--color-text-muted)",
+          }}>
+            <StageIcon size={12} strokeWidth={1.8} />
+            {de ? stageMeta.labelDe : stageMeta.labelEn}
+            {detailNode.canvasId === focusNode?.id && (
+              <span style={{
+                marginLeft: 4, fontSize: 9, padding: "1px 6px",
+                borderRadius: 4, background: "#6B7A00", color: "#fff",
+                letterSpacing: 0.5,
+              }}>FOKUS</span>
+            )}
+          </div>
+          <button onClick={onClose}
+            title={de ? "Kontext schließen" : "Close context"}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--color-text-muted)", padding: 2, lineHeight: 0,
+            }}
+          >
+            <X size={14} strokeWidth={1.8} />
+          </button>
+        </div>
+        <div style={{
+          fontSize: 13.5, fontWeight: 600, color: "var(--color-text-heading)",
+          lineHeight: 1.35, marginBottom: 6, wordBreak: "break-word",
+        }}>
+          {detailNode.label}
+        </div>
+        {detailNode.sublabel && (
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6 }}>
+            {detailNode.sublabel}
+          </div>
+        )}
+        {/* Chain-relevance meter */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, marginTop: 6,
+          fontSize: 10, color: "var(--color-text-muted)",
+        }}>
+          <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {de ? "Kettenbezug" : "Chain rel."}
+          </span>
+          <div style={{
+            flex: 1, height: 4, background: "var(--color-border)", borderRadius: 2, overflow: "hidden",
+          }}>
+            <div style={{
+              width: `${Math.round(detailNode.chainRel * 100)}%`, height: "100%",
+              background: "#6B7A00",
+            }} />
+          </div>
+          <span style={{
+            fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
+            color: "var(--color-text-heading)", minWidth: 32, textAlign: "right",
+          }}>{Math.round(detailNode.chainRel * 100)}%</span>
+        </div>
+      </div>
+
+      {/* Body (scrollable) */}
+      <div style={{ flex: 1, overflow: "auto", padding: "12px 16px 16px" }}>
+
+        {/* Upstream chain */}
+        {upstream.length > 0 && (
+          <ContextSection title={de ? "Ableitung aus" : "Derived from"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {upstream.slice(0, 8).map(u => {
+                const meta = STAGE_META[u.stage];
+                const Ico = meta.Icon;
+                return (
+                  <div key={u.id} style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    fontSize: 11, padding: "4px 8px",
+                    borderRadius: 6, background: "var(--color-surface, #F5F5F5)",
+                    border: "1px solid var(--color-border)",
+                  }}>
+                    <Ico size={10} strokeWidth={1.8} />
+                    <span style={{ fontSize: 9, color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.5 }}>
+                      {de ? meta.labelDe : meta.labelEn}
+                    </span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {u.label}
+                    </span>
+                    <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                      {Math.round(u.chainRel * 100)}%
+                    </span>
+                  </div>
+                );
+              })}
+              {upstream.length > 8 && (
+                <div style={{ fontSize: 10, color: "var(--color-text-muted)", padding: "2px 4px" }}>
+                  +{upstream.length - 8} {de ? "weitere" : "more"}
+                </div>
+              )}
+            </div>
+          </ContextSection>
+        )}
+
+        {/* Stage-specific content */}
+        {detailNode.stage === "question" && canvasNode && (
+          <QuestionContent node={canvasNode} de={de} />
+        )}
+        {detailNode.stage === "signals" && detailNode.signal && (
+          <SignalContent signal={detailNode.signal} de={de} />
+        )}
+        {detailNode.stage === "trends" && detailNode.trend && (
+          <TrendContent trend={detailNode.trend} de={de} />
+        )}
+        {detailNode.stage === "edges" && detailNode.edge && (
+          <EdgeContent edge={detailNode.edge} spine={spine} de={de} />
+        )}
+        {(detailNode.stage === "insights" ||
+          detailNode.stage === "scenarios" ||
+          detailNode.stage === "decisions") && canvasNode && (
+          <DerivedContent node={canvasNode} de={de} />
+        )}
+      </div>
+
+      {/* Actions */}
+      {(canRefocus || detailNode.canvasId) && (
+        <div style={{
+          padding: "10px 14px", borderTop: "1px solid var(--color-border)",
+          display: "flex", gap: 6, background: "rgba(0,0,0,0.015)",
+        }}>
+          {canRefocus && detailNode.canvasId && (
+            <button
+              onClick={() => onFocusNode(detailNode.canvasId!)}
+              title={de ? "Ableitungskette auf diesen Knoten fokussieren" : "Focus spine on this node"}
+              style={{
+                flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
+                borderRadius: 6, border: "1px solid #6B7A0088",
+                background: "#FAFFE5", color: "#445300", cursor: "pointer",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+              }}
+            >
+              <Target size={11} strokeWidth={2} />
+              {de ? "Fokussieren" : "Focus"}
+            </button>
+          )}
+          {detailNode.canvasId && onNavigateToNode && (
+            <button
+              onClick={() => onNavigateToNode(detailNode.canvasId!)}
+              title={de ? "Diesen Knoten im Canvas öffnen" : "Open this node in canvas"}
+              style={{
+                flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
+                borderRadius: 6, border: "1px solid var(--color-border)",
+                background: "var(--color-surface, #fff)", color: "var(--color-text-secondary)",
+                cursor: "pointer",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+              }}
+            >
+              <ArrowUpRight size={11} strokeWidth={2} />
+              {de ? "Im Canvas" : "In canvas"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContextSection({
+  title, icon, children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 5,
+        fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+        textTransform: "uppercase", color: "var(--color-text-muted)",
+        marginBottom: 6,
+      }}>
+        {icon}
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function QuestionContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
+  const r = node.result;
+  return (
+    <>
+      {node.query && (
+        <ContextSection title={de ? "Frage" : "Question"} icon={<HelpCircle size={12} strokeWidth={1.8} />}>
+          <div style={{
+            fontSize: 12, lineHeight: 1.5, color: "var(--color-text-heading)",
+            padding: "8px 10px", background: "var(--color-surface, #F5F5F5)",
+            borderRadius: 6, border: "1px solid var(--color-border)",
+          }}>
+            {node.query}
+          </div>
+        </ContextSection>
+      )}
+      {r?.synthesis && (
+        <ContextSection title={de ? "Synthese" : "Synthesis"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+          <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", whiteSpace: "pre-wrap" }}>
+            {r.synthesis}
+          </div>
+        </ContextSection>
+      )}
+      {r?.keyInsights && r.keyInsights.length > 0 && (
+        <ContextSection title={de ? "Kernerkenntnisse" : "Key insights"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, lineHeight: 1.5 }}>
+            {r.keyInsights.slice(0, 6).map((k, i) => <li key={i}>{k}</li>)}
+          </ul>
+        </ContextSection>
+      )}
+      {r?.matchedTrends && r.matchedTrends.length > 0 && (
+        <ContextSection title={de ? "Bezogene Trends" : "Matched trends"} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {r.matchedTrends.slice(0, 8).map(t => {
+              const rel = typeof t.queryRelevance === "number" ? t.queryRelevance : t.relevance * t.confidence;
+              return (
+                <div key={t.id} style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  fontSize: 11, padding: "3px 8px",
+                  borderRadius: 5, background: "var(--color-surface, #F5F5F5)",
+                }}>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {t.name}
+                  </span>
+                  <span style={{
+                    fontSize: 9, fontFamily: "var(--font-mono, monospace)",
+                    color: rel >= 0.6 ? "#445300" : rel >= 0.3 ? "var(--color-text-secondary)" : "var(--color-text-muted)",
+                    fontWeight: 600,
+                  }}>
+                    {Math.round(rel * 100)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </ContextSection>
+      )}
+      {r?.references && r.references.length > 0 && (
+        <ContextSection title={de ? "Quellen" : "References"} icon={<LinkIcon size={12} strokeWidth={1.8} />}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {r.references.slice(0, 10).map((ref, i) => (
+              <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
+                style={{
+                  fontSize: 11, padding: "5px 8px",
+                  borderRadius: 6, background: "var(--color-surface, #F5F5F5)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text-secondary)", textDecoration: "none",
+                  display: "flex", alignItems: "center", gap: 5,
+                }}>
+                <ExternalLink size={10} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {ref.title || ref.url}
+                </span>
+              </a>
+            ))}
+          </div>
+        </ContextSection>
+      )}
+    </>
+  );
+}
+
+function SignalContent({ signal, de }: { signal: UsedSignal; de: boolean }) {
+  return (
+    <ContextSection title={de ? "Signal" : "Signal"} icon={<Radio size={12} strokeWidth={1.8} />}>
+      <div style={{
+        padding: "10px 12px", borderRadius: 8,
+        border: "1px solid var(--color-border)",
+        background: "var(--color-surface, #F5F5F5)",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.4, marginBottom: 5 }}>
+          {signal.title}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 10, color: "var(--color-text-muted)", marginBottom: signal.url ? 6 : 0 }}>
+          <span style={{
+            fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
+            color: "var(--color-text-secondary)",
+          }}>
+            {signal.source}
+          </span>
+          {signal.date && <><span>·</span><span>{signal.date}</span></>}
+          {typeof signal.strength === "number" && <><span>·</span><span>{de ? "Stärke" : "Strength"} {Math.round(signal.strength * 100)}%</span></>}
+        </div>
+        {signal.url && (
+          <a href={signal.url} target="_blank" rel="noopener noreferrer"
+            style={{
+              fontSize: 10.5, color: "#2563EB", textDecoration: "none",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}>
+            <ExternalLink size={9} strokeWidth={1.8} />
+            {signal.url.length > 46 ? signal.url.slice(0, 46) + "…" : signal.url}
+          </a>
+        )}
+      </div>
+    </ContextSection>
+  );
+}
+
+function TrendContent({ trend, de }: { trend: MatchedTrend; de: boolean }) {
+  const qr = typeof trend.queryRelevance === "number" ? trend.queryRelevance : null;
+  return (
+    <ContextSection title={de ? "Trend" : "Trend"} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
+      <div style={{
+        padding: "10px 12px", borderRadius: 8,
+        border: "1px solid var(--color-border)",
+        background: "var(--color-surface, #F5F5F5)",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.3, marginBottom: 6 }}>
+          {trend.name}
+        </div>
+        <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {trend.category}
+        </div>
+        <MetricGrid items={[
+          ...(qr !== null ? [{ label: de ? "Bezug (Frage)" : "Query rel.", value: `${Math.round(qr * 100)}%`, emphasis: qr >= 0.6 }] : []),
+          { label: de ? "Relevanz" : "Relevance", value: `${Math.round(trend.relevance * 100)}%` },
+          { label: de ? "Konfidenz" : "Confidence", value: `${Math.round(trend.confidence * 100)}%` },
+          { label: de ? "Impact" : "Impact", value: `${Math.round(trend.impact * 100)}%` },
+          { label: de ? "Ring" : "Ring", value: trend.ring },
+          { label: de ? "Signale" : "Signals", value: String(trend.signalCount) },
+          { label: de ? "Velocity" : "Velocity", value: trend.velocity },
+        ]} />
+      </div>
+    </ContextSection>
+  );
+}
+
+function EdgeContent({ edge, spine, de }: { edge: MatchedEdge; spine: Spine; de: boolean }) {
+  const fromName = spine.columns.trends.find(t => t.trend?.id === edge.from)?.label ?? edge.from;
+  const toName = spine.columns.trends.find(t => t.trend?.id === edge.to)?.label ?? edge.to;
+  const typeColor: Record<string, string> = {
+    drives: "#1A9E5A", amplifies: "#2563EB", dampens: "#E8402A", correlates: "#9CA3AF",
+  };
+  const c = typeColor[edge.type] ?? "#6B7A00";
+  const typeLabel: Record<string, { de: string; en: string }> = {
+    drives: { de: "treibt", en: "drives" },
+    amplifies: { de: "verstärkt", en: "amplifies" },
+    dampens: { de: "dämpft", en: "dampens" },
+    correlates: { de: "korreliert", en: "correlates" },
+  };
+  const tlabel = typeLabel[edge.type] ?? { de: edge.type, en: edge.type };
+  return (
+    <ContextSection title={de ? "Kausale Beziehung" : "Causal edge"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
+      <div style={{
+        padding: "10px 12px", borderRadius: 8,
+        border: `1px solid ${c}44`, background: `${c}08`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, fontSize: 11.5, lineHeight: 1.4 }}>
+          <span style={{ flex: 1, fontWeight: 600, color: "var(--color-text-heading)" }}>{fromName}</span>
+        </div>
+        <div style={{
+          display: "inline-block", fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5,
+          padding: "2px 8px", borderRadius: 4, background: c, color: "#fff", marginBottom: 8,
+        }}>
+          {de ? tlabel.de : tlabel.en}
+        </div>
+        <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-text-heading)", lineHeight: 1.4, marginBottom: 8 }}>
+          {toName}
+        </div>
+        <MetricGrid items={[
+          { label: de ? "Stärke" : "Strength", value: `${Math.round(edge.strength * 100)}%` },
+          ...(typeof edge.queryRelevance === "number"
+            ? [{ label: de ? "Bezug (Frage)" : "Query rel.", value: `${Math.round(edge.queryRelevance * 100)}%`, emphasis: edge.queryRelevance >= 0.6 }]
+            : []),
+        ]} />
+        {edge.description && (
+          <div style={{ marginTop: 8, fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+            {edge.description}
+          </div>
+        )}
+      </div>
+    </ContextSection>
+  );
+}
+
+function DerivedContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
+  return (
+    <>
+      {node.content && (
+        <ContextSection title={de ? "Inhalt" : "Content"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+          <div style={{
+            fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)",
+            whiteSpace: "pre-wrap",
+            padding: "8px 10px", background: "var(--color-surface, #F5F5F5)",
+            borderRadius: 6, border: "1px solid var(--color-border)",
+          }}>
+            {node.content}
+          </div>
+        </ContextSection>
+      )}
+    </>
+  );
+}
+
+function MetricGrid({ items }: { items: Array<{ label: string; value: string; emphasis?: boolean }> }) {
+  return (
+    <div style={{
+      display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4,
+      fontSize: 10.5,
+    }}>
+      {items.map((m, i) => (
+        <div key={i} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          padding: "3px 6px", borderRadius: 4,
+          background: m.emphasis ? "#6B7A0014" : "rgba(0,0,0,0.025)",
+        }}>
+          <span style={{ color: "var(--color-text-muted)", fontSize: 9.5, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 600 }}>
+            {m.label}
+          </span>
+          <span style={{
+            fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
+            color: m.emphasis ? "#445300" : "var(--color-text-heading)",
+          }}>
+            {m.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
