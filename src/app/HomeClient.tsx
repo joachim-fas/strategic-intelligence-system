@@ -21,6 +21,7 @@ import { BriefingResult, HistoryEntry } from "@/components/briefing/BriefingResu
 import { SessionBar } from "@/components/session/SessionBar";
 import { GrainCard } from "@/components/grain/GrainCard";
 import { GrainBadge } from "@/components/grain/GrainBadge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   clearHistoryStorage,
 } from "@/lib/briefing-export";
@@ -1043,27 +1044,37 @@ export default function HomeClient() {
                 { icon: "/icons/methoden/trend-deep-dive/trend-deep-dive-microscope.svg", type: locale === "de" ? "Intelligence" : "Intelligence", label: "Trend Deep-Dive", desc: locale === "de" ? "Treiber · Systemische Trendanalyse" : "Drivers · Systemic trend analysis", templateId: "trend-deep-dive", p: { card: "#FBF0FF", icon: "#F0D4FF", border: "#D8A8F0", type: "#7C1A9E" } },
                 { icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg", type: locale === "de" ? "Mapping" : "Mapping", label: "Stakeholder", desc: locale === "de" ? "Akteure · Koalitionen · Dynamiken" : "Actors · Coalitions · Power dynamics", templateId: "stakeholder-mapping", p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00" } },
               ] as { icon: string; type: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string } }[]).map(t => (
-                <GrainCard
+                <Tooltip
                   key={t.templateId}
-                  variant="elevated"
-                  withGrain
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
-                  onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
-                  className="cursor-pointer"
-                  style={{ background: t.p.card, borderColor: t.p.border }}
-                >
-                  <div style={{ padding: "10px 12px 12px", display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ width: 32, height: 32, borderRadius: 8, background: t.p.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
-                    </span>
+                  placement="top"
+                  content={
                     <div>
-                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 12, color: "#0A0A0A", marginBottom: 2, lineHeight: 1.2 }}>{t.label}</div>
-                      <div style={{ fontSize: 10, lineHeight: 1.35, color: "#555" }}>{t.desc}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", marginBottom: 3 }}>{t.type}</div>
+                      <div style={{ fontSize: 12, lineHeight: 1.4 }}>{t.desc}</div>
                     </div>
-                  </div>
-                </GrainCard>
+                  }
+                >
+                  <GrainCard
+                    variant="elevated"
+                    withGrain
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${t.label} — ${t.desc}`}
+                    onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
+                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
+                    className="cursor-pointer"
+                    style={{ background: t.p.card, borderColor: t.p.border }}
+                  >
+                    <div style={{ padding: "12px 14px", display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ width: 32, height: 32, borderRadius: 8, background: t.p.icon, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Image src={t.icon} alt="" width={16} height={16} style={{ opacity: 0.8 }} />
+                      </span>
+                      <div className="font-display font-bold tracking-tight" style={{ fontSize: 13, color: "#0A0A0A", lineHeight: 1.2 }}>
+                        {t.label}
+                      </div>
+                    </div>
+                  </GrainCard>
+                </Tooltip>
               ))}
             </div>
 

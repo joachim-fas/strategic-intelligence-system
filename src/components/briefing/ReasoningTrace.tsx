@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Check, Circle, Loader2 } from "lucide-react";
 import { Locale } from "@/lib/i18n";
 
 export function ReasoningTrace({ query, trendCount, locale }: {
@@ -52,30 +53,29 @@ export function ReasoningTrace({ query, trendCount, locale }: {
             opacity: isPending ? 0.25 : 1,
             transition: "opacity 0.4s ease",
           }}>
-            {isDone ? (
-              <span style={{ width: 14, height: 14, flexShrink: 0, color: "var(--signal-positive, #1A9E5A)", fontWeight: 700, fontSize: 12, lineHeight: "14px" }}>✓</span>
-            ) : isActive ? (
-              <span className="animate-spin" style={{
-                width: 10, height: 10, flexShrink: 0, margin: "0 2px",
-                borderRadius: "50%",
-                border: "1.5px solid var(--volt-lime, #E4FF97)",
-                borderTopColor: "var(--volt-text, #0A0A0A)",
-                display: "inline-block",
-              }} />
-            ) : (
-              <span style={{ width: 14, height: 14, flexShrink: 0, color: "var(--volt-text-faint, #C8C8C8)", textAlign: "center", fontSize: 10, lineHeight: "14px" }}>○</span>
-            )}
+            <span style={{
+              width: 14, height: 14, flexShrink: 0,
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {isDone ? (
+                <Check size={14} strokeWidth={2.5} color="var(--signal-positive, #1A9E5A)" />
+              ) : isActive ? (
+                <Loader2 size={14} strokeWidth={2.25} color="var(--volt-text, #0A0A0A)" style={{ animation: "spin 1s linear infinite" }} />
+              ) : (
+                <Circle size={12} strokeWidth={2} color="var(--volt-text-faint, #C8C8C8)" />
+              )}
+            </span>
             <span style={{
               color: isDone ? "var(--volt-text-faint, #9B9B9B)" : isActive ? "var(--volt-text, #0A0A0A)" : "var(--volt-text-faint, #C8C8C8)",
               fontWeight: isActive ? 500 : 400,
               transition: "color 0.3s ease",
             }}>
               {s.label}
-              {isActive && <span className="cursor-blink" style={{ color: "var(--volt-text, #0A0A0A)", marginLeft: 1 }}>▮</span>}
             </span>
           </div>
         );
       })}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

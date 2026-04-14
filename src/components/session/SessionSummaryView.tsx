@@ -38,8 +38,10 @@ import {
   Gauge,
   RefreshCw,
   ArrowLeft,
+  ArrowRight,
   Layers,
   Download,
+  Zap,
 } from "lucide-react";
 
 interface SummaryData {
@@ -465,8 +467,10 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                       fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
                       letterSpacing: "0.06em", textTransform: "uppercase" as const,
                       color: "var(--muted-foreground)", marginTop: 4,
+                      display: "inline-flex", alignItems: "center", gap: 6,
                     }}>
-                      ⚡ {status}
+                      <Zap size={11} strokeWidth={2.25} />
+                      {status}
                     </div>
                   )}
                 </div>
@@ -483,7 +487,16 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                   borderRadius: 8,
                   border: "1px solid var(--color-border)",
                 }}>
-                  <span className="animate-pulse" style={{ marginRight: 6 }}>●</span>
+                  <span
+                    className="animate-pulse"
+                    style={{
+                      display: "inline-block",
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "#1A9E5A",
+                      marginRight: 8,
+                      verticalAlign: "middle",
+                    }}
+                  />
                   {streamingText.slice(-500)}
                 </div>
               )}
@@ -690,8 +703,10 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                         color: "#A0244A",
                         marginBottom: 6,
                         letterSpacing: "-0.01em",
+                        display: "inline-flex", alignItems: "center", gap: 8,
                       }}>
-                        ⚡ {t.tension}
+                        <Zap size={14} strokeWidth={2.25} />
+                        {t.tension}
                       </div>
                       {t.implication && (
                         <p style={{
@@ -824,8 +839,10 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                         color: "#4A3800",
                         marginBottom: 6,
                         letterSpacing: "-0.01em",
+                        display: "inline-flex", alignItems: "center", gap: 8,
                       }}>
-                        → {f.question}
+                        <ArrowRight size={14} strokeWidth={2.25} />
+                        {f.question}
                       </div>
                       <p style={{
                         fontSize: 12, lineHeight: 1.6,

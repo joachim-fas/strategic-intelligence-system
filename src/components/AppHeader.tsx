@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Activity, Moon, Sun, Menu } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
@@ -78,16 +80,17 @@ export function AppHeader() {
         </div>
 
         {/* Hamburger — Mobile only (Volt UI: md:hidden w-9 h-9 rounded-lg) */}
-        <button className="sis-nav-mobile"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label={de ? "Hauptnavigation öffnen" : "Open main navigation"}
-          aria-expanded={mobileMenuOpen}
-          title={de ? "Menü" : "Menu"}
-          style={{ display: "none", alignItems: "center", justifyContent: "center", marginLeft: "auto",
-            width: 36, height: 36, border: "none",
-            borderRadius: 8, background: "transparent",
-            cursor: "pointer", fontSize: 20, color: "var(--color-text-muted, #6B6B6B)", flexShrink: 0 }}
-        >&#x2261;</button>
+        <Tooltip content={de ? "Menü" : "Menu"} placement="bottom">
+          <button className="sis-nav-mobile"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={de ? "Hauptnavigation öffnen" : "Open main navigation"}
+            aria-expanded={mobileMenuOpen}
+            style={{ display: "none", alignItems: "center", justifyContent: "center", marginLeft: "auto",
+              width: 36, height: 36, border: "none",
+              borderRadius: 8, background: "transparent",
+              cursor: "pointer", color: "var(--color-text-muted, #6B6B6B)", flexShrink: 0 }}
+          ><Menu size={20} strokeWidth={2} /></button>
+        </Tooltip>
 
         {/* Nav — Desktop: right-aligned with gap before actions */}
         <nav className="sis-nav-desktop" aria-label={de ? "Hauptnavigation" : "Main navigation"} style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, flex: 1, marginRight: 16 }}>
@@ -127,26 +130,31 @@ export function AppHeader() {
         {/* Right side actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {/* Activity Monitor toggle (Ctrl+M) */}
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent("sis-toggle-activity-panel"))}
-            aria-label={de ? "Activity Monitor öffnen" : "Open Activity Monitor"}
-            title={de ? "Activity Monitor (Ctrl+M)" : "Activity Monitor (Ctrl+M)"}
-            style={{ fontSize: 14, padding: "2px 8px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
-          >{"\u25CE"}</button>
-          <button onClick={toggleDark}
-            aria-label={darkMode ? "Light Mode aktivieren" : "Dark Mode aktivieren"}
-            title={darkMode ? "Light Mode" : "Dark Mode"}
-            style={{ fontSize: 14, padding: "2px 8px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
-          >{darkMode ? "\u2600" : "\u263E"}</button>
-          <button onClick={toggleLocale}
-            aria-label={locale === "de" ? "Sprache wechseln zu Englisch" : "Switch language to German"}
-            title={locale === "de" ? "Sprache: DE / EN" : "Language: EN / DE"}
-            style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted, #6B6B6B)", background: "transparent", border: "none", padding: "4px 10px", borderRadius: 8, cursor: "pointer", transition: "all 0.15s" }}
-            onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
-            onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted, #6B6B6B)"; el.style.background = "transparent"; }}
-          >{locale.toUpperCase()}</button>
+          <Tooltip content={de ? "Activity Monitor (Ctrl+M)" : "Activity Monitor (Ctrl+M)"} placement="bottom">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("sis-toggle-activity-panel"))}
+              aria-label={de ? "Activity Monitor öffnen" : "Open Activity Monitor"}
+              style={{ padding: 0, borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
+            ><Activity size={14} strokeWidth={2} /></button>
+          </Tooltip>
+          <Tooltip content={darkMode ? (de ? "Light Mode" : "Light mode") : (de ? "Dark Mode" : "Dark mode")} placement="bottom">
+            <button onClick={toggleDark}
+              aria-label={darkMode ? (de ? "Light Mode aktivieren" : "Activate light mode") : (de ? "Dark Mode aktivieren" : "Activate dark mode")}
+              style={{ padding: 0, borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
+            >{darkMode ? <Sun size={14} strokeWidth={2} /> : <Moon size={14} strokeWidth={2} />}</button>
+          </Tooltip>
+          <Tooltip content={locale === "de" ? "Sprache: DE → EN" : "Language: EN → DE"} placement="bottom">
+            <button onClick={toggleLocale}
+              aria-label={locale === "de" ? "Sprache wechseln zu Englisch" : "Switch language to German"}
+              style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--color-text-muted, #6B6B6B)", background: "transparent", border: "none", padding: "4px 10px", borderRadius: 8, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted, #6B6B6B)"; el.style.background = "transparent"; }}
+            >{locale.toUpperCase()}</button>
+          </Tooltip>
         </div>
       </div>
 

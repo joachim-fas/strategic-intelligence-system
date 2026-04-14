@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Upload, Clipboard, Download, FileCode2 } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { Locale } from "@/lib/i18n";
 import type { HistoryEntry } from "./BriefingResult";
 import {
@@ -32,34 +34,46 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
   };
 
   const buttonBase: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: 8,
+    display: "flex", alignItems: "center", gap: 10,
     width: "100%", padding: "8px 12px",
     border: "none", background: "transparent", cursor: "pointer",
+    fontFamily: "var(--font-ui)",
     fontSize: 13, color: "var(--color-text-secondary)",
     textAlign: "left", borderRadius: "var(--radius-sm)",
     transition: "background 0.1s",
   };
 
+  const iconStyle: React.CSSProperties = {
+    width: 16, display: "inline-flex", alignItems: "center", justifyContent: "center",
+    color: "var(--color-text-muted)",
+    flexShrink: 0,
+  };
+
   return (
     <div style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title={de ? "Exportieren" : "Export"}
-        style={{
-          display: "flex", alignItems: "center", gap: 4,
-          padding: "3px 8px", borderRadius: "var(--radius-sm)",
-          border: "1px solid var(--color-border)",
-          background: open ? "var(--color-surface-2)" : "transparent",
-          cursor: "pointer", fontSize: 12,
-          color: copied ? "#1A9E5A" : "var(--color-text-muted)",
-          transition: "all 0.15s",
-        }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-brand)"}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
-      >
-        {copied ? "✓" : "↑"}
-        <span>{copied ? (de ? "Kopiert" : "Copied") : (de ? "Export" : "Export")}</span>
-      </button>
+      <Tooltip content={copied ? (de ? "In Zwischenablage kopiert" : "Copied to clipboard") : (de ? "Briefing exportieren (Markdown, JSON)" : "Export briefing (Markdown, JSON)")} placement="bottom">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label={de ? "Exportieren" : "Export"}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            height: 28,
+            padding: "0 10px", borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--color-border)",
+            background: open ? "var(--color-surface-2)" : "transparent",
+            cursor: "pointer",
+            fontFamily: "var(--font-ui)",
+            fontSize: 12,
+            color: copied ? "#1A9E5A" : "var(--color-text-muted)",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-brand)"}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
+        >
+          {copied ? <Check size={13} strokeWidth={2.5} /> : <Upload size={13} strokeWidth={2} />}
+          <span>{copied ? (de ? "Kopiert" : "Copied") : (de ? "Export" : "Export")}</span>
+        </button>
+      </Tooltip>
 
       {open && (
         <>
@@ -75,10 +89,17 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
             border: "1px solid var(--color-border)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-md)",
-            minWidth: 200,
+            minWidth: 220,
             overflow: "hidden",
+            fontFamily: "var(--font-ui)",
           }}>
-            <div style={{ padding: "6px 12px 4px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)" }}>
+            <div style={{
+              padding: "6px 12px 4px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 10, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "0.06em",
+              color: "var(--color-text-muted)",
+            }}>
               {de ? "Diese Analyse" : "This analysis"}
             </div>
             <button
@@ -87,7 +108,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--color-surface-2)"}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
-              <span style={{ width: 16, textAlign: "center", fontSize: 14 }}>📋</span>
+              <span style={iconStyle}><Clipboard size={14} strokeWidth={2} /></span>
               <span>{de ? "Markdown kopieren" : "Copy as Markdown"}</span>
             </button>
             <button
@@ -96,7 +117,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--color-surface-2)"}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
-              <span style={{ width: 16, textAlign: "center", fontSize: 14 }}>↓</span>
+              <span style={iconStyle}><Download size={14} strokeWidth={2} /></span>
               <span>{de ? "Als .md speichern" : "Save as .md"}</span>
             </button>
             <button
@@ -105,7 +126,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--color-surface-2)"}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
-              <span style={{ width: 16, textAlign: "center", fontSize: 14 }}>{ }</span>
+              <span style={iconStyle}><FileCode2 size={14} strokeWidth={2} /></span>
               <span>{de ? "Als .json speichern" : "Save as .json"}</span>
             </button>
             <div style={{ height: 1, background: "var(--color-border)", margin: "4px 0" }} />

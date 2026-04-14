@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Radar } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
@@ -169,8 +170,9 @@ export default function TrendDetailPage() {
             onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
             onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
           >
-            <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 2 }}>
-              {de ? "Im Radar anzeigen" : "View in Radar"} ◎
+            <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 2, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {de ? "Im Radar anzeigen" : "View in Radar"}
+              <Radar size={13} strokeWidth={2} />
             </div>
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 11, color: "var(--color-text-muted)" }}>
               {de ? "Position im Ring-Modell" : "Position in ring model"}

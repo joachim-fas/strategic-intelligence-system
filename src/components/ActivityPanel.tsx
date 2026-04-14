@@ -12,10 +12,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import {
+  Play, ShieldCheck, Radar, Sparkles, Check, CheckCheck, X as XIcon,
+  Download, Circle, ArrowRight, Activity as ActivityIcon,
+} from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useActivityStream } from "@/lib/use-activity-stream";
 import type { ActivityEvent } from "@/lib/use-activity-stream";
 import { useLocale } from "@/lib/locale-context";
+import { Tooltip } from "@/components/ui/Tooltip";
 import Link from "next/link";
 
 // ── Monitor API response shape ────────────────────────────────────────────
@@ -40,15 +45,15 @@ interface MonitorData {
 }
 
 // ── Visual mapping ────────────────────────────────────────────────────────
-const PHASE_ICONS: Record<string, string> = {
-  start: "\u25B6",       // ▶
-  sanitize: "\u26E8",    // ⛨
-  signals: "\u25CE",     // ◎
-  "llm-call": "\u2726",  // ✦
-  validation: "\u2713",  // ✓
-  complete: "\u2714",    // ✔
-  error: "\u2716",       // ✖
-  fetch: "\u21E9",       // ⇩
+const PHASE_ICONS: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  start: Play,
+  sanitize: ShieldCheck,
+  signals: Radar,
+  "llm-call": Sparkles,
+  validation: Check,
+  complete: CheckCheck,
+  error: XIcon,
+  fetch: Download,
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -210,36 +215,43 @@ export function ActivityPanel() {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link
-              href="/monitor"
-              title={de ? "Vollständiger Monitor" : "Full Monitor"}
-              onClick={() => setOpen(false)}
-              style={{
-                fontSize: 11, color: "var(--color-text-muted, #6B6B6B)",
-                textDecoration: "none", padding: "4px 8px", borderRadius: 6,
-                border: "1px solid var(--color-border)", background: "transparent",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget).style.background = "rgba(228,255,151,0.5)"; }}
-              onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
-            >
-              Detail →
-            </Link>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label={de ? "Schließen" : "Close"}
-              style={{
-                width: 28, height: 28, borderRadius: 6, border: "none",
-                background: "transparent", cursor: "pointer", fontSize: 16,
-                color: "var(--color-text-muted, #6B6B6B)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { (e.currentTarget).style.background = "rgba(0,0,0,0.05)"; }}
-              onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
-            >
-              ✕
-            </button>
+            <Tooltip content={de ? "Vollständiger Monitor" : "Full monitor view"} placement="bottom">
+              <Link
+                href="/monitor"
+                onClick={() => setOpen(false)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  fontSize: 11, fontWeight: 600,
+                  color: "var(--color-text-muted, #6B6B6B)",
+                  textDecoration: "none", padding: "4px 8px", borderRadius: 6,
+                  border: "1px solid var(--color-border)", background: "transparent",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget).style.background = "rgba(228,255,151,0.5)"; }}
+                onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
+              >
+                {de ? "Detail" : "Detail"}
+                <ArrowRight size={11} strokeWidth={2} />
+              </Link>
+            </Tooltip>
+            <Tooltip content={de ? "Schließen" : "Close"} placement="bottom">
+              <button
+                onClick={() => setOpen(false)}
+                aria-label={de ? "Schließen" : "Close"}
+                style={{
+                  width: 28, height: 28, borderRadius: 6, border: "none",
+                  background: "transparent", cursor: "pointer",
+                  color: "var(--color-text-muted, #6B6B6B)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget).style.background = "rgba(0,0,0,0.05)"; }}
+                onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
+              >
+                <XIcon size={14} strokeWidth={2} />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -383,7 +395,9 @@ export function ActivityPanel() {
               textAlign: "center", padding: "40px 0",
               color: "var(--color-text-muted, #6B6B6B)", fontSize: 13,
             }}>
-              <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>◎</div>
+              <div style={{ marginBottom: 8, opacity: 0.3, display: "flex", justifyContent: "center" }}>
+                <ActivityIcon size={28} strokeWidth={1.75} />
+              </div>
               <div>{de ? "Warte auf Aktivität…" : "Waiting for activity…"}</div>
               <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
                 {de ? "Starte eine Abfrage oder Pipeline" : "Start a query or pipeline"}
@@ -403,7 +417,14 @@ export function ActivityPanel() {
           flexShrink: 0,
         }}>
           <span>{de ? "Ctrl+M zum Umschalten" : "Ctrl+M to toggle"}</span>
-          <span>{connected ? (de ? "● Verbunden" : "● Connected") : (de ? "○ Getrennt" : "○ Disconnected")}</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{
+              display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+              background: connected ? "#1A9E5A" : "#C8C8C8",
+              boxShadow: connected ? "0 0 4px rgba(26,158,90,0.5)" : "none",
+            }} />
+            {connected ? (de ? "Verbunden" : "Connected") : (de ? "Getrennt" : "Disconnected")}
+          </span>
         </div>
       </aside>
 
@@ -448,6 +469,12 @@ function Placeholder() {
 
 function EventRow({ event }: { event: ActivityEvent }) {
   const isError = event.phase === "error";
+  const PhaseIcon = PHASE_ICONS[event.phase] ?? Circle;
+  const iconColor = isError
+    ? "#DC2626"
+    : event.phase === "complete" || event.phase === "validation"
+      ? "#1A9E5A"
+      : "var(--color-text-muted, #6B6B6B)";
   return (
     <div style={{
       padding: "8px 10px", borderRadius: 6,
@@ -457,8 +484,11 @@ function EventRow({ event }: { event: ActivityEvent }) {
     }}>
       {/* Event header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-        <span style={{ fontSize: 12, lineHeight: 1, width: 14, textAlign: "center" }}>
-          {PHASE_ICONS[event.phase] || "•"}
+        <span style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 14, height: 14, color: iconColor,
+        }}>
+          <PhaseIcon size={12} strokeWidth={2} />
         </span>
         <span style={{
           fontSize: 10, fontWeight: 700, textTransform: "uppercase",

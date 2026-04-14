@@ -44,7 +44,12 @@ import {
   FileText as DocIcon,
   MessageSquare,
   LayoutGrid,
+  Check as CheckIcon,
+  RotateCcw,
+  Loader2,
+  CornerDownRight,
 } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const MiniRadar = dynamic(() => import("@/components/radar/MiniRadar"), { ssr: false });
 const BalancedScorecard = dynamic(() => import("@/components/radar/BalancedScorecard"), { ssr: false });
@@ -160,12 +165,14 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
 
       {/* Thread indicator */}
       {entry.parentQuery && (
-        <div style={{ padding: "6px 14px 0", display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--volt-orchid, #D98AE8)", fontFamily: "var(--volt-font-mono)" }}>
-          <span style={{ fontSize: 12 }}>↳</span>
-          <span style={{ fontWeight: 500 }}>{locale === "de" ? "Folgefrage zu" : "Follow-up to"}: </span>
-          <span style={{ color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }}>
-            {entry.parentQuery}
-          </span>
+        <div style={{ padding: "6px 14px 0", display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--volt-orchid, #D98AE8)", fontFamily: "var(--volt-font-mono)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          <CornerDownRight size={11} strokeWidth={2.25} />
+          <span style={{ fontWeight: 700 }}>{locale === "de" ? "Folgefrage zu" : "Follow-up to"}</span>
+          <Tooltip content={entry.parentQuery} placement="bottom">
+            <span style={{ color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, textTransform: "none", letterSpacing: 0 }}>
+              {entry.parentQuery}
+            </span>
+          </Tooltip>
         </div>
       )}
 
@@ -180,27 +187,48 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           </span>
         )}
         {activeProjectId && !isLoading && !isHelp && briefing.synthesis && (
-          <Button
-            variant="ghost" size="sm"
-            onClick={saveToProject}
-            disabled={saved || saving}
-            className={cn("text-[12px] px-3 h-7", saved ? "text-[#1A9E5A]" : "text-[#9B9B9B]")}
+          <Tooltip
+            content={saved
+              ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
+              : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
+            placement="bottom"
           >
-            {saved ? "✓ Gespeichert" : saving ? "…" : "Speichern"}
-          </Button>
+            <Button
+              variant="ghost" size="sm"
+              onClick={saveToProject}
+              disabled={saved || saving}
+              className={cn("text-[12px] px-3 h-7 gap-1.5", saved ? "text-[#1A9E5A]" : "text-[#9B9B9B]")}
+            >
+              {saved ? (
+                <>
+                  <CheckIcon size={13} strokeWidth={2.5} />
+                  {locale === "de" ? "Gespeichert" : "Saved"}
+                </>
+              ) : saving ? (
+                <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+              ) : (
+                locale === "de" ? "Speichern" : "Save"
+              )}
+            </Button>
+          </Tooltip>
         )}
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
-          <Button
-            variant="ghost" size="sm"
-            onClick={openInCanvas}
-            className="text-[12px] px-3 h-7 text-[#9B9B9B] hover:text-[#4A6CF7] gap-1.5"
-            title={locale === "de"
-              ? "Dieses Briefing als Node-Canvas öffnen"
-              : "Open this briefing in the Node Canvas"}
+          <Tooltip
+            content={locale === "de"
+              ? "Dieses Briefing als Node-Canvas öffnen — volle strategische Arbeitsfläche"
+              : "Open this briefing in the Node Canvas — full strategic workspace"}
+            placement="bottom"
           >
-            <LayoutGrid size={13} />
-            Canvas
-          </Button>
+            <Button
+              variant="ghost" size="sm"
+              onClick={openInCanvas}
+              className="text-[12px] px-3 h-7 text-[#9B9B9B] hover:text-[#4A6CF7] gap-1.5"
+              aria-label={locale === "de" ? "Im Node Canvas öffnen" : "Open in Node Canvas"}
+            >
+              <LayoutGrid size={13} />
+              Canvas
+            </Button>
+          </Tooltip>
         )}
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
           <BriefingExport entry={entry} locale={locale} />
@@ -245,17 +273,21 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           <div style={{
             display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px",
             background: "var(--volt-negative-light)", border: "1px solid var(--volt-negative-border)", borderRadius: "var(--volt-radius-md)",
+            fontFamily: "var(--font-ui)",
           }}>
-            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>⚠</span>
+            <AlertTriangle size={16} strokeWidth={2.25} color="var(--volt-negative-text)" style={{ flexShrink: 0, marginTop: 2 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--volt-negative-text)", marginBottom: 4 }}>
+              <div style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 600, color: "var(--volt-negative-text)", marginBottom: 4 }}>
                 {locale === "de" ? "Analyse fehlgeschlagen" : "Analysis failed"}
               </div>
               <div style={{ fontSize: 12, color: "var(--signal-negative-text, #7F1D1D)", lineHeight: 1.5 }}>{entry.error}</div>
             </div>
-            <VoltButton variant="destructive" size="sm" onClick={() => onFollowUp?.(entry.query)}>
-              {locale === "de" ? "Wiederholen" : "Retry"} ↺
-            </VoltButton>
+            <Tooltip content={locale === "de" ? "Analyse mit derselben Frage erneut starten" : "Retry with the same query"} placement="top">
+              <VoltButton variant="destructive" size="sm" onClick={() => onFollowUp?.(entry.query)}>
+                <RotateCcw size={13} style={{ marginRight: 6 }} />
+                {locale === "de" ? "Wiederholen" : "Retry"}
+              </VoltButton>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -450,12 +482,16 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 : `${briefing.matchedTrends.length} related trends`}
               padding="none"
             >
-              <div style={{ padding: "0 20px 20px", background: "var(--muted, #F7F7F7)" }}>
+              <div style={{
+                padding: "8px 20px 20px",
+                background: "var(--muted, #F7F7F7)",
+                display: "flex", justifyContent: "center",
+              }}>
                 <MiniRadar
                   trends={briefing.matchedTrends.map((m: any) => m.trend)}
                   onTrendClick={onTrendClick}
-                  width={640}
-                  height={280}
+                  width={460}
+                  height={460}
                 />
               </div>
             </VoltSectionCard>

@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Search as DeepIcon,
+  GitBranch as WhatIfIcon,
+  ShieldAlert as ChallengeIcon,
+  Compass as StrategyIcon,
+  Save as SaveIcon,
+  Check as CheckIcon,
+  Plus as PlusIcon,
+  Merge as MergeIcon,
+} from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { VoltSectionLabel } from "@/components/verstehen/VoltPrimitives";
 
 // ── Scenario type ─────────────────────────────────────────────────────────────
@@ -17,17 +28,19 @@ interface Scenario {
 }
 
 // ── Type config ────────────────────────────────────────────────────────────────
+// Single strong color per type — used for top accent strip + percentage + hover
 const TYPE_CONFIG: Record<string, {
-  color: string; bg: string; border: string;
+  color: string;
+  tintBg: string;     // very subtle background when selected
   labelDe: string; labelEn: string;
 }> = {
-  optimistic:  { color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint-light, #E8F8EF)", border: "var(--pastel-mint-border, #7DD4A8)", labelDe: "Optimistisch",  labelEn: "Optimistic"  },
-  baseline:    { color: "var(--pastel-sky-text, #1D4ED8)", bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", labelDe: "Basisfall",      labelEn: "Baseline"    },
-  pessimistic: { color: "var(--signal-negative, #B91C1C)", bg: "var(--pastel-rose-light, #FEF2F2)", border: "var(--pastel-rose-border, #FCA5A5)", labelDe: "Pessimistisch", labelEn: "Pessimistic" },
-  wildcard:    { color: "var(--pastel-butter-text, #92400E)", bg: "var(--pastel-butter-light, #FFFBEB)", border: "var(--pastel-butter-border, #FDE68A)", labelDe: "Wildcard",       labelEn: "Wildcard"    },
+  optimistic:  { color: "#1A9E5A", tintBg: "rgba(26,158,90,0.04)",  labelDe: "Optimistisch",  labelEn: "Optimistic"  },
+  baseline:    { color: "#1D4ED8", tintBg: "rgba(29,78,216,0.04)",  labelDe: "Basisfall",      labelEn: "Baseline"    },
+  pessimistic: { color: "#B91C1C", tintBg: "rgba(185,28,28,0.04)",  labelDe: "Pessimistisch", labelEn: "Pessimistic" },
+  wildcard:    { color: "#B45309", tintBg: "rgba(180,83,9,0.04)",   labelDe: "Wildcard",       labelEn: "Wildcard"    },
 };
 
-const DEFAULT_TYPE = { color: "var(--pastel-sky-text, #1D4ED8)", bg: "var(--pastel-sky-light, #EFF6FF)", border: "var(--pastel-sky-border, #93C5FD)", labelDe: "Szenario", labelEn: "Scenario" };
+const DEFAULT_TYPE = { color: "#1D4ED8", tintBg: "rgba(29,78,216,0.04)", labelDe: "Szenario", labelEn: "Scenario" };
 
 function getTypeConfig(type?: string) {
   return TYPE_CONFIG[type ?? ""] ?? DEFAULT_TYPE;
@@ -53,13 +66,28 @@ function buildPrompt(
     : `Strategic playbook for scenario "${s.name}" in context of "${query}": Decisive actors, coalitions, optimal positioning?`;
 }
 
+// ── Action definitions (icons + labels + tooltip) ─────────────────────────────
+type ActionId = "deep" | "whatif" | "challenge" | "strategy";
+
+const ACTION_DEFS: {
+  id: ActionId;
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  labelDe: string; labelEn: string;
+  tipDe: string; tipEn: string;
+}[] = [
+  { id: "deep",      Icon: DeepIcon,      labelDe: "Vertiefen",  labelEn: "Deep dive",  tipDe: "Vertiefen — detaillierte Analyse der Bedingungen und Frühwarnindikatoren",   tipEn: "Deep dive — detailed analysis of conditions and early warning indicators" },
+  { id: "whatif",    Icon: WhatIfIcon,    labelDe: "Was wenn",   labelEn: "What if",    tipDe: "Was wenn — 3–5 konkrete Handlungsoptionen, sofort/mittel/langfristig",      tipEn: "What if — 3–5 concrete action options across immediate/mid/long term" },
+  { id: "challenge", Icon: ChallengeIcon, labelDe: "Angreifen",  labelEn: "Challenge",  tipDe: "Angreifen — Stress-Test der Annahmen: was wird übersehen?",                 tipEn: "Challenge — stress test of assumptions: what is being overlooked?" },
+  { id: "strategy",  Icon: StrategyIcon,  labelDe: "Strategie",  labelEn: "Strategy",   tipDe: "Strategie — Spielplan mit Akteuren, Koalitionen und Positionierung",        tipEn: "Strategy — playbook with actors, coalitions and positioning" },
+];
+
 // ── ScenarioCard ──────────────────────────────────────────────────────────────
 function ScenarioCard({
-  s, i, isSelected, onToggle, onAction, de, query,
+  s, isSelected, onToggle, onAction, de, query,
 }: {
   s: Scenario; i: number; isSelected: boolean;
   onToggle: () => void;
-  onAction: (a: "deep" | "whatif" | "challenge" | "strategy") => void;
+  onAction: (a: ActionId) => void;
   de: boolean;
   query?: string;
 }) {
@@ -88,101 +116,67 @@ function ScenarioCard({
   const pct   = (s.probability * 100).toFixed(0);
   const label = de ? cfg.labelDe : cfg.labelEn;
 
-  const ACTIONS: { id: "deep" | "whatif" | "challenge" | "strategy"; labelDe: string; labelEn: string; icon: string }[] = [
-    { id: "deep",      labelDe: "Vertiefen",  labelEn: "Deep dive",  icon: "↓" },
-    { id: "whatif",    labelDe: "Was wenn",   labelEn: "What if",    icon: "→" },
-    { id: "challenge", labelDe: "Angreifen",  labelEn: "Challenge",  icon: "⚡" },
-    { id: "strategy",  labelDe: "Strategie",  labelEn: "Strategy",   icon: "◈" },
-  ];
-
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      borderRadius: 12,
-      border: `1px solid ${isSelected ? cfg.border : "var(--color-border)"}`,
-      background: isSelected ? cfg.bg : "var(--color-surface)",
-      boxShadow: isSelected ? `0 0 0 2px ${cfg.color}20` : "none",
+      borderRadius: 10,
+      border: `1px solid ${isSelected ? cfg.color : "var(--color-border)"}`,
+      background: isSelected ? cfg.tintBg : "var(--color-surface)",
       transition: "all 0.15s",
       overflow: "hidden",
+      fontFamily: "var(--font-ui)",
+      position: "relative",
     }}>
+      {/* Top accent strip — single color indicator for scenario type */}
+      <div style={{ height: 3, background: cfg.color, flexShrink: 0 }} />
 
       {/* ── Clickable body ─────────────────────────── */}
-      <div onClick={onToggle} style={{ padding: "14px 14px 12px", cursor: "pointer", flex: 1 }}>
+      <div onClick={onToggle} style={{ padding: "14px 16px 12px", cursor: "pointer", flex: 1 }}>
 
-        {/* Row 1: type pill + timeframe + probability */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          {/* Volt UI pastel pill — matches Status-Pill spec */}
-          <span style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-            color: cfg.color, background: cfg.bg,
-            border: `1px solid ${cfg.border}`,
-            borderRadius: 9999, padding: "3px 9px", flexShrink: 0, lineHeight: 1.2,
-          }}>{label}</span>
-
+        {/* Meta line: type · timeframe · percentage (aligned, all subtle) */}
+        <div style={{
+          display: "flex", alignItems: "baseline", gap: 8,
+          marginBottom: 8, minWidth: 0,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase",
+        }}>
+          <span style={{ fontWeight: 700, color: cfg.color, flexShrink: 0 }}>{label}</span>
           {s.timeframe && (
             <span style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 9, color: "var(--muted-foreground, #6B7A9A)",
-              background: "var(--muted, #F7F7F7)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 9999, padding: "3px 9px", flexShrink: 0, lineHeight: 1.2,
-              letterSpacing: "0.03em",
-            }}>{s.timeframe}</span>
+              color: "var(--color-text-muted)", fontWeight: 500,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+            }}>· {s.timeframe}</span>
           )}
-
           <span style={{
             marginLeft: "auto",
             fontFamily: "var(--font-display)",
-            fontSize: 22, fontWeight: 700,
-            color: cfg.color, lineHeight: 1, flexShrink: 0,
+            fontSize: 16, fontWeight: 700,
+            color: cfg.color, lineHeight: 1,
             fontVariantNumeric: "tabular-nums",
-            letterSpacing: "-0.02em",
+            letterSpacing: "-0.01em",
+            textTransform: "none",
+            flexShrink: 0,
           }}>{pct}%</span>
-
-          {/* Save to scenario builder */}
-          <button
-            onClick={(e) => { e.stopPropagation(); saveToBuilder(); }}
-            title={de ? "Im Szenario-Builder speichern" : "Save to scenario builder"}
-            style={{
-              fontSize: 11, padding: "2px 6px", borderRadius: 6,
-              border: saved ? "1px solid var(--signal-positive, #1A9E5A)" : "1px solid var(--color-border)",
-              background: saved ? "var(--pastel-mint, #C3F4D3)" : "transparent",
-              color: saved ? "var(--pastel-mint-text)" : "var(--color-text-muted)",
-              cursor: saved ? "default" : "pointer", flexShrink: 0, marginLeft: 4,
-              transition: "all 0.15s",
-            }}
-          >{saved ? "✓" : "💾"}</button>
         </div>
 
-        {/* Probability bar */}
-        <div style={{
-          height: 4, borderRadius: 2,
-          background: "var(--color-surface-2)",
-          marginBottom: 10, overflow: "hidden",
-        }}>
-          <div style={{
-            height: 4, borderRadius: 2,
-            width: `${s.probability * 100}%`,
-            background: cfg.color,
-            transition: "width 0.4s ease",
-          }} />
-        </div>
-
-        {/* Name */}
-        <p style={{
-          fontSize: 13, fontWeight: 600, lineHeight: 1.35,
+        {/* Name — primary hierarchy */}
+        <h4 style={{
+          fontFamily: "var(--font-heading)",
+          fontSize: 15, fontWeight: 700, lineHeight: 1.3,
           color: "var(--color-text-heading)",
           margin: "0 0 8px",
+          letterSpacing: "-0.01em",
+          display: "flex", alignItems: "flex-start", gap: 6,
         }}>
-          {isSelected && <span style={{ color: cfg.color, marginRight: 4 }}>✓</span>}
-          {s.name}
-        </p>
+          {isSelected && <CheckIcon size={13} strokeWidth={2.5} color={cfg.color} style={{ marginTop: 3, flexShrink: 0 }} />}
+          <span>{s.name}</span>
+        </h4>
 
         {/* Description — capped at 4 lines */}
         <p style={{
+          fontFamily: "var(--font-ui)",
           fontSize: 12, color: "var(--color-text-subtle)",
-          lineHeight: 1.6, margin: "0 0 10px",
+          lineHeight: 1.55, margin: "0 0 10px",
           display: "-webkit-box",
           WebkitLineClamp: 4,
           WebkitBoxOrient: "vertical",
@@ -191,78 +185,103 @@ function ScenarioCard({
           {s.description}
         </p>
 
-        {/* Key drivers */}
+        {/* Key drivers — plain bulleted list (no colored boxes) */}
         {s.keyDrivers && s.keyDrivers.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          <ul style={{
+            margin: 0, padding: 0, listStyle: "none",
+            display: "flex", flexDirection: "column", gap: 3,
+          }}>
             {s.keyDrivers.slice(0, 4).map((d, j) => (
-              <span key={j} style={{
-                fontSize: 10, fontWeight: 500,
-                color: cfg.color,
-                background: cfg.bg,
-                border: `1px solid ${cfg.border}`,
-                borderRadius: "var(--radius-full)",
-                padding: "2px 8px",
-              }}>{d}</span>
+              <li key={j} style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: 11.5,
+                color: "var(--color-text-secondary)",
+                lineHeight: 1.45,
+                display: "flex", alignItems: "flex-start", gap: 7,
+              }}>
+                <span style={{
+                  width: 4, height: 4, borderRadius: "50%",
+                  background: cfg.color, flexShrink: 0, marginTop: 6,
+                }} />
+                <span>{d}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
-      {/* ── Action row ─────────────────────────────── */}
+      {/* ── Footer row: subtle icon actions + save ─────────────────────────── */}
       <div style={{
-        display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
-        borderTop: `1px solid ${isSelected ? cfg.border : "var(--color-border)"}`,
-        background: isSelected ? cfg.bg + "88" : "var(--color-page-bg)",
+        display: "flex", alignItems: "center",
+        padding: "6px 8px 6px 10px",
+        borderTop: "1px solid var(--color-border)",
+        gap: 2,
       }}>
-        {ACTIONS.map((a, idx) => (
+        {ACTION_DEFS.map((a) => (
           <ActionBtn
             key={a.id}
-            icon={a.icon}
+            Icon={a.Icon}
             label={de ? a.labelDe : a.labelEn}
-            hoverBg={cfg.bg}
+            tip={de ? a.tipDe : a.tipEn}
             hoverColor={cfg.color}
-            borderRight={idx < 3}
             onClick={(e) => { e.stopPropagation(); onAction(a.id); }}
           />
         ))}
+        <span style={{ flex: 1 }} />
+        <Tooltip content={saved ? (de ? "Gespeichert" : "Saved") : (de ? "Im Szenario-Builder speichern" : "Save to scenario builder")} placement="top">
+          <button
+            onClick={(e) => { e.stopPropagation(); saveToBuilder(); }}
+            aria-label={de ? "Im Szenario-Builder speichern" : "Save to scenario builder"}
+            style={{
+              width: 26, height: 26, borderRadius: 6,
+              border: "none",
+              background: "transparent",
+              color: saved ? "#1A9E5A" : "var(--color-text-muted)",
+              cursor: saved ? "default" : "pointer", flexShrink: 0,
+              transition: "all 0.12s",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+            }}
+            onMouseEnter={e => { if (!saved) (e.currentTarget as HTMLElement).style.background = "var(--color-surface-2)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            {saved ? <CheckIcon size={13} strokeWidth={2.5} /> : <SaveIcon size={12} strokeWidth={2} />}
+          </button>
+        </Tooltip>
       </div>
     </div>
   );
 }
 
 function ActionBtn({
-  icon, label, hoverBg, hoverColor, borderRight, onClick,
+  Icon, label, tip, hoverColor, onClick,
 }: {
-  icon: string; label: string; hoverBg: string; hoverColor: string;
-  borderRight: boolean; onClick: (e: React.MouseEvent) => void;
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  label: string;
+  tip: string;
+  hoverColor: string;
+  onClick: (e: React.MouseEvent) => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const color = hovered ? hoverColor : "var(--color-text-muted)";
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        border: "none",
-        borderRight: borderRight ? "1px solid var(--color-border)" : "none",
-        background: hovered ? hoverBg : "transparent",
-        cursor: "pointer",
-        padding: "8px 4px",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-        transition: "background 0.12s",
-      }}
-    >
-      <span style={{
-        fontSize: 12, lineHeight: 1,
-        color: hovered ? hoverColor : "var(--color-text-muted)",
-      }}>{icon}</span>
-      <span style={{
-        fontSize: 9, fontWeight: 600,
-        color: hovered ? hoverColor : "var(--color-text-muted)",
-        letterSpacing: "0.04em", textTransform: "uppercase", lineHeight: 1,
-        whiteSpace: "nowrap",
-      }}>{label}</span>
-    </button>
+    <Tooltip content={tip} placement="top">
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        aria-label={label}
+        style={{
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          width: 28, height: 26, borderRadius: 6,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.12s",
+        }}
+      >
+        <Icon size={14} color={color} strokeWidth={2} />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -303,7 +322,7 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
   };
 
   return (
-    <div>
+    <div style={{ fontFamily: "var(--font-ui)" }}>
       {/* Header row — Volt UI SectionLabel with hint + actions */}
       {!hideHeader && (
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
@@ -316,14 +335,20 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {selected.size > 1 && (
-              <Button onClick={combineSelected} size="sm"
-                className="text-[12px] bg-[#E4FF97] text-[#0A0A0A] hover:bg-[#D4F080] border border-black/10 font-semibold">
-                {de ? `${selected.size} kombinieren →` : `Combine ${selected.size} →`}
-              </Button>
+              <Tooltip content={de ? "Ausgewählte Szenarien zu einer Meta-Analyse kombinieren" : "Combine selected scenarios into a meta-analysis"} placement="top">
+                <Button onClick={combineSelected} size="sm"
+                  className="text-[12px] bg-[#E4FF97] text-[#0A0A0A] hover:bg-[#D4F080] border border-black/10 font-semibold gap-1.5">
+                  <MergeIcon size={13} />
+                  {de ? `${selected.size} kombinieren` : `Combine ${selected.size}`}
+                </Button>
+              </Tooltip>
             )}
-            <Button variant="outline" onClick={generateMore} size="sm" className="text-[12px]">
-              {de ? "+ Weitere" : "+ More"}
-            </Button>
+            <Tooltip content={de ? "3 weitere, fundamental andere Szenarien generieren" : "Generate 3 more fundamentally different scenarios"} placement="top">
+              <Button variant="outline" onClick={generateMore} size="sm" className="text-[12px] gap-1.5">
+                <PlusIcon size={13} />
+                {de ? "Weitere" : "More"}
+              </Button>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -331,8 +356,8 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
       {/* Cards grid */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-        gap: 10,
+        gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+        gap: 12,
       }}>
         {scenarios.map((s, i) => (
           <ScenarioCard
@@ -344,20 +369,6 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
             de={de}
             query={query}
           />
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 10, paddingLeft: 2 }}>
-        {[
-          { icon: "↓", label: de ? "Vertiefen — detaillierte Analyse" : "Deep dive — detailed analysis" },
-          { icon: "→", label: de ? "Was wenn — Handlungsoptionen"     : "What if — action options" },
-          { icon: "⚡", label: de ? "Angreifen — Annahmen testen"     : "Challenge — test assumptions" },
-          { icon: "◈", label: de ? "Strategie — Spielplan bauen"      : "Strategy — build playbook" },
-        ].map(l => (
-          <span key={l.icon} style={{ fontSize: 10, color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ fontWeight: 700 }}>{l.icon}</span> {l.label}
-          </span>
         ))}
       </div>
     </div>

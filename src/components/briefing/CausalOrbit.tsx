@@ -111,7 +111,7 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
                       textAnchor="middle"
                       fill="var(--volt-text, #0A0A0A)" fontSize="7" fontWeight="600" fontFamily="var(--volt-font-ui, sans-serif)"
                     >
-                      → Analysieren
+                      Analysieren
                     </text>
                   )}
                 </g>
