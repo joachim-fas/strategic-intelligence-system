@@ -93,15 +93,13 @@ interface Spine {
 /** Per-query relevance for a matched trend. Prefers API-supplied queryRelevance
  *  when present (Phase B), falls back to `relevance × confidence` proxy. */
 function trendQueryRelevance(t: MatchedTrend): number {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const apiScore = (t as any).queryRelevance;
+  const apiScore = t.queryRelevance;
   if (typeof apiScore === "number" && apiScore >= 0 && apiScore <= 1) return apiScore;
   return clamp01(t.relevance * t.confidence);
 }
 
 function edgeQueryRelevance(e: MatchedEdge): number {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const apiScore = (e as any).queryRelevance;
+  const apiScore = e.queryRelevance;
   if (typeof apiScore === "number" && apiScore >= 0 && apiScore <= 1) return apiScore;
   return clamp01(e.strength);
 }

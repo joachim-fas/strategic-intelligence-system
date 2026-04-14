@@ -72,6 +72,10 @@ export const LLMResponseSchema = z.object({
   reasoningChains: z.array(z.string().max(1000)).max(10).default([]),
   steepV: SteepVSchema.optional().nullable(),
   matchedTrendIds: z.array(z.string().max(100)).max(40).default([]),
+  matchedTrendRelevance: z
+    .record(z.string().max(100), z.number().min(0).max(1))
+    .optional()
+    .nullable(),
   keyInsights: z.array(z.string().max(1000)).max(10).default([]),
   regulatoryContext: z.array(z.string().max(1000)).max(10).default([]),
   causalAnalysis: z.array(z.string().max(1000)).max(10).default([]),
@@ -156,6 +160,17 @@ export function validateLLMResponse(
   }
   if (data.matchedTrendIds.length === 0 && originalCount > 0) {
     warnings.push("ALL matchedTrendIds were invalid — LLM did not match any real trends");
+  }
+
+  // Step 2b: Filter matchedTrendRelevance to only keep entries for valid matched IDs.
+  // Entries for dropped / hallucinated ids are removed so they cannot re-enter the pipeline.
+  if (data.matchedTrendRelevance) {
+    const validSet = new Set(data.matchedTrendIds);
+    const filtered: Record<string, number> = {};
+    for (const [id, score] of Object.entries(data.matchedTrendRelevance)) {
+      if (validSet.has(id)) filtered[id] = score;
+    }
+    data.matchedTrendRelevance = Object.keys(filtered).length > 0 ? filtered : null;
   }
 
   // Step 3: Normalize scenario probabilities

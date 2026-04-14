@@ -31,6 +31,14 @@ interface LLMBriefingResponse {
   synthesis: string;
   reasoningChains: string[];
   matchedTrendIds: string[];
+  /**
+   * Optional per-query relevance map for matched trends: id → [0, 1].
+   * When the LLM supplies this, the Orbit derivation spine uses it to
+   * filter off-topic matches (e.g. a football trend surfacing on a
+   * mobility query because of tag overlap). Absent → consumers fall
+   * back to `relevance × confidence` as a proxy.
+   */
+  matchedTrendRelevance?: Record<string, number>;
   keyInsights: string[];
   regulatoryContext: string[];
   causalAnalysis: string[];
@@ -144,12 +152,24 @@ KRITISCH: Die drei Szenario-Wahrscheinlichkeiten muessen sich aus der ANALYSE ER
 - Begruende in der description WARUM du diese Wahrscheinlichkeit vergibst
 - Summe muss ~100% sein (95-105% akzeptabel durch Rundung)
 
-═══ TREND-MATCHING (matchedTrendIds) ═══
+═══ TREND-MATCHING (matchedTrendIds + matchedTrendRelevance) ═══
 Mappe deine Analyse IMMER zurueck auf konkrete Trend-IDs aus der TRENDS-Liste oben.
 - Pruefe JEDEN Trend in der Liste: Ist er DIREKT relevant fuer diese Frage?
 - Gib NUR die trend-IDs zurueck (z.B. "mega-ai-transformation"), NICHT die Namen
 - Erwartete Anzahl: 3-8 matched Trends pro Query — nicht 0, nicht alle 40
 - FEHLERMELDUNG an dich selbst: matchedTrendIds = [] ist IMMER ein Fehler
+
+Zusaetzlich MUSS fuer JEDEN gematchten Trend eine per-Query-Relevanz in
+matchedTrendRelevance geliefert werden — eine Zahl zwischen 0.0 und 1.0,
+die angibt wie ZENTRAL dieser Trend fuer DIESE konkrete Frage ist:
+- 0.90-1.00: Kernthema der Frage — die Antwort waere ohne diesen Trend unvollstaendig
+- 0.60-0.89: Starker Bezug — pragender Einflussfaktor fuer die Frage
+- 0.30-0.59: Mittlerer Bezug — relevanter Kontext, aber nicht zentral
+- 0.10-0.29: Schwacher Bezug — streift das Thema, ist aber nicht pragend
+- Unter 0.10: Nicht matchen, diesen Trend weglassen
+WICHTIG: Der globale Trend-Relevance-Score (oben in der Liste) ist NICHT
+automatisch die Query-Relevanz. Ein global wichtiger Trend kann fuer diese
+spezielle Frage randstaendig sein. Bewerte themenspezifisch.
 
 ═══ FRAGTYPEN ═══
 STRATEGISCH ("Wie entwickelt sich X in 5 Jahren?", "Welche Chancen bei Y?") → Tiefe STEEP+V-Analyse + BSC-Kandidat
@@ -208,6 +228,11 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     "V": "Values-Dimension: 1-2 Saetze (oder null)"
   },
   "matchedTrendIds": ["mega-ai-transformation", "mega-climate-sustainability", "mega-geopolitical-shifts"],
+  "matchedTrendRelevance": {
+    "mega-ai-transformation": 0.85,
+    "mega-climate-sustainability": 0.42,
+    "mega-geopolitical-shifts": 0.18
+  },
   "keyInsights": [
     "Konkrete, nicht-triviale Erkenntnis mit Begruendung und Konsequenz",
     "Zweite Erkenntnis — anderer Aspekt, konkret",

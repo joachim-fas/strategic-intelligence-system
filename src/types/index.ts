@@ -203,6 +203,15 @@ export interface MatchedTrend {
   velocity: string;
   ring: string;
   signalCount: number;
+  /**
+   * Per-query relevance of this trend to the specific question — in [0, 1].
+   * Supplied by the LLM match step when it judges how load-bearing this trend
+   * is for THIS query (not the trend's global relevance). Consumed by the
+   * Orbit derivation spine to filter off-topic matches. Optional for
+   * backward compatibility — consumers fall back to
+   * `relevance × confidence` when absent.
+   */
+  queryRelevance?: number;
 }
 
 export interface MatchedEdge {
@@ -211,6 +220,11 @@ export interface MatchedEdge {
   type: "drives" | "amplifies" | "dampens" | "correlates" | string;
   strength: number;
   description?: string;
+  /**
+   * Per-query relevance of this causal edge to the specific question — in [0, 1].
+   * Supplied by the LLM; optional for backward compatibility.
+   */
+  queryRelevance?: number;
 }
 
 export interface DimensionEntry {

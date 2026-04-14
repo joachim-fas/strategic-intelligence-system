@@ -547,16 +547,21 @@ export async function POST(req: Request) {
           // Augment: matched trend details for radar + demographics
           const matchedIds: string[] = validated.matchedTrendIds || [];
           const matchedIdSet = new Set(matchedIds);
+          const relevanceMap: Record<string, number> = validated.matchedTrendRelevance ?? {};
           const matchedTrends = matchedIds
             .map((id: string) => trends.find((t: TrendDot) => t.id === id))
             .filter(Boolean)
-            .map((t: any) => ({
-              id: t.id, name: t.name, category: t.category,
-              tags: t.tags || [],
-              relevance: t.relevance, confidence: t.confidence,
-              impact: t.impact, velocity: t.velocity, ring: t.ring,
-              signalCount: t.signalCount || 0,
-            }));
+            .map((t: any) => {
+              const qr = relevanceMap[t.id];
+              return {
+                id: t.id, name: t.name, category: t.category,
+                tags: t.tags || [],
+                relevance: t.relevance, confidence: t.confidence,
+                impact: t.impact, velocity: t.velocity, ring: t.ring,
+                signalCount: t.signalCount || 0,
+                ...(typeof qr === "number" ? { queryRelevance: qr } : {}),
+              };
+            });
 
           // Augment: causal edges between matched trends
           const { getEdgesForTrend } = await import("@/lib/causal-graph");
