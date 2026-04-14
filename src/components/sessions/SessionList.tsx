@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import {
   FRAMEWORK_CATEGORIES,
   type FrameworkCategory,
@@ -122,7 +123,7 @@ export function SessionList({ mode, de }: Props) {
   const load = useCallback(() => {
     setLoading(true);
     const q = mode === "archived" ? "?archived=true" : "";
-    fetch(`/api/v1/canvas${q}`)
+    fetchWithTimeout(`/api/v1/canvas${q}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -142,7 +143,7 @@ export function SessionList({ mode, de }: Props) {
     if (busyId) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`, {
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: true }),
@@ -154,8 +155,12 @@ export function SessionList({ mode, de }: Props) {
       } catch {}
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      console.error("[archive]", e);
-      alert(de ? "Archivieren fehlgeschlagen." : "Archive failed.");
+      if (e instanceof Error && e.name === "AbortError") {
+        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        console.error("[archive]", e);
+        alert(de ? "Archivieren fehlgeschlagen." : "Archive failed.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -165,7 +170,7 @@ export function SessionList({ mode, de }: Props) {
     if (busyId) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`, {
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: false }),
@@ -173,8 +178,12 @@ export function SessionList({ mode, de }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      console.error("[restore]", e);
-      alert(de ? "Wiederherstellen fehlgeschlagen." : "Restore failed.");
+      if (e instanceof Error && e.name === "AbortError") {
+        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        console.error("[restore]", e);
+        alert(de ? "Wiederherstellen fehlgeschlagen." : "Restore failed.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -190,7 +199,7 @@ export function SessionList({ mode, de }: Props) {
     if (!confirmed) return;
     setBusyId(id);
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`, { method: "DELETE" });
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       try {
         const active = localStorage.getItem("sis-active-canvas");
@@ -198,8 +207,12 @@ export function SessionList({ mode, de }: Props) {
       } catch {}
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      console.error("[delete]", e);
-      alert(de ? "Löschen fehlgeschlagen." : "Delete failed.");
+      if (e instanceof Error && e.name === "AbortError") {
+        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        console.error("[delete]", e);
+        alert(de ? "Löschen fehlgeschlagen." : "Delete failed.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -225,7 +238,7 @@ export function SessionList({ mode, de }: Props) {
     if (!nextName || nextName === current.name) { cancelRename(); return; }
     setBusyId(id);
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`, {
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: nextName }),
@@ -233,8 +246,12 @@ export function SessionList({ mode, de }: Props) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, name: nextName } : s)));
     } catch (e) {
-      console.error("[rename]", e);
-      alert(de ? "Umbenennen fehlgeschlagen." : "Rename failed.");
+      if (e instanceof Error && e.name === "AbortError") {
+        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        console.error("[rename]", e);
+        alert(de ? "Umbenennen fehlgeschlagen." : "Rename failed.");
+      }
     } finally {
       setBusyId(null);
       cancelRename();

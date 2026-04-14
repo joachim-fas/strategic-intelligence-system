@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 
@@ -143,7 +144,7 @@ export default function MonitorPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/monitor");
+      const res = await fetchWithTimeout("/api/v1/monitor");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       setData(d);
@@ -151,8 +152,13 @@ export default function MonitorPage() {
       setLastRefresh(new Date());
       addLog("fetch", `Monitor-Daten geladen: ${d.signals.total} Signale, ${d.trends.total} Trends`);
     } catch (err) {
-      setError(String(err));
-      addLog("error", `Monitor-Fehler: ${err}`);
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("Request timed out");
+        addLog("error", "Monitor-Timeout: Server antwortet nicht");
+      } else {
+        setError(String(err));
+        addLog("error", `Monitor-Fehler: ${err}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -172,7 +178,7 @@ export default function MonitorPage() {
     setPipelineRunning(true);
     addLog("pipeline", "Pipeline gestartet...");
     try {
-      const res = await fetch("/api/v1/pipeline", { method: "POST" });
+      const res = await fetchWithTimeout("/api/v1/pipeline", { method: "POST" }, 120_000);
       const d = await res.json();
       if (d.success) {
         addLog("pipeline", `Pipeline fertig: ${d.signalCount} Signale aus ${d.sources?.length} Quellen in ${d.duration}ms`);

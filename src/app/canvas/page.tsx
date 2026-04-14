@@ -36,6 +36,7 @@ import {
   VoltDropdownMenuSeparator,
   VoltDropdownMenuLabel,
 } from "@/components/volt/VoltDropdownMenu";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useLocale } from "@/lib/locale-context";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
@@ -4765,12 +4766,16 @@ export default function CanvasPage() {
 
   const loadProjects = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/canvas");
+      const res = await fetchWithTimeout("/api/v1/canvas");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setProjects(json.canvases ?? []);
     } catch (e) {
-      showProjectError(de ? `Projekte laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load projects: ${(e as Error).message}`);
+      if (e instanceof Error && e.name === "AbortError") {
+        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        showProjectError(de ? `Projekte laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load projects: ${(e as Error).message}`);
+      }
     }
   }, [de, showProjectError]);
 
@@ -4788,7 +4793,7 @@ export default function CanvasPage() {
         _schemaVersion: CANVAS_SCHEMA_VERSION, // FIXED: EDGE-08 — Include schema version in saved state
         userGroups: userGroupsRef.current.length > 0 ? userGroupsRef.current : undefined,
       };
-      await fetch(`/api/v1/canvas/${id}`, {
+      await fetchWithTimeout(`/api/v1/canvas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasState: state }),
@@ -4810,7 +4815,7 @@ export default function CanvasPage() {
     if (!name?.trim()) return;
     setProjectOp("creating");
     try {
-      const res = await fetch("/api/v1/canvas", {
+      const res = await fetchWithTimeout("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
@@ -4854,7 +4859,7 @@ export default function CanvasPage() {
     }
     setProjectOp("loading");
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`);
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`);
       if (res.status === 404) {
         // Project was deleted — clear stale references
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
@@ -4923,7 +4928,7 @@ export default function CanvasPage() {
     setEditingName(false);
     if (!projectId || !projectName.trim()) return;
     try {
-      const res = await fetch(`/api/v1/canvas/${projectId}`, {
+      const res = await fetchWithTimeout(`/api/v1/canvas/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: projectName.trim() }),
@@ -4931,7 +4936,11 @@ export default function CanvasPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, name: projectName.trim() } : p));
     } catch (e) {
-      showProjectError(de ? `Umbenennen fehlgeschlagen: ${(e as Error).message}` : `Rename failed: ${(e as Error).message}`);
+      if (e instanceof Error && e.name === "AbortError") {
+        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        showProjectError(de ? `Umbenennen fehlgeschlagen: ${(e as Error).message}` : `Rename failed: ${(e as Error).message}`);
+      }
     }
   }, [projectId, projectName, de, showProjectError]);
 
@@ -4939,7 +4948,7 @@ export default function CanvasPage() {
     if (!window.confirm(de ? "Projekt unwiderruflich löschen?" : "Delete project permanently?")) return;
     setProjectOp("deleting");
     try {
-      const res = await fetch(`/api/v1/canvas/${id}`, { method: "DELETE" });
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       setProjects(prev => prev.filter(p => p.id !== id));
       if (projectId === id) {
@@ -4950,7 +4959,11 @@ export default function CanvasPage() {
         try { window.history.replaceState(null, "", "/canvas"); } catch {}
       }
     } catch (e) {
-      showProjectError(de ? `Löschen fehlgeschlagen: ${(e as Error).message}` : `Delete failed: ${(e as Error).message}`);
+      if (e instanceof Error && e.name === "AbortError") {
+        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+      } else {
+        showProjectError(de ? `Löschen fehlgeschlagen: ${(e as Error).message}` : `Delete failed: ${(e as Error).message}`);
+      }
     } finally {
       setProjectOp(null);
     }
@@ -5586,7 +5599,7 @@ export default function CanvasPage() {
       setSelectedId(null); setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       if (projectIdRef.current) {
-        fetch(`/api/v1/canvas/${projectIdRef.current}`, {
+        fetchWithTimeout(`/api/v1/canvas/${projectIdRef.current}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ canvasState: null }),
         }).catch(() => {});
@@ -5742,7 +5755,7 @@ export default function CanvasPage() {
               hasAutoNamedRef.current = true;
               const autoName = query.substring(0, 60);
               // Fire-and-forget rename API call
-              fetch(`/api/v1/canvas/${pid}`, {
+              fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: autoName }),
@@ -5887,7 +5900,7 @@ export default function CanvasPage() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("/api/v1/canvas/upload", { method: "POST", body: formData });
+      const res = await fetchWithTimeout("/api/v1/canvas/upload", { method: "POST", body: formData }, 60_000);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setNodes(prev => prev.map(n =>
@@ -6038,7 +6051,7 @@ export default function CanvasPage() {
     setSelectedId(null); setCmdVisible(false);
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     if (projectIdRef.current) {
-      fetch(`/api/v1/canvas/${projectIdRef.current}`, {
+      fetchWithTimeout(`/api/v1/canvas/${projectIdRef.current}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasState: null }),

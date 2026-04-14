@@ -2,6 +2,7 @@
 
 
 import { useRef, useEffect, useCallback, useState, useMemo, type ChangeEvent } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { select } from "d3-selection";
 import type { Selection } from "d3-selection";
 import { zoom } from "d3-zoom";
@@ -122,7 +123,7 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/v1/feed", { cache: "no-store" });
+        const res = await fetchWithTimeout("/api/v1/feed", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as LiveFeedResponse;
         if (cancelled || !data.trends) return;

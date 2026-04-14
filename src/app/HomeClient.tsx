@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Image from "next/image";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
@@ -38,7 +39,7 @@ export default function HomeClient() {
 
   // Load trends from DB on mount — fall back to hardcoded data
   useEffect(() => {
-    fetch("/api/v1/trends")
+    fetchWithTimeout("/api/v1/trends")
       .then((res) => res.json())
       .then((data) => {
         if (data.trends?.length > 0) {
@@ -63,8 +64,8 @@ export default function HomeClient() {
   const [liveStats, setLiveStats] = useState<{ sources: number; trends: number; sessions: number } | null>(null);
   useEffect(() => {
     Promise.all([
-      fetch("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
-      fetch("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? []).length).catch(() => 0),
+      fetchWithTimeout("/api/v1/trends").then(r => r.json()).then(d => d.trends?.length ?? 0).catch(() => 0),
+      fetchWithTimeout("/api/v1/canvas").then(r => r.json()).then(d => (d.canvases ?? []).length).catch(() => 0),
     ]).then(([trendCount, sessionCount]) => {
       setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
     });
@@ -107,7 +108,7 @@ export default function HomeClient() {
 
   // Load past sessions for the picker on mount
   useEffect(() => {
-    fetch("/api/v1/canvas")
+    fetchWithTimeout("/api/v1/canvas")
       .then(r => r.json())
       .then(data => {
         const list = (data?.canvases || []) as Array<any>;
@@ -212,7 +213,7 @@ export default function HomeClient() {
 
       if (!projectId) {
         // Create new canvas project
-        const res = await fetch("/api/v1/canvas", {
+        const res = await fetchWithTimeout("/api/v1/canvas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: "Aktuelles Projekt" }),
@@ -226,7 +227,7 @@ export default function HomeClient() {
       }
 
       // Load existing canvas state, append new nodes
-      const existingRes = await fetch(`/api/v1/canvas/${projectId}`);
+      const existingRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}`);
       let existingNodes: any[] = [];
       let existingConns: any[] = [];
       if (existingRes.ok) {
@@ -253,7 +254,7 @@ export default function HomeClient() {
         v: 2,
       };
 
-      await fetch(`/api/v1/canvas/${projectId}`, {
+      await fetchWithTimeout(`/api/v1/canvas/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasState: mergedState }),
@@ -287,7 +288,7 @@ export default function HomeClient() {
       const topic = q.substring(q.indexOf(":") + 1).trim();
       if (topic) {
         try {
-          const res = await fetch("/api/v1/canvas", {
+          const res = await fetchWithTimeout("/api/v1/canvas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: `Szenario: ${topic.substring(0, 50)}` }),
@@ -307,7 +308,7 @@ export default function HomeClient() {
     }
 
     if (q === "/live") {
-      fetch("/api/v1/pipeline", { method: "POST" });
+      fetchWithTimeout("/api/v1/pipeline", { method: "POST" });
       setHistory((prev) => [{
         query: "/live",
         briefing: {
@@ -357,7 +358,7 @@ export default function HomeClient() {
     if (q === "/clear") {
       setHistory([]); clearHistoryStorage(); setQuery("");
       const cid = activeProjectIdRef.current;
-      if (cid) fetch(`/api/v1/canvas/${cid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canvasState: JSON.stringify({ nodes: [], conns: [], pan: { x: 0, y: 0 }, zoom: 1, v: 2 }) }) }).catch(() => {});
+      if (cid) fetchWithTimeout(`/api/v1/canvas/${cid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canvasState: JSON.stringify({ nodes: [], conns: [], pan: { x: 0, y: 0 }, zoom: 1, v: 2 }) }) }).catch(() => {});
       return;
     }
 
@@ -779,7 +780,7 @@ export default function HomeClient() {
                             ? `${mainTopic} (${fieldParts.join("; ")})`
                             : mainTopic;
                           const result = tmpl.build(enrichedTopic);
-                          const res = await fetch("/api/v1/canvas", {
+                          const res = await fetchWithTimeout("/api/v1/canvas", {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
                           });
@@ -787,7 +788,7 @@ export default function HomeClient() {
                           const json = await res.json();
                           const pid = json.canvas?.id;
                           if (!pid) { setFrameworkLoading(false); return; }
-                          await fetch(`/api/v1/canvas/${pid}`, {
+                          await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                             method: "PATCH", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                           });
@@ -949,7 +950,7 @@ export default function HomeClient() {
                                 ? `${mainTopic} (${fieldParts.join("; ")})`
                                 : mainTopic;
                               const result = tmpl.build(enrichedTopic);
-                              const res = await fetch("/api/v1/canvas", {
+                              const res = await fetchWithTimeout("/api/v1/canvas", {
                                 method: "POST", headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
                               });
@@ -957,7 +958,7 @@ export default function HomeClient() {
                               const json = await res.json();
                               const pid = json.canvas?.id;
                               if (!pid) { setFrameworkLoading(false); return; }
-                              await fetch(`/api/v1/canvas/${pid}`, {
+                              await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                                 method: "PATCH", headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                               });
@@ -1258,7 +1259,7 @@ export default function HomeClient() {
                   // Also rename the canvas project so it's reflected in the picker and elsewhere
                   const pid = activeProjectIdRef.current;
                   if (pid) {
-                    fetch(`/api/v1/canvas/${pid}`, {
+                    fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: newTitle }),

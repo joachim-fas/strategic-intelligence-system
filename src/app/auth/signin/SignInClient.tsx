@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useLocale } from "@/lib/locale-context";
 
 export default function SignInClient() {
@@ -16,7 +17,7 @@ export default function SignInClient() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/signin/email", {
+      const res = await fetchWithTimeout("/api/auth/signin/email", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -111,7 +112,7 @@ export default function SignInClient() {
 }
 
 async function getCsrfToken(): Promise<string> {
-  const res = await fetch("/api/auth/csrf");
+  const res = await fetchWithTimeout("/api/auth/csrf");
   const data = await res.json();
   return data.csrfToken;
 }

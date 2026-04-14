@@ -12,6 +12,7 @@
  */
 
 import { useRef, useState, useMemo, useEffect } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import RadarChart from "./RadarChart";
 import { TrendDot, TimeHorizon } from "@/types";
 import { Locale } from "@/lib/i18n";
@@ -58,7 +59,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
   const [liveTrends, setLiveTrends] = useState<Map<string, LiveFeedTrend> | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/v1/feed")
+    fetchWithTimeout("/api/v1/feed")
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;

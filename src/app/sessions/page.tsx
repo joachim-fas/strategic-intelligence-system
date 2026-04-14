@@ -8,6 +8,7 @@
  */
 
 import { useState } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import { SessionList } from "@/components/sessions/SessionList";
@@ -22,7 +23,7 @@ export default function SessionsPage() {
     if (creating) return;
     setCreating(true);
     try {
-      const res = await fetch("/api/v1/canvas", {
+      const res = await fetchWithTimeout("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: de ? "Neues Projekt" : "New Project" }),

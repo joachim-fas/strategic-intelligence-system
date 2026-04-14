@@ -18,6 +18,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useLocale } from "@/lib/locale-context";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
@@ -82,7 +83,7 @@ export default function VerstehenClient() {
   const loadTrends = useCallback(() => {
     setTrendsLoading(true);
     setTrendsError(null);
-    fetch("/api/v1/trends")
+    fetchWithTimeout("/api/v1/trends")
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -111,7 +112,7 @@ export default function VerstehenClient() {
   // endpoint is unreachable.
   const [sourcesCount, setSourcesCount] = useState<number | null>(null);
   useEffect(() => {
-    fetch("/api/v1/feed")
+    fetchWithTimeout("/api/v1/feed")
       .then(r => r.json())
       .then(data => {
         const list = data?.sourceStatus ?? [];
@@ -384,7 +385,7 @@ export default function VerstehenClient() {
                   try {
                     const { buildTrendDeepDive } = await import("@/lib/canvas-templates");
                     const template = buildTrendDeepDive(selectedTrend.name);
-                    const res = await fetch("/api/v1/canvas", {
+                    const res = await fetchWithTimeout("/api/v1/canvas", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: `Trend: ${selectedTrend.name}` }),
@@ -393,7 +394,7 @@ export default function VerstehenClient() {
                     const json = await res.json();
                     const pid = json.canvas?.id;
                     if (!pid) return;
-                    await fetch(`/api/v1/canvas/${pid}`, {
+                    await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                       method: "PATCH",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ canvasState: { nodes: template.nodes, conns: template.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),

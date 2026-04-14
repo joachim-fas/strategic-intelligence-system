@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { VoltSectionLabel } from "@/components/verstehen/VoltPrimitives";
@@ -66,7 +67,7 @@ function ScenarioCard({
   const saveToBuilder = async () => {
     if (saved) return;
     try {
-      await fetch("/api/v1/scenarios", {
+      await fetchWithTimeout("/api/v1/scenarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface TickerSignal {
   id: string;
@@ -57,7 +58,7 @@ export default function SignalTicker() {
   // Initial fetch + auto-refresh every 2 minutes
   useEffect(() => {
     const load = () => {
-      fetch("/api/v1/feed/ticker?limit=60&hours=48")
+      fetchWithTimeout("/api/v1/feed/ticker?limit=60&hours=48")
         .then(r => r.json())
         .then(data => {
           const list = (data?.signals ?? []) as TickerSignal[];

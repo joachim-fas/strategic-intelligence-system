@@ -4,10 +4,6 @@
  * NOTE: Superseded by auth-guard.ts for auth. Consider consolidating.
  */
 
-// TODO: EDGE-21 — All client-side fetch() calls should use AbortController with 30s timeout.
-// Currently no fetch has a timeout, so a hanging server blocks the UI indefinitely.
-// FIX: Create a fetchWithTimeout() utility and use it everywhere.
-
 // TODO: FE-10 — Route handler patterns inconsistent across 34 API routes.
 // Some use NextRequest/NextResponse, others use Request/Response.
 // FIX: Create a standardized API handler wrapper with auth + error handling + response typing.
