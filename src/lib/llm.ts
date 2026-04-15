@@ -71,10 +71,14 @@ interface LLMBriefingResponse {
  * Build the system prompt with full data context
  */
 export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignalsContext?: string): string {
-  // Compact trend summaries
-  const trendSummaries = trends
-    .sort((a, b) => b.relevance - a.relevance)
-    .slice(0, 40) // Top 40 trends for context
+  // Sort into a new array (avoid mutating the caller's input) and pick the
+  // top 40 for the prompt. Also capture the top 3 IDs so the JSON example
+  // downstream uses REAL ids from the actual list — hardcoding slug-style
+  // ids like "mega-ai-transformation" taught the LLM to emit similar
+  // hallucinations that then got dropped by the id-whitelist validator.
+  const sortedTrends = [...trends].sort((a, b) => b.relevance - a.relevance);
+  const trendSummaries = sortedTrends
+    .slice(0, 40)
     .map((t) => {
       const cls = t.classification || autoClassify(t);
       const regs = getRegulationsForTrend(t.id);
@@ -83,6 +87,10 @@ export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignal
       return `- ID:"${t.id}" | ${t.name} [${t.category}] Ring:${t.ring} Rel:${(t.relevance*100).toFixed(0)}% Conf:${(t.confidence*100).toFixed(0)}% Imp:${(t.impact*100).toFixed(0)}% ${t.velocity}↕ Dur:${cls.duration} Dir:${cls.direction} Focus:${cls.focus.join(",")} Signals:${t.signalCount} Sources:${sources.map(s=>s.shortName).join(",")} Regs:${regs.map(r=>r.shortName).join(",")} Edges:${edges.length}`;
     })
     .join("\n");
+  // Three real IDs for the schema example. Fall back to a generic marker if
+  // fewer than 3 trends exist (e.g. in tests).
+  const exampleIds: string[] = sortedTrends.slice(0, 3).map((t) => t.id);
+  while (exampleIds.length < 3) exampleIds.push("<trend-id-from-list-above>");
 
   // Compact regulation summaries
   const regSummaries = GLOBAL_REGULATIONS
@@ -155,7 +163,11 @@ KRITISCH: Die drei Szenario-Wahrscheinlichkeiten muessen sich aus der ANALYSE ER
 ═══ TREND-MATCHING (matchedTrendIds + matchedTrendRelevance) ═══
 Mappe deine Analyse IMMER zurueck auf konkrete Trend-IDs aus der TRENDS-Liste oben.
 - Pruefe JEDEN Trend in der Liste: Ist er DIREKT relevant fuer diese Frage?
-- Gib NUR die trend-IDs zurueck (z.B. "mega-ai-transformation"), NICHT die Namen
+- KRITISCH: Kopiere die IDs EXAKT so wie sie in der TRENDS-Liste oben stehen
+  (siehe ID:"..."-Feld jeder Zeile). Die IDs sind UUIDs oder aehnliche Strings
+  wie "${exampleIds[0]}" — ERFINDE KEINE eigenen slug-artigen IDs wie
+  "mega-ai" oder "trend-mobility". Jede erfundene ID wird komplett verworfen.
+- Gib NUR die trend-IDs zurueck, NICHT die Namen
 - Erwartete Anzahl: 3-8 matched Trends pro Query — nicht 0, nicht alle 40
 - FEHLERMELDUNG an dich selbst: matchedTrendIds = [] ist IMMER ein Fehler
 
@@ -227,11 +239,11 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     "P": "Politics-Dimension: 1-2 Saetze (oder null)",
     "V": "Values-Dimension: 1-2 Saetze (oder null)"
   },
-  "matchedTrendIds": ["mega-ai-transformation", "mega-climate-sustainability", "mega-geopolitical-shifts"],
+  "matchedTrendIds": ["${exampleIds[0]}", "${exampleIds[1]}", "${exampleIds[2]}"],
   "matchedTrendRelevance": {
-    "mega-ai-transformation": 0.85,
-    "mega-climate-sustainability": 0.42,
-    "mega-geopolitical-shifts": 0.18
+    "${exampleIds[0]}": 0.85,
+    "${exampleIds[1]}": 0.42,
+    "${exampleIds[2]}": 0.18
   },
   "causalAnalysis": ["Ursache → Wirkung → strategische Konsequenz"],
   "keyInsights": [

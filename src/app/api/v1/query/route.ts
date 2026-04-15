@@ -508,6 +508,57 @@ export async function POST(req: Request) {
             console.warn("[query] LLM output validation warnings:", warnings);
           }
 
+          // ── Defensive salvage: when ALL LLM-returned trendIds were dropped
+          // as hallucinated AND the original output looks slug-like, try to
+          // recover by fuzzy name-matching. This catches the "LLM copied the
+          // slug example from the prompt" failure mode where e.g. it emitted
+          // "mega-ai-transformation" instead of the DB UUID. The prompt fix
+          // prevents this going forward, but this salvage gives us a safety
+          // net for cached prompts / edge cases.
+          const rawIds: unknown = (result as any)?.matchedTrendIds;
+          if (
+            validated.matchedTrendIds.length === 0 &&
+            Array.isArray(rawIds) &&
+            rawIds.length > 0
+          ) {
+            const originalIds = (rawIds as unknown[]).filter((x): x is string => typeof x === "string");
+            const slugify = (s: string) =>
+              s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            const trendIndex = trends.map((t: TrendDot) => ({
+              id: t.id,
+              words: new Set(slugify(t.name).split("-").filter(Boolean)),
+            }));
+            const salvaged: string[] = [];
+            for (const origId of originalIds) {
+              const stripped = origId.toLowerCase().replace(/^(mega-|macro-|micro-|trend-)/, "");
+              const origWords = new Set(stripped.split("-").filter((w) => w && w.length >= 3));
+              if (origWords.size === 0) continue;
+              let best: { id: string; score: number; overlap: number } | null = null;
+              for (const ti of trendIndex) {
+                const overlap = [...origWords].filter((w) => ti.words.has(w)).length;
+                if (overlap < 2) continue; // require at least two shared meaningful words
+                const union = new Set([...origWords, ...ti.words]).size;
+                const score = union > 0 ? overlap / union : 0;
+                if (score >= 0.4 && (!best || score > best.score)) {
+                  best = { id: ti.id, score, overlap };
+                }
+              }
+              if (best && !salvaged.includes(best.id)) salvaged.push(best.id);
+            }
+            if (salvaged.length > 0) {
+              console.warn(
+                `[query] Salvaged ${salvaged.length}/${originalIds.length} trend IDs by name match: ` +
+                `${originalIds.slice(0, 3).join(", ")} → ${salvaged.slice(0, 3).join(", ")}`
+              );
+              validated.matchedTrendIds = salvaged;
+              emitActivity({
+                type: "query", phase: "validation",
+                message: `${salvaged.length} Trend-Zuordnungen \u00fcber Name-Matching wiederhergestellt`,
+                meta: { salvaged: salvaged.length, sampleOriginal: originalIds.slice(0, 3), sampleSalvaged: salvaged.slice(0, 3) },
+              });
+            }
+          }
+
           // VAL-03: Compute evidence-based blended confidence score
           const uniqueSourcesVal = new Set(relevantSignals.map((s: any) => s.source)).size;
           validated.confidence = computeBlendedConfidence(
