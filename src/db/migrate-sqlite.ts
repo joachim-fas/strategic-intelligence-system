@@ -5,10 +5,17 @@
  *
  * Creates all tables in local.db if they do not already exist.
  * This is the SQLite equivalent of `npm run db:push` for Postgres.
+ *
+ * The multi-tenant layer (tenants, memberships, invites, audit_log plus
+ * the tenant_id columns on radars/bsc_ratings/scenarios and the
+ * last_active_tenant_id column on users) is kept in a dedicated helper
+ * (`ensureMultiTenantSchema`) so that the runtime can also call it lazily
+ * from route handlers without re-running the full initial schema.
  */
 
 import Database from "better-sqlite3";
 import path from "path";
+import { ensureMultiTenantSchema, ensureDefaultTenant } from "./sqlite-helpers";
 
 const dbPath = path.join(process.cwd(), "local.db");
 const db = new Database(dbPath);
@@ -278,6 +285,18 @@ console.log("Initialising SQLite database at:", dbPath);
 for (const stmt of statements) {
   db.exec(stmt);
 }
+
+// ── Multi-tenant layer ────────────────────────────────────────────────
+// Idempotent: adds the new tables + columns if missing, leaves them alone
+// otherwise. Also backfills a "Default Workspace" tenant and wires every
+// existing radar / scenario / bsc_rating / user to it so no prior data
+// is stranded after the migration lands.
+ensureMultiTenantSchema(db);
+const { tenantId, createdTenant, membershipsAdded, radarsBackfilled, scenariosBackfilled, ratingsBackfilled } = ensureDefaultTenant(db);
+if (createdTenant) {
+  console.log(`[tenants] Created Default Workspace (${tenantId}).`);
+}
+console.log(`[tenants] Backfill — radars: ${radarsBackfilled}, scenarios: ${scenariosBackfilled}, bsc_ratings: ${ratingsBackfilled}, memberships added: ${membershipsAdded}.`);
 
 console.log("SQLite schema created successfully.");
 db.close();

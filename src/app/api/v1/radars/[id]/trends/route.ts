@@ -5,45 +5,34 @@
  * includes the trend name, category, tags etc.
  */
 
-import { NextResponse } from "next/server";
-import { eq, and, or } from "drizzle-orm";
-import { requireAuth, apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
+import { eq, and } from "drizzle-orm";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, context: Params) {
+export async function GET(request: Request, context: Params) {
   const { id: radarId } = await context.params;
-  const { session, errorResponse } = await requireAuth();
-  if (errorResponse) return errorResponse;
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx.errorResponse;
 
   const db = getDb();
   const dialect = getDialectName();
-  const userId = session!.user!.id!;
 
   if (dialect === "pg") {
     const schema = await import("@/db/schema");
 
-    // Verify the user can see this radar
+    // Tenant-scoped radar check (replaces the legacy owner/shared branch).
     const radar = await db
       .select()
       .from(schema.radars)
-      .where(
-        and(
-          eq(schema.radars.id, radarId),
-          or(
-            eq(schema.radars.ownerId, userId),
-            eq(schema.radars.isShared, true)
-          )
-        )
-      )
+      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.tenantId, ctx.tenantId)))
       .limit(1);
 
     if (radar.length === 0) {
       return apiError("Radar not found", 404, "NOT_FOUND");
     }
 
-    // Get radar trends with full trend details
     const result = await db
       .select({
         radarTrend: schema.radarTrends,
@@ -66,15 +55,7 @@ export async function GET(_request: Request, context: Params) {
     const radar = db
       .select()
       .from(schema.radars)
-      .where(
-        and(
-          eq(schema.radars.id, radarId),
-          or(
-            eq(schema.radars.ownerId, userId),
-            eq(schema.radars.isShared, true)
-          )
-        )
-      )
+      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.tenantId, ctx.tenantId)))
       .get();
 
     if (!radar) {

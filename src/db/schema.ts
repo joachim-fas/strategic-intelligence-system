@@ -158,8 +158,12 @@ export const trendSignals = pgTable("trend_signals", {
 });
 
 // ─── Radars (user-curated lenses) ────────────────────────
+// `tenant_id` is the scope boundary (which org sees this). `owner_id`
+// stays as attribution ("who created this") but does not gate access
+// any more — access flows from tenant_memberships.
 export const radars = pgTable("radars", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   ownerId: uuid("owner_id").references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
@@ -297,17 +301,22 @@ export const queryVersions = pgTable("query_versions", {
 });
 
 // ─── BSC Ratings ────────────────────────────────────────
+// BSC ratings are per-tenant: two orgs can hold opposite up/down votes
+// for the same queryHash. Unique index widened to include tenant_id.
 export const bscRatings = pgTable("bsc_ratings", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   queryHash: text("query_hash").notNull(),
   perspectiveId: text("perspective_id").notNull(),
   rating: text("rating").notNull(), // 'up' | 'down'
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.queryHash, table.perspectiveId)]);
+}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.tenantId, table.queryHash, table.perspectiveId)]);
 
 // ─── Scenarios ──────────────────────────────────────────
+// Previously global — now tenant-scoped (SEC-14).
 export const scenarios = pgTable("scenarios", {
   id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").default("custom"),

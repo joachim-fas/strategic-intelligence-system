@@ -1,23 +1,32 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
-import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
+import { getSqliteHandle } from "@/db";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  return d;
+/**
+ * Tenant-scope guard for all operations on project_queries:
+ * ensures the parent radar is in the active tenant before any read/write.
+ * project_queries has no direct tenant_id — scope flows through radar_id.
+ */
+function assertRadarInTenant(radarId: string, tenantId: string): boolean {
+  const d = getSqliteHandle();
+  const row = d.prepare("SELECT id FROM radars WHERE id = ? AND tenant_id = ?").get(radarId, tenantId);
+  return !!row;
 }
 
 // GET — list saved queries for project
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const d = db();
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (!assertRadarInTenant(id, ctx.tenantId)) {
+    return apiError("Project not found", 404, "NOT_FOUND");
+  }
+
+  const d = getSqliteHandle();
   const queries = d.prepare(`
     SELECT q.*, (SELECT COUNT(*) FROM project_notes WHERE query_id = q.id) as note_count
     FROM project_queries q WHERE q.radar_id = ? ORDER BY q.created_at DESC
   `).all(id);
-  d.close();
 
   // Parse result_json for each query
   const parsed = (queries as any[]).map((q) => ({
@@ -32,10 +41,19 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // POST — save a query result to project
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot add queries", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+  if (!assertRadarInTenant(id, ctx.tenantId)) {
+    return apiError("Project not found", 404, "NOT_FOUND");
+  }
+
   const { query, result, locale, contextProfile } = await req.json();
   if (!query) return apiError("Query required", 400, "VALIDATION_ERROR");
 
-  const d = db();
+  const d = getSqliteHandle();
   const qid = crypto.randomUUID();
   d.prepare(`
     INSERT INTO project_queries (id, radar_id, query, locale, result_json, context_profile, pinned, created_at)
@@ -46,32 +64,47 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   d.prepare("UPDATE radars SET updated_at = datetime('now') WHERE id = ?").run(id);
 
   const saved = d.prepare("SELECT * FROM project_queries WHERE id = ?").get(qid);
-  d.close();
   return apiSuccess({ query: saved }, 201);
 }
 
 // DELETE — remove a query (via query param ?qid=xxx)
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot delete queries", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+  if (!assertRadarInTenant(id, ctx.tenantId)) {
+    return apiError("Project not found", 404, "NOT_FOUND");
+  }
+
   const url = new URL(req.url);
   const qid = url.searchParams.get("qid");
   if (!qid) return apiError("qid required", 400, "VALIDATION_ERROR");
 
-  const d = db();
+  const d = getSqliteHandle();
   d.prepare("DELETE FROM project_queries WHERE id = ? AND radar_id = ?").run(qid, id);
-  d.close();
   return new NextResponse(null, { status: 204 });
 }
 
 // PATCH — pin/unpin a query (via query param ?qid=xxx)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot modify queries", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+  if (!assertRadarInTenant(id, ctx.tenantId)) {
+    return apiError("Project not found", 404, "NOT_FOUND");
+  }
+
   const url = new URL(req.url);
   const qid = url.searchParams.get("qid");
   if (!qid) return apiError("qid required", 400, "VALIDATION_ERROR");
   const { pinned } = await req.json();
-  const d = db();
+  const d = getSqliteHandle();
   d.prepare("UPDATE project_queries SET pinned = ? WHERE id = ? AND radar_id = ?").run(pinned ? 1 : 0, qid, id);
-  d.close();
   return apiSuccess({ updated: true });
 }

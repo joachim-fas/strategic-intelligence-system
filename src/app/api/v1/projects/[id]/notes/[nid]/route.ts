@@ -1,22 +1,34 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
-
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  return d;
-}
+import { getSqliteHandle } from "@/db";
+import { requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string; nid: string }> };
 
+/** Scope-Join — project_notes has no direct tenant_id. */
+function assertNoteInTenant(radarId: string, nid: string, tenantId: string): boolean {
+  const d = getSqliteHandle();
+  const row = d.prepare(
+    `SELECT n.id FROM project_notes n
+     JOIN radars r ON r.id = n.radar_id
+     WHERE n.id = ? AND n.radar_id = ? AND r.tenant_id = ?`,
+  ).get(nid, radarId, tenantId);
+  return !!row;
+}
+
 // DELETE — remove a specific note
-export async function DELETE(_req: Request, context: Params) {
+export async function DELETE(req: Request, context: Params) {
   try {
-    const { nid } = await context.params;
-    const d = db();
+    const { id, nid } = await context.params;
+    const ctx = await requireTenantContext(req);
+    if (ctx.errorResponse) return ctx.errorResponse;
+    if (ctx.role === "viewer") {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (!assertNoteInTenant(id, nid, ctx.tenantId)) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
+    const d = getSqliteHandle();
     d.prepare("DELETE FROM project_notes WHERE id = ?").run(nid);
-    d.close();
     return NextResponse.json({ deleted: true });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
@@ -26,15 +38,22 @@ export async function DELETE(_req: Request, context: Params) {
 // PATCH — update note content
 export async function PATCH(req: Request, context: Params) {
   try {
-    const { nid } = await context.params;
+    const { id, nid } = await context.params;
+    const ctx = await requireTenantContext(req);
+    if (ctx.errorResponse) return ctx.errorResponse;
+    if (ctx.role === "viewer") {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    if (!assertNoteInTenant(id, nid, ctx.tenantId)) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
     const body = await req.json();
     const { content } = body;
     if (!content?.trim()) return NextResponse.json({ error: "content required" }, { status: 400 });
-    const d = db();
+    const d = getSqliteHandle();
     d.prepare("UPDATE project_notes SET content = ?, updated_at = datetime('now') WHERE id = ?")
       .run(content.trim(), nid);
     const updated = d.prepare("SELECT * FROM project_notes WHERE id = ?").get(nid);
-    d.close();
     if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
     return NextResponse.json({ note: updated });
   } catch (err) {

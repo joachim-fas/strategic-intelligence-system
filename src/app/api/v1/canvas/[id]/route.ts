@@ -6,43 +6,43 @@
  */
 
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
-import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
-
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  // Idempotent schema upgrades (must match /api/v1/canvas/route.ts)
-  try { d.exec("ALTER TABLE radars ADD COLUMN canvas_state TEXT"); } catch {}
-  try { d.exec("ALTER TABLE radars ADD COLUMN archived_at TEXT"); } catch {}
-  return d;
-}
+import { getSqliteHandle } from "@/db";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
-// TODO: SEC-14 — Add user_id ownership check when user_id column exists on the radars table.
-// All GET/POST/PATCH/DELETE handlers should verify the resource belongs to the authenticated user.
+// SEC-14 resolved: every handler now checks that the canvas belongs to the
+// active tenant and that the requesting user has at least viewer access.
+// Write handlers additionally reject the "viewer" role.
 
-// GET — load full canvas state
-export async function GET(_req: Request, { params }: Params) {
-  const { id } = await params;
-  // DAT-13: Ensure DB handle is always closed
-  const d = db();
-  try {
-    const row = d.prepare(
-      "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
-    ).get(id) as { id: string; name: string; description: string | null; canvas_state: string | null; created_at: string; updated_at: string; archived_at: string | null } | undefined;
-
-    if (!row) return apiError("Canvas not found", 404, "NOT_FOUND");
-    return apiSuccess({ canvas: row }, 200, CACHE_HEADERS.short);
-  } finally {
-    d.close();
-  }
+/** Load a canvas row and enforce tenant-scope in a single query. */
+function loadScopedCanvas(id: string, tenantId: string) {
+  const d = getSqliteHandle();
+  return d.prepare(
+    `SELECT id, name, description, tenant_id, canvas_state, created_at, updated_at, archived_at
+     FROM radars WHERE id = ? AND tenant_id = ?`,
+  ).get(id, tenantId) as
+    | { id: string; name: string; description: string | null; tenant_id: string; canvas_state: string | null; created_at: string; updated_at: string; archived_at: string | null }
+    | undefined;
 }
 
-// Shared update logic for PATCH and POST (sendBeacon)
-function applyCanvasUpdate(d: ReturnType<typeof db>, id: string, body: Record<string, unknown>) {
+// GET — load full canvas state
+export async function GET(req: Request, { params }: Params) {
+  const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+
+  const row = loadScopedCanvas(id, ctx.tenantId);
+  if (!row) return apiError("Canvas not found", 404, "NOT_FOUND");
+  // Strip tenant_id from the response — the client doesn't need it and
+  // it keeps the payload shape compatible with the pre-tenant API.
+  const { tenant_id: _t, ...canvas } = row;
+  return apiSuccess({ canvas }, 200, CACHE_HEADERS.short);
+}
+
+/** Shared update logic for PATCH and POST (sendBeacon). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyCanvasUpdate(d: any, id: string, tenantId: string, body: Record<string, unknown>) {
   const sets: string[] = ["updated_at = datetime('now')"];
   const values: unknown[] = [];
 
@@ -63,8 +63,10 @@ function applyCanvasUpdate(d: ReturnType<typeof db>, id: string, body: Record<st
   }
 
   if (sets.length > 0) {
-    values.push(id);
-    d.prepare(`UPDATE radars SET ${sets.join(", ")} WHERE id = ?`).run(...values);
+    values.push(id, tenantId);
+    // The tenant_id-guarded WHERE clause is critical: a PATCH with an id
+    // from another tenant must not silently succeed.
+    d.prepare(`UPDATE radars SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...values);
   }
 }
 
@@ -72,25 +74,28 @@ function applyCanvasUpdate(d: ReturnType<typeof db>, id: string, body: Record<st
 //   Accepts the same body as PATCH.
 export async function POST(req: Request, { params }: Params) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot modify canvases", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
   const body = await req.json().catch(() => ({}));
-  const d = db();
+  const d = getSqliteHandle();
 
   try {
-    const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
+    const existing = loadScopedCanvas(id, ctx.tenantId);
     if (!existing) {
-      d.close();
       return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
-    applyCanvasUpdate(d, id, body);
+    applyCanvasUpdate(d, id, ctx.tenantId, body);
 
     const updated = d.prepare(
-      "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
-    ).get(id);
-    d.close();
+      "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ? AND tenant_id = ?",
+    ).get(id, ctx.tenantId);
     return apiSuccess({ canvas: updated });
   } catch (err) {
-    d.close();
     console.error("POST /api/v1/canvas/[id] error:", err);
     return apiError("Failed to save canvas", 500, "INTERNAL_ERROR");
   }
@@ -103,48 +108,55 @@ export async function POST(req: Request, { params }: Params) {
 //   - archived: boolean (true → archive now, false → restore from archive)
 export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot modify canvases", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
   const body = await req.json().catch(() => ({}));
-  const d = db();
+  const d = getSqliteHandle();
 
   try {
-    const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
+    const existing = loadScopedCanvas(id, ctx.tenantId);
     if (!existing) {
-      d.close();
       return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
-    applyCanvasUpdate(d, id, body);
+    applyCanvasUpdate(d, id, ctx.tenantId, body);
 
     const updated = d.prepare(
-      "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ?"
-    ).get(id);
-    d.close();
+      "SELECT id, name, description, canvas_state, created_at, updated_at, archived_at FROM radars WHERE id = ? AND tenant_id = ?",
+    ).get(id, ctx.tenantId);
     return apiSuccess({ canvas: updated });
   } catch (err) {
-    d.close();
     console.error("PATCH /api/v1/canvas/[id] error:", err);
     return apiError("Failed to update canvas", 500, "INTERNAL_ERROR");
   }
 }
 
 // DELETE — delete canvas project (cascades to project_queries and project_notes)
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
-  const d = db();
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  // Only admin/owner can delete — members and viewers cannot.
+  if (ctx.role === "member" || ctx.role === "viewer") {
+    return apiError("Only tenant admins/owners can delete", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
+  const d = getSqliteHandle();
 
   try {
-    const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
+    const existing = loadScopedCanvas(id, ctx.tenantId);
     if (!existing) {
-      d.close();
       return apiError("Canvas not found", 404, "NOT_FOUND");
     }
 
-    d.prepare("DELETE FROM radars WHERE id = ?").run(id);
-    d.close();
+    d.prepare("DELETE FROM radars WHERE id = ? AND tenant_id = ?").run(id, ctx.tenantId);
     // API-18: DELETE with no body should return 204
     return new NextResponse(null, { status: 204 });
   } catch (err) {
-    d.close();
     console.error("DELETE /api/v1/canvas/[id] error:", err);
     return apiError("Failed to delete canvas", 500, "INTERNAL_ERROR");
   }

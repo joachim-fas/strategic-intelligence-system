@@ -1,50 +1,47 @@
 /**
- * GET  /api/v1/canvas — list all canvas projects
- * POST /api/v1/canvas — create a new canvas project
+ * GET  /api/v1/canvas — list all canvas projects for the active tenant
+ * POST /api/v1/canvas — create a new canvas project in the active tenant
  *
- * Canvas projects reuse the existing `radars` table.
- * Canvas state (nodes, connections, pan, zoom) is stored in the `canvas_state` column.
+ * Canvas projects reuse the existing `radars` table — each row is owned
+ * by a tenant (via `tenant_id`) and optionally attributed to a user (via
+ * the legacy `owner_id`, kept for "who created this"). The row is only
+ * visible to members of the owning tenant.
+ *
+ * The schema migration (tenant_id column + default-tenant backfill) runs
+ * in src/db/sqlite-helpers.ts when the DB handle is first opened.
  */
 
-import Database from "better-sqlite3";
-import path from "path";
-import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
+import { getSqliteHandle } from "@/db";
+import { apiSuccess, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  // Idempotent schema upgrades
-  try { d.exec("ALTER TABLE radars ADD COLUMN canvas_state TEXT"); } catch {}
-  try { d.exec("ALTER TABLE radars ADD COLUMN archived_at TEXT"); } catch {}
-  return d;
-}
-
-// GET — list canvas projects
+// GET — list canvas projects for the active tenant
 //   /api/v1/canvas                 → active only (archived_at IS NULL)
 //   /api/v1/canvas?archived=true   → archived only (archived_at IS NOT NULL)
 //   /api/v1/canvas?archived=all    → everything
 export async function GET(req: Request) {
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+
   const url = new URL(req.url);
   const archived = url.searchParams.get("archived"); // null | "true" | "all"
 
-  let where = "WHERE archived_at IS NULL";
-  if (archived === "true") where = "WHERE archived_at IS NOT NULL";
-  else if (archived === "all") where = "";
+  let archivedClause = "AND archived_at IS NULL";
+  if (archived === "true") archivedClause = "AND archived_at IS NOT NULL";
+  else if (archived === "all") archivedClause = "";
 
-  const d = db();
+  const d = getSqliteHandle();
   const rows = d.prepare(`
     SELECT id, name, description, canvas_state, created_at, updated_at, archived_at
     FROM radars
-    ${where}
+    WHERE tenant_id = ? ${archivedClause}
     ORDER BY
       CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,
       COALESCE(archived_at, updated_at) DESC
-  `).all() as Array<{
+  `).all(ctx.tenantId) as Array<{
     id: string; name: string; description: string | null;
     canvas_state: string | null; created_at: string; updated_at: string;
     archived_at: string | null;
   }>;
-  d.close();
 
   // Return lightweight list (with node count for session picker UX)
   const canvases = rows.map(r => {
@@ -81,19 +78,28 @@ export async function GET(req: Request) {
   return apiSuccess({ canvases }, 200, CACHE_HEADERS.short);
 }
 
-// POST — create a new canvas project
+// POST — create a new canvas project in the active tenant
 export async function POST(req: Request) {
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  // Viewers are read-only within a tenant.
+  if (ctx.role === "viewer") {
+    return apiSuccess(
+      { ok: false, error: { message: "Viewers cannot create projects", code: "INSUFFICIENT_TENANT_ROLE" } },
+      403,
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const name: string = body.name?.trim() || "Neues Projekt";
 
-  const d = db();
+  const d = getSqliteHandle();
   const id = crypto.randomUUID();
   d.prepare(`
-    INSERT INTO radars (id, name, description, scope, is_shared, canvas_state, created_at, updated_at)
-    VALUES (?, ?, ?, '{}', 0, NULL, datetime('now'), datetime('now'))
-  `).run(id, name, body.description ?? null);
+    INSERT INTO radars (id, tenant_id, owner_id, name, description, scope, is_shared, canvas_state, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, '{}', 0, NULL, datetime('now'), datetime('now'))
+  `).run(id, ctx.tenantId, ctx.user.id || null, name, body.description ?? null);
 
   const canvas = d.prepare("SELECT id, name, description, created_at, updated_at FROM radars WHERE id = ?").get(id);
-  d.close();
   return apiSuccess({ canvas }, 201);
 }

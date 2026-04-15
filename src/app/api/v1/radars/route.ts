@@ -3,10 +3,9 @@
  * POST /api/v1/radars — Create a new radar
  */
 
-import { NextResponse } from "next/server";
-import { eq, or } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, parseBody, apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
+import { parseBody, apiSuccess, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 // ---------------------------------------------------------------------------
@@ -25,11 +24,15 @@ const createRadarSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// GET — list radars
+// GET — list radars for the active tenant
+// Previously this filtered by owner_id OR isShared. Tenant-scoping
+// supersedes that — a member sees all radars in their org regardless of
+// who created them. The `isShared` flag is kept on the schema but has no
+// effect today; cross-tenant sharing is a later-phase feature.
 // ---------------------------------------------------------------------------
-export async function GET() {
-  const { session, errorResponse } = await requireAuth();
-  if (errorResponse) return errorResponse;
+export async function GET(request: Request) {
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx.errorResponse;
 
   const db = getDb();
   const dialect = getDialectName();
@@ -41,28 +44,26 @@ export async function GET() {
     schema = await import("@/db/schema-sqlite");
   }
 
-  const userId = session!.user!.id!;
-
-  // Return radars the user owns OR that are shared
   const result = await db
     .select()
     .from(schema.radars)
-    .where(
-      or(
-        eq(schema.radars.ownerId, userId),
-        eq(schema.radars.isShared, true)
-      )
-    );
+    .where(eq(schema.radars.tenantId, ctx.tenantId));
 
   return apiSuccess({ radars: result }, 200, CACHE_HEADERS.short);
 }
 
 // ---------------------------------------------------------------------------
-// POST — create radar
+// POST — create radar in the active tenant
 // ---------------------------------------------------------------------------
 export async function POST(request: Request) {
-  const { session, errorResponse } = await requireAuth();
-  if (errorResponse) return errorResponse;
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiSuccess(
+      { ok: false, error: { message: "Viewers cannot create radars", code: "INSUFFICIENT_TENANT_ROLE" } },
+      403,
+    );
+  }
 
   const { data, error } = await parseBody(request, createRadarSchema);
   if (error) return error;
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const db = getDb();
   const dialect = getDialectName();
 
-  const userId = session!.user!.id!;
+  const userId = ctx.user.id;
 
   if (dialect === "pg") {
     const schema = await import("@/db/schema");
@@ -81,7 +82,8 @@ export async function POST(request: Request) {
         description: data!.description ?? null,
         scope: data!.scope ?? {},
         isShared: data!.isShared ?? false,
-        ownerId: userId,
+        ownerId: userId || null,
+        tenantId: ctx.tenantId,
       })
       .returning();
 
@@ -96,14 +98,15 @@ export async function POST(request: Request) {
         description: data!.description ?? null,
         scope: JSON.stringify(data!.scope ?? {}),
         isShared: data!.isShared ?? false,
-        ownerId: userId,
+        ownerId: userId || null,
+        tenantId: ctx.tenantId,
       })
       .run();
 
     const created = db
       .select()
       .from(schema.radars)
-      .where(eq(schema.radars.id, id))
+      .where(and(eq(schema.radars.id, id), eq(schema.radars.tenantId, ctx.tenantId)))
       .get();
 
     return apiSuccess({ radar: created }, 201);

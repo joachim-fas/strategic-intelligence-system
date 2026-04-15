@@ -93,6 +93,218 @@ export async function requireAuth() {
   return { session, errorResponse: null };
 }
 
+// ---------------------------------------------------------------------------
+// Multi-tenant auth helpers
+// ---------------------------------------------------------------------------
+
+/** Pro-Tenant Rolle, wie sie in tenant_memberships.role gespeichert ist. */
+export type TenantRole = "owner" | "admin" | "member" | "viewer";
+
+const TENANT_ROLE_RANK: Record<TenantRole, number> = {
+  owner: 3,
+  admin: 2,
+  member: 1,
+  viewer: 0,
+};
+
+/** Minimal-Shape eines Memberships, wie es die Session liefert. */
+export interface TenantMembershipLite {
+  id: string;
+  name: string;
+  slug: string;
+  role: TenantRole;
+}
+
+export interface TenantContext {
+  /** Auth-Session User (id, email, role = system-rolle). */
+  user: {
+    id: string;
+    email: string;
+    role: string; // "admin" | "member" = system-rolle
+  };
+  /** ID des aktiven Tenants fuer diesen Request. */
+  tenantId: string;
+  /** Rolle des Users in diesem Tenant. */
+  role: TenantRole;
+  /** Alle Memberships des Users — nuetzlich fuer Switcher + UI-Gates. */
+  memberships: TenantMembershipLite[];
+  /** Bei Fehler ein fertig-gerenderter NextResponse, sonst null. */
+  errorResponse: NextResponse | null;
+}
+
+/**
+ * Fordert einen gueltigen Tenant-Scope fuer den Request.
+ *
+ * Resolution-Reihenfolge fuer den aktiven Tenant:
+ *   1. Header `X-Tenant-Id` (Client hat explizit gewaehlt)
+ *   2. Query-Param `?tenant=<id>` (Legacy / direkte Links)
+ *   3. Session-Default `session.user.activeTenantId` (persistierter Wert aus
+ *      users.last_active_tenant_id, gepflegt durch /api/v1/auth/switch-tenant)
+ *
+ * In allen Faellen MUSS der User Membership in dem gewuenschten Tenant haben,
+ * sonst 403. In der Dev-Mode-Umgebung (NODE_ENV=development) wird auf den
+ * Default-Tenant mit Rolle "owner" zurueckgefallen, damit lokale Entwicklung
+ * ohne Login weiterhin funktioniert.
+ */
+export async function requireTenantContext(request?: Request): Promise<TenantContext> {
+  // ── Dev-Mode-Bypass (gleiches Verhalten wie requireAuth) ────────────
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getSqliteHandle } = require("@/db");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getDefaultTenantId } = require("@/db/sqlite-helpers");
+    let tenantId: string;
+    try {
+      const db = getSqliteHandle();
+      tenantId = getDefaultTenantId(db);
+    } catch {
+      // Falls DB in manchen Pfaden (z.B. Edge) nicht verfuegbar ist —
+      // Request bleibt ohne Tenant. Die Routes sollten das nicht treffen.
+      tenantId = "default-dev-tenant";
+    }
+    return {
+      user: { id: "dev-user", email: "dev@localhost", role: "admin" },
+      tenantId,
+      role: "owner",
+      memberships: [{ id: tenantId, name: "Default Workspace", slug: "default", role: "owner" }],
+      errorResponse: null,
+    };
+  }
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return emptyTenantContextWithError(
+      NextResponse.json({ ok: false, error: { message: "Unauthorized", code: "UNAUTHORIZED" } }, { status: 401 }),
+    );
+  }
+
+  // Der SQLite-Adapter + Session-Callback liefert diese Felder (siehe
+  // src/lib/auth.ts: enrichUser und src/lib/auth.config.ts). Bei JWT-
+  // basierten Sessions koennte `tenants` fehlen — defensiv handeln.
+  const user = session.user as unknown as {
+    id: string;
+    email: string;
+    role: string;
+    tenants?: TenantMembershipLite[];
+    activeTenantId?: string | null;
+  };
+  const memberships: TenantMembershipLite[] = Array.isArray(user.tenants) ? user.tenants : [];
+
+  if (memberships.length === 0) {
+    return emptyTenantContextWithError(
+      NextResponse.json(
+        { ok: false, error: { message: "No tenant memberships", code: "NO_TENANT_MEMBERSHIPS" } },
+        { status: 403 },
+      ),
+    );
+  }
+
+  // Tenant-Auswahl: Header > Query-Param > Session-Default > erstes Membership
+  const url = request ? new URL(request.url) : null;
+  const headerTenant = request?.headers.get("x-tenant-id") ?? null;
+  const queryTenant = url?.searchParams.get("tenant") ?? null;
+  const sessionTenant = user.activeTenantId ?? null;
+  const requestedTenantId = headerTenant || queryTenant || sessionTenant || memberships[0].id;
+
+  const match = memberships.find((m) => m.id === requestedTenantId);
+  if (!match) {
+    return emptyTenantContextWithError(
+      NextResponse.json(
+        { ok: false, error: { message: "Tenant not authorized", code: "TENANT_NOT_AUTHORIZED" } },
+        { status: 403 },
+      ),
+    );
+  }
+
+  return {
+    user: { id: user.id, email: user.email, role: user.role ?? "member" },
+    tenantId: match.id,
+    role: match.role,
+    memberships,
+    errorResponse: null,
+  };
+}
+
+/**
+ * Ueberprueft, dass der aktuelle Request-Benutzer mindestens eine bestimmte
+ * Rolle im aktiven Tenant hat. Baut auf requireTenantContext auf.
+ *
+ * Usage:
+ *   const ctx = await requireTenantRole(request, "admin");
+ *   if (ctx.errorResponse) return ctx.errorResponse;
+ *   // ab hier ist ctx.role entweder "owner" oder "admin"
+ */
+export async function requireTenantRole(request: Request | undefined, minRole: TenantRole): Promise<TenantContext> {
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx;
+  if (TENANT_ROLE_RANK[ctx.role] < TENANT_ROLE_RANK[minRole]) {
+    return {
+      ...ctx,
+      errorResponse: NextResponse.json(
+        { ok: false, error: { message: "Insufficient tenant role", code: "INSUFFICIENT_TENANT_ROLE", required: minRole, actual: ctx.role } },
+        { status: 403 },
+      ),
+    };
+  }
+  return ctx;
+}
+
+/**
+ * Fordert einen System-Admin (users.role = "admin") — orthogonal zu den
+ * Tenant-Rollen. Verwendet fuer /api/v1/admin/tenants/* etc.
+ */
+export async function requireSystemAdmin(): Promise<{
+  session: { user: { id: string; email: string; role: string } } | null;
+  errorResponse: NextResponse | null;
+}> {
+  // Dev-Mode-Bypass — gleiche Logik wie requireAuth, aber immer "admin".
+  if (process.env.NODE_ENV === "development") {
+    return {
+      session: { user: { id: "dev-user", email: "dev@localhost", role: "admin" } },
+      errorResponse: null,
+    };
+  }
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      session: null,
+      errorResponse: NextResponse.json(
+        { ok: false, error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      ),
+    };
+  }
+  if ((session.user as { role?: string }).role !== "admin") {
+    return {
+      session: null,
+      errorResponse: NextResponse.json(
+        { ok: false, error: { message: "System admin required", code: "FORBIDDEN" } },
+        { status: 403 },
+      ),
+    };
+  }
+  return {
+    session: {
+      user: {
+        id: session.user.id,
+        email: session.user.email ?? "",
+        role: (session.user as { role?: string }).role ?? "member",
+      },
+    },
+    errorResponse: null,
+  };
+}
+
+function emptyTenantContextWithError(errorResponse: NextResponse): TenantContext {
+  return {
+    user: { id: "", email: "", role: "member" },
+    tenantId: "",
+    role: "viewer",
+    memberships: [],
+    errorResponse,
+  };
+}
+
 /**
  * Parse and validate a JSON request body against a Zod schema.
  */

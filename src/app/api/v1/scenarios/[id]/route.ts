@@ -5,24 +5,18 @@
  */
 
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
-import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
-
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  return d;
-}
+import { getSqliteHandle } from "@/db";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
-  const d = db();
-  const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
-  d.close();
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
 
+  const d = getSqliteHandle();
+  const row = d.prepare("SELECT * FROM scenarios WHERE id = ? AND tenant_id = ?").get(id, ctx.tenantId) as any;
   if (!row) return apiError("Scenario not found", 404, "NOT_FOUND");
 
   return apiSuccess({
@@ -36,8 +30,14 @@ export async function GET(_req: Request, { params }: Params) {
 
 export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot modify scenarios", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
   const body = await req.json().catch(() => ({}));
-  const d = db();
+  const d = getSqliteHandle();
 
   const sets: string[] = ["updated_at = datetime('now')"];
   const values: unknown[] = [];
@@ -51,13 +51,11 @@ export async function PATCH(req: Request, { params }: Params) {
   if (body.impacts !== undefined) { sets.push("impacts = ?"); values.push(JSON.stringify(body.impacts)); }
 
   if (sets.length > 0) {
-    values.push(id);
-    d.prepare(`UPDATE scenarios SET ${sets.join(", ")} WHERE id = ?`).run(...values);
+    values.push(id, ctx.tenantId);
+    d.prepare(`UPDATE scenarios SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...values);
   }
 
-  const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
-  d.close();
-
+  const row = d.prepare("SELECT * FROM scenarios WHERE id = ? AND tenant_id = ?").get(id, ctx.tenantId) as any;
   if (!row) return apiError("Scenario not found", 404, "NOT_FOUND");
 
   return apiSuccess({
@@ -69,10 +67,15 @@ export async function PATCH(req: Request, { params }: Params) {
   });
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
-  const d = db();
-  d.prepare("DELETE FROM scenarios WHERE id = ?").run(id);
-  d.close();
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "member" || ctx.role === "viewer") {
+    return apiError("Only tenant admins/owners can delete scenarios", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
+  const d = getSqliteHandle();
+  d.prepare("DELETE FROM scenarios WHERE id = ? AND tenant_id = ?").run(id, ctx.tenantId);
   return new NextResponse(null, { status: 204 });
 }

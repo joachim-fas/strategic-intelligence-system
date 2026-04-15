@@ -459,12 +459,39 @@ export default function HomeClient() {
       })
       .catch(() => {});
     const params = new URLSearchParams(window.location.search);
-    // Re-run from /projects page
+    // ── URL-Param-Routing vom Trend-Detail-Panel (und /projects) ─────
+    //   q=<query>           → nur vorbefuellen, User muss noch klicken
+    //   q=... & autostart=1 → Query sofort losschicken (neues Projekt)
+    //   q=... & project=<id>→ in bestehendes Projekt als Follow-up
+    // Die URL wird nach Auslesen wieder sauber geraeumt (replaceState),
+    // damit ein Reload nicht dieselbe Action nochmal triggert.
     const urlQ = params.get("q");
+    const urlAutostart = params.get("autostart") === "1";
+    const urlProject = params.get("project");
     if (urlQ) {
-      setQuery(decodeURIComponent(urlQ));
+      const decoded = decodeURIComponent(urlQ);
+      setQuery(decoded);
       window.history.replaceState({}, "", window.location.pathname);
+
+      if (urlProject) {
+        // In bestehendes Projekt: activeProjectId setzen + als Follow-up
+        // starten. handleSubmit liest den aktuellen query-State.
+        activeProjectIdRef.current = urlProject;
+        setActiveProjectId(urlProject);
+        // kurz warten, bis state durch ist, dann submit
+        setTimeout(() => {
+          try { handleSubmit(decoded); } catch {}
+        }, 40);
+      } else if (urlAutostart) {
+        // Neues Projekt aus dieser Query — bestehendes Verhalten von
+        // handleSubmit() erzeugt on-first-submit automatisch einen
+        // Canvas, wenn activeProjectIdRef.current leer ist.
+        setTimeout(() => {
+          try { handleSubmit(decoded); } catch {}
+        }, 40);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [showFullRadar, setShowFullRadar] = useState(false);

@@ -48,7 +48,16 @@ export const authConfig = {
     async session({ session, user }: { session: any; user: any }) {
       if (session.user) {
         session.user.id = user.id;
+        // System-rolle (admin/member) — orthogonal zur Tenant-Rolle.
         (session.user as any).role = (user as any).role ?? "member";
+        // Multi-tenant-Felder aus dem angereicherten User-Objekt (siehe
+        // enrichUser in auth.ts). `tenants` ist die Liste aller Orgas in
+        // denen der User Mitglied ist (mit Rolle), `activeTenantId`
+        // ist die aktuell gewaehlte Orga — Source-of-Truth ist
+        // users.last_active_tenant_id, von POST /api/v1/auth/switch-tenant
+        // geschrieben.
+        (session.user as any).tenants = (user as any).tenants ?? [];
+        (session.user as any).activeTenantId = (user as any).activeTenantId ?? null;
       }
       return session;
     },

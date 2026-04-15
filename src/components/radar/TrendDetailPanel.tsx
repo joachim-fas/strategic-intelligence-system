@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { TrendDot, RING_COLORS, TIME_HORIZON_COLORS, DURATION_CONFIG, DIRECTION_CONFIG, FOCUS_CONFIG, TrendClassification } from "@/types";
 import { useLocale } from "@/lib/locale-context";
 import { Locale } from "@/lib/i18n";
@@ -10,6 +11,86 @@ import { getDrivers, getEffects, getInhibitors, calculateCascadeDepth, TrendEdge
 import { getRegulationsForTrend, getRegulatoryPressure } from "@/lib/regulations";
 import { getClusterForTrend } from "@/lib/trend-clusters";
 import { Tooltip } from "@/components/ui/Tooltip";
+
+/**
+ * TrendActionsBar — kontextbewusste Primaerwahl + Vertiefen-Link.
+ *
+ * Client-only: liest `sis-active-canvas` aus localStorage beim Mount
+ * und entscheidet damit, ob der Primary-Button auf "Im aktuellen Projekt
+ * fragen" (Projekt da) oder "Neues Projekt starten" (kein Projekt)
+ * zeigt. Die Entscheidung passiert hydration-sicher erst nach dem
+ * ersten Render — bis dahin wird der neutrale "Neues Projekt"-Text
+ * angezeigt, damit Server und Client-Render dieselbe Markup liefern.
+ */
+function TrendActionsBar({ trend, locale }: { trend: TrendDot; locale: Locale }) {
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const id = localStorage.getItem("sis-active-canvas");
+      if (id) setActiveProjectId(id);
+    } catch {
+      /* SSR or blocked storage — stays null, falls to "new project" */
+    }
+  }, []);
+
+  const deepDiveQuery = locale === "de"
+    ? `Deep Dive: ${trend.name} — Treiber, Signale, Szenarien`
+    : `Deep dive: ${trend.name} — drivers, signals, scenarios`;
+
+  const primaryLabel = activeProjectId
+    ? (locale === "de" ? "Im aktuellen Projekt fragen" : "Ask in current project")
+    : (locale === "de" ? "Neues Projekt starten" : "Start new project");
+
+  // /?q=… + autostart=1 → Home liest das Param und startet handleSubmit
+  //   automatisch bei Mount, ohne dass der User noch klicken muss.
+  // /?q=… + project=<id> → Home findet das Projekt, haengt die neue
+  //   Query als Follow-up daran an und uebergibt sie der Pipeline mit
+  //   der vorhandenen Synthese als previousContext.
+  const primaryHref = activeProjectId
+    ? `/?q=${encodeURIComponent(deepDiveQuery)}&project=${encodeURIComponent(activeProjectId)}`
+    : `/?q=${encodeURIComponent(deepDiveQuery)}&autostart=1`;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <a
+        href={primaryHref}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          width: "100%", padding: "10px 16px",
+          borderRadius: 10,
+          background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)",
+          fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+          fontSize: 13, fontWeight: 600,
+          textDecoration: "none",
+          transition: "transform 150ms ease",
+          border: "1px solid rgba(0,0,0,0.08)",
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+        onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+      >
+        {primaryLabel} →
+      </a>
+
+      <a
+        href={`/verstehen/${trend.id}`}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+          width: "100%", padding: "8px 12px", borderRadius: 8,
+          border: "1px solid var(--volt-border, #E8E8E8)",
+          background: "var(--volt-surface, #FFFFFF)",
+          color: "var(--volt-text, #0A0A0A)",
+          fontSize: 12, fontWeight: 500, textDecoration: "none",
+          fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+          transition: "all 150ms ease",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
+      >
+        ↓ {locale === "de" ? "Vertiefen" : "Deep dive"}
+      </a>
+    </div>
+  );
+}
 
 // ─── Volt UI pastel palette ────────────────────────────────────────────
 const RING_PASTEL: Record<string, { color: string; background: string }> = {
@@ -339,21 +420,18 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           >
             ← {t(locale, "back")}
           </button>
-          <div className="flex gap-1.5 items-center">
-            <button className="px-3 py-1 text-xs rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] transition-colors bg-white">
-              {t(locale, "edit")}
-            </button>
-            <button className="px-3 py-1 text-xs rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] transition-colors bg-white">
-              {t(locale, "pin")}
-            </button>
-            <button
-              onClick={onClose}
-              title={t(locale, "back")}
-              className="ml-1 w-7 h-7 flex items-center justify-center rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] hover:bg-[rgba(0,0,0,0.04)] transition-colors bg-white text-sm font-medium"
-            >
-              ✕
-            </button>
-          </div>
+          {/* "Bearbeiten" und "Anheften" entfernt — die beiden Buttons
+               hatten keinen Handler und keinen Effekt, nur der Close-
+               Button bleibt. Trends bearbeiten findet im Canvas statt,
+               Anheften wird im Trend-Filter bzw. pro Radar-Karte
+               gesteuert, nicht hier im Detail-Panel. */}
+          <button
+            onClick={onClose}
+            title={t(locale, "back")}
+            className="w-7 h-7 flex items-center justify-center rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] hover:bg-[rgba(0,0,0,0.04)] transition-colors bg-white text-sm font-medium"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Title */}
@@ -658,79 +736,30 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
         </div>
       </div>
 
-      {/* ── L3: Actions Bar ── */}
+      {/* ── L3: Actions Bar ──────────────────────────────────────────────
+           Zwei Aktionen, jede mit klarer semantischer Rolle:
+
+           (a) Frage stellen — KONTEXTBEWUSST:
+               - Gibt es ein aktives Projekt (sis-active-canvas in
+                 localStorage)? → Der Trend wird als Follow-up in DIESES
+                 Projekt eingebracht. Label: "Im aktuellen Projekt fragen".
+               - Kein aktives Projekt? → Ein NEUES Projekt wird aus dieser
+                 Fragestellung erzeugt. Label: "Neues Projekt starten".
+               Der Query-Text selbst ist identisch ("Deep Dive: <Trend>"),
+               nur das Ziel unterscheidet sich: /?q=...&project=<id> vs.
+               /?q=...&autostart=1.
+
+           (b) Vertiefen — Trend-Detailseite (Signale, Kausal, Quellen).
+               Kein State-Wechsel, reine Recherche.
+
+           Der alte "Zum Projekt"-Button ist entfernt: er fuehrte
+           dekontextualisiert zum zuletzt geoeffneten Canvas ohne Bezug
+           zum gerade betrachteten Trend. */}
       <div className="px-6 py-5">
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {/* Primary: Ask about this trend */}
-          <a
-            href={`/?q=${encodeURIComponent(locale === "de" ? `Deep Dive: ${trend.name} — Treiber, Signale, Szenarien` : `Deep dive: ${trend.name} — drivers, signals, scenarios`)}`}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              width: "100%", padding: "10px 16px",
-              borderRadius: 10,
-              background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)",
-              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-              fontSize: 13, fontWeight: 600,
-              textDecoration: "none",
-              transition: "transform 150ms ease",
-              border: "1px solid rgba(0,0,0,0.08)",
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-          >
-            {locale === "de" ? "Frage stellen" : "Ask question"} →
-          </a>
+        <TrendActionsBar trend={trend} locale={locale} />
 
-          {/* Secondary row */}
-          <div style={{ display: "flex", gap: 8 }}>
-            {/* Deep dive */}
-            <a
-              href={`/verstehen/${trend.id}`}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                padding: "8px 12px", borderRadius: 8,
-                border: "1px solid var(--volt-border, #E8E8E8)",
-                background: "var(--volt-surface, #FFFFFF)",
-                color: "var(--volt-text, #0A0A0A)",
-                fontSize: 12, fontWeight: 500, textDecoration: "none",
-                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
-            >
-              ↓ {locale === "de" ? "Vertiefen" : "Deep dive"}
-            </a>
-
-            {/* Save to project */}
-            <button
-              onClick={() => {
-                const projectId = (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
-                if (projectId) {
-                  window.location.href = `/canvas?project=${projectId}`;
-                } else {
-                  window.location.href = "/canvas";
-                }
-              }}
-              style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                padding: "8px 12px", borderRadius: 8,
-                border: "1px solid var(--volt-border, #E8E8E8)",
-                background: "var(--volt-surface, #FFFFFF)",
-                color: "var(--volt-text, #0A0A0A)",
-                fontSize: 12, fontWeight: 500, cursor: "pointer",
-                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                transition: "all 150ms ease",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--volt-text, #0A0A0A)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)"; }}
-            >
-              📁 {locale === "de" ? "Zum Projekt" : "To project"}
-            </button>
-          </div>
-        </div>
-
-        {/* All authoritative sources with links */}
+        {/* All authoritative sources with links (inside the same px-6 py-5
+             block as the actions bar so padding stays symmetric). */}
         {authoritativeSources.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <h4 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider mb-2">

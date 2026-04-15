@@ -46,16 +46,91 @@ function buildAdapter() {
 /**
  * Minimal NextAuth adapter for SQLite local development.
  * Stores data in the SQLite database using raw queries.
+ *
+ * Multi-tenant awareness
+ * ──────────────────────
+ * - createUser also creates a tenant_memberships row (role=member) in the
+ *   default tenant, and stamps users.last_active_tenant_id. So a brand-new
+ *   user lands in a usable tenant on first login.
+ * - getSession/getUser variants load the memberships list + the active
+ *   tenant id, and return them on the user object. The session callback
+ *   in auth.config.ts picks that up and exposes it as session.user.tenants
+ *   and session.user.activeTenantId.
  */
 function buildSqliteAdapter() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ensureMultiTenantSchema, ensureDefaultTenant, getDefaultTenantId } = require("@/db/sqlite-helpers");
 
   const dbPath = path.join(process.cwd(), "local.db");
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
+
+  // Adapter is constructed once at module init — make sure the schema is
+  // up to date before we start serving auth requests against it.
+  try {
+    ensureMultiTenantSchema(sqlite);
+    ensureDefaultTenant(sqlite);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[auth] multi-tenant migration failed:", err);
+  }
+
+  /**
+   * Adds membership + active-tenant pointer for a freshly-invited or
+   * freshly-signed-up user. Called once per newly created user row.
+   */
+  function wireNewUserToDefaultTenant(userId: string): string {
+    const tenantId: string = getDefaultTenantId(sqlite);
+    sqlite
+      .prepare(
+        `INSERT OR IGNORE INTO tenant_memberships (id, tenant_id, user_id, role, joined_at)
+         VALUES (?, ?, ?, 'member', datetime('now'))`,
+      )
+      .run(crypto.randomUUID(), tenantId, userId);
+    sqlite
+      .prepare(`UPDATE users SET last_active_tenant_id = ? WHERE id = ? AND last_active_tenant_id IS NULL`)
+      .run(tenantId, userId);
+    return tenantId;
+  }
+
+  /**
+   * Loads every membership the user has plus the tenant metadata. Used
+   * to enrich the User object returned by getUser* calls.
+   */
+  function loadMemberships(userId: string): Array<{ id: string; name: string; slug: string; role: string }> {
+    return sqlite
+      .prepare(
+        `SELECT t.id, t.name, t.slug, m.role
+         FROM tenant_memberships m
+         JOIN tenants t ON t.id = m.tenant_id
+         WHERE m.user_id = ? AND t.archived_at IS NULL
+         ORDER BY m.joined_at ASC`,
+      )
+      .all(userId) as Array<{ id: string; name: string; slug: string; role: string }>;
+  }
+
+  /** Wrap a raw users row into the shape NextAuth expects, with tenant extras. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function enrichUser(row: any) {
+    const base = mapUser(row);
+    const tenants = loadMemberships(base.id);
+    // Active tenant: use the user's remembered choice if they still have a
+    // membership in it; otherwise fall back to the first membership (or the
+    // default tenant as last resort). This keeps the session safe even when
+    // a user was removed from the org they last used.
+    let activeTenantId: string | null = (row.last_active_tenant_id as string | null) ?? null;
+    if (activeTenantId && !tenants.some((t) => t.id === activeTenantId)) {
+      activeTenantId = null;
+    }
+    if (!activeTenantId) {
+      activeTenantId = tenants[0]?.id ?? getDefaultTenantId(sqlite);
+    }
+    return { ...base, tenants, activeTenantId };
+  }
 
   return {
     createUser(data: { email: string; emailVerified?: Date | null; name?: string; image?: string }) {
@@ -65,17 +140,25 @@ function buildSqliteAdapter() {
           `INSERT INTO users (id, email, email_verified, name, image, role) VALUES (?, ?, ?, ?, ?, 'member')`
         )
         .run(id, data.email, data.emailVerified?.toISOString() ?? null, data.name ?? null, data.image ?? null);
-      return { id, ...data, role: "member", createdAt: new Date() };
+      const activeTenantId = wireNewUserToDefaultTenant(id);
+      return {
+        id,
+        ...data,
+        role: "member",
+        createdAt: new Date(),
+        tenants: loadMemberships(id),
+        activeTenantId,
+      };
     },
 
     getUser(id: string) {
       const row = sqlite.prepare(`SELECT * FROM users WHERE id = ?`).get(id);
-      return row ? mapUser(row) : null;
+      return row ? enrichUser(row) : null;
     },
 
     getUserByEmail(email: string) {
       const row = sqlite.prepare(`SELECT * FROM users WHERE email = ?`).get(email);
-      return row ? mapUser(row) : null;
+      return row ? enrichUser(row) : null;
     },
 
     getUserByAccount({ provider, providerAccountId }: { provider: string; providerAccountId: string }) {
@@ -84,7 +167,7 @@ function buildSqliteAdapter() {
           `SELECT u.* FROM users u JOIN accounts a ON u.id = a.user_id WHERE a.provider = ? AND a.provider_account_id = ?`
         )
         .get(provider, providerAccountId);
-      return row ? mapUser(row) : null;
+      return row ? enrichUser(row) : null;
     },
 
     updateUser(data: { id: string; name?: string; email?: string; emailVerified?: Date | null; image?: string }) {
@@ -145,7 +228,9 @@ function buildSqliteAdapter() {
     getSessionAndUser(sessionToken: string) {
       const row = sqlite
         .prepare(
-          `SELECT s.*, u.id as uid, u.email, u.name, u.image, u.role, u.email_verified FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.session_token = ?`
+          `SELECT s.*, u.id as uid, u.email, u.name, u.image, u.role, u.email_verified, u.last_active_tenant_id
+           FROM sessions s JOIN users u ON s.user_id = u.id
+           WHERE s.session_token = ?`
         )
         .get(sessionToken) as Record<string, unknown> | undefined;
       if (!row) return null;
@@ -155,7 +240,10 @@ function buildSqliteAdapter() {
           userId: row.user_id as string,
           expires: new Date(row.expires as string),
         },
-        user: mapUser(row),
+        // Use enrichUser so the session callback (auth.config.ts) sees
+        // `user.tenants` + `user.activeTenantId` and can forward them
+        // onto the session object clients receive.
+        user: enrichUser(row),
       };
     },
 

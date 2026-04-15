@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, parseBody } from "@/lib/api-helpers";
+import { parseBody, requireTenantContext } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 const updateRadarTrendSchema = z.object({
@@ -26,28 +26,30 @@ type Params = { params: Promise<{ id: string; trendId: string }> };
 
 export async function PATCH(request: Request, context: Params) {
   const { id: radarId, trendId } = await context.params;
-  const { session, errorResponse } = await requireAuth();
-  if (errorResponse) return errorResponse;
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return NextResponse.json({ error: "Viewers cannot modify radar trends" }, { status: 403 });
+  }
 
   const { data, error } = await parseBody(request, updateRadarTrendSchema);
   if (error) return error;
 
   const db = getDb();
   const dialect = getDialectName();
-  const userId = session!.user!.id!;
 
   if (dialect === "pg") {
     const schema = await import("@/db/schema");
 
-    // Verify radar ownership
+    // Tenant-scope check (replaces owner-based ownership).
     const radar = await db
       .select()
       .from(schema.radars)
-      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.ownerId, userId)))
+      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.tenantId, ctx.tenantId)))
       .limit(1);
 
     if (radar.length === 0) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
     }
 
     // Find the radar-trend entry
@@ -100,11 +102,11 @@ export async function PATCH(request: Request, context: Params) {
     const radar = db
       .select()
       .from(schema.radars)
-      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.ownerId, userId)))
+      .where(and(eq(schema.radars.id, radarId), eq(schema.radars.tenantId, ctx.tenantId)))
       .get();
 
     if (!radar) {
-      return NextResponse.json({ error: "Radar not found or not owned by you" }, { status: 404 });
+      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
     }
 
     const existing = db

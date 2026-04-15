@@ -3,67 +3,45 @@
  * POST /api/v1/scenarios — Create a new scenario
  */
 
-import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
 import { randomUUID } from "crypto";
+import { getSqliteHandle } from "@/db";
 import { checkRateLimit, tooManyRequests, validationError } from "@/lib/api-utils";
 import { validateStringLength } from "@/lib/validation";
-import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
+import { apiSuccess, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS scenarios (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      type TEXT DEFAULT 'custom',
-      probability REAL DEFAULT 0.5,
-      timeframe TEXT,
-      key_drivers TEXT,
-      impacts TEXT,
-      source TEXT DEFAULT 'user',
-      source_query TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
-  return d;
-}
-
-// TODO: SEC-14 — Add user_id ownership check when user_id column exists on the scenarios table.
-// GET should filter by user_id; POST should set user_id from session.
+// SEC-14 resolved: scenarios are now tenant-scoped via tenant_id.
 
 export async function GET(request: Request) {
   const clientIp = request.headers.get("x-forwarded-for") || "unknown";
   if (!checkRateLimit(clientIp, 60, 60000)) {
     return tooManyRequests();
   }
-  // DAT-13: Ensure DB handle is always closed
-  const d = db();
-  try {
-    const rows = d.prepare(
-      "SELECT * FROM scenarios ORDER BY updated_at DESC"
-    ).all();
+  const ctx = await requireTenantContext(request);
+  if (ctx.errorResponse) return ctx.errorResponse;
 
-    const scenarios = (rows as any[]).map((r) => ({
-      ...r,
-      key_drivers: r.key_drivers ? JSON.parse(r.key_drivers) : [],
-      impacts: r.impacts ? JSON.parse(r.impacts) : [],
-    }));
+  const d = getSqliteHandle();
+  const rows = d.prepare(
+    "SELECT * FROM scenarios WHERE tenant_id = ? ORDER BY updated_at DESC"
+  ).all(ctx.tenantId);
 
-    return apiSuccess({ scenarios }, 200, CACHE_HEADERS.short);
-  } finally {
-    d.close();
-  }
+  const scenarios = (rows as any[]).map((r) => ({
+    ...r,
+    key_drivers: r.key_drivers ? JSON.parse(r.key_drivers) : [],
+    impacts: r.impacts ? JSON.parse(r.impacts) : [],
+  }));
+
+  return apiSuccess({ scenarios }, 200, CACHE_HEADERS.short);
 }
 
 export async function POST(req: Request) {
   const clientIp = req.headers.get("x-forwarded-for") || "unknown";
   if (!checkRateLimit(clientIp, 60, 60000)) {
     return tooManyRequests();
+  }
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return validationError("Viewers cannot create scenarios");
   }
 
   const body = await req.json().catch(() => ({}));
@@ -95,36 +73,31 @@ export async function POST(req: Request) {
   }
 
   const id = randomUUID();
-  // DAT-13: Ensure DB handle is always closed
-  const d = db();
-  try {
-    d.prepare(`
-      INSERT INTO scenarios (id, name, description, type, probability, timeframe, key_drivers, impacts, source, source_query)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      name,
-      description ?? null,
-      type ?? "custom",
-      probability ?? 0.5,
-      timeframe ?? null,
-      key_drivers ? JSON.stringify(key_drivers) : null,
-      impacts ? JSON.stringify(impacts) : null,
-      source ?? "user",
-      source_query ?? null,
-    );
+  const d = getSqliteHandle();
+  d.prepare(`
+    INSERT INTO scenarios (id, tenant_id, name, description, type, probability, timeframe, key_drivers, impacts, source, source_query)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    ctx.tenantId,
+    name,
+    description ?? null,
+    type ?? "custom",
+    probability ?? 0.5,
+    timeframe ?? null,
+    key_drivers ? JSON.stringify(key_drivers) : null,
+    impacts ? JSON.stringify(impacts) : null,
+    source ?? "user",
+    source_query ?? null,
+  );
 
-    const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
+  const row = d.prepare("SELECT * FROM scenarios WHERE id = ?").get(id) as any;
 
-    // API-18: POST creating a resource should return 201
-    return apiSuccess({
-      scenario: {
-        ...row,
-        key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
-        impacts: row.impacts ? JSON.parse(row.impacts) : [],
-      },
-    }, 201);
-  } finally {
-    d.close();
-  }
+  return apiSuccess({
+    scenario: {
+      ...row,
+      key_drivers: row.key_drivers ? JSON.parse(row.key_drivers) : [],
+      impacts: row.impacts ? JSON.parse(row.impacts) : [],
+    },
+  }, 201);
 }

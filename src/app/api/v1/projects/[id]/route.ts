@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
+import { getSqliteHandle } from "@/db";
 import { validationError } from "@/lib/api-utils";
 import { validateStringLength, validateId } from "@/lib/validation";
-import { apiSuccess, apiError } from "@/lib/api-helpers";
-
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  d.pragma("foreign_keys = ON");
-  return d;
-}
+import { apiSuccess, apiError, requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
-// TODO: SEC-14 — Add user_id ownership check when user_id column exists on the radars table.
-// PATCH and DELETE handlers should verify the resource belongs to the authenticated user.
+// SEC-14 resolved: PATCH/DELETE now require tenant membership and the
+// radar row must belong to the active tenant.
 
 // PATCH — rename project
 export async function PATCH(req: Request, context: Params) {
@@ -25,6 +17,12 @@ export async function PATCH(req: Request, context: Params) {
     // SEC-13: Validate path param
     const idCheck = validateId(id);
     if (!idCheck.valid) return validationError(idCheck.error);
+
+    const ctx = await requireTenantContext(req);
+    if (ctx.errorResponse) return ctx.errorResponse;
+    if (ctx.role === "viewer") {
+      return apiError("Viewers cannot rename projects", 403, "INSUFFICIENT_TENANT_ROLE");
+    }
 
     const body = await req.json();
     const { name, description } = body;
@@ -38,17 +36,13 @@ export async function PATCH(req: Request, context: Params) {
       if (!descCheck.valid) return validationError(descCheck.error);
     }
 
-    // DAT-13: Ensure DB handle is always closed
-    const d = db();
-    try {
-      d.prepare("UPDATE radars SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(name.trim(), description ?? null, id);
-      const updated = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
-      if (!updated) return apiError("Project not found", 404, "NOT_FOUND");
-      return apiSuccess({ project: updated });
-    } finally {
-      d.close();
-    }
+    const d = getSqliteHandle();
+    const res = d.prepare(
+      "UPDATE radars SET name = ?, description = ?, updated_at = datetime('now') WHERE id = ? AND tenant_id = ?",
+    ).run(name.trim(), description ?? null, id, ctx.tenantId);
+    if (res.changes === 0) return apiError("Project not found", 404, "NOT_FOUND");
+    const updated = d.prepare("SELECT * FROM radars WHERE id = ? AND tenant_id = ?").get(id, ctx.tenantId);
+    return apiSuccess({ project: updated });
   } catch (err) {
     console.error("PATCH /api/v1/projects/[id] error:", err);
     return apiError("Failed to update project", 500, "INTERNAL_ERROR");
@@ -56,27 +50,31 @@ export async function PATCH(req: Request, context: Params) {
 }
 
 // DELETE — delete project + cascade
-export async function DELETE(_req: Request, context: Params) {
+export async function DELETE(req: Request, context: Params) {
   try {
     const { id } = await context.params;
-    // DAT-13: Ensure DB handle is always closed
-    const d = db();
-    try {
-      const existing = d.prepare("SELECT id FROM radars WHERE id = ?").get(id);
-      if (!existing) {
-        return apiError("Project not found", 404, "NOT_FOUND");
-      }
-
-      // Cascade manually (foreign_keys pragma handles it if FK constraints exist,
-      // but we delete explicitly to be safe)
-      d.prepare("DELETE FROM project_notes WHERE radar_id = ?").run(id);
-      d.prepare("DELETE FROM project_queries WHERE radar_id = ?").run(id);
-      d.prepare("DELETE FROM radars WHERE id = ?").run(id);
-      // API-18: DELETE with no body should return 204
-      return new NextResponse(null, { status: 204 });
-    } finally {
-      d.close();
+    const ctx = await requireTenantContext(req);
+    if (ctx.errorResponse) return ctx.errorResponse;
+    // Only admin/owner can delete — members and viewers cannot.
+    if (ctx.role === "member" || ctx.role === "viewer") {
+      return apiError("Only tenant admins/owners can delete projects", 403, "INSUFFICIENT_TENANT_ROLE");
     }
+
+    const d = getSqliteHandle();
+    const existing = d.prepare("SELECT id FROM radars WHERE id = ? AND tenant_id = ?").get(id, ctx.tenantId);
+    if (!existing) {
+      return apiError("Project not found", 404, "NOT_FOUND");
+    }
+
+    // Cascade manually (foreign_keys pragma handles it if FK constraints exist,
+    // but we delete explicitly to be safe). All join tables reference radar_id
+    // so no extra tenant_id filter is needed once we verified the radar is
+    // in-tenant above.
+    d.prepare("DELETE FROM project_notes WHERE radar_id = ?").run(id);
+    d.prepare("DELETE FROM project_queries WHERE radar_id = ?").run(id);
+    d.prepare("DELETE FROM radars WHERE id = ? AND tenant_id = ?").run(id, ctx.tenantId);
+    // API-18: DELETE with no body should return 204
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
     console.error("DELETE /api/v1/projects/[id] error:", err);
     return apiError("Failed to delete project", 500, "INTERNAL_ERROR");

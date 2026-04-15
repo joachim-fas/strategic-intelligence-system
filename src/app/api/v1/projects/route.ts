@@ -1,33 +1,32 @@
-import Database from "better-sqlite3";
-import path from "path";
-import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
+import { getSqliteHandle } from "@/db";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  return d;
+// GET — list projects in the active tenant
+export async function GET(req: Request) {
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+
+  const d = getSqliteHandle();
+  const projects = d.prepare(`
+    SELECT r.id, r.name, r.description, r.scope, r.is_shared,
+      r.created_at, r.updated_at,
+      (SELECT COUNT(*) FROM project_queries WHERE radar_id = r.id) as query_count,
+      (SELECT COUNT(*) FROM project_notes WHERE radar_id = r.id) as note_count
+    FROM radars r
+    WHERE r.tenant_id = ?
+    ORDER BY r.updated_at DESC
+  `).all(ctx.tenantId);
+  return apiSuccess({ projects }, 200, CACHE_HEADERS.short);
 }
 
-// GET — list all projects (excludes canvas_state blob for performance)
-export async function GET() {
-  // DAT-13: Ensure DB handle is always closed
-  const d = db();
-  try {
-    const projects = d.prepare(`
-      SELECT r.id, r.name, r.description, r.scope, r.is_shared,
-        r.created_at, r.updated_at,
-        (SELECT COUNT(*) FROM project_queries WHERE radar_id = r.id) as query_count,
-        (SELECT COUNT(*) FROM project_notes WHERE radar_id = r.id) as note_count
-      FROM radars r ORDER BY r.updated_at DESC
-    `).all();
-    return apiSuccess({ projects }, 200, CACHE_HEADERS.short);
-  } finally {
-    d.close();
-  }
-}
-
-// POST — create project
+// POST — create project in the active tenant
 export async function POST(req: Request) {
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  if (ctx.role === "viewer") {
+    return apiError("Viewers cannot create projects", 403, "INSUFFICIENT_TENANT_ROLE");
+  }
+
   const body = await req.json().catch(() => ({}));
   const { name, description } = body;
 
@@ -43,18 +42,13 @@ export async function POST(req: Request) {
     return apiError("Description must be 2000 characters or fewer", 400, "VALIDATION_ERROR");
   }
 
-  // DAT-13: Ensure DB handle is always closed
-  const d = db();
-  try {
-    const id = crypto.randomUUID();
-    d.prepare(`
-      INSERT INTO radars (id, name, description, scope, is_shared, created_at, updated_at)
-      VALUES (?, ?, ?, '{}', 0, datetime('now'), datetime('now'))
-    `).run(id, name.trim(), description || null);
+  const d = getSqliteHandle();
+  const id = crypto.randomUUID();
+  d.prepare(`
+    INSERT INTO radars (id, tenant_id, owner_id, name, description, scope, is_shared, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, '{}', 0, datetime('now'), datetime('now'))
+  `).run(id, ctx.tenantId, ctx.user.id || null, name.trim(), description || null);
 
-    const project = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
-    return apiSuccess({ project }, 201);
-  } finally {
-    d.close();
-  }
+  const project = d.prepare("SELECT * FROM radars WHERE id = ?").get(id);
+  return apiSuccess({ project }, 201);
 }
