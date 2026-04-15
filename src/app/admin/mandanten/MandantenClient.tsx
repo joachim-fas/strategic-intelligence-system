@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import { VoltModal, voltConfirm } from "@/components/volt";
@@ -308,7 +309,18 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
             color: "var(--color-text-primary)",
             opacity: t.archived_at ? 0.6 : 1,
           }}>
-            <span style={{ fontWeight: 600 }}>{t.name}</span>
+            <Link
+              href={`/admin/mandanten/${t.id}`}
+              style={{
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+                textDecoration: "none",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--volt-lime-dark, #5A8B1F)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; }}
+            >
+              {t.name}
+            </Link>
             <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{t.slug}</span>
             <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{t.member_count}</span>
             <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{t.radar_count}</span>

@@ -84,6 +84,19 @@ export function TenantProvider({
         console.error("[tenant] switch failed:", res.status);
         return;
       }
+      // Tenant-Cross-Contamination vermeiden: die Legacy-localStorage-
+      // Keys, die den aktuellen Projekt-/Canvas-State halten, duerfen
+      // nicht ueberleben — sonst oeffnet der User nach dem Wechsel im
+      // neuen Tenant ein Canvas, das dort gar nicht existiert (und
+      // bekommt vom Server ein 404/403 auf die PATCH-Calls).
+      try {
+        window.localStorage.removeItem("sis-active-canvas");
+        window.localStorage.removeItem("sis-canvas-history-v2");
+        window.localStorage.removeItem("sis-transfer-to-canvas");
+        window.localStorage.removeItem("sis-canvas-project");
+      } catch {
+        /* storage locked — reload below picks up fresh state anyway */
+      }
       // Hard reload so every page + every localStorage lookup picks up
       // the new tenant on the next server render. Soft state swap is
       // not worth the fragility here.
