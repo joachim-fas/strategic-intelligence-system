@@ -312,7 +312,7 @@ export function SessionBar({
                   color: "var(--muted-foreground)",
                   letterSpacing: "0.04em",
                 }}>
-                  {s.nodeCount} {de ? "Nodes" : "nodes"}
+                  {s.nodeCount} {de ? (s.nodeCount === 1 ? "Karte" : "Karten") : (s.nodeCount === 1 ? "card" : "cards")}
                 </div>
               </button>
             ))}

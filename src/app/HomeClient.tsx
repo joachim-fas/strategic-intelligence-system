@@ -60,7 +60,7 @@ export default function HomeClient() {
   // Phase 5: Custom session title override (otherwise auto-generated from first query)
   const [customSessionTitle, setCustomSessionTitle] = useState<string | null>(null);
   // Phase 5: Past sessions for the picker dropdown
-  const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; updatedAt?: string }>>([]);
+  const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; queryCount: number; updatedAt?: string }>>([]);
   const activeProjectIdRef = useRef<string | null>(null);
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
   // Live stats for the hero mono line — fetched on mount, loading state until ready
@@ -119,7 +119,12 @@ export default function HomeClient() {
           .map((c: any) => ({
             id: c.id,
             name: c.name || "Unbenannt",
-            nodeCount: c.queryCount || 0,
+            // Previously this mapped queryCount into nodeCount, so the Home
+            // list showed "6 Nodes" for a project with 6 queries but 65 cards.
+            // API already returns both — keep them distinct so the label can
+            // match the canvas language ("Abfragen · Karten").
+            nodeCount: c.nodeCount || 0,
+            queryCount: c.queryCount || 0,
             updatedAt: c.updated_at,
           }));
         setPastSessions(sessions);
@@ -1388,7 +1393,11 @@ export default function HomeClient() {
                             display: "flex", alignItems: "center", gap: 10,
                             flexShrink: 0,
                           }}>
-                            <span>{s.nodeCount} Nodes</span>
+                            <span>
+                              {s.queryCount} {locale === "de" ? (s.queryCount === 1 ? "Abfrage" : "Abfragen") : (s.queryCount === 1 ? "Query" : "Queries")}
+                              {" · "}
+                              {s.nodeCount} {locale === "de" ? (s.nodeCount === 1 ? "Karte" : "Karten") : (s.nodeCount === 1 ? "Card" : "Cards")}
+                            </span>
                             {s.updatedAt && (
                               <span>{new Date(s.updatedAt).toLocaleDateString(locale === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}</span>
                             )}
