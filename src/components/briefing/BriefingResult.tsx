@@ -35,7 +35,6 @@ import {
   Sparkles,
   Lightbulb,
   AlertTriangle,
-  TrendingUp,
   Radio,
   Scale,
   ArrowRight,
@@ -51,7 +50,6 @@ import {
 } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 
-const MiniRadar = dynamic(() => import("@/components/radar/MiniRadar"), { ssr: false });
 const BalancedScorecard = dynamic(() => import("@/components/radar/BalancedScorecard"), { ssr: false });
 
 // ── Shared type for history entries ──────────────────────────────────────────
@@ -471,46 +469,41 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </VoltSectionCard>
           )}
 
-          {/* 6. Mini Radar (if ≥3 matched trends) */}
-          {briefing.matchedTrends.length > 2 && (
-            <VoltSectionCard
-              icon={<TrendingUp size={18} />}
-              iconVariant="butter"
-              title={locale === "de" ? "Trend-Radar" : "Trend Radar"}
-              subtitle={locale === "de"
-                ? `${briefing.matchedTrends.length} verwandte Trends`
-                : `${briefing.matchedTrends.length} related trends`}
-              padding="none"
-            >
-              <div style={{
-                padding: "8px 20px 20px",
-                background: "var(--muted, #F7F7F7)",
-                display: "flex", justifyContent: "center",
+          {/* Trend chips — scales from 1 to N, each chip carries ring + velocity cues */}
+          {briefing.matchedTrends.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+                textTransform: "uppercase", color: "var(--color-text-muted)",
+                marginRight: 4,
               }}>
-                <MiniRadar
-                  trends={briefing.matchedTrends.map((m: any) => m.trend)}
-                  onTrendClick={onTrendClick}
-                  width={460}
-                  height={460}
-                />
-              </div>
-            </VoltSectionCard>
-          )}
-
-          {/* Trend chips (≤2 matched trends) */}
-          {briefing.matchedTrends.length > 0 && briefing.matchedTrends.length <= 2 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {briefing.matchedTrends.map((m: any) => (
-                <button key={m.trend.id} onClick={() => onTrendClick(m.trend)} className="chip chip-brand">
-                  <span style={{
-                    width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                    background: m.trend.velocity === "rising" ? "var(--color-success)"
-                      : m.trend.velocity === "falling" ? "var(--color-danger)"
-                      : "var(--color-text-muted)",
-                  }} />
-                  {m.trend.name}
-                </button>
-              ))}
+                {locale === "de"
+                  ? `${briefing.matchedTrends.length} verwandte Trends`
+                  : `${briefing.matchedTrends.length} related trends`}
+              </span>
+              {briefing.matchedTrends.map((m: any) => {
+                const t = m.trend;
+                const ring: string | undefined = t.ring;
+                const velDot = t.velocity === "rising" ? "var(--color-success)"
+                  : t.velocity === "falling" ? "var(--color-danger)"
+                  : "var(--color-text-muted)";
+                return (
+                  <button key={t.id} onClick={() => onTrendClick(t)} className="chip chip-brand" title={ring ? `Ring: ${ring}` : undefined}>
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                      background: velDot,
+                    }} />
+                    {t.name}
+                    {ring && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                        textTransform: "uppercase", color: "var(--color-text-muted)",
+                        marginLeft: 4,
+                      }}>{ring}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
 

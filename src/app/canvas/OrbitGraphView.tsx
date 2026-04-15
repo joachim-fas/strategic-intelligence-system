@@ -809,109 +809,161 @@ function DetailPanel({
   onSelectQuery?: (id: string) => void;
   onSelectNode: (id: string) => void;
 }) {
+  // Trends stage color (matches STAGE_META.trends.color in OrbitDerivationView)
+  const typeColor = "#1A9E5A";
+
   return (
-    <>
-      {/* Header */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)", lineHeight: 1.3, wordBreak: "break-word" }}>
+    <div style={{
+      // Card shell — mirrors the Canvas DerivedNodeCard visual language
+      background: "var(--color-surface)",
+      border: "1.5px solid var(--color-border, #E8E8E8)",
+      borderRadius: 12, overflow: "hidden",
+      boxShadow: `inset 3px 0 0 ${typeColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
+      display: "flex", flexDirection: "column",
+    }}>
+      {/* Header — Trend badge pill + counts */}
+      <div style={{
+        minHeight: 36, padding: "8px 12px",
+        display: "flex", alignItems: "center", gap: 6,
+        background: `${typeColor}0C`,
+        borderBottom: `1px solid ${typeColor}22`,
+      }}>
+        <span style={{
+          flexShrink: 0, fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+          fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+          color: typeColor, background: `${typeColor}14`, border: `1px solid ${typeColor}30`,
+          borderRadius: 6, padding: "4px 10px",
+        }}>
+          {de ? "Trend" : "Trend"}
+        </span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+          {node.edgeCount} · {node.queryIds.length}
+        </span>
+      </div>
+
+      {/* Title + meta */}
+      <div style={{
+        padding: "12px 14px 10px",
+        borderBottom: "1px solid rgba(0,0,0,0.05)",
+      }}>
+        <div style={{
+          fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)",
+          lineHeight: 1.3, wordBreak: "break-word",
+        }}>
           {node.label}
         </div>
-        <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>
-          {node.edgeCount} {de ? "Verbindungen" : "connections"}
-          {" · "}
-          {node.queryIds.length} {de ? "Analysen" : "queries"}
+        <div style={{
+          fontSize: 10, color: "var(--color-text-muted)", marginTop: 6,
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        }}>
+          <span>
+            <strong style={{ color: typeColor, fontWeight: 700 }}>{node.edgeCount}</strong>{" "}
+            {de ? "Verbindungen" : "connections"}
+          </span>
+          <span style={{ color: "var(--color-border)" }}>·</span>
+          <span>
+            <strong style={{ color: "var(--color-text-secondary)", fontWeight: 700 }}>{node.queryIds.length}</strong>{" "}
+            {de ? "Analysen" : "queries"}
+          </span>
         </div>
       </div>
 
-      {/* Connected edges */}
-      {edges.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <SectionLabel>{de ? "Kausale Verbindungen" : "Causal connections"}</SectionLabel>
-          {edges.map((e, i) => {
-            const isFrom = e.from === node.id;
-            const otherId = isFrom ? e.to : e.from;
-            const otherName = allTrendNames[otherId] ?? otherId;
-            const color = EDGE_COLOR[e.type] ?? "#9CA3AF";
-            return (
-              <button key={i}
-                onClick={() => onSelectNode(otherId)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, width: "100%",
-                  marginBottom: 4, padding: "4px 6px", borderRadius: 6,
-                  background: `${color}08`, border: `1px solid ${color}22`,
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}15`; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}08`; }}
-              >
-                <span style={{ fontSize: 10, fontWeight: 600, color, background: `${color}20`, borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>
-                  {isFrom ? "→" : "←"} {EDGE_LABEL[e.type] ?? e.type}
-                </span>
-                <span style={{ fontSize: 11, color: "var(--color-text-heading)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {otherName}
-                </span>
-                <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)", flexShrink: 0 }}>
-                  {Math.round(e.strength * 100)}%
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* Body */}
+      <div style={{ padding: "12px 14px 12px" }}>
+        {/* Connected edges */}
+        {edges.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <SectionLabel>{de ? "Kausale Verbindungen" : "Causal connections"}</SectionLabel>
+            {edges.map((e, i) => {
+              const isFrom = e.from === node.id;
+              const otherId = isFrom ? e.to : e.from;
+              const otherName = allTrendNames[otherId] ?? otherId;
+              const color = EDGE_COLOR[e.type] ?? "#9CA3AF";
+              return (
+                <button key={i}
+                  onClick={() => onSelectNode(otherId)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, width: "100%",
+                    marginBottom: 4, padding: "4px 6px", borderRadius: 6,
+                    background: `${color}08`, border: `1px solid ${color}22`,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}15`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}08`; }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 600, color, background: `${color}20`, borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>
+                    {isFrom ? "→" : "←"} {EDGE_LABEL[e.type] ?? e.type}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-heading)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {otherName}
+                  </span>
+                  <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)", flexShrink: 0 }}>
+                    {Math.round(e.strength * 100)}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Query references */}
-      {node.queryIds.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <SectionLabel>{de ? "Referenziert in" : "Referenced in"}</SectionLabel>
-          {node.queryIds.map(qId => {
-            const label = queryLabels?.[qId];
-            const display = label && label.length > 60 ? label.slice(0, 60) + "…" : label ?? `Query ${qId.slice(0, 8)}…`;
-            return (
-              <button key={qId}
-                onClick={() => onSelectQuery?.(qId)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  width: "100%", fontSize: 11, padding: "6px 8px",
-                  borderRadius: 6, border: "1px solid var(--color-border)",
-                  background: "transparent", color: "var(--color-text-secondary)",
-                  cursor: "pointer", marginBottom: 3,
-                  transition: "background 0.12s", lineHeight: 1.4,
-                  textAlign: "left",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                title={label}
-              >
-                <span style={{ color: "#1A9E5A", fontWeight: 600, flexShrink: 0 }}>›</span>
-                <span style={{ flex: 1 }}>{display}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+        {/* Query references */}
+        {node.queryIds.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            <SectionLabel>{de ? "Referenziert in" : "Referenced in"}</SectionLabel>
+            {node.queryIds.map(qId => {
+              const label = queryLabels?.[qId];
+              const display = label && label.length > 60 ? label.slice(0, 60) + "…" : label ?? `Query ${qId.slice(0, 8)}…`;
+              return (
+                <button key={qId}
+                  onClick={() => onSelectQuery?.(qId)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    width: "100%", fontSize: 11, padding: "6px 8px",
+                    borderRadius: 6, border: "1px solid var(--color-border)",
+                    background: "transparent", color: "var(--color-text-secondary)",
+                    cursor: "pointer", marginBottom: 3,
+                    transition: "background 0.12s", lineHeight: 1.4,
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.03)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                  title={label}
+                >
+                  <span style={{ color: typeColor, fontWeight: 600, flexShrink: 0 }}>›</span>
+                  <span style={{ flex: 1 }}>{display}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* Deepen action */}
-      <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 12 }}>
+      {/* Actions footer */}
+      <div style={{
+        padding: "10px 12px", borderTop: "1px solid var(--color-border)",
+        background: "rgba(0,0,0,0.02)",
+      }}>
         <Tooltip content={de ? "Neue Analyse mit diesem Trend als Fokus starten" : "Start new analysis focused on this trend"} placement="left">
           <button
             onClick={() => onSelectQuery?.(`__orbit_deepen__${node.label}`)}
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
               width: "100%", fontSize: 11, fontWeight: 600, padding: "7px 12px",
-              borderRadius: 8, border: "1px solid #1A9E5A44",
-              background: "#1A9E5A12", color: "#1A9E5A", cursor: "pointer",
+              borderRadius: 6, border: `1px solid ${typeColor}66`,
+              background: `${typeColor}12`, color: typeColor, cursor: "pointer",
               transition: "background 0.12s",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A22"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#1A9E5A12"; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${typeColor}22`; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${typeColor}12`; }}
           >
             <ArrowDownToLine size={12} strokeWidth={2} />
             {de ? "Trend vertiefen" : "Deepen trend"}
           </button>
         </Tooltip>
       </div>
-    </>
+    </div>
   );
 }
 

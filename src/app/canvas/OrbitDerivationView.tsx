@@ -1219,9 +1219,11 @@ function ContextPanel({
 
   const stageMeta = STAGE_META[detailNode.stage];
   const StageIcon = stageMeta.Icon;
+  const stageColor = stageMeta.color;
   const canvasNode = detailNode.canvasId ? allNodes.find(n => n.id === detailNode.canvasId) : null;
+  const isFocused = detailNode.canvasId === focusNode?.id;
   const canRefocus = detailNode.canvasId
-    && detailNode.canvasId !== focusNode?.id
+    && !isFocused
     && (detailNode.stage === "question" ||
         detailNode.stage === "insights" ||
         detailNode.stage === "scenarios" ||
@@ -1229,176 +1231,211 @@ function ContextPanel({
 
   return (
     <div style={{
-      width: 340, flexShrink: 0,
+      width: 340, flexShrink: 0, height: "100%",
       borderLeft: "1px solid var(--color-border)",
-      background: "rgba(255,255,255,0.98)", backdropFilter: "blur(10px)",
+      background: "rgba(248,248,248,0.94)", backdropFilter: "blur(10px)",
+      padding: 12,
       display: "flex", flexDirection: "column",
       fontSize: 12, color: "var(--color-text-secondary)",
     }}>
-      {/* Header */}
+      {/* Card shell — mirrors the Canvas DerivedNodeCard visual language */}
       <div style={{
-        padding: "14px 16px 12px",
-        borderBottom: "1px solid var(--color-border)",
-        background: detailNode.canvasId === focusNode?.id ? "#FAFFE5" : "rgba(255,255,255,0.4)",
+        flex: 1, minHeight: 0,
+        display: "flex", flexDirection: "column",
+        background: "var(--color-surface)",
+        border: `1.5px solid ${isFocused ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
+        borderRadius: 12, overflow: "hidden",
+        boxShadow: isFocused
+          ? `inset 3px 0 0 ${stageColor}, 0 0 0 3px rgba(228,255,151,0.55), 0 4px 18px rgba(0,0,0,0.08)`
+          : `inset 3px 0 0 ${stageColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-            textTransform: "uppercase", color: "var(--color-text-muted)",
+        {/* Header — stage badge pill + optional FOKUS + close */}
+        <div style={{
+          minHeight: 36, padding: "8px 12px", flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 6,
+          background: `${stageColor}0C`,
+          borderBottom: `1px solid ${stageColor}22`,
+        }}>
+          <span style={{
+            flexShrink: 0, fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+            fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
+            color: stageColor, background: `${stageColor}14`, border: `1px solid ${stageColor}30`,
+            borderRadius: 6, padding: "4px 10px",
+            display: "inline-flex", alignItems: "center", gap: 5,
           }}>
-            <StageIcon size={12} strokeWidth={1.8} />
+            <StageIcon size={11} strokeWidth={2} />
             {de ? stageMeta.labelDe : stageMeta.labelEn}
-            {detailNode.canvasId === focusNode?.id && (
-              <span style={{
-                marginLeft: 4, fontSize: 9, padding: "1px 6px",
-                borderRadius: 4, background: "#6B7A00", color: "#fff",
-                letterSpacing: 0.5,
-              }}>FOKUS</span>
-            )}
-          </div>
+          </span>
+          {isFocused && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "2px 7px",
+              borderRadius: 4, background: "#6B7A00", color: "#fff",
+              letterSpacing: "0.08em", textTransform: "uppercase",
+            }}>
+              {de ? "Fokus" : "Focus"}
+            </span>
+          )}
+          <div style={{ flex: 1 }} />
           <button onClick={onClose}
             title={de ? "Kontext schließen" : "Close context"}
             style={{
               background: "none", border: "none", cursor: "pointer",
               color: "var(--color-text-muted)", padding: 2, lineHeight: 0,
+              display: "inline-flex", alignItems: "center",
             }}
           >
             <X size={14} strokeWidth={1.8} />
           </button>
         </div>
+
+        {/* Title + chain-rel block */}
         <div style={{
-          fontSize: 13.5, fontWeight: 600, color: "var(--color-text-heading)",
-          lineHeight: 1.35, marginBottom: 6, wordBreak: "break-word",
+          padding: "12px 14px 10px", flexShrink: 0,
+          borderBottom: "1px solid rgba(0,0,0,0.05)",
         }}>
-          {detailNode.label}
-        </div>
-        {detailNode.sublabel && (
-          <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6 }}>
-            {detailNode.sublabel}
-          </div>
-        )}
-        {/* Chain-relevance meter */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8, marginTop: 6,
-          fontSize: 10, color: "var(--color-text-muted)",
-        }}>
-          <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {de ? "Kettenbezug" : "Chain rel."}
-          </span>
           <div style={{
-            flex: 1, height: 4, background: "var(--color-border)", borderRadius: 2, overflow: "hidden",
+            fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)",
+            lineHeight: 1.3, marginBottom: 6, wordBreak: "break-word",
           }}>
-            <div style={{
-              width: `${Math.round(detailNode.chainRel * 100)}%`, height: "100%",
-              background: "#6B7A00",
-            }} />
+            {detailNode.label}
           </div>
-          <span style={{
-            fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
-            color: "var(--color-text-heading)", minWidth: 32, textAlign: "right",
-          }}>{Math.round(detailNode.chainRel * 100)}%</span>
-        </div>
-      </div>
-
-      {/* Body (scrollable) */}
-      <div style={{ flex: 1, overflow: "auto", padding: "12px 16px 16px" }}>
-
-        {/* Upstream chain */}
-        {upstream.length > 0 && (
-          <ContextSection title={de ? "Ableitung aus" : "Derived from"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {upstream.slice(0, 8).map(u => {
-                const meta = STAGE_META[u.stage];
-                const Ico = meta.Icon;
-                return (
-                  <div key={u.id} style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    fontSize: 11, padding: "4px 8px",
-                    borderRadius: 6, background: "var(--color-surface, #F5F5F5)",
-                    border: "1px solid var(--color-border)",
-                  }}>
-                    <Ico size={10} strokeWidth={1.8} />
-                    <span style={{ fontSize: 9, color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.5 }}>
-                      {de ? meta.labelDe : meta.labelEn}
-                    </span>
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {u.label}
-                    </span>
-                    <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)" }}>
-                      {Math.round(u.chainRel * 100)}%
-                    </span>
-                  </div>
-                );
-              })}
-              {upstream.length > 8 && (
-                <div style={{ fontSize: 10, color: "var(--color-text-muted)", padding: "2px 4px" }}>
-                  +{upstream.length - 8} {de ? "weitere" : "more"}
-                </div>
-              )}
+          {detailNode.sublabel && (
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8, lineHeight: 1.4 }}>
+              {detailNode.sublabel}
             </div>
-          </ContextSection>
-        )}
-
-        {/* Stage-specific content */}
-        {detailNode.stage === "question" && canvasNode && (
-          <QuestionContent node={canvasNode} de={de} />
-        )}
-        {detailNode.stage === "signals" && detailNode.signal && (
-          <SignalContent signal={detailNode.signal} de={de} />
-        )}
-        {detailNode.stage === "trends" && detailNode.trend && (
-          <TrendContent trend={detailNode.trend} de={de} />
-        )}
-        {detailNode.stage === "edges" && detailNode.edge && (
-          <EdgeContent edge={detailNode.edge} spine={spine} de={de} />
-        )}
-        {(detailNode.stage === "insights" ||
-          detailNode.stage === "scenarios" ||
-          detailNode.stage === "decisions") && canvasNode && (
-          <DerivedContent node={canvasNode} de={de} />
-        )}
-      </div>
-
-      {/* Actions */}
-      {(canRefocus || detailNode.canvasId) && (
-        <div style={{
-          padding: "10px 14px", borderTop: "1px solid var(--color-border)",
-          display: "flex", gap: 6, background: "rgba(0,0,0,0.015)",
-        }}>
-          {canRefocus && detailNode.canvasId && (
-            <button
-              onClick={() => onFocusNode(detailNode.canvasId!)}
-              title={de ? "Ableitungskette auf diesen Knoten fokussieren" : "Focus spine on this node"}
-              style={{
-                flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
-                borderRadius: 6, border: "1px solid #6B7A0088",
-                background: "#FAFFE5", color: "#445300", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
-              }}
-            >
-              <Target size={11} strokeWidth={2} />
-              {de ? "Fokussieren" : "Focus"}
-            </button>
           )}
-          {detailNode.canvasId && onNavigateToNode && (
-            <button
-              onClick={() => onNavigateToNode(detailNode.canvasId!)}
-              title={de ? "Diesen Knoten im Canvas öffnen" : "Open this node in canvas"}
-              style={{
-                flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
-                borderRadius: 6, border: "1px solid var(--color-border)",
-                background: "var(--color-surface, #fff)", color: "var(--color-text-secondary)",
-                cursor: "pointer",
-                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
-              }}
-            >
-              <ArrowUpRight size={11} strokeWidth={2} />
-              {de ? "Im Canvas" : "In canvas"}
-            </button>
+          {/* Chain-relevance meter */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginTop: 4,
+            fontSize: 10, color: "var(--color-text-muted)",
+          }}>
+            <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              {de ? "Kettenbezug" : "Chain rel."}
+            </span>
+            <div style={{
+              flex: 1, height: 4, background: "var(--color-border)",
+              borderRadius: 2, overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${Math.round(detailNode.chainRel * 100)}%`, height: "100%",
+                background: stageColor,
+              }} />
+            </div>
+            <span style={{
+              fontFamily: "var(--font-mono, monospace)", fontWeight: 700,
+              color: stageColor, minWidth: 32, textAlign: "right",
+            }}>{Math.round(detailNode.chainRel * 100)}%</span>
+          </div>
+        </div>
+
+        {/* Body (scrollable) */}
+        <div style={{ flex: 1, overflow: "auto", padding: "12px 14px 14px", minHeight: 0 }}>
+          {/* Upstream chain */}
+          {upstream.length > 0 && (
+            <ContextSection title={de ? "Ableitung aus" : "Derived from"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {upstream.slice(0, 8).map(u => {
+                  const meta = STAGE_META[u.stage];
+                  const Ico = meta.Icon;
+                  return (
+                    <div key={u.id} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontSize: 11, padding: "4px 8px",
+                      borderRadius: 6,
+                      background: `${meta.color}08`,
+                      border: `1px solid ${meta.color}22`,
+                    }}>
+                      <span style={{ color: meta.color, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+                        <Ico size={10} strokeWidth={2} />
+                      </span>
+                      <span style={{ fontSize: 9, color: meta.color, textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>
+                        {de ? meta.labelDe : meta.labelEn}
+                      </span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--color-text-secondary)" }}>
+                        {u.label}
+                      </span>
+                      <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)" }}>
+                        {Math.round(u.chainRel * 100)}%
+                      </span>
+                    </div>
+                  );
+                })}
+                {upstream.length > 8 && (
+                  <div style={{ fontSize: 10, color: "var(--color-text-muted)", padding: "2px 4px" }}>
+                    +{upstream.length - 8} {de ? "weitere" : "more"}
+                  </div>
+                )}
+              </div>
+            </ContextSection>
+          )}
+
+          {/* Stage-specific content */}
+          {detailNode.stage === "question" && canvasNode && (
+            <QuestionContent node={canvasNode} de={de} />
+          )}
+          {detailNode.stage === "signals" && detailNode.signal && (
+            <SignalContent signal={detailNode.signal} de={de} />
+          )}
+          {detailNode.stage === "trends" && detailNode.trend && (
+            <TrendContent trend={detailNode.trend} de={de} />
+          )}
+          {detailNode.stage === "edges" && detailNode.edge && (
+            <EdgeContent edge={detailNode.edge} spine={spine} de={de} />
+          )}
+          {(detailNode.stage === "insights" ||
+            detailNode.stage === "scenarios" ||
+            detailNode.stage === "decisions") && canvasNode && (
+            <DerivedContent node={canvasNode} de={de} />
           )}
         </div>
-      )}
+
+        {/* Actions footer */}
+        {(canRefocus || detailNode.canvasId) && (
+          <div style={{
+            padding: "10px 12px", borderTop: "1px solid var(--color-border)",
+            display: "flex", gap: 6, background: "rgba(0,0,0,0.02)",
+            flexShrink: 0,
+          }}>
+            {canRefocus && detailNode.canvasId && (
+              <button
+                onClick={() => onFocusNode(detailNode.canvasId!)}
+                title={de ? "Ableitungskette auf diesen Knoten fokussieren" : "Focus spine on this node"}
+                style={{
+                  flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
+                  borderRadius: 6, border: `1px solid ${stageColor}66`,
+                  background: `${stageColor}12`, color: stageColor, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${stageColor}22`; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${stageColor}12`; }}
+              >
+                <Target size={11} strokeWidth={2} />
+                {de ? "Fokussieren" : "Focus"}
+              </button>
+            )}
+            {detailNode.canvasId && onNavigateToNode && (
+              <button
+                onClick={() => onNavigateToNode(detailNode.canvasId!)}
+                title={de ? "Diesen Knoten im Canvas öffnen" : "Open this node in canvas"}
+                style={{
+                  flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
+                  borderRadius: 6, border: "1px solid var(--color-border)",
+                  background: "var(--color-surface)", color: "var(--color-text-secondary)",
+                  cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.03)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
+              >
+                <ArrowUpRight size={11} strokeWidth={2} />
+                {de ? "Im Canvas" : "In canvas"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
