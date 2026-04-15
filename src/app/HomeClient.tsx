@@ -1040,7 +1040,16 @@ export default function HomeClient() {
                     }}
                     onFocus={() => setFrameworkTopicFocused(true)}
                     onBlur={() => setFrameworkTopicFocused(false)}
-                    placeholder={locale === "de" ? "Formuliere eine vollständige, konkrete Frage…" : "Formulate a complete, concrete question…"}
+                    // Placeholder disappears the moment the user clicks in,
+                    // so the lime block cursor sits on a visually empty line
+                    // instead of colliding with grey placeholder glyphs.
+                    placeholder={
+                      frameworkTopicFocused
+                        ? ""
+                        : locale === "de"
+                          ? "Formuliere eine vollständige, konkrete Frage…"
+                          : "Formulate a complete, concrete question…"
+                    }
                     style={{
                       width: "100%",
                       minHeight: 24,
