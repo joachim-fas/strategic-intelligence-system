@@ -849,46 +849,60 @@ h1, h2, h3, h4, h5, h6 {
 /* ──────────────────────────────────────────────────────────────────────
    Reasoning indicator: pixel-man promenade
    ──────────────────────────────────────────────────────────────────────
-   A tiny 8-bit character walks right-to-left along the bottom edge of
-   the card while reasoning runs. The master timeline is 18 seconds per
-   cycle and deliberately asymmetric: three walking segments separated
-   by three standing-still moments where the character scratches their
-   head or looks around. This turns the indicator from a progress bar
-   into a small idle-animation with personality — if you glance at it
-   during a long query you always see something different.
+   A detailed 8-bit character (Mario-inspired: red cap, brown hair, skin
+   face, red shirt with gray shoulder pads, black belt, red pants, black
+   boots) paces right-to-left across the walkway strip between the
+   "Reasoning läuft" label and the mm:ss timer. The master timeline is
+   10 seconds per cycle and deliberately asymmetric: three walking
+   segments separated by three standing-still moments where the character
+   scratches their head or looks around. A 10s cycle (vs the earlier 18s)
+   makes the figure feel livelier — you notice the motion without waiting
+   20 seconds for the next dwell.
+
+   Why animate `left` instead of `transform: translateX`:
+   translateX percentages refer to the element's own width (30px), so
+   they can't span a variable-width walkway. Animating `left` as a
+   percentage of the parent walkway means the figure always walks the
+   full strip, whether the card is 400px or 700px wide. The small perf
+   cost vs a transform is fine for a 30px pixel-art figure.
 
    How the body parts stay in sync with the master cycle:
-   - The outer .sis-pixel-man element owns sis-pm-walk (horizontal
-     position: 100% → -30px over 18s, with three dwell windows).
-   - The legs run their own ~500ms walk cycle independent of the
-     master, so they shuffle continuously; during the dwell windows
-     the body doesn't translate, so legs appear to shuffle in place
-     (reads as "fidgeting").
-   - The scratch arm and rotating head each run an 18s keyframe that
-     matches the master's dwell windows exactly — they're still for
-     most of the loop and only animate during the dwells at 24-30%
-     (scratch), 52-58% (look around), and 82-86% (scratch again).
+   - The outer .sis-pixel-man element owns sis-pm-walk (left: 100% →
+     -30px over 10s, with three dwell windows).
+   - The legs run their own ~350ms step cycle independent of the master,
+     so they shuffle continuously; during the dwell windows the body
+     doesn't translate, so legs appear to shuffle in place (reads as
+     "fidgeting").
+   - The scratch arm and rotating head each run a 10s keyframe whose
+     percentage windows match the master's dwell windows exactly —
+     they're still for most of the loop and only animate during the
+     dwells at 22-30% (scratch), 52-58% (look around), and 82-86%
+     (scratch again).
    ────────────────────────────────────────────────────────────────────── */
 
-/* Master horizontal motion. Starts off-screen right, walks to three
- * stopping points, continues off-screen left. translateX plateaus
- * at each dwell (walking %% == next %% so the element is static).
- * Uses "linear" timing so segment speeds are controlled by spacing
- * the keyframes, not easing curves. */
+/* Master horizontal motion. Starts off-screen right of the walkway,
+ * walks to three stopping points across the strip, continues off-screen
+ * left. Animates `left` against the walkway's width so the figure always
+ * traverses the full strip regardless of card width (%' in left refers
+ * to the parent). Plateaus (same value on successive keyframes) create
+ * the dwell windows. Linear timing — segment speeds are controlled by
+ * spacing the keyframes, not easing. */
 @keyframes sis-pm-walk {
-  0%   { transform: translateX(calc(100% + 20px)); }
-  22%  { transform: translateX(72%); }
-  32%  { transform: translateX(72%); }
-  50%  { transform: translateX(48%); }
-  60%  { transform: translateX(48%); }
-  80%  { transform: translateX(18%); }
-  86%  { transform: translateX(18%); }
-  100% { transform: translateX(-30px); }
+  0%   { left: 100%; }        /* just off-screen right of the walkway */
+  22%  { left: 70%; }         /* arrives at first rest point */
+  30%  { left: 70%; }         /* dwell 1: scratch head */
+  52%  { left: 40%; }         /* walks to middle */
+  58%  { left: 40%; }         /* dwell 2: look around */
+  82%  { left: 12%; }         /* walks to near-left */
+  86%  { left: 12%; }         /* dwell 3: scratch head again */
+  100% { left: -30px; }       /* exits off-screen left (30px = char width) */
 }
 
 /* Leg step cycle. Two legs alternate: one is "down" while the other is
  * "up-and-forward". Using steps(1) gives the characteristic retro
- * 2-frame hop instead of smooth interpolation. */
+ * 2-frame hop instead of smooth interpolation. 350ms per full cycle
+ * (~175ms per step) matches a slightly brisk walk — faster than the
+ * old 500ms so the figure looks energetic rather than plodding. */
 @keyframes sis-pm-leg-l {
   0%, 49%   { transform: translateY(0); }
   50%, 100% { transform: translateY(-1.5px); }
@@ -911,28 +925,29 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Right arm (viewer's right) raises to the head during two dwell
  * windows. Stays low (translate 0) the rest of the time. Two distinct
- * scratch windows match the two scratch dwells in sis-pm-walk. */
+ * scratch windows match the two scratch dwells in sis-pm-walk (22-30%
+ * and 82-86%). */
 @keyframes sis-pm-scratch {
   0%,   22% { transform: translate(0, 0); }
-  24%,  26% { transform: translate(-2.5px, -3.5px); }
-  27%,  29% { transform: translate(-2.5px, -4.5px); }
-  30%,  80% { transform: translate(0, 0); }
-  82%,  83% { transform: translate(-2.5px, -3.5px); }
-  84%,  85% { transform: translate(-2.5px, -4.5px); }
+  24%,  26% { transform: translate(-1.5px, -2.5px); }
+  27%,  29% { transform: translate(-1.5px, -3.5px); }
+  30%,  82% { transform: translate(0, 0); }
+  83%,  84% { transform: translate(-1.5px, -2.5px); }
+  85%      { transform: translate(-1.5px, -3.5px); }
   86%, 100% { transform: translate(0, 0); }
 }
 
-/* Head turns left/right during the middle dwell. Rotation origin is
- * the neck joint (bottom-center of the head group). Four quick turns
- * inside the 52-58% window read as "looking around nervously". */
+/* Head turns left/right during the middle dwell (52-58%). Rotation
+ * origin is the neck joint (bottom-center of the head group). Four
+ * quick turns inside the window read as "looking around nervously". */
 @keyframes sis-pm-look {
-  0%,   51% { transform: rotate(0deg); }
+  0%,   52% { transform: rotate(0deg); }
   53%,  54% { transform: rotate(-16deg); }
   56%,  57% { transform: rotate(16deg); }
-  59%, 100% { transform: rotate(0deg); }
+  58%, 100% { transform: rotate(0deg); }
 }
 
-/* Eye blinks: rare, short. Every ~6s the eye closes for 100ms. */
+/* Eye blinks: rare, short. Two blinks per master cycle (every ~5s). */
 @keyframes sis-pm-blink {
   0%,  28%  { opacity: 1; }
   29%, 31%  { opacity: 0; }
@@ -941,29 +956,34 @@ h1, h2, h3, h4, h5, h6 {
   66%, 100% { opacity: 1; }
 }
 
+/* The pixel-man is positioned relative to its walkway parent (a flex:1
+ * strip between label and timer in ReasoningIndicator). `bottom: 4px`
+ * keeps the feet just above the 3px progress pill at the card bottom. */
 .sis-pixel-man {
   position: absolute;
-  bottom: 6px;
-  right: 0;
+  bottom: 4px;
+  left: 100%;
   z-index: 1;
   pointer-events: none;
-  animation: sis-pm-walk 18s linear infinite;
-  will-change: transform;
+  animation: sis-pm-walk 10s linear infinite;
+  will-change: left;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-.sis-pixel-man .pm-leg-l  { animation: sis-pm-leg-l 500ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-leg-r  { animation: sis-pm-leg-r 500ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-foot-l { animation: sis-pm-foot-l 500ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-foot-r { animation: sis-pm-foot-r 500ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-arm-r  { animation: sis-pm-scratch 18s linear infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-head   { animation: sis-pm-look 18s linear infinite; transform-box: fill-box; transform-origin: center bottom; }
-.sis-pixel-man .pm-eye    { animation: sis-pm-blink 6s linear infinite; }
+.sis-pixel-man .pm-leg-l  { animation: sis-pm-leg-l 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
+.sis-pixel-man .pm-leg-r  { animation: sis-pm-leg-r 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
+.sis-pixel-man .pm-foot-l { animation: sis-pm-foot-l 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
+.sis-pixel-man .pm-foot-r { animation: sis-pm-foot-r 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
+.sis-pixel-man .pm-arm-r  { animation: sis-pm-scratch 10s linear infinite; transform-box: fill-box; transform-origin: center top; }
+.sis-pixel-man .pm-head   { animation: sis-pm-look 10s linear infinite; transform-box: fill-box; transform-origin: center bottom; }
+.sis-pixel-man .pm-eye    { animation: sis-pm-blink 5s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .sis-pixel-man,
   .sis-pixel-man * { animation: none !important; }
-  .sis-pixel-man { transform: translateX(50%); }
+  /* Park the figure visibly in the middle of the walkway instead of
+     leaving it off-screen or stuck at `left: 100%`. */
+  .sis-pixel-man { left: 45%; }
 }
 
 /* Hero background with lime radial orbs */

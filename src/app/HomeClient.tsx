@@ -75,55 +75,116 @@ function buildFrameworkQuery(
 }
 
 /**
- * Tiny 8-bit character that walks right-to-left along the bottom edge of
- * the ReasoningIndicator while a query is running. Built as a single SVG
- * with labelled `<rect>` parts so CSS keyframes can drive each body part
- * independently (legs alternate for the walk cycle, the right arm raises
- * to scratch, the head turns during a "looking around" dwell). See the
- * sis-pm-* keyframes in globals.css for how the timings stay in sync.
+ * Detailed 8-bit character that walks right-to-left along the walkway strip
+ * between the "Reasoning läuft" label and the mm:ss timer inside the
+ * ReasoningIndicator. Inspired by the classic Mario-style pixel hero the user
+ * provided as reference: red cap, brown hair peeking out at the temples, a
+ * skin-tone face with a single pixel eye, red shirt with gray shoulder pads
+ * and sleeves, black belt, red pants, black boots. Multi-colour instead of
+ * the earlier monochrome silhouette so it reads as a character at the small
+ * render size.
  *
- * The pixel art is explicit 1-unit-per-pixel at viewBox 14x16, rendered at
- * 28x32 CSS px so the blocks stay sharp. `image-rendering: pixelated`
- * prevents browsers from smoothing the edges if they decide to rasterize.
+ * Built as a single SVG with body-part `<g>` groups and labelled rects so
+ * CSS keyframes in globals.css can drive parts independently:
+ *   - .pm-head   — rotates at the neck during the "look around" dwell
+ *   - .pm-arm-r  — raises to the head during the two scratch dwells
+ *   - .pm-leg-l/-r + .pm-foot-l/-r — alternating step cycle (retro 2-frame)
+ *   - .pm-eye    — rare blink so the figure isn't a blank stare
+ *
+ * Pixel grid is 10x14 (viewBox), rendered at 30x42 CSS px (3x scale). The
+ * `shapeRendering="crispEdges"` hint keeps the blocks sharp even when the
+ * browser decides to anti-alias.
  */
 function PixelMan() {
+  // Palette next to the art so tweaking stays in one place.
+  const RED = "#D43A2F";       // hat, shirt, pants
+  const BROWN = "#5A2F14";     // hair
+  const SKIN = "#F4C49B";      // face
+  const EYE = "#0A0A0A";       // pupil
+  const GRAY = "#8E8E8E";      // shoulder pads, sleeves, hands
+  const BLACK = "#0A0A0A";     // belt, boots
   return (
     <svg
       className="sis-pixel-man"
-      width="28" height="32" viewBox="0 0 14 16"
+      width="30" height="42" viewBox="0 0 10 14"
+      shapeRendering="crispEdges"
       aria-hidden="true"
     >
-      {/* Head group — rotates around the neck joint during the "look" dwell */}
+      {/* HEAD GROUP — rotates around the neck joint (bottom-center) during look dwell. */}
       <g className="pm-head">
-        <rect x="5" y="0" width="4" height="4" fill="#0A0A0A" />
-        {/* Lime eye — faces left (toward walk direction) */}
-        <rect className="pm-eye" x="5" y="2" width="1" height="1" fill="#E4FF97" />
+        {/* Row 0 — hat top */}
+        <rect x="3" y="0" width="4" height="1" fill={RED} />
+        {/* Row 1 — hat main brim */}
+        <rect x="2" y="1" width="6" height="1" fill={RED} />
+        {/* Row 2 — brown hair at temples + red hat band across the forehead */}
+        <rect x="1" y="2" width="2" height="1" fill={BROWN} />
+        <rect x="3" y="2" width="4" height="1" fill={RED} />
+        <rect x="7" y="2" width="2" height="1" fill={BROWN} />
+        {/* Row 3 — sideburns + face + single-pixel eye */}
+        <rect x="1" y="3" width="1" height="1" fill={BROWN} />
+        <rect x="2" y="3" width="3" height="1" fill={SKIN} />
+        <rect className="pm-eye" x="5" y="3" width="1" height="1" fill={EYE} />
+        <rect x="6" y="3" width="2" height="1" fill={SKIN} />
+        <rect x="8" y="3" width="1" height="1" fill={BROWN} />
+        {/* Row 4 — full face */}
+        <rect x="2" y="4" width="6" height="1" fill={SKIN} />
+        {/* Row 5 — chin */}
+        <rect x="3" y="5" width="4" height="1" fill={SKIN} />
       </g>
-      {/* Torso */}
-      <rect x="5" y="4" width="4" height="4" fill="#0A0A0A" />
-      {/* Left arm (viewer's left, character's right side as drawn) — swings with walk */}
-      <rect x="4" y="4" width="1" height="3" fill="#0A0A0A" />
-      {/* Right arm — the scratch arm (viewer's right). Raises to the head during scratch dwells. */}
-      <rect className="pm-arm-r" x="9" y="4" width="1" height="3" fill="#0A0A0A" />
-      {/* Legs — alternating step cycle */}
-      <rect className="pm-leg-l" x="5" y="8" width="1" height="5" fill="#0A0A0A" />
-      <rect className="pm-leg-r" x="8" y="8" width="1" height="5" fill="#0A0A0A" />
-      {/* Feet — match their leg's vertical offset so the figure stays grounded */}
-      <rect className="pm-foot-l" x="4" y="12" width="2" height="1" fill="#0A0A0A" />
-      <rect className="pm-foot-r" x="8" y="12" width="2" height="1" fill="#0A0A0A" />
+
+      {/* TORSO — shoulders, shirt body, belt. Static; the arm groups are separate. */}
+      {/* Row 6 — shoulder pads flanking the red chest */}
+      <rect x="1" y="6" width="2" height="1" fill={GRAY} />
+      <rect x="3" y="6" width="4" height="1" fill={RED} />
+      <rect x="7" y="6" width="2" height="1" fill={GRAY} />
+      {/* Row 7 — left sleeve + shirt body. Right sleeve lives in pm-arm-r below. */}
+      <rect x="0" y="7" width="2" height="1" fill={GRAY} />
+      <rect x="2" y="7" width="6" height="1" fill={RED} />
+      {/* Row 8 — left hand + shirt */}
+      <rect x="0" y="8" width="1" height="1" fill={GRAY} />
+      <rect x="2" y="8" width="6" height="1" fill={RED} />
+
+      {/* RIGHT ARM GROUP — the scratch arm (viewer's right). Animates up to the
+           head during two scratch dwells per walk cycle. Two pixels: sleeve + hand. */}
+      <g className="pm-arm-r">
+        <rect x="8" y="7" width="2" height="1" fill={GRAY} />
+        <rect x="9" y="8" width="1" height="1" fill={GRAY} />
+      </g>
+
+      {/* Belt */}
+      <rect x="2" y="9" width="6" height="1" fill={BLACK} />
+
+      {/* Pants waist */}
+      <rect x="2" y="10" width="6" height="1" fill={RED} />
+
+      {/* LEGS — each a 2x2 red block. Alternate vertical offsets make the step cycle. */}
+      <rect className="pm-leg-l" x="2" y="11" width="2" height="2" fill={RED} />
+      <rect className="pm-leg-r" x="6" y="11" width="2" height="2" fill={RED} />
+
+      {/* BOOTS — one pixel wider than each leg so they read as feet. Follow the
+           matching leg's vertical offset so the foot stays glued during walk. */}
+      <rect className="pm-foot-l" x="1" y="13" width="3" height="1" fill={BLACK} />
+      <rect className="pm-foot-r" x="6" y="13" width="3" height="1" fill={BLACK} />
     </svg>
   );
 }
 
 /**
  * Placeholder that takes over the hero command-line slot while the pipeline
- * is running. Shows an animated shimmer bar + pulsing dot + mm:ss clock and
- * a pixel-man walking along the bottom edge. The SequentialPipeline card
+ * is running. Shows an animated shimmer bar + pulsing sonar + label + pixel-
+ * man walking across the middle + mm:ss clock. The SequentialPipeline card
  * still renders inside the history column below with full per-stage detail —
  * this one's just a compact "we're thinking" marker that keeps the hero slot
  * busy so the input doesn't look idle while the LLM streams. Identical look
  * is used at both render sites (session + first-visit) so reasoning feels
  * the same everywhere.
+ *
+ * Horizontal layout reads left-to-right:
+ *   [sonar dot] [ "Reasoning läuft..." ] [ pixel-man walkway ] [ mm:ss ]
+ * The walkway is an explicit flex:1 strip between label and timer — that's
+ * where the tiny 8-bit character paces back and forth. Confining it to this
+ * strip (rather than letting it roam the whole card) keeps it out of the way
+ * of the text while giving it enough room for entrances, exits and dwells.
  */
 function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: "de" | "en" }) {
   const seconds = Math.floor(elapsedMs / 1000);
@@ -136,9 +197,9 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
   //   - the bottom progress pill glides (indeterminate = "work in flight")
   //   - the typing dots after the label animate in sequence (language model = "composing")
   //   - the card glow breathes (ambient = "alive")
-  //   - a tiny pixel-art character walks right-to-left along the bottom edge,
-  //     pausing to scratch its head or look around (long-running idle fun)
-  // The stagger between them (1.8s / 2.4s / 2.0s / 1.5s / 2.8s / 18s) keeps
+  //   - a tiny pixel-art character paces in the middle walkway, pausing to
+  //     scratch its head or look around (long-running idle fun)
+  // The stagger between them (1.8s / 2.4s / 2.0s / 1.5s / 2.8s / 10s) keeps
   // the rhythm asymmetric and organic — synced loops would read as a single
   // blinking mass.
   return (
@@ -149,10 +210,10 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       style={{
         display: "flex", alignItems: "center", gap: 14,
         padding: "16px 22px",
-        // Bumped from 64 → 84 so the pixel-man has its own lane at the bottom
-        // of the card without covering the label or timer. The progress pill
-        // still lives at the very bottom; the man walks just above it.
-        minHeight: 84,
+        // The pixel-man now lives in an explicit walkway between label and
+        // timer, so the card no longer needs a padded bottom lane. 64px is
+        // enough to fit the character (42px tall) plus the progress pill.
+        minHeight: 64,
         borderRadius: "var(--volt-radius-lg, 14px)",
         border: "1.5px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
@@ -202,7 +263,9 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       </span>
       <span style={{
         display: "inline-flex", alignItems: "baseline", gap: 2,
-        flex: 1,
+        // No flex:1 any more — the walkway below claims the remaining space so
+        // the pixel-man has somewhere to stroll. Label keeps its natural width.
+        flexShrink: 0,
         fontSize: 14, fontWeight: 600,
         fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
         color: "var(--volt-text, #0A0A0A)",
@@ -215,6 +278,23 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-2 1.5s infinite" }}>.</span>
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-3 1.5s infinite" }}>.</span>
       </span>
+      {/* Pixel-man walkway — the explicit strip between label and timer where
+           the tiny 8-bit character paces back and forth. Anchored position:
+           relative so the absolutely-positioned PixelMan animates against this
+           parent's width (the left-% keyframes in sis-pm-walk). minWidth keeps
+           the walkway usable on narrow cards; height matches the figure height
+           so the feet line up just above the progress pill. */}
+      <div
+        aria-hidden="true"
+        style={{
+          flex: 1,
+          position: "relative",
+          alignSelf: "stretch",
+          minWidth: 120,
+        }}
+      >
+        <PixelMan />
+      </div>
       <span style={{
         fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
         fontSize: 13, fontWeight: 600,
@@ -224,12 +304,6 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       }}>
         {mm}:{ss}
       </span>
-      {/* Pixel-man promenade — a tiny 8-bit character walking right-to-left
-           along the bottom of the card, pausing to scratch its head or look
-           around. Absolute-positioned so it doesn't affect flex layout of
-           the label/timer above. See PixelMan() + sis-pm-* keyframes for
-           the animation details. */}
-      <PixelMan />
       {/* Indeterminate progress pill — a slim lime capsule that glides across
            the full width. Purely ambient: signals "work is flowing", not any
            specific percentage. */}
