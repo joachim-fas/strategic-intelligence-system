@@ -878,7 +878,7 @@ export default function HomeClient() {
                   onKeyDown={handleKeyDown}
                   onFocus={() => setInputFocused(true)}
                   onBlur={() => setInputFocused(false)}
-                  placeholder={inputFocused ? "" : (locale === "de" ? "Projekt vertiefen oder neue Frage stellen…" : "Deepen project or ask a new question…")}
+                  placeholder={inputFocused ? "" : (locale === "de" ? "Oder stelle eine Frage …" : "Or ask a question …")}
                   style={{
                     flex: 1, border: "none", outline: "none", background: "transparent",
                     color: "var(--volt-text, #0A0A0A)",
@@ -1397,7 +1397,7 @@ export default function HomeClient() {
                     onKeyDown={handleKeyDown}
                     onFocus={() => setInputFocused(true)}
                     onBlur={() => setInputFocused(false)}
-                    placeholder={inputFocused ? "" : (locale === "de" ? "Oder frage direkt etwas Strategisches…" : "Or ask something strategic directly…")}
+                    placeholder={inputFocused ? "" : (locale === "de" ? "Oder stelle eine Frage …" : "Or ask a question …")}
                     style={{
                       flex: 1, border: "none", outline: "none", background: "transparent",
                       color: "var(--volt-text, #0A0A0A)",
