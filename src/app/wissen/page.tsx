@@ -1,2 +1,2 @@
 import { redirect } from "next/navigation";
-export default function Page() { redirect("/verstehen"); }
+export default function Page() { redirect("/cockpit"); }

@@ -1,7 +1,7 @@
 /**
  * Trend ↔ Live-Signal Matching
  *
- * The Knowledge Cockpit (/verstehen), Radar and Trends grid read
+ * The Knowledge Cockpit (/cockpit), Radar and Trends grid read
  * `signalCount` / `signalCount72h` from the trends API. Those values
  * come from this module's matchers, which bridge the loose naming of
  * `live_signals.topic` / `live_signals.tags` with the canonical

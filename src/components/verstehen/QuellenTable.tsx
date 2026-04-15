@@ -7,7 +7,7 @@
  *   "Vollständige Quellen-Verwaltungsansicht mit Filter-Pills, Suchfeld,
  *    Typ-Badges und Status/Auth-Spalten."
  *
- * Used as the "Quellen" tab in /verstehen.
+ * Used as the "Quellen" tab in /cockpit.
  *
  * Layout:
  *   [Header: "X Quellen · X aktiv · X brauchen Key"   🔍 Suchen...]

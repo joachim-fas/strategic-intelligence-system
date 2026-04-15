@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * /verstehen — Knowledge Cockpit (Client Component)
+ * /cockpit — Knowledge Cockpit (Client Component)
  *
- * Simplified to match the discipline applied across Home and Sessions pages:
+ * Simplified to match the discipline applied across Home and Projekte pages:
  *   — Single-line mono stats instead of a KPI hero grid
  *   — Functional subtitle, not marketing prose
  *   — 4 tabs (Radar · Netzwerk · Signale · Quellen), Methodik lives on its
- *     own route /verstehen/methodik and is reached from a link in the hero
+ *     own route /cockpit/methodik and is reached from a link in the hero
  *   — Live Sources count pulled from /api/v1/feed (no hardcoded lies)
- *   — 1360 max-width container, consistent with Sessions
+ *   — 1360 max-width container, consistent with Projekte
  *   — No redundant mini-stats above the Radar (already in the hero)
  *
  * The "Signale" tab is now a live signal stream (LiveSignalStream) that pulls
@@ -81,7 +81,7 @@ const TABS: { key: Tab; labelDe: string; labelEn: string }[] = [
 
 // ── Main Page ───────────────────────────────────────────────────────────────
 
-export default function VerstehenClient() {
+export default function CockpitClient() {
   const { locale } = useLocale();
   const de = locale === "de";
   const activeTenantId = useActiveTenantId();
@@ -224,7 +224,7 @@ export default function VerstehenClient() {
     // Legacy URL compat: ?tab=methodik used to select the Methodik tab.
     // Methodik is now a dedicated route — redirect to preserve old links.
     if (urlTab === "methodik") {
-      window.location.replace("/verstehen/methodik");
+      window.location.replace("/cockpit/methodik");
       return;
     }
     if (urlTab && (["radar", "trends", "netzwerk", "signale", "quellen"] as Tab[]).includes(urlTab as Tab)) {
@@ -305,7 +305,7 @@ export default function VerstehenClient() {
               Knowledge Cockpit
             </h1>
             <a
-              href="/verstehen/methodik"
+              href="/cockpit/methodik"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 fontSize: 12, fontWeight: 600,

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * MethodikContent — Rich methodology explainer, used by the /verstehen/methodik
+ * MethodikContent — Rich methodology explainer, used by the /cockpit/methodik
  * route. Pure content component: no overlay chrome, no modal wrapper. The
  * parent page provides AppHeader and navigation chrome. This component
  * renders the body only, section by section, with inline visualizations.

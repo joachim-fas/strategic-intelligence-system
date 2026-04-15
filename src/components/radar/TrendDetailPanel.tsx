@@ -76,7 +76,7 @@ function TrendActionsBar({ trend, locale }: { trend: TrendDot; locale: Locale })
       </a>
 
       <a
-        href={`/verstehen/${trend.id}`}
+        href={`/cockpit/${trend.id}`}
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
           width: "100%", padding: "8px 12px", borderRadius: 8,

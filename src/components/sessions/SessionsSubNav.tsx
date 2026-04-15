@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Sub-navigation for the Sessions area: Aktiv | Archiv.
- * Used on /sessions and /sessions/archiv.
+ * Sub-navigation for the Projekte area: Aktiv | Archiv.
+ * Used on /projekte and /projekte/archiv.
  *
  * Active tab gets a solid bottom border + bolder weight + darker text.
  * Inactive tab has a subtle hover state with background tint.
@@ -15,8 +15,8 @@ interface Props {
 
 export function SessionsSubNav({ active, de }: Props) {
   const tabs: Array<{ key: "active" | "archive"; href: string; label: string }> = [
-    { key: "active",  href: "/sessions",        label: de ? "Aktiv"  : "Active"  },
-    { key: "archive", href: "/sessions/archiv", label: de ? "Archiv" : "Archive" },
+    { key: "active",  href: "/projekte",        label: de ? "Aktiv"  : "Active"  },
+    { key: "archive", href: "/projekte/archiv", label: de ? "Archiv" : "Archive" },
   ];
 
   return (

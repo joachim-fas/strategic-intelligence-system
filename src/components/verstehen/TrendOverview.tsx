@@ -7,7 +7,7 @@
  *   "Vollständiges Layout einer Trend-Intelligence-Plattform — Trend-Grid mit
  *    Statusgruppen, Detail-Panel und Intelligence Feed."
  *
- * Used as the "Signale" tab in /verstehen.
+ * Used as the "Signale" tab in /cockpit.
  *
  * Layout:
  *   [Status Group Header: ● ADOPT (8)]

@@ -721,19 +721,19 @@ export default function HomeClient() {
     if (!q || isAnalyzing) return;
 
     // ── Special commands ──
-    if (q === "/radar" || q === "/r") { window.location.href = "/verstehen"; return; }
-    if (q === "/graph" || q === "/g") { window.location.href = "/verstehen?tab=netzwerk"; return; }
+    if (q === "/radar" || q === "/r") { window.location.href = "/cockpit"; return; }
+    if (q === "/graph" || q === "/g") { window.location.href = "/cockpit?tab=netzwerk"; return; }
     if (q === "/close" || q === "/c") { setShowFullRadar(false); setShowGraph(false); setQuery(""); return; }
 
     // ── Query Shortcuts (Bloomberg Learning 1) ──
     if (q.startsWith("TREND:") || q.startsWith("trend:")) {
       const trendName = q.slice(6).trim();
-      window.location.href = `/verstehen?tab=radar&q=${encodeURIComponent(trendName)}`;
+      window.location.href = `/cockpit?tab=radar&q=${encodeURIComponent(trendName)}`;
       return;
     }
     if (q.startsWith("SIGNAL:") || q.startsWith("signal:")) {
       const filter = q.slice(7).trim();
-      window.location.href = `/verstehen?tab=signale&q=${encodeURIComponent(filter)}`;
+      window.location.href = `/cockpit?tab=signale&q=${encodeURIComponent(filter)}`;
       return;
     }
     if (q.startsWith("SCENARIO:") || q.startsWith("scenario:") || q.startsWith("SZENARIO:") || q.startsWith("szenario:")) {
@@ -1734,7 +1734,7 @@ export default function HomeClient() {
               )}
 
               {/* Top-Trends entfernt — Trends leben ausschliesslich im
-                   Knowledge Cockpit (/verstehen) bzw. unter /trends. Die
+                   Knowledge Cockpit (/cockpit) bzw. unter /trends. Die
                    Startseite zeigt stattdessen nur noch die Letzte-Projekte-
                    Liste, damit das Centered-Hero ruhig bleibt. */}
             </div>

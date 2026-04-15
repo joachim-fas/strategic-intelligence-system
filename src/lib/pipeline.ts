@@ -180,7 +180,7 @@ export async function runPipeline(): Promise<PipelineResult> {
 
     // Phase 2a: Persist into live_signals — this is the live RAG store
     // that /api/v1/feed, /api/v1/feed/ticker, /api/v1/sources/status and
-    // the Knowledge Cockpit (/verstehen) all read from. Before this fix
+    // the Knowledge Cockpit (/cockpit) all read from. Before this fix
     // the pipeline only filled trend_signals, so the UI looked stale even
     // when connectors succeeded.
     try {
