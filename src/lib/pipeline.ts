@@ -192,6 +192,20 @@ export async function runPipeline(): Promise<PipelineResult> {
     try {
       // Prune first so the window stays bounded.
       pruneOldSignals(48);
+      // Audit-Log haushalten: tenant_audit_log wuchs bislang unbegrenzt
+      // und stand als Restrisiko in der QC. Wir loeschen Eintraege
+      // aelter als 180 Tage auf jedem Pipeline-Run (alle 4h in Prod).
+      // 180 Tage lassen genug Zeit fuer Rueckverfolgung von Tenant-
+      // Aktionen ueber ein Halbjahr, bevor die Zeile faellt.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { getSqliteHandle } = require("@/db");
+        getSqliteHandle().prepare(
+          "DELETE FROM tenant_audit_log WHERE created_at < datetime('now', '-180 day')",
+        ).run();
+      } catch {
+        /* audit table missing in very old DBs — ignore */
+      }
       let liveStored = 0;
       for (const [connectorName, connSignals] of signalsByConnector) {
         if (connSignals.length === 0) continue;

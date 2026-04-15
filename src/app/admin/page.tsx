@@ -29,6 +29,14 @@ interface AdminStats {
   openInvites: number;
   auditLast24h: number;
   recentTenant: { id: string; name: string; slug: string; created_at: string } | null;
+  /**
+   * Count of users with the system role 'admin'. When this is 0 the
+   * platform is in a bootstrap state: no one can reach /admin/tenants
+   * in production. We surface the recovery script (scripts/tenant-
+   * bootstrap.ts → `npm run tenant:bootstrap`) directly on the landing
+   * so a fresh deployment is never silently stuck.
+   */
+  systemAdminCount: number;
 }
 
 function loadStats(): AdminStats {
@@ -46,6 +54,7 @@ function loadStats(): AdminStats {
     const recent = d.prepare(
       "SELECT id, name, slug, created_at FROM tenants WHERE archived_at IS NULL ORDER BY created_at DESC LIMIT 1",
     ).get() as AdminStats["recentTenant"];
+    const sysAdmin = d.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'").get() as { n: number };
     return {
       tenantCountTotal: tenantTotal.n,
       tenantCountActive: tenantActive.n,
@@ -53,6 +62,7 @@ function loadStats(): AdminStats {
       openInvites: invites.n,
       auditLast24h: audit.n,
       recentTenant: recent ?? null,
+      systemAdminCount: sysAdmin.n,
     };
   } catch {
     return {
@@ -62,6 +72,7 @@ function loadStats(): AdminStats {
       openInvites: 0,
       auditLast24h: 0,
       recentTenant: null,
+      systemAdminCount: 0,
     };
   }
 }
@@ -100,6 +111,43 @@ export default async function AdminLanding() {
             Uebersicht ueber Mandanten, Einladungen, Aktivitaet. Einstieg in die System-Admin-Tools.
           </p>
         </div>
+
+        {/* Bootstrap-Warnung: kein System-Admin → niemand kann Tenants
+             anlegen, weil jede Admin-UI `requireSystemAdmin` ist. Der
+             recovery-path ist `npm run tenant:bootstrap -- <email>`
+             nach einem ersten Magic-Link-Login. Banner bleibt sichtbar
+             bis mindestens ein User role=admin hat. */}
+        {stats.systemAdminCount === 0 && (
+          <div style={{
+            padding: "14px 16px", marginBottom: 20, borderRadius: 12,
+            background: "var(--signal-negative-light, #FDEEE9)",
+            border: "1px solid var(--signal-negative-border, #F5BDB4)",
+            color: "var(--signal-negative-text, #7F1D1D)",
+            fontSize: 13, lineHeight: 1.55,
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Kein System-Admin vorhanden
+            </div>
+            <div style={{ color: "var(--color-text-primary)" }}>
+              Es gibt keinen Benutzer mit der System-Rolle <code>admin</code>. Ohne mindestens
+              einen System-Admin kann niemand ueber die UI Mandanten anlegen oder verwalten.
+            </div>
+            <div style={{
+              marginTop: 10,
+              fontFamily: "var(--volt-font-mono, monospace)", fontSize: 12,
+              color: "var(--color-text-primary)",
+              background: "#fff", padding: "8px 10px", borderRadius: 6,
+              border: "1px solid var(--color-border)",
+            }}>
+              npm run tenant:bootstrap -- &lt;email&gt;
+            </div>
+            <div style={{ fontSize: 11, marginTop: 6, color: "var(--color-text-muted)" }}>
+              Erst muss der User sich einmal per Magic-Link eingeloggt haben, damit die
+              users-Row existiert. Das Script promoted ihn dann zu System-Admin und macht
+              ihn zum Owner jedes aktiven Mandanten.
+            </div>
+          </div>
+        )}
 
         {/* KPI Row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 28 }}>

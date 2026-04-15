@@ -41,6 +41,12 @@ export async function GET(request: Request) {
   const actionFilter = url.searchParams.get("action");
   const tenantFilter = url.searchParams.get("tenantId");
   const actorFilter = url.searchParams.get("actorId");
+  // NEU: Actor-Email-Freitext-Filter server-side. Frueher nur Client-
+  // side (auf dem geladenen Batch) — das fand nur Treffer in den
+  // juengsten 100 Eintraegen. Server-side nutzt eine case-insensitive
+  // LIKE-Query auf users.email, damit der Filter auch in alten
+  // Audit-Rows findet, die nicht mehr in der ersten Seite stecken.
+  const actorEmail = url.searchParams.get("actorEmail");
 
   const d = getSqliteHandle();
 
@@ -53,6 +59,13 @@ export async function GET(request: Request) {
   if (actionFilter) { wheres.push("a.action = ?"); vals.push(actionFilter); }
   if (tenantFilter) { wheres.push("a.tenant_id = ?"); vals.push(tenantFilter); }
   if (actorFilter) { wheres.push("a.actor_user_id = ?"); vals.push(actorFilter); }
+  if (actorEmail) {
+    // LIKE mit %…% matched Substring, lower() macht es case-insensitive.
+    // Die JOIN-Alias `u` wird unten im SELECT auch verwendet, deshalb
+    // kein extra JOIN noetig.
+    wheres.push("lower(u.email) LIKE ?");
+    vals.push(`%${actorEmail.toLowerCase().trim()}%`);
+  }
   const whereSql = wheres.length > 0 ? `WHERE ${wheres.join(" AND ")}` : "";
 
   const rows = d.prepare(`

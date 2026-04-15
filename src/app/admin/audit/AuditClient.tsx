@@ -24,7 +24,7 @@
  * den typischen "ich suche meinen eigenen letzten Move"-Fall.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
@@ -71,6 +71,11 @@ export function AuditClient() {
       if (opts?.before) params.set("before", opts.before);
       if (tenantFilter) params.set("tenantId", tenantFilter);
       if (actionFilter) params.set("action", actionFilter);
+      // Actor-Email jetzt als Server-Side-Filter (LIKE auf users.email)
+      // mit einem kleinen Debounce — sonst feuert jedes Tastaturzeichen
+      // einen Roundtrip. Der Debounce sitzt im useEffect-Trigger weiter
+      // unten; hier reicht das Forward.
+      if (actorQuery.trim().length >= 2) params.set("actorEmail", actorQuery.trim());
       params.set("limit", "100");
       const res = await fetchWithTimeout(`/api/v1/admin/audit?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -86,24 +91,19 @@ export function AuditClient() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [tenantFilter, actionFilter]);
+  }, [tenantFilter, actionFilter, actorQuery]);
 
-  // Reload on filter change (not on infinite-load).
+  // Reload on filter change (not on infinite-load). Actor-Email debounced
+  // um 250ms so the user can tippen without triggering N requests.
   useEffect(() => {
     setNextBefore(null);
-    load();
+    const t = window.setTimeout(() => { load(); }, actorQuery ? 250 : 0);
+    return () => window.clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantFilter, actionFilter]);
+  }, [tenantFilter, actionFilter, actorQuery]);
 
-  const visibleEntries = useMemo(() => {
-    if (!actorQuery.trim()) return entries;
-    const q = actorQuery.toLowerCase().trim();
-    return entries.filter((e) => {
-      if (!e.actor) return false;
-      return (e.actor.email ?? "").toLowerCase().includes(q)
-        || (e.actor.name ?? "").toLowerCase().includes(q);
-    });
-  }, [entries, actorQuery]);
+  // Client-Side-Filter entfaellt — Server filtert bereits. Pass-through.
+  const visibleEntries = entries;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--volt-surface, #fff)" }}>
