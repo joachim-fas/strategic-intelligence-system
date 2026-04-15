@@ -132,6 +132,16 @@ export default function VerstehenClient() {
   // tatsaechlichen Live-Quellen-Anzahl. Defensive-Unwrap akzeptiert beide
   // Shapes.
   const [sourcesCount, setSourcesCount] = useState<number | null>(null);
+  // Freshness meta — exposed from /api/v1/signals (GET). The banner below
+  // warns the user when no connector has written to live_signals recently
+  // so the Cockpit doesn't silently serve stale data. `null` = unknown
+  // (endpoint unreachable), which we treat the same as "fresh" (no banner)
+  // to avoid false positives on first load.
+  const [freshness, setFreshness] = useState<{
+    signalCount: number;
+    newestAgeHours: number;
+    stale: boolean;
+  } | null>(null);
   useEffect(() => {
     fetchWithTimeout("/api/v1/feed")
       .then(r => r.json())
@@ -139,6 +149,22 @@ export default function VerstehenClient() {
         const data = json?.data ?? json;
         const list = data?.sourceStatus ?? [];
         if (Array.isArray(list) && list.length > 0) setSourcesCount(list.length);
+      })
+      .catch(() => {});
+    fetchWithTimeout("/api/v1/signals")
+      .then(r => r.json())
+      .then(json => {
+        const data = json?.data ?? json;
+        if (data && typeof data.signalCount === "number") {
+          setFreshness({
+            signalCount: data.signalCount,
+            newestAgeHours: Number(data.newestAgeHours ?? 0),
+            // Treat anything > 24h as stale in the Cockpit UI — that's
+            // longer than the Vercel cron interval (4h) so a single miss
+            // shouldn't alarm, but a day of silence should.
+            stale: Number(data.newestAgeHours ?? 0) > 24,
+          });
+        }
       })
       .catch(() => {});
   }, []);
@@ -277,6 +303,49 @@ export default function VerstehenClient() {
               ? "Die Daten-Landschaft, gegen die du deine strategischen Fragen stellst — Trends, Kausalnetz, Live-Signale und Quellen in einem System."
               : "The data landscape you run your strategic questions against — trends, causal network, live signals, and sources in one system."}
           </p>
+
+          {/* Stale-data banner — shown when live_signals is older than 24h or
+              empty. Makes it obvious when the Cockpit is serving dead data
+              instead of letting the user infer it from empty feeds. */}
+          {freshness && (freshness.stale || freshness.signalCount === 0) && (
+            <div
+              role="status"
+              style={{
+                marginBottom: 18,
+                padding: "10px 14px",
+                borderRadius: "var(--volt-radius-md, 10px)",
+                border: "1px solid #F5C089",
+                background: "#FFF7ED",
+                color: "#7C2D12",
+                fontSize: 12,
+                lineHeight: 1.5,
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-block",
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "#EA580C",
+                  flexShrink: 0,
+                }}
+              />
+              <strong style={{ fontWeight: 700 }}>
+                {de ? "Signale veraltet" : "Signals are stale"}
+              </strong>
+              <span style={{ color: "#7C2D12", opacity: 0.85 }}>
+                {freshness.signalCount === 0
+                  ? (de
+                    ? "Keine Live-Signale in der Datenbank. Starte die Pipeline mit `npm run signals:pump`."
+                    : "No live signals in the database. Run `npm run signals:pump` to seed.")
+                  : (de
+                    ? `Letztes Signal vor ${Math.round(freshness.newestAgeHours)} Std. Pipeline mit "npm run signals:pump" nachziehen oder Cron prüfen.`
+                    : `Last signal ${Math.round(freshness.newestAgeHours)}h ago. Trigger pipeline via "npm run signals:pump" or check cron.`)}
+              </span>
+            </div>
+          )}
 
           {/* Tabs — flush to the hero bottom, no standalone container */}
           <VoltTabs

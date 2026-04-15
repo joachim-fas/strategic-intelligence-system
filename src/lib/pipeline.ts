@@ -33,6 +33,7 @@ import { connectors, type RawSignal } from "@/connectors";
 import { groupSignalsByTopic, scoreTrend } from "@/lib/scoring";
 import { megaTrends } from "@/lib/mega-trends";
 import { sanitizeConnectorResponse } from "@/lib/api-utils";
+import { storeSignals, pruneOldSignals } from "@/lib/signals";
 import { eq, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -144,12 +145,17 @@ export async function runPipeline(): Promise<PipelineResult> {
 
     const results = await runWithConcurrency(tasks, CONCURRENCY_LIMIT);
 
+    // Collect per-connector signals so we can write them to live_signals
+    // grouped by source — this is what the Knowledge Cockpit reads.
+    const signalsByConnector = new Map<string, RawSignal[]>();
+
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       const connectorName = connectors[i].name;
       if (result.status === "fulfilled") {
         allSignals.push(...result.value.signals);
         activeSources.push(result.value.name);
+        signalsByConnector.set(result.value.name, result.value.signals);
         console.log(
           `[pipeline] ${result.value.name}: ${result.value.signals.length} signals`,
         );
@@ -172,7 +178,59 @@ export async function runPipeline(): Promise<PipelineResult> {
     // Phase 1c: Sanitize all signals (SEC-19)
     const sanitizedSignals = dedupedSignals.map((s) => sanitizeConnectorResponse(s));
 
-    // Phase 2: Store signals and update scores in the database
+    // Phase 2a: Persist into live_signals — this is the live RAG store
+    // that /api/v1/feed, /api/v1/feed/ticker, /api/v1/sources/status and
+    // the Knowledge Cockpit (/verstehen) all read from. Before this fix
+    // the pipeline only filled trend_signals, so the UI looked stale even
+    // when connectors succeeded.
+    try {
+      // Prune first so the window stays bounded.
+      pruneOldSignals(48);
+      let liveStored = 0;
+      for (const [connectorName, connSignals] of signalsByConnector) {
+        if (connSignals.length === 0) continue;
+        const toStore = connSignals.map((s) => ({
+          title: s.sourceTitle,
+          content: s.rawData
+            ? Object.entries(s.rawData)
+                .filter(([k]) =>
+                  ["summary", "description", "excerpt", "text", "trailText", "snippet", "abstract", "lead_paragraph", "content"].includes(k),
+                )
+                .map(([, v]) => String(v).slice(0, 400))
+                .join(" | ")
+                .slice(0, 600) || undefined
+            : undefined,
+          url: s.sourceUrl || undefined,
+          topic: s.topic || undefined,
+          tags: s.topic ? [s.topic] : [],
+          signalType: s.signalType,
+          strength: s.rawStrength,
+          rawData: s.rawData,
+        }));
+        try {
+          storeSignals(connectorName, toStore);
+          liveStored += toStore.length;
+        } catch (err) {
+          console.error(
+            `[pipeline] live_signals insert failed for ${connectorName}:`,
+            err,
+          );
+          errors.push({
+            source: `live_signals:${connectorName}`,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      console.log(`[pipeline] live_signals: stored ${liveStored} rows across ${signalsByConnector.size} connectors`);
+    } catch (err) {
+      console.error("[pipeline] live_signals write failed:", err);
+      errors.push({
+        source: "live_signals",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Phase 2b: Store signals and update aggregate trend scores (trend_signals)
     try {
       await storeSignalsAndUpdateScores(sanitizedSignals);
     } catch (err) {

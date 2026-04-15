@@ -13,7 +13,9 @@
     "db:studio": "drizzle-kit studio",
     "db:init-local": "tsx src/db/migrate-sqlite.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:setup": "npm run db:init-local && npm run db:seed"
+    "db:setup": "npm run db:init-local && npm run db:seed",
+    "signals:pump": "tsx scripts/signals-pump.ts",
+    "signals:status": "sqlite3 local.db \"SELECT source, COUNT(*) as n, ROUND((julianday('now') - julianday(MAX(fetched_at))) * 24, 1) as hours_ago FROM live_signals GROUP BY source ORDER BY hours_ago ASC LIMIT 40;\""
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",
