@@ -12,6 +12,10 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ─── Users ───────────────────────────────────────────────
+// `role` hier = System-Rolle (orthogonal zur Tenant-Rolle). Werte:
+//   - "member" → normaler Nutzer (kann Mitglied in Tenants sein)
+//   - "admin"  → System-Admin (darf Tenants anlegen / administrieren)
+// Die tenant-spezifische Rolle steht in `tenant_memberships.role`.
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").unique().notNull(),
@@ -19,6 +23,68 @@ export const users = pgTable("users", {
   name: text("name"),
   image: text("image"),
   role: text("role").default("member").notNull(), // admin | member
+  lastActiveTenantId: uuid("last_active_tenant_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Tenants (Mandanten / Organisationen) ──────────────────
+// Ein Tenant = eine Kunden-Organisation. Alle User-Daten (radars, queries,
+// notes, scenarios, bsc_ratings) sind pro Tenant isoliert. Stammdaten
+// (trends, trend_signals, data_sources) bleiben global shared.
+export const tenants = pgTable("tenants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  plan: text("plan").default("standard").notNull(),
+  settings: jsonb("settings").default({}),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Tenant Memberships ────────────────────────────────────
+// N:N user↔tenant mit Rolle pro Membership.
+export const tenantMemberships = pgTable(
+  "tenant_memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role").notNull(), // owner | admin | member | viewer
+    invitedBy: uuid("invited_by").references(() => users.id),
+    joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("tenant_membership_unique").on(table.tenantId, table.userId)],
+);
+
+// ─── Tenant Invites ───────────────────────────────────────
+export const tenantInvites = pgTable("tenant_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull(),
+  token: text("token").unique().notNull(),
+  invitedBy: uuid("invited_by").references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Tenant Audit Log ─────────────────────────────────────
+export const tenantAuditLog = pgTable("tenant_audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .notNull(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  target: jsonb("target").default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

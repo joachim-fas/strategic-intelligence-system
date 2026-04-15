@@ -20,6 +20,11 @@ const uuidDefault = sql`(lower(hex(randomblob(4))) || '-' || lower(hex(randomblo
 const nowDefault = sql`(datetime('now'))`;
 
 // ─── Users ───────────────────────────────────────────────
+// `role` hier = System-Rolle (orthogonal zur Tenant-Rolle). Werte:
+//   - "member"  → normaler Nutzer (kann Mitglied in Tenants sein)
+//   - "admin"   → System-Admin (sieht /admin/mandanten, darf Tenants anlegen)
+// Die tenant-spezifische Rolle (owner/admin/member/viewer) steht in
+// `tenant_memberships.role` und wird pro Orga gefuehrt.
 export const users = sqliteTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").unique().notNull(),
@@ -27,6 +32,83 @@ export const users = sqliteTable("users", {
   name: text("name"),
   image: text("image"),
   role: text("role").default("member").notNull(),
+  // Welcher Tenant war zuletzt aktiv — wird beim Login als Default geladen,
+  // damit User nicht jedes Mal neu wechseln muss.
+  lastActiveTenantId: text("last_active_tenant_id"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// ─── Tenants (Mandanten / Organisationen) ──────────────────
+// Ein Tenant = eine Kunden-Organisation. Alle User-Daten (radars, queries,
+// notes, scenarios, bsc_ratings) sind pro Tenant isoliert. Stammdaten
+// (trends, trend_signals, data_sources) bleiben global shared.
+export const tenants = sqliteTable("tenants", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(), // URL-safe, z.B. "mercedes-strategie"
+  plan: text("plan").default("standard").notNull(), // fuer spaetere Tiers
+  settings: text("settings").default("{}"), // JSON: branding, timezone, defaults
+  archivedAt: text("archived_at"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+  updatedAt: text("updated_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// ─── Tenant Memberships ────────────────────────────────────
+// N:N zwischen users und tenants mit Rolle pro Membership. Ein User kann
+// in mehreren Orgas Mitglied sein mit jeweils anderer Rolle.
+export const tenantMemberships = sqliteTable(
+  "tenant_memberships",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    // 'owner' | 'admin' | 'member' | 'viewer'
+    role: text("role").notNull(),
+    invitedBy: text("invited_by").references(() => users.id),
+    joinedAt: text("joined_at").default(sql`(datetime('now'))`).notNull(),
+  },
+  (table) => [
+    // Kein User kann doppelt in derselben Orga sein.
+    uniqueIndex("tenant_membership_unique").on(table.tenantId, table.userId),
+  ],
+);
+
+// ─── Tenant Invites ───────────────────────────────────────
+// Einladungen per Email fuer User, die noch kein Konto haben oder in der
+// Ziel-Orga noch kein Mitglied sind. Token ist kryptografisch und wird via
+// Magic-Link-Email versendet.
+export const tenantInvites = sqliteTable("tenant_invites", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull(),
+  token: text("token").unique().notNull(),
+  invitedBy: text("invited_by").references(() => users.id),
+  expiresAt: text("expires_at").notNull(),
+  acceptedAt: text("accepted_at"),
+  createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
+});
+
+// ─── Tenant Audit Log ─────────────────────────────────────
+// Minimal-Audit-Trail fuer administrative Aktionen pro Tenant.
+// Voller Log-Viewer ist erst fuer spaeter geplant — hier nur die
+// Datenbasis + ein Preview im Tenant-Detail.
+export const tenantAuditLog = sqliteTable("tenant_audit_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .references(() => tenants.id, { onDelete: "cascade" })
+    .notNull(),
+  actorUserId: text("actor_user_id").references(() => users.id),
+  // Beispiele: 'member.added', 'member.removed', 'role.changed',
+  // 'tenant.archived', 'invite.sent', 'invite.revoked', 'canvas.deleted'
+  action: text("action").notNull(),
+  target: text("target").default("{}"), // JSON mit kontextbezogenen Feldern
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
 });
 
@@ -94,8 +176,15 @@ export const trendSignals = sqliteTable("trend_signals", {
 });
 
 // ─── Radars ──────────────────────────────────────────────
+// `tenant_id` ist die Zugriffs-Grenze (was "Mercedes" sieht vs. "VW").
+// `owner_id` bleibt erhalten als "Ersteller" (historisch, fuer Attribution),
+// hat aber KEINE Zugriffsbedeutung mehr — Zugriff kommt aus tenant_id +
+// Rolle aus tenant_memberships. tenant_id ist technisch nullable, damit
+// alte Rows nach dem Seed backfilled werden koennen; neue Rows sollen
+// immer tenant_id setzen.
 export const radars = sqliteTable("radars", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   ownerId: text("owner_id").references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
@@ -208,17 +297,25 @@ export const projectNotes = sqliteTable("project_notes", {
 });
 
 // ─── BSC Ratings ────────────────────────────────────────
+// Vorher global — jetzt tenant-scoped. `queryHash` ist weiterhin der
+// stabile Identifier der Query, Ratings werden aber pro Tenant getrennt,
+// damit zwei Orgas zur gleichen Query unterschiedliche Bewertungen fuehren
+// koennen. Unique-Index erweitert um tenant_id.
 export const bscRatings = sqliteTable("bsc_ratings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   queryHash: text("query_hash").notNull(),
   perspectiveId: text("perspective_id").notNull(),
   rating: text("rating").notNull(), // 'up' | 'down'
   createdAt: text("created_at").default(sql`(datetime('now'))`).notNull(),
-}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.queryHash, table.perspectiveId)]);
+}, (table) => [uniqueIndex("bsc_ratings_unique").on(table.tenantId, table.queryHash, table.perspectiveId)]);
 
 // ─── Scenarios ──────────────────────────────────────────
+// Vorher global (TODO SEC-14 flagte das). Jetzt pro Tenant — jede Orga
+// fuehrt ihre eigene Szenario-Bibliothek.
 export const scenarios = sqliteTable("scenarios", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").default("custom"),
