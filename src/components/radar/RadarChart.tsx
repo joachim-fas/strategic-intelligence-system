@@ -139,7 +139,11 @@ export default function RadarChart({
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
-      const size = Math.min(width, 900);
+      // Use the full available container width — no hard cap that would
+      // leave empty space inside the outer bordered box. Height matches
+      // width because the radar itself is circular. A soft floor keeps the
+      // chart usable on very narrow viewports.
+      const size = Math.max(320, width);
       setDimensions({ width: size, height: size });
     });
     observer.observe(containerRef.current);
@@ -156,7 +160,11 @@ export default function RadarChart({
   const height = propHeight ?? dimensions.height;
   const cx = width / 2;
   const cy = height / 2;
-  const maxR = Math.min(cx, cy) - 70;
+  // Padding scales with chart size but keeps a floor so trend-labels
+  // (which sit below each dot, extending past the outer ring) don't hit the
+  // edge of the bordered container. Previously a fixed 70px combined with a
+  // 900px SVG cap created a visible "inner box" effect in wide viewports.
+  const maxR = Math.min(cx, cy) - Math.max(56, Math.min(cx, cy) * 0.12);
 
   // ── Memoized grid lines ──
   const gridLines = useMemo(() => {
