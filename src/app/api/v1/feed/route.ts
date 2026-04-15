@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
+import {
+  buildTrendIndex,
+  matchesTrend,
+  signalKeys,
+} from "@/lib/trend-signal-match";
 
 /**
  * GET /api/v1/feed — Signal-Radar Feed
@@ -58,29 +62,57 @@ export async function GET() {
       SELECT * FROM trends WHERE status != 'archived'
     `).all() as TrendRow[];
 
-    // Signal counts per trend (last 72h)
-    const signalCounts = db.prepare(`
-      SELECT topic, COUNT(*) as cnt, AVG(strength) as avg_str
-      FROM live_signals
-      WHERE fetched_at > datetime('now', '-72 hours')
-      GROUP BY topic
-    `).all() as Array<{ topic: string; cnt: number; avg_str: number | null }>;
-    const countMap = new Map(signalCounts.map(r => [r.topic, { count: r.cnt, avgStr: r.avg_str ?? 0 }]));
-
-    // Sparkline: signal count per day for last 7 days, per trend
-    const sparklineRows = db.prepare(`
-      SELECT topic,
-        CAST(julianday('now') - julianday(fetched_at) AS INTEGER) as days_ago,
-        COUNT(*) as cnt
+    // ── Fuzzy trend ↔ live_signals matching ─────────────────────────────
+    // The old logic grouped live_signals by `topic` string and looked it up
+    // by trend slug / id / name. That missed every connector that emits
+    // tag-based topics (github "Rust", hackernews "AI", clinicaltrials
+    // "Health, Biotech & Longevity" → matches only the "mega-health-biotech"
+    // slug by name but NOT the pipeline-created duplicates). Now we scan
+    // all signals in the 7-day window once and fan them out over a shared
+    // trend index keyed on slug / id / name + tag intersection + name-token
+    // substring. See src/lib/trend-signal-match.ts.
+    interface RawSig {
+      topic: string | null;
+      tags: string | null;
+      title: string | null;
+      strength: number | null;
+      days_ago: number;
+    }
+    const sigRows = db.prepare(`
+      SELECT topic, tags, title, strength,
+        CAST(julianday('now') - julianday(fetched_at) AS INTEGER) as days_ago
       FROM live_signals
       WHERE fetched_at > datetime('now', '-7 days')
-      GROUP BY topic, days_ago
-    `).all() as Array<{ topic: string; days_ago: number; cnt: number }>;
-    const sparklineMap = new Map<string, number[]>();
-    for (const r of sparklineRows) {
-      if (r.days_ago < 0 || r.days_ago > 6) continue;
-      if (!sparklineMap.has(r.topic)) sparklineMap.set(r.topic, [0, 0, 0, 0, 0, 0, 0]);
-      sparklineMap.get(r.topic)![6 - r.days_ago] = r.cnt;
+    `).all() as RawSig[];
+
+    const trendLikes = trendRows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      tags: r.tags ? (JSON.parse(r.tags) as string[]) : [],
+    }));
+    const trendIndex = buildTrendIndex(trendLikes);
+
+    // Map keyed by trend.id → { count72h, sumStr72h, sparkline[7] }
+    const perTrend = new Map<string, { count: number; sumStr: number; spark: number[] }>();
+    for (const t of trendRows) perTrend.set(t.id, { count: 0, sumStr: 0, spark: [0, 0, 0, 0, 0, 0, 0] });
+
+    for (const sig of sigRows) {
+      const sKeys = signalKeys(sig);
+      const titleLower = sig.title ? sig.title.toLowerCase() : null;
+      for (const tIdx of trendIndex) {
+        if (!matchesTrend(tIdx, sKeys, titleLower)) continue;
+        const slot = perTrend.get(tIdx.id)!;
+        // 72h window feeds both the count and avg strength
+        if (sig.days_ago <= 3) {
+          slot.count += 1;
+          slot.sumStr += sig.strength ?? 0;
+        }
+        // 7-day sparkline
+        if (sig.days_ago >= 0 && sig.days_ago <= 6) {
+          slot.spark[6 - sig.days_ago] += 1;
+        }
+      }
     }
 
     function deriveRing(rel: number, conf: number): string {
@@ -108,9 +140,10 @@ export async function GET() {
       const rel = t.agg_relevance ?? 0.5;
       const conf = t.agg_confidence ?? 0.5;
       const imp = t.agg_impact ?? 0.5;
-      // Try slug first, then id, then name for signal matching
-      const sc = countMap.get(t.slug) ?? countMap.get(t.id) ?? countMap.get(t.name) ?? { count: 0, avgStr: 0 };
-      const spark = sparklineMap.get(t.slug) ?? sparklineMap.get(t.id) ?? sparklineMap.get(t.name) ?? [0, 0, 0, 0, 0, 0, 0];
+      const slot = perTrend.get(t.id) ?? { count: 0, sumStr: 0, spark: [0, 0, 0, 0, 0, 0, 0] };
+      const count72h = slot.count;
+      const avgStr = count72h > 0 ? slot.sumStr / count72h : 0;
+      const spark = slot.spark;
       const vel = meta.velocity ?? deriveVelocity(spark);
 
       // Derive trend type from tags or name heuristic
@@ -127,8 +160,8 @@ export async function GET() {
         relevance: rel,
         confidence: conf,
         impact: imp,
-        signalCount72h: sc.count,
-        avgStrength: sc.avgStr,
+        signalCount72h: count72h,
+        avgStrength: avgStr,
         sparkline: spark,
         tags,
       };
