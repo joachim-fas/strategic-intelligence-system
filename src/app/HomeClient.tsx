@@ -182,16 +182,21 @@ export default function HomeClient() {
 
   const [showFullRadar, setShowFullRadar] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const [cursorLeft, setCursorLeft] = useState(0);
+  // Hero command-line is a multi-line textarea (was single-line input) so long
+  // questions wrap + the row grows vertically instead of scrolling horizontally
+  // and cropping characters on the left edge. Same ref used from both render
+  // sites (session-state top bar and first-visit hero) — only one is mounted
+  // at a time because of the isFirstVisit gate.
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Measure text width to position block cursor
+  // Auto-grow the textarea to match content height on every query change.
+  // Reset to "auto" first so it can shrink when text is deleted — otherwise
+  // scrollHeight sticks at the previous max.
   useEffect(() => {
-    if (measureRef.current) {
-      measureRef.current.textContent = query || "";
-      setCursorLeft(measureRef.current.offsetWidth);
-    }
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   }, [query]);
 
   // Focus input on load
@@ -718,7 +723,9 @@ export default function HomeClient() {
   }, [frameworkModal, frameworkTopic, frameworkLoading, frameworkFieldValues, locale, handleSubmit]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); handleSubmit(); }
+    // Enter submits; Shift+Enter inserts a newline (textarea default). Matches
+    // the framework-modal textarea behavior so the hero and modal feel alike.
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   };
 
   const suggestions = locale === "de"
@@ -763,13 +770,16 @@ export default function HomeClient() {
           padding: isFirstVisit && !showFullRadar ? "0" : "20px 24px 0",
           position: "relative",
         }}>
-          {/* Command line for session state (history exists) — stays at top */}
+          {/* Command line for session state (history exists) — stays at top.
+               alignItems: flex-end so the submit button stays bottom-aligned
+               with the last line of the textarea when content grows to 2+
+               rows. minHeight preserves the 56px look for the 1-line state. */}
           {(!isFirstVisit || showFullRadar) && (
             <div
               style={{
-                display: "flex", alignItems: "center",
-                padding: "0 22px",
-                height: 56,
+                display: "flex", alignItems: "flex-end", gap: 10,
+                padding: "10px 10px 10px 22px",
+                minHeight: 56,
                 borderRadius: "var(--volt-radius-lg, 14px)",
                 border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
                 transition: "border-color 150ms ease",
@@ -778,30 +788,25 @@ export default function HomeClient() {
               }}
               onClick={() => inputRef.current?.focus()}
             >
-              <span ref={measureRef} style={{
-                position: "absolute", visibility: "hidden", whiteSpace: "pre",
-                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-              }} />
-              {!isAnalyzing && (query || inputFocused) && (
-                <span className="sis-blink-cursor" style={{
-                  position: "absolute",
-                  left: 22 + cursorLeft,
-                  top: "50%", transform: "translateY(-50%)",
-                  width: 10, height: 20,
-                  background: "var(--volt-text, #0A0A0A)",
-                  zIndex: 2,
-                }} />
-              )}
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
+                rows={1}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
                 placeholder={inputFocused ? "" : (locale === "de" ? "Projekt vertiefen oder neue Frage stellen…" : "Deepen project or ask a new question…")}
-                style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
+                style={{
+                  flex: 1, border: "none", outline: "none", background: "transparent",
+                  color: "var(--volt-text, #0A0A0A)",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                  lineHeight: 1.5,
+                  resize: "none", overflow: "hidden",
+                  padding: "7px 0",
+                  // Match the old input: Enter submits, so block the native newline char
+                  // from rendering visible whitespace before the handler kicks in.
+                }}
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -1292,9 +1297,9 @@ export default function HomeClient() {
             }}>
               <div
                 style={{
-                  display: "flex", alignItems: "center",
-                  padding: "0 22px",
-                  height: 56,
+                  display: "flex", alignItems: "flex-end", gap: 10,
+                  padding: "10px 10px 10px 22px",
+                  minHeight: 56,
                   borderRadius: "var(--volt-radius-lg, 14px)",
                   border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
                   transition: "border-color 150ms ease, box-shadow 150ms ease",
@@ -1304,30 +1309,23 @@ export default function HomeClient() {
                 }}
                 onClick={() => inputRef.current?.focus()}
               >
-                <span ref={measureRef} style={{
-                  position: "absolute", visibility: "hidden", whiteSpace: "pre",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-                }} />
-                {!isAnalyzing && (query || inputFocused) && (
-                  <span className="sis-blink-cursor" style={{
-                    position: "absolute",
-                    left: 22 + cursorLeft,
-                    top: "50%", transform: "translateY(-50%)",
-                    width: 10, height: 20,
-                    background: "var(--volt-text, #0A0A0A)",
-                    zIndex: 2,
-                  }} />
-                )}
-                <input
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onFocus={() => setInputFocused(true)}
                   onBlur={() => setInputFocused(false)}
                   placeholder={inputFocused ? "" : (locale === "de" ? "Oder frage direkt etwas Strategisches…" : "Or ask something strategic directly…")}
-                  style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--volt-text, #0A0A0A)", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15, caretColor: "transparent" }}
+                  style={{
+                    flex: 1, border: "none", outline: "none", background: "transparent",
+                    color: "var(--volt-text, #0A0A0A)",
+                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                    lineHeight: 1.5,
+                    resize: "none", overflow: "hidden",
+                    padding: "7px 0",
+                  }}
                   autoComplete="off"
                   spellCheck={false}
                 />
