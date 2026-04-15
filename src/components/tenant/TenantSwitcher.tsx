@@ -30,6 +30,16 @@ const ROLE_BADGE_COLOR: Record<TenantRole, string> = {
   viewer: "#9B9B9B",
 };
 
+const footerLinkStyle: React.CSSProperties = {
+  display: "block",
+  padding: "10px 14px",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--volt-text, #0A0A0A)",
+  textDecoration: "none",
+  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+};
+
 function roleLabel(role: TenantRole, de: boolean): string {
   if (de) {
     return role === "owner" ? "Inhaber" : role === "admin" ? "Admin" : role === "member" ? "Mitglied" : "Leser";
@@ -243,25 +253,30 @@ export function TenantSwitcher() {
               );
             })}
           </div>
+          {/* Footer-Aktionen im Dropdown. "Einstellungen" ist fuer
+               Owner/Admin des aktuellen Tenants sichtbar (eigene Orga
+               konfigurieren); "Mandanten verwalten" nur fuer System-
+               Admins (alle Orgas). */}
+          {(role === "owner" || role === "admin" || canManage) && (
+            <div style={{ height: 1, background: "var(--color-border, #E8E8E8)" }} />
+          )}
+          {(role === "owner" || role === "admin") && (
+            <Link
+              href="/settings/mandant"
+              onClick={() => setOpen(false)}
+              style={footerLinkStyle}
+            >
+              {de ? "Einstellungen" : "Settings"}
+            </Link>
+          )}
           {canManage && (
-            <>
-              <div style={{ height: 1, background: "var(--color-border, #E8E8E8)" }} />
-              <Link
-                href="/admin/mandanten"
-                onClick={() => setOpen(false)}
-                style={{
-                  display: "block",
-                  padding: "10px 14px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--volt-text, #0A0A0A)",
-                  textDecoration: "none",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                }}
-              >
-                {de ? "Mandanten verwalten →" : "Manage tenants →"}
-              </Link>
-            </>
+            <Link
+              href="/admin/mandanten"
+              onClick={() => setOpen(false)}
+              style={footerLinkStyle}
+            >
+              {de ? "Mandanten verwalten →" : "Manage tenants →"}
+            </Link>
           )}
         </div>
       )}
