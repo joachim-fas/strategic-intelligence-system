@@ -11,6 +11,7 @@ import { VoltBadge, VoltButton } from "@/components/volt";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ReasoningTrace } from "./ReasoningTrace";
+import { SequentialPipeline, type PipelineStageMap } from "./SequentialPipeline";
 import { SynthesisBlock } from "./SynthesisBlock";
 import { EigenerGedanke } from "./EigenerGedanke";
 import { CausalOrbit } from "./CausalOrbit";
@@ -62,6 +63,7 @@ export interface HistoryEntry {
   isLoading?: boolean; // explicit flag — never rely on synthesis string comparison
   error?: string;      // set when LLM call failed, shown with retry option
   parentQuery?: string; // if this is a follow-up, the original query text
+  pipelineStages?: PipelineStageMap; // live progress of the 7-stage reveal (while loading)
 }
 
 // ── BriefingResult ────────────────────────────────────────────────────────────
@@ -293,7 +295,11 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
       {/* ── Loading state ──────────────────────────────────────── */}
       {isLoading && (
         <div className="card-body">
-          <ReasoningTrace query={entry.query} trendCount={trendCount} locale={locale} />
+          {entry.pipelineStages ? (
+            <SequentialPipeline stages={entry.pipelineStages} query={entry.query} locale={locale} />
+          ) : (
+            <ReasoningTrace query={entry.query} trendCount={trendCount} locale={locale} />
+          )}
         </div>
       )}
 

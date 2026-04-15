@@ -9,7 +9,8 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
-import { queryIntelligenceAsync } from "@/lib/intelligence-engine";
+import { queryIntelligenceAsync, type PipelineStageEvent } from "@/lib/intelligence-engine";
+import { defaultPipelineStages, type PipelineStageMap } from "@/components/briefing/SequentialPipeline";
 import { classifyTrends } from "@/lib/classify";
 import { useLocale } from "@/lib/locale-context";
 import TrendDetailPanel from "@/components/radar/TrendDetailPanel";
@@ -474,6 +475,7 @@ export default function HomeClient() {
       },
       timestamp: new Date(),
       parentQuery: prevCtx?.query, // link to parent if this is a follow-up
+      pipelineStages: defaultPipelineStages(),
     }, ...prev]);
     // New query always becomes the active node in the session
     setActiveNodeId(entryId);
@@ -494,7 +496,31 @@ export default function HomeClient() {
       ));
     };
 
-    queryIntelligenceAsync(q, trends, locale, ctxProfile, onSynthesisChunk, prevCtx)
+    // Track pipeline stage transitions. Mutate a ref-like local map so each
+    // callback flips exactly one stage; React commits the updated copy per call.
+    const localStages: PipelineStageMap = defaultPipelineStages();
+    const onStage = (ev: PipelineStageEvent) => {
+      const prev = localStages[ev.stage];
+      localStages[ev.stage] = {
+        status: ev.status === "done" ? "done" : "active",
+        count: ev.count ?? prev.count,
+      };
+      // Clone so React sees a new object reference.
+      const snapshot: PipelineStageMap = {
+        frage: { ...localStages.frage },
+        signale: { ...localStages.signale },
+        trends: { ...localStages.trends },
+        kausal: { ...localStages.kausal },
+        erkenntnisse: { ...localStages.erkenntnisse },
+        szenarien: { ...localStages.szenarien },
+        empfehlungen: { ...localStages.empfehlungen },
+      };
+      setHistory((prevH) => prevH.map((e) =>
+        e.id === entryId ? { ...e, pipelineStages: snapshot } : e
+      ));
+    };
+
+    queryIntelligenceAsync(q, trends, locale, ctxProfile, onSynthesisChunk, prevCtx, onStage)
       .then((llmBriefing) => {
         if (llmBriefing && llmBriefing.synthesis && llmBriefing.synthesis.length > 20) {
           // ✅ LLM succeeded — full structured briefing

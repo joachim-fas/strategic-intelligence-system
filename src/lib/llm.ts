@@ -233,13 +233,13 @@ ANTWORTE NUR als JSON (kein Text ausserhalb):
     "mega-climate-sustainability": 0.42,
     "mega-geopolitical-shifts": 0.18
   },
+  "causalAnalysis": ["Ursache → Wirkung → strategische Konsequenz"],
   "keyInsights": [
     "Konkrete, nicht-triviale Erkenntnis mit Begruendung und Konsequenz",
     "Zweite Erkenntnis — anderer Aspekt, konkret",
     "Dritte Erkenntnis — Handlungsrelevanz"
   ],
   "regulatoryContext": ["Nur wenn regulatorisch relevant fuer diese Frage"],
-  "causalAnalysis": ["Ursache → Wirkung → strategische Konsequenz"],
   "scenarios": [
     {
       "type": "optimistic",

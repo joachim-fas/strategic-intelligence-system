@@ -69,6 +69,58 @@ interface TrendMatch {
 }
 
 /**
+ * Sequential pipeline stages for the first-query CLI reveal.
+ *
+ * The visual order (Frage → Signale → Trends → Kausalitäten → Erkenntnisse →
+ * Szenarien → Empfehlungen) mirrors the JSON-output order the LLM is
+ * prompted to produce (synthesis, matchedTrendIds, causalAnalysis,
+ * keyInsights, scenarios, decisionFramework). Each stage activates when its
+ * JSON marker first appears in the streaming buffer and marks the previous
+ * stage as done.
+ */
+export type PipelineStage =
+  | "frage"
+  | "signale"
+  | "trends"
+  | "kausal"
+  | "erkenntnisse"
+  | "szenarien"
+  | "empfehlungen";
+
+export interface PipelineStageEvent {
+  stage: PipelineStage;
+  status: "active" | "done";
+  count?: number;
+}
+
+const STAGE_MARKERS: Array<{ stage: PipelineStage; marker: string }> = [
+  // synthesis is the first LLM-generated field; seeing it means we've left
+  // "signale" and moved into "trends" orbit — but we use matchedTrendIds as
+  // the first hard trend marker because synthesis streams character-by-char
+  // and isn't a clean transition point.
+  { stage: "trends", marker: '"matchedTrendIds"' },
+  { stage: "kausal", marker: '"causalAnalysis"' },
+  { stage: "erkenntnisse", marker: '"keyInsights"' },
+  { stage: "szenarien", marker: '"scenarios"' },
+  { stage: "empfehlungen", marker: '"decisionFramework"' },
+];
+
+/**
+ * Detect which stage markers have newly appeared in the accumulated buffer.
+ * Returns stages in discovery order so callers can fire events in sequence.
+ */
+function detectNewStages(text: string, fired: Set<PipelineStage>): PipelineStage[] {
+  const fresh: PipelineStage[] = [];
+  for (const { stage, marker } of STAGE_MARKERS) {
+    if (!fired.has(stage) && text.includes(marker)) {
+      fired.add(stage);
+      fresh.push(stage);
+    }
+  }
+  return fresh;
+}
+
+/**
  * Extract synthesis text progressively from accumulated streaming JSON.
  * Returns the new characters added since last call (delta only).
  */
@@ -123,7 +175,32 @@ export async function queryIntelligenceAsync(
   contextProfile?: { role: string; industry: string; region: string },
   onSynthesisChunk?: (chunk: string) => void,
   previousContext?: { query: string; synthesis: string },
+  onStage?: (event: PipelineStageEvent) => void,
 ): Promise<IntelligenceBriefing | null> {
+  // Track which stages have fired so we don't emit duplicates, and track the
+  // current "active" stage so transitions can flip it to "done" when the next
+  // stage activates. Frage is considered done the moment the fetch starts.
+  const firedStages = new Set<PipelineStage>();
+  let activeStage: PipelineStage | null = null;
+
+  const transition = (next: PipelineStage) => {
+    if (!onStage) return;
+    if (activeStage && activeStage !== next) {
+      onStage({ stage: activeStage, status: "done" });
+    }
+    activeStage = next;
+    onStage({ stage: next, status: "active" });
+  };
+
+  // Frage fires immediately (client already has the query text) and goes
+  // straight to done so the first visible "active" stage is Signale.
+  if (onStage) {
+    onStage({ stage: "frage", status: "active" });
+    onStage({ stage: "frage", status: "done" });
+    firedStages.add("frage");
+    transition("signale");
+  }
+
   try {
     const res = await fetch("/api/v1/query", {
       method: "POST",
@@ -153,6 +230,12 @@ export async function queryIntelligenceAsync(
             if (delta) {
               synthExtractedLen += delta.length;
               onSynthesisChunk(delta);
+            }
+          }
+          // Detect new pipeline stages from JSON markers as they stream in.
+          if (onStage) {
+            for (const stage of detectNewStages(fullRawText, firedStages)) {
+              transition(stage);
             }
           }
         } else if (event.type === "complete" && event.result) {
@@ -190,6 +273,26 @@ export async function queryIntelligenceAsync(
       }));
 
     const totalSignals = matchedTrends.reduce((sum: number, m: TrendMatch) => sum + m.trend.signalCount, 0);
+
+    // Finalise pipeline stages with real counts from the parsed result.
+    // Any stage that never fired during streaming (e.g. sparse causal data)
+    // still gets emitted as done so the UI reaches a terminal state.
+    if (onStage) {
+      const finalCounts: Record<PipelineStage, number | undefined> = {
+        frage: undefined,
+        signale: llmResult.usedSignals?.length ?? 0,
+        trends: llmResult.matchedTrendIds?.length ?? 0,
+        kausal: (llmResult.causalAnalysis?.length ?? 0) + (llmResult.reasoningChains?.length ?? 0),
+        erkenntnisse: llmResult.keyInsights?.length ?? 0,
+        szenarien: llmResult.scenarios?.length ?? 0,
+        empfehlungen: llmResult.decisionFramework ? 1 : 0,
+      };
+      const ALL_STAGES: PipelineStage[] = ["frage", "signale", "trends", "kausal", "erkenntnisse", "szenarien", "empfehlungen"];
+      for (const stage of ALL_STAGES) {
+        onStage({ stage, status: "done", count: finalCounts[stage] });
+      }
+      activeStage = null;
+    }
 
     return {
       query,
