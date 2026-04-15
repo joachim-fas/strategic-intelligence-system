@@ -90,7 +90,7 @@ function avoidLabelCollisions(
   const show = new Array(labels.length).fill(false);
 
   for (const item of sorted) {
-    const estW = item.text.length * 5 + 8;
+    const estW = item.text.length * 4.8 + 8;
     const estH = 14;
     const rect = { x: item.x - estW / 2, y: item.y, w: estW, h: estH };
 
@@ -126,6 +126,8 @@ export default function RadarChart({
   const svgRef = externalSvgRef || internalSvgRef;
   const zoomLayerRef = useRef<SVGGElement>(null);
   const dotLayerRef = useRef<SVGGElement>(null);
+  const ringLabelLayerRef = useRef<SVGGElement>(null);
+  const quadrantLabelLayerRef = useRef<SVGGElement>(null);
   const [tooltip, setTooltip] = useState<{
     trend: TrendDot;
     x: number;
@@ -192,11 +194,18 @@ export default function RadarChart({
   }, [maxR]);
 
   // ── Memoized ring labels ──
+  // Position labels at the TOP edge of each ring band (inner boundary toward
+  // the outer ring) so they sit in a region with fewer trend-dots. For the
+  // innermost ring "adopt" we still center them since there's no cleaner edge.
   const ringLabels = useMemo(() => {
     return RINGS.map((ring, i) => {
-      const labelR = i === 0 ? RING_RADII[0] / 2 : (RING_RADII[i - 1] + RING_RADII[i]) / 2;
+      // Place just inside the outer boundary of this ring (top edge).
+      // For ring 0 (adopt) there's no inner boundary, so sit halfway up.
+      const outerR = RING_RADII[i];
+      const innerR = i === 0 ? 0 : RING_RADII[i - 1];
+      const labelR = i === 0 ? outerR * 0.5 : innerR + (outerR - innerR) * 0.15;
       const labelText = getRingLabel(locale, ring).toUpperCase();
-      const tw = labelText.length * 5.5 + 14;
+      const tw = labelText.length * 5.2 + 10;
       return { ring, y: -labelR * maxR, text: labelText, tw, color: RING_COLORS[ring] };
     });
   }, [maxR, locale]);
@@ -234,10 +243,14 @@ export default function RadarChart({
       return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
     });
 
+    // Trend-label text: allow up to 28 chars before ellipsis — wider than
+    // the previous 20 so names like "Mobility & Autonomous Systems" fit.
+    // Collision avoidance still drops labels that would overlap. Full name
+    // is always available via hover tooltip.
     const candidates = trends.map((d, i) => ({
       x: pos[i].x,
       y: pos[i].y + getDotSize(d.impact) + 12,
-      text: d.name.length > 20 ? d.name.slice(0, 18) + "\u2026" : d.name,
+      text: d.name.length > 28 ? d.name.slice(0, 26) + "\u2026" : d.name,
       priority: d.impact + (d.id === selectedTrendId ? 2 : 0),
     }));
     const show = avoidLabelCollisions(candidates);
@@ -264,19 +277,47 @@ export default function RadarChart({
 
     function applySemanticZoom(k: number) {
       currentKRef.current = k;
-      if (!dotLayerRef.current) return;
       const invK = 1 / k;
       // Counter-scale each dot group so they stay the same visual size
-      select(dotLayerRef.current)
-        .selectAll<SVGGElement, unknown>(".trend-dot")
-        .each(function () {
-          const el = select(this);
-          const currentTransform = el.attr("transform");
-          const match = currentTransform?.match(/translate\(([^,]+),([^)]+)\)/);
-          if (match) {
-            el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
-          }
-        });
+      if (dotLayerRef.current) {
+        select(dotLayerRef.current)
+          .selectAll<SVGGElement, unknown>(".trend-dot")
+          .each(function () {
+            const el = select(this);
+            const currentTransform = el.attr("transform");
+            const match = currentTransform?.match(/translate\(([^,]+),([^)]+)\)/);
+            if (match) {
+              el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+            }
+          });
+      }
+      // Counter-scale ring labels so text stays fixed pixel size across zoom.
+      // Without this, "UEBERNEHMEN" etc. balloon up at high zoom levels.
+      if (ringLabelLayerRef.current) {
+        select(ringLabelLayerRef.current)
+          .selectAll<SVGGElement, unknown>(".ring-label")
+          .each(function () {
+            const el = select(this);
+            const currentTransform = el.attr("transform");
+            const match = currentTransform?.match(/translate\(([^,]+),([^)]+)\)/);
+            if (match) {
+              el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+            }
+          });
+      }
+      // Counter-scale quadrant labels too.
+      if (quadrantLabelLayerRef.current) {
+        select(quadrantLabelLayerRef.current)
+          .selectAll<SVGGElement, unknown>(".quadrant-label")
+          .each(function () {
+            const el = select(this);
+            const currentTransform = el.attr("transform");
+            const match = currentTransform?.match(/translate\(([^,]+),([^)]+)\)/);
+            if (match) {
+              el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+            }
+          });
+      }
     }
 
     const zoomBehavior = zoom<SVGSVGElement, unknown>()
@@ -296,6 +337,40 @@ export default function RadarChart({
       svg.on("dblclick.zoom", null);
     };
   }, [svgRef, width, height]);
+
+  // ── Re-apply counter-scale to ring and quadrant labels after React
+  // re-renders them. Without this, any dimension or locale change would
+  // reset the transform back to the un-scaled JSX value and the labels
+  // would temporarily balloon until the next zoom gesture. ──
+  useEffect(() => {
+    const k = currentKRef.current;
+    if (k === 1) return;
+    const invK = 1 / k;
+    if (ringLabelLayerRef.current) {
+      select(ringLabelLayerRef.current)
+        .selectAll<SVGGElement, unknown>(".ring-label")
+        .each(function () {
+          const el = select(this);
+          const currentTransform = el.attr("transform");
+          const match = currentTransform?.match(/translate\(([^,)]+),([^)]+)\)/);
+          if (match) {
+            el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+          }
+        });
+    }
+    if (quadrantLabelLayerRef.current) {
+      select(quadrantLabelLayerRef.current)
+        .selectAll<SVGGElement, unknown>(".quadrant-label")
+        .each(function () {
+          const el = select(this);
+          const currentTransform = el.attr("transform");
+          const match = currentTransform?.match(/translate\(([^,)]+),([^)]+)\)/);
+          if (match) {
+            el.attr("transform", `translate(${match[1]},${match[2]}) scale(${invK})`);
+          }
+        });
+    }
+  }, [ringLabels, quadrantLabelData]);
 
   // ── D3 drag behavior (imperative — must manipulate individual dot transforms) ──
   useEffect(() => {
@@ -386,31 +461,43 @@ export default function RadarChart({
                 <circle r={r} fill={color} fillOpacity={0.06} />
                 <circle
                   r={r} fill="none"
-                  stroke={color} strokeOpacity={0.15}
-                  strokeWidth={1} strokeDasharray="3 5"
+                  stroke={color} strokeOpacity={0.28}
+                  strokeWidth={1.25} strokeDasharray="3 5"
                 />
               </React.Fragment>
             ))}
 
-            {/* Ring labels */}
-            {ringLabels.map(({ ring, y, text, tw, color }) => (
-              <React.Fragment key={ring}>
-                <rect
-                  x={-tw / 2} y={y - 7}
-                  width={tw} height={14} rx={7}
-                  fill="var(--color-surface, #fff)" fillOpacity={0.9}
-                />
-                <text
-                  x={0} y={y}
-                  textAnchor="middle" dy="0.35em"
-                  fill={color} fillOpacity={0.65}
-                  fontSize="10px" fontWeight="700"
-                  letterSpacing="0.06em"
+            {/* Ring labels.
+                Wrapped in per-label <g className="ring-label"> so the D3
+                zoom handler can counter-scale them, keeping the text at a
+                fixed pixel size regardless of zoom. Placed at the top edge
+                of each ring band (fewer trends there), rendered dimmer
+                than before (opacity 0.38) so overlapping trend-labels still
+                read cleanly. */}
+            <g ref={ringLabelLayerRef} className="ring-label-layer">
+              {ringLabels.map(({ ring, y, text, tw, color }) => (
+                <g
+                  key={ring}
+                  className="ring-label"
+                  transform={`translate(0, ${y})`}
                 >
-                  {text}
-                </text>
-              </React.Fragment>
-            ))}
+                  <rect
+                    x={-tw / 2} y={-6}
+                    width={tw} height={12} rx={6}
+                    fill="var(--color-surface, #fff)" fillOpacity={0.75}
+                  />
+                  <text
+                    x={0} y={0}
+                    textAnchor="middle" dy="0.35em"
+                    fill={color} fillOpacity={0.42}
+                    fontSize="10px" fontWeight="700"
+                    letterSpacing="0.06em"
+                  >
+                    {text}
+                  </text>
+                </g>
+              ))}
+            </g>
 
             {/* Quadrant dividers */}
             {quadrantDividers.map((d, i) => (
@@ -422,25 +509,36 @@ export default function RadarChart({
               />
             ))}
 
-            {/* Quadrant labels */}
-            {quadrantLabelData.map(({ label, lx, ly, tw }) => (
-              <React.Fragment key={label}>
-                <rect
-                  x={lx - tw / 2} y={ly - 9}
-                  width={tw} height={18} rx={9}
-                  fill="var(--color-surface, #fff)" fillOpacity={0.92}
-                  stroke="var(--color-border, #ddd)" strokeOpacity={0.4}
-                />
-                <text
-                  x={lx} y={ly}
-                  textAnchor="middle" dy="0.35em"
-                  fill="var(--color-text-secondary, #555)"
-                  fontSize="11px" fontWeight="600"
+            {/* Quadrant labels.
+                Also wrapped in per-label <g className="quadrant-label"> so
+                the zoom handler can counter-scale them. The Q1-Q4 labels
+                carry dominant visual weight — toned down to 0.55 opacity
+                and smaller font, stroke removed so they don't compete with
+                the trend-dots. */}
+            <g ref={quadrantLabelLayerRef} className="quadrant-label-layer">
+              {quadrantLabelData.map(({ label, lx, ly, tw }) => (
+                <g
+                  key={label}
+                  className="quadrant-label"
+                  transform={`translate(${lx}, ${ly})`}
                 >
-                  {label}
-                </text>
-              </React.Fragment>
-            ))}
+                  <rect
+                    x={-tw / 2} y={-8}
+                    width={tw} height={16} rx={8}
+                    fill="var(--color-surface, #fff)" fillOpacity={0.75}
+                  />
+                  <text
+                    x={0} y={0}
+                    textAnchor="middle" dy="0.35em"
+                    fill="var(--color-text-secondary, #555)"
+                    fillOpacity={0.6}
+                    fontSize="10px" fontWeight="600"
+                  >
+                    {label}
+                  </text>
+                </g>
+              ))}
+            </g>
           </g>
 
           {/* ── Gradient defs ── */}

@@ -48,6 +48,9 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
+  // `searchFocused` steuert das Ergebnis-Dropdown unter dem Suchfeld —
+  // nur sichtbar wenn der Input fokussiert ist UND eine Eingabe existiert.
+  const [searchFocused, setSearchFocused] = useState(false);
   const [velocityFilter, setVelocityFilter] = useState<VelocityFilter>("all");
   const [horizonFilter, setHorizonFilter] = useState<Set<TimeHorizon>>(
     new Set(["short", "mid", "long"])
@@ -99,6 +102,31 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
     });
   }, [trends, liveTrends]);
 
+  // ── Search dropdown: top 8 matches, ignoriert Velocity/Horizon/Scores ──
+  // Das Dropdown zeigt Trefferliste unabhaengig von den Filter-Pills —
+  // "Suche" heisst hier "finde einen Trend, ueber den ich jetzt mehr
+  // wissen will", nicht "Filter auf Radar". Scoring: Substring im Namen
+  // zaehlt hoeher als Substring in der Description (Namenstreffer zuerst).
+  const searchMatches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [] as typeof enrichedTrends;
+    const scored = enrichedTrends
+      .map((t) => {
+        const name = t.name.toLowerCase();
+        const desc = t.description?.toLowerCase() ?? "";
+        let score = 0;
+        if (name.startsWith(q)) score += 100;
+        else if (name.includes(q)) score += 60;
+        if (desc.includes(q)) score += 10;
+        return { t, score };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map((x) => x.t);
+    return scored;
+  }, [enrichedTrends, search]);
+
   // ── Apply filters ────────────────────────────────────────────────────────
   const filteredTrends = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -139,13 +167,37 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
         border: "1px solid var(--volt-border, #E8E8E8)",
         borderRadius: 12,
       }}>
-        {/* Search */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 200px" }}>
+        {/* Search — mit Ergebnis-Dropdown.
+             Vorher: die Sucheingabe filterte nur die Dots auf dem Radar,
+             es gab aber keine explizite Trefferliste. Bei einem Query
+             wie "mobility" sah der User keine Suche im klassischen Sinn —
+             das Radar reorganisierte sich still und wirkte "ergebnislos".
+             Jetzt: direkt unter dem Input klappt ein Dropdown mit max 8
+             Treffern auf. Klick oeffnet das TrendDetailPanel (ueber den
+             bestehenden onTrendClick-Callback), Enter waehlt den ersten
+             Treffer, Escape schliesst. Das Filter-Verhalten auf dem Radar
+             bleibt erhalten, ist jetzt aber nur noch die visuelle
+             Begleitmusik zur eigentlichen Trefferliste. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "1 1 200px", position: "relative" }}>
           <span style={{ fontSize: 12, color: "var(--volt-text-faint, #999)" }}>⌕</span>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => {
+              // Delay blur so onMouseDown on a result-row can fire first.
+              window.setTimeout(() => setSearchFocused(false), 150);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setSearch("");
+                (e.target as HTMLInputElement).blur();
+              } else if (e.key === "Enter" && searchMatches.length > 0) {
+                onTrendClick(searchMatches[0]);
+                setSearch("");
+              }
+            }}
             placeholder={de ? "Trend suchen…" : "Search trends…"}
             style={{
               flex: 1, minWidth: 0,
@@ -161,6 +213,85 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
             >
               ✕
             </button>
+          )}
+
+          {/* Ergebnis-Dropdown */}
+          {searchFocused && search.trim().length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                background: "var(--volt-surface-raised, #fff)",
+                border: "1px solid var(--volt-border, #E8E8E8)",
+                borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+                maxHeight: 320,
+                overflowY: "auto",
+              }}
+            >
+              {searchMatches.length === 0 ? (
+                <div style={{
+                  padding: "12px 14px",
+                  fontSize: 12,
+                  color: "var(--volt-text-muted, #6B6B6B)",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                }}>
+                  {de ? `Keine Treffer für „${search}"` : `No matches for "${search}"`}
+                </div>
+              ) : (
+                searchMatches.map((t, i) => (
+                  <div
+                    key={t.id}
+                    onMouseDown={(e) => {
+                      // Use mousedown so it fires before the input's blur.
+                      e.preventDefault();
+                      onTrendClick(t);
+                      setSearch("");
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "9px 14px",
+                      cursor: "pointer",
+                      borderBottom: i < searchMatches.length - 1 ? "1px solid var(--volt-border, #E8E8E8)" : "none",
+                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "var(--color-surface-2, #F5F5F5)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                  >
+                    <span
+                      style={{
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: t.ring === "adopt" ? "#0F6038"
+                          : t.ring === "trial" ? "#1A4A8A"
+                          : t.ring === "assess" ? "#7A5C00"
+                          : "#6B7280",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{
+                      fontSize: 13, fontWeight: 500,
+                      color: "var(--volt-text, #0A0A0A)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      flex: 1, minWidth: 0,
+                    }}>
+                      {t.name}
+                    </span>
+                    <span style={{
+                      fontSize: 10, fontFamily: "var(--volt-font-mono, monospace)",
+                      textTransform: "uppercase", letterSpacing: "0.08em",
+                      color: "var(--volt-text-faint, #999)",
+                      flexShrink: 0,
+                    }}>
+                      {t.category}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           )}
         </div>
 
@@ -321,33 +452,54 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
         />
       </div>
 
-      {/* ── Bottom legend ──────────────────────────────────────────────── */}
+      {/* ── Bottom legend.
+           Previously crammed six differently-weighted items on one line
+           ("RINGE: Adopt→Trial…" next to dashed-circle rising marker next
+           to interaction hints). Now split into:
+             - a single subtle ring-order strip
+             - rising / falling / live-halo markers as compact pills
+             - interaction hints behind a "?" help tooltip (hover reveals) ──── */}
       <div style={{
-        display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12,
+        display: "flex", flexWrap: "wrap", alignItems: "center", gap: 14,
         marginTop: 10, marginBottom: 20,
         fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-        fontSize: 9,
+        fontSize: 9, lineHeight: 1.6,
         color: "var(--volt-text-faint, #AAA)",
       }}>
-        <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          {de ? "Ringe" : "Rings"}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {de ? "Ringe" : "Rings"}
+          </span>
+          <span style={{ opacity: 0.8 }}>Adopt → Trial → Assess → Hold</span>
         </span>
-        <span>Adopt → Trial → Assess → Hold ({de ? "innen → außen" : "inner → outer"})</span>
         <span style={{ width: 1, height: 10, background: "var(--volt-border, #E8E8E8)" }} />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px dashed #1A9E5A", display: "inline-block" }} />
+          <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1.25px dashed #1A9E5A", display: "inline-block" }} />
           {de ? "steigt" : "rising"}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px solid #E8402A", display: "inline-block" }} />
+          <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1.25px solid #E8402A", display: "inline-block" }} />
           {de ? "fällt" : "falling"}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(122,184,245,0.35)", display: "inline-block" }} />
-          {de ? "Live-Halo = Signal-Aktivität" : "Live halo = Signal activity"}
+          <span style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(122,184,245,0.35)", display: "inline-block" }} />
+          {de ? "Live-Halo" : "Live halo"}
         </span>
-        <span style={{ marginLeft: "auto", fontSize: 9 }}>
-          {de ? "Klick = Auswahl · Scroll = Zoom · Doppelklick = Reset" : "Click = Select · Scroll = Zoom · Double-click = Reset"}
+        <span
+          style={{ marginLeft: "auto", position: "relative", cursor: "help" }}
+          title={de
+            ? "Klick = Auswahl · Scroll = Zoom · Doppelklick = Reset"
+            : "Click = Select · Scroll = Zoom · Double-click = Reset"}
+        >
+          <span style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 14, height: 14, borderRadius: "50%",
+            border: "1px solid var(--volt-border, #E8E8E8)",
+            fontSize: 9, fontWeight: 700,
+            color: "var(--volt-text-muted, #6B6B6B)",
+          }}>
+            ?
+          </span>
         </span>
       </div>
     </div>
