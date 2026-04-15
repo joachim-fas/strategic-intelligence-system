@@ -23,6 +23,7 @@ import { SessionBar } from "@/components/session/SessionBar";
 import { GrainCard } from "@/components/grain/GrainCard";
 import { GrainBadge } from "@/components/grain/GrainBadge";
 import { Tooltip } from "@/components/ui/Tooltip";
+import BlockCursor from "@/components/common/BlockCursor";
 import {
   clearHistoryStorage,
 } from "@/lib/briefing-export";
@@ -886,10 +887,15 @@ export default function HomeClient() {
                     lineHeight: 1.5,
                     resize: "none", overflow: "hidden",
                     padding: "7px 0",
+                    // Native caret hidden — BlockCursor below draws a wide
+                    // terminal-style cursor that stays glued to selectionStart
+                    // even across soft wraps.
+                    caretColor: "transparent",
                   }}
                   autoComplete="off"
                   spellCheck={false}
                 />
+                <BlockCursor targetRef={inputRef} value={query} focused={inputFocused} />
                 {query && (
                   <button onClick={() => handleSubmit()}
                     className="sis-shimmer-btn"
@@ -1048,9 +1054,15 @@ export default function HomeClient() {
                       lineHeight: 1.5,
                       overflow: "hidden",
                       padding: 0,
+                      caretColor: "transparent",
                     }}
                     autoComplete="off"
                     spellCheck={false}
+                  />
+                  <BlockCursor
+                    targetRef={frameworkTopicRef}
+                    value={frameworkTopic}
+                    focused={frameworkTopicFocused}
                   />
                 </div>
 
@@ -1405,10 +1417,12 @@ export default function HomeClient() {
                       lineHeight: 1.5,
                       resize: "none", overflow: "hidden",
                       padding: "7px 0",
+                      caretColor: "transparent",
                     }}
                     autoComplete="off"
                     spellCheck={false}
                   />
+                  <BlockCursor targetRef={inputRef} value={query} focused={inputFocused} />
                   {query && (
                     <button onClick={() => handleSubmit()}
                       className="sis-shimmer-btn"
