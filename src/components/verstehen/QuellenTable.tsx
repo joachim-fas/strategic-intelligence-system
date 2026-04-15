@@ -434,8 +434,13 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           </>
         ) : (
           <>
-            {liveCount} {de ? "Live-Quellen" : "live sources"} ·{" "}
-            <span style={{ color: "var(--signal-positive, #1A9E5A)", fontWeight: 600 }}>
+            {/* "Live-Quellen" war irrefuehrend, weil die Zahl alle
+                 registrierten Connectors zaehlte — unabhaengig davon,
+                 ob sie in den letzten Tagen Signale geliefert haben.
+                 Jetzt klar getrennt: "Registriert" (installiert) vs.
+                 "aktiv" (hat frische Signale) vs. "geplant" (Backlog). */}
+            {liveCount} {de ? "registriert" : "registered"} ·{" "}
+            <span style={{ color: activeCount > 0 ? "var(--signal-positive, #1A9E5A)" : "var(--signal-negative, #C0341D)", fontWeight: 600 }}>
               {activeCount} {de ? "aktiv" : "active"}
             </span>
             {" · "}

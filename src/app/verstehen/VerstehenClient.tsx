@@ -108,7 +108,19 @@ export default function VerstehenClient() {
         const list = data?.data?.trends ?? data?.trends;
         if (Array.isArray(list) && list.length > 0) {
           const dbTrends = list as TrendDot[];
-          const dbByName = new Map(dbTrends.map((t: TrendDot) => [t.name.toLowerCase(), t]));
+          // Duplicate rows can exist in DB under the same lowercased name
+          // (one curated mega/macro row + one pipeline-created stub). Pick
+          // the entry with the highest signalCount — that's the one the
+          // matcher actually populated. Plain .set() silently let the last
+          // row (often an empty stub) overwrite the real one.
+          const dbByName = new Map<string, TrendDot>();
+          for (const t of dbTrends) {
+            const key = t.name.toLowerCase();
+            const prior = dbByName.get(key);
+            if (!prior || (t.signalCount ?? 0) > (prior.signalCount ?? 0)) {
+              dbByName.set(key, t);
+            }
+          }
           const merged = megaTrends.map(mt => {
             const db = dbByName.get(mt.name.toLowerCase());
             if (!db) return mt;
@@ -141,7 +153,13 @@ export default function VerstehenClient() {
   // zeigte dadurch dauerhaft die connectors.length-Fallbackzahl statt der
   // tatsaechlichen Live-Quellen-Anzahl. Defensive-Unwrap akzeptiert beide
   // Shapes.
-  const [sourcesCount, setSourcesCount] = useState<number | null>(null);
+  // Source-Zahlen im Header: **aktive** Quellen (fresh in <24h),
+  // nicht alle registrierten Connectors. Vorher zeigte der Header
+  // "56 Quellen" (= alle registrierten), waehrend die Datenquellen-
+  // Tabelle "0 aktiv" zeigte — widerspruechlich. Jetzt zaehlen wir
+  // nur Quellen mit frischen Signalen; wenn 0, zeigen wir es auch so.
+  const [sourcesActive, setSourcesActive] = useState<number | null>(null);
+  const [sourcesTotal, setSourcesTotal] = useState<number | null>(null);
   // Freshness meta — exposed from /api/v1/signals (GET). The banner below
   // warns the user when no connector has written to live_signals recently
   // so the Cockpit doesn't silently serve stale data. `null` = unknown
@@ -157,8 +175,14 @@ export default function VerstehenClient() {
       .then(r => r.json())
       .then(json => {
         const data = json?.data ?? json;
-        const list = data?.sourceStatus ?? [];
-        if (Array.isArray(list) && list.length > 0) setSourcesCount(list.length);
+        const list = (data?.sourceStatus ?? []) as Array<{ status?: string }>;
+        if (Array.isArray(list)) {
+          setSourcesTotal(list.length);
+          // "aktiv" = Quelle mit frischen Signalen (fresh). stale/empty
+          // zaehlen NICHT als aktiv — sonst waere "56 Quellen" + "0 aktiv"
+          // dieselbe Luege wie vorher.
+          setSourcesActive(list.filter((s) => s.status === "fresh" || s.status === "ok").length);
+        }
       })
       .catch(() => {});
     fetchWithTimeout("/api/v1/signals")
@@ -223,9 +247,25 @@ export default function VerstehenClient() {
   // Derived stats for the mono stats line
   const activeEdges = TREND_EDGES.length;
   const adoptCount = trends.filter(t => t.ring === "adopt").length;
-  // Use live API count when available, fall back to static connector count,
-  // never use a hardcoded number.
-  const effectiveSourcesCount = sourcesCount ?? connectors.length;
+  // Quellen-Anzeige-Logik: wir zeigen pro Zustand klar an, was Sache ist.
+  //   - Solange die API nicht geantwortet hat (sourcesTotal === null):
+  //     zeige die Anzahl registrierter Connectors als best-effort.
+  //   - Sobald die API geantwortet hat:
+  //     - wenn es aktive Quellen gibt: "X/Y Quellen aktiv"
+  //     - wenn 0 aktive: "Y Quellen (0 aktiv)" — nicht verstecken, damit
+  //       der User das Pipeline-Silence-Problem gleich im Header sieht.
+  const sourcesLabel = (() => {
+    const de_ = de;
+    if (sourcesTotal === null) {
+      return `${connectors.length} ${de_ ? "Quellen" : "sources"}`;
+    }
+    const active = sourcesActive ?? 0;
+    const total = sourcesTotal;
+    if (active === 0) {
+      return `${total} ${de_ ? "Quellen · 0 aktiv" : "sources · 0 active"}`;
+    }
+    return `${active}/${total} ${de_ ? "Quellen aktiv" : "sources active"}`;
+  })();
 
   return (
     <div style={{ minHeight: "100vh", background: "transparent", color: "var(--color-text-primary)", display: "flex", flexDirection: "column" }}>
@@ -250,7 +290,7 @@ export default function VerstehenClient() {
             <span style={{ opacity: 0.4 }}>·</span>
             <span>{activeEdges} {de ? "Kausal-Edges" : "Causal edges"}</span>
             <span style={{ opacity: 0.4 }}>·</span>
-            <span>{effectiveSourcesCount} {de ? "Quellen" : "Sources"}</span>
+            <span>{sourcesLabel}</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span>{adoptCount} {de ? "Adopt-Ring" : "Adopt ring"}</span>
           </div>
