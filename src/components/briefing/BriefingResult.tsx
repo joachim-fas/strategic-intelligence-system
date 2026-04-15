@@ -222,7 +222,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             <Button
               variant="ghost" size="sm"
               onClick={openInCanvas}
-              className="text-[12px] px-3 h-7 text-[#9B9B9B] hover:text-[#4A6CF7] gap-1.5"
+              className="text-[12px] px-3 h-7 text-[#9B9B9B] hover:text-[#0A0A0A] gap-1.5"
               aria-label={locale === "de" ? "Im Node Canvas öffnen" : "Open in Node Canvas"}
             >
               <LayoutGrid size={13} />

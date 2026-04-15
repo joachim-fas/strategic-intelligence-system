@@ -87,6 +87,16 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
   const seconds = Math.floor(elapsedMs / 1000);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
+  // Each visual layer here has a narrow job so the whole thing reads as "the
+  // system is actively thinking" without getting noisy:
+  //   - sonar rings radiate from the lime dot (spatial pulse = "scanning")
+  //   - the top shimmer sweeps (linear time = "still running")
+  //   - the bottom progress pill glides (indeterminate = "work in flight")
+  //   - the typing dots after the label animate in sequence (language model = "composing")
+  //   - the card glow breathes (ambient = "alive")
+  // The stagger between them (1.8s / 2.4s / 2.0s / 1.5s / 2.8s) keeps the
+  // rhythm asymmetric and organic — synced loops would read as a single
+  // blinking mass.
   return (
     <div
       role="status"
@@ -94,12 +104,13 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       aria-label={locale === "de" ? `Reasoning läuft, ${mm} Minuten ${ss} Sekunden` : `Reasoning in progress, ${mm} minutes ${ss} seconds`}
       style={{
         display: "flex", alignItems: "center", gap: 14,
-        padding: "0 22px",
-        minHeight: 56,
+        padding: "16px 22px",
+        minHeight: 64,
         borderRadius: "var(--volt-radius-lg, 14px)",
         border: "1.5px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
         position: "relative", overflow: "hidden",
+        animation: "sis-reasoning-breathe 2.8s ease-in-out infinite",
       }}
     >
       {/* Thin shimmer sweep pinned to the top edge. Clipped by overflow:hidden. */}
@@ -111,25 +122,51 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
           animation: "sis-reasoning-shimmer 1.8s linear infinite",
         }}
       />
-      {/* Pulsing dot as the focal animation. */}
+      {/* Sonar wrapper: a stacked pile of rings that emanate outward while the
+           solid dot pulses in place. The wrapper reserves the space so the
+           layout doesn't reflow as rings grow. */}
       <span
         aria-hidden="true"
         style={{
+          position: "relative", width: 14, height: 14,
+          flexShrink: 0,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        {/* Two offset rings for a continuous "scanning" feel. */}
+        <span style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "1.5px solid #E4FF97",
+          animation: "sis-reasoning-ripple 2.4s ease-out infinite",
+        }} />
+        <span style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "1.5px solid #E4FF97",
+          animation: "sis-reasoning-ripple 2.4s ease-out 1.2s infinite",
+        }} />
+        {/* Solid lime dot at the origin — the "emitter". */}
+        <span style={{
+          position: "relative", zIndex: 1,
           width: 10, height: 10, borderRadius: "50%",
           background: "var(--volt-lime, #E4FF97)",
-          border: "1px solid rgba(0,0,0,0.12)",
+          border: "1px solid rgba(0,0,0,0.18)",
           animation: "sis-reasoning-pulse 1.6s ease-in-out infinite",
-          flexShrink: 0,
-        }}
-      />
+        }} />
+      </span>
       <span style={{
+        display: "inline-flex", alignItems: "baseline", gap: 2,
         flex: 1,
         fontSize: 14, fontWeight: 600,
         fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
         color: "var(--volt-text, #0A0A0A)",
         letterSpacing: "-0.01em",
       }}>
-        {locale === "de" ? "Reasoning läuft …" : "Reasoning in progress …"}
+        {locale === "de" ? "Reasoning läuft" : "Reasoning in progress"}
+        {/* Typing dots — staggered so they fill left-to-right, then all clear
+             at once and restart. Keeps the phrase feeling unfinished. */}
+        <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-1 1.5s infinite" }}>.</span>
+        <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-2 1.5s infinite" }}>.</span>
+        <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-3 1.5s infinite" }}>.</span>
       </span>
       <span style={{
         fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
@@ -139,6 +176,24 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
         flexShrink: 0,
       }}>
         {mm}:{ss}
+      </span>
+      {/* Indeterminate progress pill — a slim lime capsule that glides across
+           the full width. Purely ambient: signals "work is flowing", not any
+           specific percentage. */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 3,
+          overflow: "hidden",
+          background: "rgba(228,255,151,0.15)",
+        }}
+      >
+        <span style={{
+          display: "block", height: "100%",
+          background: "linear-gradient(90deg, transparent 0%, #E4FF97 35%, #E4FF97 65%, transparent 100%)",
+          animation: "sis-reasoning-progress 2.0s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+          borderRadius: 2,
+        }} />
       </span>
     </div>
   );
@@ -850,68 +905,65 @@ export default function HomeClient() {
           position: "relative",
         }}>
           {/* Command line for session state (history exists) — stays at top.
-               While reasoning is active, the input is replaced with a compact
-               ReasoningIndicator (shimmer + pulse + mm:ss clock) so the hero
-               slot doesn't sit with a disabled button — the SequentialPipeline
-               card below carries the detailed stage reveal. */}
+               The input now stays visible continuously; the ReasoningIndicator
+               moved to sit UNDER the BriefingResult card so the user can
+               already queue the next question while the current one is still
+               streaming. That's a much better editor-like feel than swapping
+               the whole input out. */}
           {(!isFirstVisit || showFullRadar) && (
-            isAnalyzing ? (
-              <ReasoningIndicator elapsedMs={reasoningElapsedMs} locale={locale} />
-            ) : (
-              <div
+            <div
+              style={{
+                display: "flex", alignItems: "flex-end", gap: 10,
+                padding: "10px 10px 10px 22px",
+                minHeight: 56,
+                borderRadius: "var(--volt-radius-lg, 14px)",
+                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                transition: "border-color 150ms ease",
+                background: "var(--volt-surface-raised, #fff)",
+                position: "relative",
+              }}
+              onClick={() => inputRef.current?.focus()}
+            >
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                placeholder={inputFocused ? "" : (locale === "de" ? "Oder stelle eine Frage …" : "Or ask a question …")}
                 style={{
-                  display: "flex", alignItems: "flex-end", gap: 10,
-                  padding: "10px 10px 10px 22px",
-                  minHeight: 56,
-                  borderRadius: "var(--volt-radius-lg, 14px)",
-                  border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
-                  transition: "border-color 150ms ease",
-                  background: "var(--volt-surface-raised, #fff)",
-                  position: "relative",
+                  flex: 1, border: "none", outline: "none", background: "transparent",
+                  color: "var(--volt-text, #0A0A0A)",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                  lineHeight: 1.5,
+                  resize: "none", overflow: "hidden",
+                  padding: "7px 0",
+                  // Native caret hidden — BlockCursor below draws a wide
+                  // terminal-style cursor that stays glued to selectionStart
+                  // even across soft wraps.
+                  caretColor: "transparent",
                 }}
-                onClick={() => inputRef.current?.focus()}
-              >
-                <textarea
-                  ref={inputRef}
-                  rows={1}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
-                  placeholder={inputFocused ? "" : (locale === "de" ? "Oder stelle eine Frage …" : "Or ask a question …")}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <BlockCursor targetRef={inputRef} value={query} focused={inputFocused} />
+              {query && (
+                <button onClick={() => handleSubmit()}
+                  className="sis-shimmer-btn"
                   style={{
-                    flex: 1, border: "none", outline: "none", background: "transparent",
-                    color: "var(--volt-text, #0A0A0A)",
-                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-                    lineHeight: 1.5,
-                    resize: "none", overflow: "hidden",
-                    padding: "7px 0",
-                    // Native caret hidden — BlockCursor below draws a wide
-                    // terminal-style cursor that stays glued to selectionStart
-                    // even across soft wraps.
-                    caretColor: "transparent",
+                    fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
+                    borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
+                    background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
+                    border: "none", cursor: "pointer",
+                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                   }}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <BlockCursor targetRef={inputRef} value={query} focused={inputFocused} />
-                {query && (
-                  <button onClick={() => handleSubmit()}
-                    className="sis-shimmer-btn"
-                    style={{
-                      fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
-                      borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                      background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
-                      border: "none", cursor: "pointer",
-                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                    }}
-                  >
-                    {locale === "de" ? "Analysieren →" : "Analyze →"}
-                  </button>
-                )}
-              </div>
-            )
+                >
+                  {locale === "de" ? "Analysieren →" : "Analyze →"}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Framework Topic Modal */}
@@ -1635,6 +1687,16 @@ export default function HomeClient() {
               </div>
             );
           })()}
+
+          {/* Reasoning indicator — rendered BELOW the pipeline card so the
+               command line at the top stays free for queueing the next
+               question while reasoning is still running. The old placement
+               (replacing the command line) blocked that flow. */}
+          {isAnalyzing && (
+            <div style={{ animation: "sis-brief-fade 220ms ease-out" }}>
+              <ReasoningIndicator elapsedMs={reasoningElapsedMs} locale={locale} />
+            </div>
+          )}
         </div>
         )}
         <style>{`
