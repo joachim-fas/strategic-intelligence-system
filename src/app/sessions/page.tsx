@@ -1,9 +1,9 @@
 /**
- * /sessions — legacy redirect to /projekte.
+ * /sessions — legacy redirect to /projects.
  *
- * The route was renamed to match the UI label "Projekte". Existing bookmarks
- * and internal links pointing to /sessions keep working via this redirect.
- * Query parameters are preserved.
+ * The route was renamed to match the UI label "Projekte" / "Projects" and
+ * consolidated into English. Existing bookmarks and internal links pointing
+ * to /sessions keep working via this redirect. Query parameters are preserved.
  */
 
 import { redirect } from "next/navigation";
@@ -24,5 +24,5 @@ export default async function SessionsRedirect({
     )
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
-  redirect(qs ? `/projekte?${qs}` : "/projekte");
+  redirect(qs ? `/projects?${qs}` : "/projects");
 }

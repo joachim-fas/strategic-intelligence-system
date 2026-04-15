@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Client-Komponente fuer /admin/mandanten.
+ * Client-Komponente fuer /admin/tenants.
  *
  * Zeigt eine Tabelle aller Tenants mit Stats (Mitglieder, Projekte,
  * Erstellungsdatum, Archiv-Status) + "+ Neuer Mandant"-Button.
@@ -33,7 +33,7 @@ interface Tenant {
   radar_count: number;
 }
 
-export function MandantenClient() {
+export function TenantsClient() {
   const { locale } = useLocale();
   const de = locale === "de";
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -310,7 +310,7 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
             opacity: t.archived_at ? 0.6 : 1,
           }}>
             <Link
-              href={`/admin/mandanten/${t.id}`}
+              href={`/admin/tenants/${t.id}`}
               style={{
                 fontWeight: 600,
                 color: "var(--color-text-primary)",

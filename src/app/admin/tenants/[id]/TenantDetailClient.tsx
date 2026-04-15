@@ -217,7 +217,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       <AppHeader />
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 24px 64px" }}>
         {/* Back */}
-        <Link href="/admin/mandanten" style={{
+        <Link href="/admin/tenants" style={{
           display: "inline-flex", alignItems: "center", gap: 4,
           fontSize: 12, color: "var(--color-text-muted)",
           textDecoration: "none",

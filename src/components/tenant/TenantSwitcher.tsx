@@ -262,7 +262,7 @@ export function TenantSwitcher() {
           )}
           {(role === "owner" || role === "admin") && (
             <Link
-              href="/settings/mandant"
+              href="/settings/tenant"
               onClick={() => setOpen(false)}
               style={footerLinkStyle}
             >
@@ -271,7 +271,7 @@ export function TenantSwitcher() {
           )}
           {canManage && (
             <Link
-              href="/admin/mandanten"
+              href="/admin/tenants"
               onClick={() => setOpen(false)}
               style={footerLinkStyle}
             >

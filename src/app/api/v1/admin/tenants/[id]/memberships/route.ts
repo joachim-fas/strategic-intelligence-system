@@ -9,7 +9,7 @@
  *
  * Gatekeeper: system-admin (users.role = "admin"). Tenant-owners will
  * use the same data via a member-scoped variant in a later phase — for
- * now the /admin/mandanten/[id]/mitglieder UI lives under the system
+ * now the /admin/tenants/[id]/mitglieder UI lives under the system
  * admin tree and uses this endpoint.
  */
 

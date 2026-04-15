@@ -3,7 +3,7 @@
 // TODO: ARC-12 — Namespace collision: src/components/session/ and src/components/sessions/ both active.
 
 /**
- * Shared list of sessions used by both /projekte (active) and /projekte/archiv
+ * Shared list of sessions used by both /projects (active) and /projects/archive
  * (archived). Handles data fetching, row actions (archive / restore / delete),
  * framework categorization (chips + filter), and empty/error states.
  */

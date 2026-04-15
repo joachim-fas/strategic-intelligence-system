@@ -17,7 +17,7 @@ const NAV_ITEMS: Array<{
   labelEn: string;
   matchAlso?: string[];
 }> = [
-  { href: "/projekte",      labelDe: "Projekte",           labelEn: "Projects"          },
+  { href: "/projects",      labelDe: "Projekte",           labelEn: "Projects"          },
   { href: "/cockpit",       labelDe: "Knowledge Cockpit", labelEn: "Knowledge Cockpit" },
 ];
 

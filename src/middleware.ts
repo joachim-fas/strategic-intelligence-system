@@ -42,11 +42,12 @@ const PUBLIC_PATH_PREFIXES: readonly string[] = [
 const PUBLIC_PAGE_PATHS: readonly string[] = [
   "/",               // Landing / main terminal
   "/cockpit",        // Knowledge Cockpit
-  "/projekte",       // Projekte list
+  "/projects",       // Projects list
+  "/projekte",       // Legacy redirect → /projects
   "/workspace",      // Canvas workspace
   "/canvas",         // Direct canvas access
   "/verstehen",      // Legacy redirect → /cockpit
-  "/sessions",       // Legacy redirect → /projekte
+  "/sessions",       // Legacy redirect → /projects
   "/werkstatt",      // Legacy redirect
   "/archiv",         // Legacy redirect
   "/arbeiten",       // Legacy redirect

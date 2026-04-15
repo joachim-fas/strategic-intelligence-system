@@ -1,7 +1,7 @@
 /**
  * /invite/accept?token=… — Landing-Page fuer Tenant-Einladungen.
  *
- * Der Link kommt aus der Admin-UI (/admin/mandanten/[id]/mitglieder)
+ * Der Link kommt aus der Admin-UI (/admin/tenants/[id]/mitglieder)
  * oder einer Invite-Email. Die Seite laedt den Invite-Status ueber
  * /api/v1/invites/accept?token=… und zeigt dem Besucher:
  *
