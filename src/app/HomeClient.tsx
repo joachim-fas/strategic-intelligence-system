@@ -19,7 +19,10 @@ import { FRAMEWORKS } from "@/lib/canvas-templates";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { connectors } from "@/connectors";
 import { BriefingResult, HistoryEntry } from "@/components/briefing/BriefingResult";
-import { SessionBar } from "@/components/session/SessionBar";
+// SessionBar wurde aus der Home-Session-Ansicht entfernt — die Briefing-
+// Ansicht zeigt nur noch das aktive Ergebnis. Zusammenfassung/Canvas-
+// Wechsel leben in der Canvas-Toolbar (/canvas). Projektwahl passiert
+// ueber die "Letzte Projekte"-Liste auf dem Hero.
 import { GrainCard } from "@/components/grain/GrainCard";
 import { GrainBadge } from "@/components/grain/GrainBadge";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -298,15 +301,18 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       {/* Pixel-man walkway — the explicit strip between label and timer where
            the tiny 8-bit character paces back and forth. Anchored position:
            relative so the absolutely-positioned PixelMan animates against this
-           parent's width (the left-% keyframes in sis-pm-walk). minWidth keeps
-           the walkway usable on narrow cards; height matches the figure height
-           so the feet line up just above the progress pill. */}
+           parent's width (the left-% keyframes in sis-pm-walk). overflow:
+           hidden clips the character at the walkway's left/right edges so
+           the entrance/exit animations don't bleed over the "Reasoning
+           läuft" label or the mm:ss timer. minWidth keeps the walkway
+           usable on narrow cards. */}
       <div
         aria-hidden="true"
         style={{
           flex: 1,
           position: "relative",
           alignSelf: "stretch",
+          overflow: "hidden",
           minWidth: 120,
         }}
       >
@@ -380,7 +386,8 @@ export default function HomeClient() {
   // Phase 1+2: Active node within the session. Null = latest. Non-null = user has picked a specific node.
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // Phase 5: Custom session title override (otherwise auto-generated from first query)
-  const [customSessionTitle, setCustomSessionTitle] = useState<string | null>(null);
+  // customSessionTitle — state aus der alten SessionBar entfernt. Canvas
+  // verwaltet Projektnamen jetzt eigenstaendig ueber /api/v1/canvas/:id.
   // Phase 5: Past sessions for the picker dropdown
   const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; queryCount: number; cardCount: number; updatedAt?: string }>>([]);
   const activeProjectIdRef = useRef<string | null>(null);
@@ -425,8 +432,13 @@ export default function HomeClient() {
       .then(r => r.json())
       .then(data => {
         const list = (data?.data?.canvases ?? data?.canvases ?? []) as Array<any>;
+        // Zeige alle benannten Canvases. Frueher wurden leere Projekte
+        // (queryCount === 0) gefiltert, damit die Liste "echte" Sessions
+        // zeigt. Nutzer erwarten aber "zuletzt geoeffnet" — auch wenn noch
+        // keine Query gelaufen ist. Wir behalten nur den Schutz gegen
+        // namenslose Geister-Canvases aus fehlgeschlagenen Creates.
         const sessions = list
-          .filter((c: any) => (c.queryCount || 0) > 0)
+          .filter((c: any) => !!(c.name && String(c.name).trim()))
           .slice(0, 8)
           .map((c: any) => ({
             id: c.id,
@@ -1048,69 +1060,11 @@ export default function HomeClient() {
           padding: isFirstVisit && !showFullRadar ? "0" : "20px 24px 0",
           position: "relative",
         }}>
-          {/* Command line for session state (history exists) — stays at top
-               while no query is running. During reasoning it disappears so
-               the only active UI is the ReasoningIndicator (with its pixel-
-               man promenade) directly above the pipeline card. Having the
-               empty input simultaneously visible at the top read as visual
-               noise — the user explicitly asked for it to go away during
-               reasoning, and it reappears as soon as the query completes
-               so the next question can be queued. */}
-          {(!isFirstVisit || showFullRadar) && !isAnalyzing && (
-            <div
-              style={{
-                display: "flex", alignItems: "flex-end", gap: 10,
-                padding: "10px 10px 10px 22px",
-                minHeight: 56,
-                borderRadius: "var(--volt-radius-lg, 14px)",
-                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
-                transition: "border-color 150ms ease",
-                background: "var(--volt-surface-raised, #fff)",
-                position: "relative",
-              }}
-              onClick={() => inputRef.current?.focus()}
-            >
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                placeholder={inputFocused ? "" : (locale === "de" ? "Oder stelle eine Frage …" : "Or ask a question …")}
-                style={{
-                  flex: 1, border: "none", outline: "none", background: "transparent",
-                  color: "var(--volt-text, #0A0A0A)",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-                  lineHeight: 1.5,
-                  resize: "none", overflow: "hidden",
-                  padding: "7px 0",
-                  // Native caret hidden — BlockCursor below draws a wide
-                  // terminal-style cursor that stays glued to selectionStart
-                  // even across soft wraps.
-                  caretColor: "transparent",
-                }}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <BlockCursor targetRef={inputRef} value={query} focused={inputFocused} />
-              {query && (
-                <button onClick={() => handleSubmit()}
-                  className="sis-shimmer-btn"
-                  style={{
-                    fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
-                    borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                    background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
-                    border: "none", cursor: "pointer",
-                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                  }}
-                >
-                  {locale === "de" ? "Analysieren →" : "Analyze →"}
-                </button>
-              )}
-            </div>
-          )}
+          {/* Session-state follow-up command-line removed: during an active
+               session the only query entry point is the hero command-line on
+               first visit. While a pipeline runs, the ReasoningIndicator
+               (with its pixel-man walkway) is the sole active UI element
+               above the pipeline card. */}
 
           {/* Framework Topic Modal */}
           {frameworkModal && (
@@ -1730,105 +1684,10 @@ export default function HomeClient() {
                 </div>
               )}
 
-              {/* Top-Trends-Vorschau — Einstiegspunkt zur Trend-Vollansicht.
-                   Die Startseite zeigt jetzt auch die 5 relevantesten Trends
-                   aus dem Radar (sortiert nach relevance × impact × confidence),
-                   damit der Nutzer ohne Umweg ueber /verstehen in das Trend-
-                   Material einsteigen kann. Klick auf einen Trend oeffnet
-                   /trends mit Ziel-Anker, "Alle Trends anzeigen" geht direkt
-                   auf die Uebersicht. Mit 5 Pills bei Zeilenumbruch bleibt die
-                   Blockhoehe ~2 Zeilen und sprengt die Centered-Hero-Hoehe
-                   nicht. */}
-              {trends.length > 0 && (() => {
-                const topTrends = [...trends]
-                  .sort((a, b) => {
-                    const sa = (a.relevance ?? 0) * (a.impact ?? 0.5) * (a.confidence ?? 0.5);
-                    const sb = (b.relevance ?? 0) * (b.impact ?? 0.5) * (b.confidence ?? 0.5);
-                    return sb - sa;
-                  })
-                  .slice(0, 5);
-                const ringColor: Record<string, string> = {
-                  adopt: "#0F6038", trial: "#1A4A8A", assess: "#7A5C00", hold: "#6B7280",
-                };
-                return (
-                  <div style={{ marginTop: 28 }}>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      marginBottom: 10, gap: 12,
-                    }}>
-                      <div style={{
-                        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                        fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
-                        color: "var(--volt-text-faint, #BBB)",
-                      }}>
-                        {locale === "de" ? "Top-Trends" : "Top Trends"}
-                      </div>
-                      <a
-                        href="/trends"
-                        style={{
-                          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                          fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-                          color: "var(--volt-text-muted, #6B6B6B)",
-                          textDecoration: "none",
-                          transition: "color 120ms ease",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.color = "var(--volt-text, #0A0A0A)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = "var(--volt-text-muted, #6B6B6B)"; }}
-                      >
-                        {locale === "de" ? "Alle Trends anzeigen →" : "View all trends →"}
-                      </a>
-                    </div>
-                    <div style={{
-                      display: "flex", flexWrap: "wrap", gap: 8,
-                    }}>
-                      {topTrends.map((t) => {
-                        const color = ringColor[t.ring ?? "assess"] ?? ringColor.assess;
-                        return (
-                          <a
-                            key={t.id}
-                            href="/trends"
-                            onClick={() => setSelectedTrend(t)}
-                            style={{
-                              display: "inline-flex", alignItems: "center", gap: 8,
-                              padding: "6px 12px",
-                              borderRadius: 999,
-                              border: "1px solid var(--volt-border, #E8E8E8)",
-                              background: "var(--volt-surface-raised, #fff)",
-                              textDecoration: "none",
-                              color: "var(--volt-text, #0A0A0A)",
-                              fontSize: 12,
-                              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                              transition: "border-color 120ms ease, background-color 120ms ease",
-                              cursor: "pointer",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.borderColor = color;
-                              e.currentTarget.style.backgroundColor = `${color}10`;
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)";
-                              e.currentTarget.style.backgroundColor = "var(--volt-surface-raised, #fff)";
-                            }}
-                          >
-                            <span style={{
-                              width: 6, height: 6, borderRadius: "50%",
-                              background: color, flexShrink: 0,
-                            }} />
-                            <span style={{ fontWeight: 600, letterSpacing: "-0.01em" }}>{t.name}</span>
-                            <span style={{
-                              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
-                              fontSize: 9, color: "var(--volt-text-faint, #AAA)",
-                              textTransform: "uppercase" as const, letterSpacing: "0.08em",
-                            }}>
-                              {(t.ring ?? "assess").toUpperCase()}
-                            </span>
-                          </a>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
+              {/* Top-Trends entfernt — Trends leben ausschliesslich im
+                   Knowledge Cockpit (/verstehen) bzw. unter /trends. Die
+                   Startseite zeigt stattdessen nur noch die Letzte-Projekte-
+                   Liste, damit das Centered-Hero ruhig bleibt. */}
             </div>
           </div>
         )}
@@ -1836,71 +1695,11 @@ export default function HomeClient() {
         {/* Results — Phase 1+2: Session Bar + Active Node rendering. Only rendered when there is content, so the empty-state gradient command line can claim the full flex space. Bottom padding clears the fixed SignalTicker. */}
         {!isFirstVisit && (
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 60px", maxWidth: 960, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Session Bar: only when history has 2+ entries. The single-shot experience stays clean. */}
-          {history.length >= 2 && (() => {
-            // Ensure the active entry is valid; default to latest (index 0, since history is newest-first).
-            const resolvedActiveId = activeNodeId && history.find(h => (h.id ?? h.query) === activeNodeId)
-              ? activeNodeId
-              : (history[0].id ?? history[0].query);
-            const autoTitle = history[history.length - 1]?.query ?? "Projekt";
-            const sessionTitle = customSessionTitle || autoTitle;
-            return (
-              <SessionBar
-                sessionTitle={sessionTitle}
-                nodes={[...history].reverse().map(h => ({
-                  id: h.id ?? h.query,
-                  query: h.query,
-                  isLoading: h.isLoading,
-                  hasError: !!h.error,
-                }))}
-                activeNodeId={resolvedActiveId}
-                onNodeClick={(id) => setActiveNodeId(id)}
-                onNewSession={() => {
-                  if (!window.confirm(locale === "de" ? "Aktuelles Projekt beenden und neues starten?" : "End current project and start new?")) return;
-                  clearHistoryStorage();
-                  setHistory([]);
-                  setActiveNodeId(null);
-                  setCustomSessionTitle(null);
-                  activeProjectIdRef.current = null;
-                  setActiveProjectId(null);
-                  setQuery("");
-                  inputRef.current?.focus();
-                }}
-                onOpenCanvas={() => {
-                  const pid = activeProjectIdRef.current;
-                  window.location.href = pid ? `/canvas?project=${pid}` : "/canvas";
-                }}
-                onOpenSummary={() => {
-                  const pid = activeProjectIdRef.current;
-                  if (pid) {
-                    window.location.href = `/canvas/${pid}/zusammenfassung`;
-                  } else {
-                    window.location.href = "/canvas";
-                  }
-                }}
-                onTitleChange={(newTitle) => {
-                  setCustomSessionTitle(newTitle);
-                  // Also rename the canvas project so it's reflected in the picker and elsewhere
-                  const pid = activeProjectIdRef.current;
-                  if (pid) {
-                    fetchWithTimeout(`/api/v1/canvas/${pid}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ name: newTitle }),
-                    }).catch(() => {});
-                  }
-                }}
-                pastSessions={pastSessions}
-                onPickSession={(id) => {
-                  // Switch to selected canvas project — navigate for direct access
-                  activeProjectIdRef.current = id;
-                  setActiveProjectId(id);
-                  window.location.href = `/canvas?project=${id}`;
-                }}
-                de={locale === "de"}
-              />
-            );
-          })()}
+          {/* Session Bar removed: the step-pill bar (with Zusammenfassung /
+               Canvas shortcuts) was intentionally dropped from the briefing
+               view so each result stands on its own. Project switching and
+               the "Zusammenfassung" entry point live in /canvas now (next to
+               the Orbit toggle), not here. */}
 
           {/* Active Briefing: show only the currently-focused entry with crossfade animation */}
           {history.length > 0 && (() => {

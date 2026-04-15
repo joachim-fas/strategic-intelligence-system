@@ -42,6 +42,7 @@ import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
   ArrowDown, ArrowRight, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import type {
   UsedSignal, Scenario, Reference, MatchedTrend,
@@ -6793,7 +6794,13 @@ export default function CanvasPage() {
         </div>
 
         {/* ── CENTER: View mode tabs (primary navigation) ─────────────── */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+        {/* Canvas / Board / Timeline / Orbit bleiben in der Segmented-Group,
+             weil sie echte View-Modi sind (Umschalten, nicht Navigieren).
+             Die "Zusammenfassung" ist eine Navigation in den Briefing-Mode
+             und lebt deshalb daneben — nicht IM Pill-Switch, aber visuell
+             angegliedert, damit der Einstieg weg von der Startseite hier
+             zentral verfuegbar bleibt. */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
           <div style={{
             display: "inline-flex",
             alignItems: "center",
@@ -6844,6 +6851,34 @@ export default function CanvasPage() {
               );
             })}
           </div>
+
+          {/* Zusammenfassung — separate Navigations-Button direkt neben der
+               View-Group. Frueher lag dieser Einstieg in der SessionBar auf
+               der Startseite; die SessionBar wurde entfernt, damit die
+               Briefing-Ansicht ruhig bleibt. Der Button navigiert auf die
+               Read-Only-Zusammenfassungsseite und ist nur aktiv, wenn ein
+               projectId verfuegbar ist — sonst haetten wir eine tote Route. */}
+          {projectId && (
+            <Tooltip content={de ? "Zusammenfassung: Ergebnisse des Projekts als Briefing" : "Summary: project results as briefing"} placement="bottom">
+              <button
+                onClick={() => { window.location.href = `/canvas/${projectId}/zusammenfassung`; }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 11, fontWeight: 600, padding: "5px 11px",
+                  borderRadius: 8, border: "1px solid var(--color-border)",
+                  background: "transparent",
+                  color: "var(--color-text-secondary)",
+                  cursor: "pointer", transition: "all 0.12s",
+                  fontFamily: "var(--font-ui)",
+                }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
+              >
+                <Sparkles size={12} />
+                <span>{de ? "Zusammenfassung" : "Summary"}</span>
+              </button>
+            </Tooltip>
+          )}
         </div>
 
         {/* ── RIGHT: Compact action buttons ─────────────────────────── */}
