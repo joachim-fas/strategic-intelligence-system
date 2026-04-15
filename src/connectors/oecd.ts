@@ -4,9 +4,12 @@ import { SourceConnector, RawSignal } from "./types";
  * OECD Data Connector — completely free, no API key required
  *
  * Tracks key economic and policy indicators from OECD member countries.
- * Data from the official OECD.Stat SDMX-JSON API.
+ * Data from the official OECD SDMX-JSON 2.0 API at sdmx.oecd.org. The
+ * legacy `stats.oecd.org/SDMX-JSON/...` hostname was decommissioned and
+ * now 301-redirects to a static page, which is why the old connector
+ * returned zero.
  *
- * API: https://data.oecd.org/api/sdmx-json-documentation/
+ * API: https://sdmx.oecd.org/public/rest/
  * License: OECD Terms & Conditions (free for non-commercial use)
  */
 
@@ -17,25 +20,18 @@ const OECD_INDICATORS: {
   unit: string;
 }[] = [
   {
-    // GDP quarterly growth, G7 countries
-    url: "https://stats.oecd.org/SDMX-JSON/data/QNA/DEU+USA+FRA+GBR.B1_GS1.GPSA.Q/OECD?lastNObservations=4&format=jsondata",
-    label: "GDP Growth (G7 Quarterly)",
+    // Composite Leading Indicators (CLI): amplitude-adjusted index.
+    url: "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI/all/all?lastNObservations=3&dimensionAtObservation=AllDimensions&format=jsondata",
+    label: "Composite Leading Indicators",
     topic: "Economic Trends",
-    unit: "% QoQ",
+    unit: "index",
   },
   {
-    // Unemployment rate
-    url: "https://stats.oecd.org/SDMX-JSON/data/STLABOUR/DEU+USA+FRA+GBR+OECD.UNEMA.ST.M/OECD?lastNObservations=3&format=jsondata",
-    label: "Unemployment Rate (OECD)",
+    // Monthly unemployment level (labour force survey)
+    url: "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_LFS@DF_IALFS_UNE_M/all/all?lastNObservations=3&dimensionAtObservation=AllDimensions&format=jsondata",
+    label: "Unemployment (monthly, OECD)",
     topic: "Future of Work",
     unit: "%",
-  },
-  {
-    // CPI inflation
-    url: "https://stats.oecd.org/SDMX-JSON/data/PRICES_CPI/DEU+USA+OECD.CPALTT01.GY.M/OECD?lastNObservations=3&format=jsondata",
-    label: "CPI Inflation (OECD)",
-    topic: "Economic Trends",
-    unit: "% YoY",
   },
 ];
 
@@ -48,24 +44,40 @@ export const oecdConnector: SourceConnector = {
 
     for (const ind of OECD_INDICATORS) {
       try {
+        // NOTE: sdmx.oecd.org 500s when we send certain header combinations
+        // (e.g. a `User-Agent` with a mailto: part + `Accept: application/json`).
+        // A bare request returns JSON (`format=jsondata` in the URL is
+        // enough); adding headers is what breaks content negotiation.
         const res = await fetch(ind.url, {
-          headers: { "User-Agent": "SIS/1.0 (mailto:sis@strategic-intelligence.app)", Accept: "application/json" },
           signal: AbortSignal.timeout(20000),
         });
         if (!res.ok) continue;
 
         const data = await res.json();
-        // SDMX-JSON structure: data.dataSets[0].series → keyed by dimension indices
-        const series = data?.dataSets?.[0]?.series;
-        if (!series) continue;
+        // SDMX-JSON 2.0: when dimensionAtObservation=AllDimensions, numeric
+        // observations live directly on dataSets[0].observations as a flat
+        // keyed map (no intermediate `series` wrapper). The old connector
+        // walked `dataSets[0].series`, which doesn't exist in this shape,
+        // so every indicator was dropped silently.
+        const ds = data?.data?.dataSets?.[0] ?? data?.dataSets?.[0];
+        const obs: Record<string, unknown[]> =
+          ds?.observations ?? ds?.series ?? {};
+        if (!obs || Object.keys(obs).length === 0) continue;
 
         const allValues: number[] = [];
-        for (const key of Object.keys(series)) {
-          const obs = series[key]?.observations;
-          if (!obs) continue;
-          for (const obsKey of Object.keys(obs)) {
-            const v = obs[obsKey]?.[0];
-            if (v != null && !isNaN(v)) allValues.push(v);
+        for (const key of Object.keys(obs)) {
+          const entry = obs[key];
+          // Each entry is either [value, ...flags] (AllDimensions) or
+          // { observations: {...} } (legacy series shape).
+          if (Array.isArray(entry)) {
+            const v = entry[0] as number | null | undefined;
+            if (v != null && Number.isFinite(v)) allValues.push(v as number);
+          } else if (entry && typeof entry === "object" && "observations" in (entry as Record<string, unknown>)) {
+            const inner = (entry as { observations: Record<string, unknown[]> }).observations;
+            for (const ok of Object.keys(inner)) {
+              const v = inner[ok]?.[0] as number | null | undefined;
+              if (v != null && Number.isFinite(v)) allValues.push(v as number);
+            }
           }
         }
 

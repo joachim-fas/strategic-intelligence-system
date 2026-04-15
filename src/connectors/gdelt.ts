@@ -12,17 +12,21 @@ import { SourceConnector, RawSignal } from "./types";
 
 const GDELT_BASE = "https://api.gdeltproject.org/api/v2/doc/doc";
 
+// GDELT syntax note: multi-term boolean queries MUST wrap the OR'd terms in
+// parentheses. Requests without parens come back as 200 + the plain-text
+// error "Queries containing OR'd terms must be surrounded by ().", which
+// JSON.parse then throws on. Ten silent throws = zero signals.
 const TREND_QUERIES: { query: string; topic: string; label: string }[] = [
-  { query: "artificial intelligence OR machine learning OR AI regulation", topic: "Artificial Intelligence & Automation", label: "AI" },
-  { query: "climate change OR global warming OR carbon emissions", topic: "Climate Change & Sustainability", label: "Climate" },
-  { query: "cyberattack OR ransomware OR data breach OR cybersecurity", topic: "Cybersecurity & Zero Trust", label: "Cyber" },
-  { query: "geopolitical tension OR sanctions OR trade war", topic: "Geopolitical Fragmentation", label: "Geopolitics" },
-  { query: "renewable energy OR solar OR wind power OR energy transition", topic: "Energy Transition & Decarbonization", label: "Energy" },
-  { query: "quantum computing OR quantum advantage", topic: "Quantum Computing", label: "Quantum" },
-  { query: "autonomous vehicles OR self-driving", topic: "Mobility & Autonomous Transport", label: "Autonomous" },
-  { query: "blockchain OR cryptocurrency regulation OR CBDC", topic: "Web3 & Decentralization", label: "Crypto/Web3" },
-  { query: "pandemic preparedness OR disease outbreak OR WHO alert", topic: "Health, Biotech & Longevity", label: "Health" },
-  { query: "supply chain disruption OR semiconductor shortage", topic: "Economic Trends", label: "Supply Chain" },
+  { query: "(\"artificial intelligence\" OR \"machine learning\" OR \"AI regulation\")", topic: "Artificial Intelligence & Automation", label: "AI" },
+  { query: "(\"climate change\" OR \"global warming\" OR \"carbon emissions\")", topic: "Climate Change & Sustainability", label: "Climate" },
+  { query: "(cyberattack OR ransomware OR \"data breach\" OR cybersecurity)", topic: "Cybersecurity & Zero Trust", label: "Cyber" },
+  { query: "(\"geopolitical tension\" OR sanctions OR \"trade war\")", topic: "Geopolitical Fragmentation", label: "Geopolitics" },
+  { query: "(\"renewable energy\" OR solar OR \"wind power\" OR \"energy transition\")", topic: "Energy Transition & Decarbonization", label: "Energy" },
+  { query: "(\"quantum computing\" OR \"quantum advantage\")", topic: "Quantum Computing", label: "Quantum" },
+  { query: "(\"autonomous vehicles\" OR \"self-driving\")", topic: "Mobility & Autonomous Transport", label: "Autonomous" },
+  { query: "(blockchain OR \"cryptocurrency regulation\" OR CBDC)", topic: "Web3 & Decentralization", label: "Crypto/Web3" },
+  { query: "(\"pandemic preparedness\" OR \"disease outbreak\" OR \"WHO alert\")", topic: "Health, Biotech & Longevity", label: "Health" },
+  { query: "(\"supply chain disruption\" OR \"semiconductor shortage\")", topic: "Economic Trends", label: "Supply Chain" },
 ];
 
 export const gdeltConnector: SourceConnector = {
@@ -32,9 +36,21 @@ export const gdeltConnector: SourceConnector = {
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];
 
-    for (const { query, topic, label } of TREND_QUERIES) {
+    // GDELT rate-limits anonymous clients. Burst requests earn a 429; spacing
+    // them ~3 s apart avoids the limiter while keeping the overall connector
+    // runtime in a reasonable band (~30 s for ten queries). If we tighten
+    // this further the API starts returning 429 again.
+    const RATE_DELAY_MS = 3000;
+    const fromStr = `${getYesterdayStr()}000000`;
+    const toStr = `${getTodayStr()}235959`;
+
+    for (let i = 0; i < TREND_QUERIES.length; i++) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, RATE_DELAY_MS));
+      }
+      const { query, topic, label } = TREND_QUERIES[i];
       try {
-        const url = `${GDELT_BASE}?query=${encodeURIComponent(query)}&mode=ArtList&maxrecords=10&format=json&startdatetime=${getYesterdayStr()}000000&enddatetime=${getTodayStr()}235959`;
+        const url = `${GDELT_BASE}?query=${encodeURIComponent(query)}&mode=ArtList&maxrecords=10&format=json&startdatetime=${fromStr}&enddatetime=${toStr}`;
 
         const res = await fetch(url, {
           headers: { Accept: "application/json" },
@@ -52,7 +68,9 @@ export const gdeltConnector: SourceConnector = {
         if (articles.length === 0) continue;
 
         // Aggregate: article count = signal strength
-        const domains = new Set(articles.map((a: any) => new URL(a.url).hostname).filter(Boolean));
+        const domains = new Set(articles.map((a: { url?: string }) => {
+          try { return a.url ? new URL(a.url).hostname : null; } catch { return null; }
+        }).filter(Boolean));
 
         signals.push({
           sourceType: "gdelt",
@@ -64,7 +82,7 @@ export const gdeltConnector: SourceConnector = {
           rawData: {
             articleCount: articles.length,
             domainCount: domains.size,
-            topArticles: articles.slice(0, 3).map((a: any) => ({ title: a.title, url: a.url, domain: a.domain })),
+            topArticles: articles.slice(0, 3).map((a: { title?: string; url?: string; domain?: string }) => ({ title: a.title, url: a.url, domain: a.domain })),
           },
           detectedAt: new Date(),
         });

@@ -66,23 +66,29 @@ async function runWithConcurrency<T>(
   limit: number,
 ): Promise<PromiseSettledResult<T>[]> {
   const results: PromiseSettledResult<T>[] = [];
-  const executing: Promise<void>[] = [];
+  const executing = new Set<Promise<void>>();
   for (const task of tasks) {
-    const p = task().then(
+    // Wrap each task so it (a) always settles, (b) removes itself from the
+    // in-flight set exactly when it completes — not when Promise.race happens
+    // to fire. The old version called `executing.findIndex((e) => e === p)`
+    // right after racing and spliced the JUST-ADDED promise, orphaning the
+    // one that actually finished and causing long-running connectors (GDELT
+    // with its 3 s rate-limit backoff) to be dropped from results because
+    // the outer function returned before they pushed.
+    let self: Promise<void>;
+    self = task().then(
       (value) => {
         results.push({ status: "fulfilled", value });
+        executing.delete(self);
       },
       (reason) => {
         results.push({ status: "rejected", reason });
+        executing.delete(self);
       },
     );
-    executing.push(p);
-    if (executing.length >= limit) {
+    executing.add(self);
+    if (executing.size >= limit) {
       await Promise.race(executing);
-      executing.splice(
-        executing.findIndex((e) => e === p),
-        1,
-      );
     }
   }
   await Promise.all(executing);

@@ -6,7 +6,9 @@ import { SourceConnector, RawSignal } from "./types";
  * Open markets on politics, economics, and world events.
  * Public market listing requires no auth.
  *
- * API: https://trading-api.kalshi.com/trade-api/v2/
+ * API: https://api.elections.kalshi.com/trade-api/v2/
+ * (The old `trading-api.kalshi.com` host now returns 401 + a migration notice;
+ * the elections subdomain is the current public listing endpoint.)
  */
 
 const CATEGORY_TOPICS: Record<string, string> = {
@@ -28,7 +30,7 @@ export const kalshiConnector: SourceConnector = {
 
     try {
       const res = await fetch(
-        "https://trading-api.kalshi.com/trade-api/v2/markets?limit=20&status=open",
+        "https://api.elections.kalshi.com/trade-api/v2/markets?limit=20&status=open",
         {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(20000),

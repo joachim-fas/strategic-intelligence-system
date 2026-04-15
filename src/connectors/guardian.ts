@@ -39,7 +39,10 @@ export const guardianConnector: SourceConnector = {
       // SEC-09: Guardian API requires api-key as a query param; it does not support
       // header-based auth. See https://open-platform.theguardian.com/documentation/
       // TODO: SEC-09 — Guardian API only supports query-param auth (api-key=...). No header alternative available.
-      const url = `https://content.guardianapis.com/search?q=*&order-by=newest&show-fields=trailText,headline&page-size=20&api-key=${key}`;
+      // NOTE: The query `q=*` returns zero hits because Guardian's search rejects
+      // the wildcard. Omitting `q` falls back to the full content stream — that's
+      // the closest equivalent to "latest across all sections" for this endpoint.
+      const url = `https://content.guardianapis.com/search?order-by=newest&show-fields=trailText,headline&page-size=20&api-key=${key}`;
 
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
