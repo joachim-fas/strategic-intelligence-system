@@ -849,102 +849,101 @@ h1, h2, h3, h4, h5, h6 {
 /* ──────────────────────────────────────────────────────────────────────
    Reasoning indicator: pixel-man promenade
    ──────────────────────────────────────────────────────────────────────
-   A detailed 8-bit character (Mario-inspired: red cap, brown hair, skin
-   face, red shirt with gray shoulder pads, black belt, red pants, black
-   boots) paces right-to-left across the walkway strip between the
-   "Reasoning läuft" label and the mm:ss timer. The master timeline is
-   10 seconds per cycle and deliberately asymmetric: three walking
-   segments separated by three standing-still moments where the character
-   scratches their head or looks around. A 10s cycle (vs the earlier 18s)
-   makes the figure feel livelier — you notice the motion without waiting
-   20 seconds for the next dwell.
+   A tiny 8-bit character drawn in side-view profile (hat with forward
+   visor, one visible eye facing the walk direction, single near-arm,
+   two legs in stride) paces across the walkway between the "Reasoning
+   läuft" label and the mm:ss timer. Master timeline is 10 seconds per
+   cycle with three walking segments separated by three standing still
+   moments. The figure is deliberately small (~55% of the earlier
+   footprint) so it doesn't dominate the reasoning card.
 
-   Why animate `left` instead of `transform: translateX`:
-   translateX percentages refer to the element's own width (30px), so
+   DOM structure:
+     <div.sis-pixel-man>      — position + left-walk animation + vertical centering
+       <div.pm-facing>        — scaleX(-1) during the look-around dwell
+         <svg>                — the actual pixel art (side-view facing LEFT)
+
+   Why this split:
+   The outer wrapper needs `transform: translateY(-50%)` to vertically
+   center in the walkway (combined with top: 50%). We can't also use
+   transform to flip horizontally — they'd fight. So the flip lives on
+   a separate inner wrapper. Legs and arms still animate on individual
+   SVG rects.
+
+   Why animate `left` rather than `transform: translateX`:
+   translateX percentages refer to the element's own width (~20px), so
    they can't span a variable-width walkway. Animating `left` as a
    percentage of the parent walkway means the figure always walks the
-   full strip, whether the card is 400px or 700px wide. The small perf
-   cost vs a transform is fine for a 30px pixel-art figure.
+   full strip regardless of card width.
 
-   How the body parts stay in sync with the master cycle:
-   - The outer .sis-pixel-man element owns sis-pm-walk (left: 100% →
-     -30px over 10s, with three dwell windows).
-   - The legs run their own ~350ms step cycle independent of the master,
-     so they shuffle continuously; during the dwell windows the body
-     doesn't translate, so legs appear to shuffle in place (reads as
-     "fidgeting").
-   - The scratch arm and rotating head each run a 10s keyframe whose
-     percentage windows match the master's dwell windows exactly —
-     they're still for most of the loop and only animate during the
-     dwells at 22-30% (scratch), 52-58% (look around), and 82-86%
-     (scratch again).
+   Sync points between keyframes:
+   - Walk dwells at 22-30%, 52-60%, 82-86%
+   - Scratch arm rises at 22-30% and 82-86% (matches dwells 1 and 3)
+   - Facing flips to RIGHT at 53-56% (inside dwell 2), briefly back, then
+     right again at 58-60%, then settles LEFT for the remaining walk
    ────────────────────────────────────────────────────────────────────── */
 
 /* Master horizontal motion. Starts off-screen right of the walkway,
  * walks to three stopping points across the strip, continues off-screen
  * left. Animates `left` against the walkway's width so the figure always
- * traverses the full strip regardless of card width (%' in left refers
- * to the parent). Plateaus (same value on successive keyframes) create
- * the dwell windows. Linear timing — segment speeds are controlled by
- * spacing the keyframes, not easing. */
+ * traverses the full strip regardless of card width. Plateaus (same
+ * value on successive keyframes) create the dwell windows. */
 @keyframes sis-pm-walk {
   0%   { left: 100%; }        /* just off-screen right of the walkway */
   22%  { left: 70%; }         /* arrives at first rest point */
   30%  { left: 70%; }         /* dwell 1: scratch head */
   52%  { left: 40%; }         /* walks to middle */
-  58%  { left: 40%; }         /* dwell 2: look around */
-  82%  { left: 12%; }         /* walks to near-left */
-  86%  { left: 12%; }         /* dwell 3: scratch head again */
-  100% { left: -30px; }       /* exits off-screen left (30px = char width) */
+  60%  { left: 40%; }         /* dwell 2: look around (longer so the flip is readable) */
+  82%  { left: 14%; }         /* walks to near-left */
+  86%  { left: 14%; }         /* dwell 3: scratch head again */
+  100% { left: -20px; }       /* exits off-screen left (20px = char width) */
+}
+
+/* Direction flip for the look-around dwell. The character walks and
+ * stands with scaleX(1) (facing LEFT, matching walk direction). During
+ * dwell 2 it briefly flips to face RIGHT twice — reads as "looking
+ * right, then left, then right again" which is what the user asked
+ * for instead of the earlier head-only rotation. */
+@keyframes sis-pm-facing {
+  0%,   52%  { transform: scaleX(1); }    /* default: face left */
+  53%,  55%  { transform: scaleX(-1); }   /* turn right */
+  56%,  57%  { transform: scaleX(1); }    /* glance back left */
+  58%,  60%  { transform: scaleX(-1); }   /* turn right again */
+  61%, 100%  { transform: scaleX(1); }    /* resume facing left for the rest of the cycle */
 }
 
 /* Leg step cycle. Two legs alternate: one is "down" while the other is
- * "up-and-forward". Using steps(1) gives the characteristic retro
- * 2-frame hop instead of smooth interpolation. 350ms per full cycle
- * (~175ms per step) matches a slightly brisk walk — faster than the
- * old 500ms so the figure looks energetic rather than plodding. */
+ * "up-and-forward". steps(1) gives the characteristic retro 2-frame
+ * hop instead of smooth interpolation. 350ms per full cycle matches a
+ * brisk walk. Because viewBox units are smaller now (2x scale), the
+ * translateY is 1px rather than 1.5px. */
 @keyframes sis-pm-leg-l {
   0%, 49%   { transform: translateY(0); }
-  50%, 100% { transform: translateY(-1.5px); }
+  50%, 100% { transform: translateY(-1px); }
 }
 @keyframes sis-pm-leg-r {
-  0%, 49%   { transform: translateY(-1.5px); }
+  0%, 49%   { transform: translateY(-1px); }
   50%, 100% { transform: translateY(0); }
 }
 
-/* Foot lift mirrors the leg above it so the foot stays glued during
- * the walk — otherwise the legs detach visually from the feet. */
+/* Foot lift mirrors the leg above it so the foot stays glued. */
 @keyframes sis-pm-foot-l {
   0%, 49%   { transform: translateY(0); }
-  50%, 100% { transform: translateY(-1.5px); }
+  50%, 100% { transform: translateY(-1px); }
 }
 @keyframes sis-pm-foot-r {
-  0%, 49%   { transform: translateY(-1.5px); }
+  0%, 49%   { transform: translateY(-1px); }
   50%, 100% { transform: translateY(0); }
 }
 
-/* Right arm (viewer's right) raises to the head during two dwell
- * windows. Stays low (translate 0) the rest of the time. Two distinct
- * scratch windows match the two scratch dwells in sis-pm-walk (22-30%
- * and 82-86%). */
+/* Near-arm raises up-forward to the head during dwells 1 and 3. The
+ * translation flips correctly when scaleX(-1) is applied at the parent:
+ * the arm stays attached to the shoulder that's now on the right. */
 @keyframes sis-pm-scratch {
-  0%,   22% { transform: translate(0, 0); }
-  24%,  26% { transform: translate(-1.5px, -2.5px); }
-  27%,  29% { transform: translate(-1.5px, -3.5px); }
-  30%,  82% { transform: translate(0, 0); }
-  83%,  84% { transform: translate(-1.5px, -2.5px); }
-  85%      { transform: translate(-1.5px, -3.5px); }
-  86%, 100% { transform: translate(0, 0); }
-}
-
-/* Head turns left/right during the middle dwell (52-58%). Rotation
- * origin is the neck joint (bottom-center of the head group). Four
- * quick turns inside the window read as "looking around nervously". */
-@keyframes sis-pm-look {
-  0%,   52% { transform: rotate(0deg); }
-  53%,  54% { transform: rotate(-16deg); }
-  56%,  57% { transform: rotate(16deg); }
-  58%, 100% { transform: rotate(0deg); }
+  0%,   22%  { transform: translate(0, 0); }
+  24%,  30%  { transform: translate(2px, -4px); }     /* up-forward to temple */
+  32%,  82%  { transform: translate(0, 0); }
+  84%,  86%  { transform: translate(2px, -4px); }
+  88%, 100%  { transform: translate(0, 0); }
 }
 
 /* Eye blinks: rare, short. Two blinks per master cycle (every ~5s). */
@@ -956,33 +955,44 @@ h1, h2, h3, h4, h5, h6 {
   66%, 100% { opacity: 1; }
 }
 
-/* The pixel-man is positioned relative to its walkway parent (a flex:1
- * strip between label and timer in ReasoningIndicator). `bottom: 4px`
- * keeps the feet just above the 3px progress pill at the card bottom. */
+/* Outer wrapper — owns position + horizontal walk + vertical centering. */
 .sis-pixel-man {
   position: absolute;
-  bottom: 4px;
+  top: 50%;
   left: 100%;
+  transform: translateY(-50%);   /* vertically centered in the walkway strip */
   z-index: 1;
   pointer-events: none;
   animation: sis-pm-walk 10s linear infinite;
   will-change: left;
+}
+
+/* Facing wrapper — owns the scaleX(-1) flip during look-around. */
+.sis-pixel-man .pm-facing {
+  display: block;
+  animation: sis-pm-facing 10s linear infinite;
+  transform-origin: center center;
+}
+
+/* Pixel-rendering hints live on the SVG itself (the outer wrapper is a
+ * plain div and image-rendering only applies to images/SVG). */
+.sis-pixel-man svg {
+  display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
+
 .sis-pixel-man .pm-leg-l  { animation: sis-pm-leg-l 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
 .sis-pixel-man .pm-leg-r  { animation: sis-pm-leg-r 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
 .sis-pixel-man .pm-foot-l { animation: sis-pm-foot-l 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
 .sis-pixel-man .pm-foot-r { animation: sis-pm-foot-r 350ms steps(1) infinite; transform-box: fill-box; transform-origin: center top; }
 .sis-pixel-man .pm-arm-r  { animation: sis-pm-scratch 10s linear infinite; transform-box: fill-box; transform-origin: center top; }
-.sis-pixel-man .pm-head   { animation: sis-pm-look 10s linear infinite; transform-box: fill-box; transform-origin: center bottom; }
 .sis-pixel-man .pm-eye    { animation: sis-pm-blink 5s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   .sis-pixel-man,
   .sis-pixel-man * { animation: none !important; }
-  /* Park the figure visibly in the middle of the walkway instead of
-     leaving it off-screen or stuck at `left: 100%`. */
+  /* Park the figure visibly in the middle of the walkway. */
   .sis-pixel-man { left: 45%; }
 }
 

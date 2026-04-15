@@ -75,25 +75,37 @@ function buildFrameworkQuery(
 }
 
 /**
- * Detailed 8-bit character that walks right-to-left along the walkway strip
- * between the "Reasoning läuft" label and the mm:ss timer inside the
- * ReasoningIndicator. Inspired by the classic Mario-style pixel hero the user
- * provided as reference: red cap, brown hair peeking out at the temples, a
- * skin-tone face with a single pixel eye, red shirt with gray shoulder pads
- * and sleeves, black belt, red pants, black boots. Multi-colour instead of
- * the earlier monochrome silhouette so it reads as a character at the small
- * render size.
+ * Tiny 8-bit character drawn in true side-view profile (like classic
+ * platformer sprites) that paces across the walkway between the
+ * "Reasoning läuft" label and the mm:ss timer. Mario-inspired colouring:
+ * red cap with a visor brim pointing in the walk direction, brown hair
+ * peeking out at the back, skin-tone face with a single pixel eye facing
+ * the walk direction, red shirt with gray shoulder pads, one visible
+ * near-arm, black belt, red pants, two legs in mid-stride, black boots
+ * with toes pointing forward.
  *
- * Built as a single SVG with body-part `<g>` groups and labelled rects so
- * CSS keyframes in globals.css can drive parts independently:
- *   - .pm-head   — rotates at the neck during the "look around" dwell
- *   - .pm-arm-r  — raises to the head during the two scratch dwells
- *   - .pm-leg-l/-r + .pm-foot-l/-r — alternating step cycle (retro 2-frame)
- *   - .pm-eye    — rare blink so the figure isn't a blank stare
+ * Side-view design choices that matter for the animation:
+ *   - Default orientation faces LEFT (the walk direction). The eye and
+ *     hat brim are on the left side of the sprite so it "reads" left.
+ *   - Direction flips for the look-around dwell via scaleX(-1) on the
+ *     .pm-facing wrapper — see sis-pm-facing keyframes in globals.css.
+ *     This replaces the earlier head-rotation trick with an honest
+ *     right-facing side view.
+ *   - Two legs in profile (back leg + front leg) alternate heights via
+ *     pm-leg-l/-r to make a retro 2-frame walk cycle.
+ *   - The near-arm (.pm-arm-r) raises up-forward to the head during the
+ *     two scratch dwells.
+ *   - Rare blink on .pm-eye keeps the stare from feeling frozen.
  *
- * Pixel grid is 10x14 (viewBox), rendered at 30x42 CSS px (3x scale). The
- * `shapeRendering="crispEdges"` hint keeps the blocks sharp even when the
- * browser decides to anti-alias.
+ * Wrapper structure:
+ *   <div.sis-pixel-man>          — owns position + left walk animation
+ *     <div.pm-facing>            — owns the scaleX flip for look-around
+ *       <svg>                    — the actual pixel art
+ *
+ * Pixel grid is 10x14 (viewBox), rendered at 20x28 CSS px (2x scale) —
+ * ~55% of the earlier character's footprint so the figure doesn't
+ * dominate the reasoning card any more. `shapeRendering="crispEdges"`
+ * plus `image-rendering: pixelated` in CSS keeps blocks sharp.
  */
 function PixelMan() {
   // Palette next to the art so tweaking stays in one place.
@@ -104,68 +116,73 @@ function PixelMan() {
   const GRAY = "#8E8E8E";      // shoulder pads, sleeves, hands
   const BLACK = "#0A0A0A";     // belt, boots
   return (
-    <svg
-      className="sis-pixel-man"
-      width="30" height="42" viewBox="0 0 10 14"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* HEAD GROUP — rotates around the neck joint (bottom-center) during look dwell. */}
-      <g className="pm-head">
-        {/* Row 0 — hat top */}
-        <rect x="3" y="0" width="4" height="1" fill={RED} />
-        {/* Row 1 — hat main brim */}
-        <rect x="2" y="1" width="6" height="1" fill={RED} />
-        {/* Row 2 — brown hair at temples + red hat band across the forehead */}
-        <rect x="1" y="2" width="2" height="1" fill={BROWN} />
-        <rect x="3" y="2" width="4" height="1" fill={RED} />
-        <rect x="7" y="2" width="2" height="1" fill={BROWN} />
-        {/* Row 3 — sideburns + face + single-pixel eye */}
-        <rect x="1" y="3" width="1" height="1" fill={BROWN} />
-        <rect x="2" y="3" width="3" height="1" fill={SKIN} />
-        <rect className="pm-eye" x="5" y="3" width="1" height="1" fill={EYE} />
-        <rect x="6" y="3" width="2" height="1" fill={SKIN} />
-        <rect x="8" y="3" width="1" height="1" fill={BROWN} />
-        {/* Row 4 — full face */}
-        <rect x="2" y="4" width="6" height="1" fill={SKIN} />
-        {/* Row 5 — chin */}
-        <rect x="3" y="5" width="4" height="1" fill={SKIN} />
-      </g>
+    <div className="sis-pixel-man" aria-hidden="true">
+      {/* Direction wrapper — scaleX(-1) during the look-around dwell flips
+           the whole profile sprite to face right, then back to left. */}
+      <div className="pm-facing">
+        <svg width="20" height="28" viewBox="0 0 10 14" shapeRendering="crispEdges">
+          {/* HEAD — hat, hair, face. Single eye on the LEFT side (walk dir). */}
+          <g className="pm-head">
+            {/* Row 0: hat crown */}
+            <rect x="3" y="0" width="4" height="1" fill={RED} />
+            {/* Row 1: hat main */}
+            <rect x="1" y="1" width="7" height="1" fill={RED} />
+            {/* Row 2: hat brim — extends 1px LEFT as a visor pointing the walk direction */}
+            <rect x="0" y="2" width="7" height="1" fill={RED} />
+            {/* Row 3: front hair wisp + red hat band + back hair */}
+            <rect x="1" y="3" width="2" height="1" fill={BROWN} />
+            <rect x="3" y="3" width="3" height="1" fill={RED} />
+            <rect x="6" y="3" width="3" height="1" fill={BROWN} />
+            {/* Row 4: sideburn + face front + eye + face back + back hair */}
+            <rect x="1" y="4" width="1" height="1" fill={BROWN} />
+            <rect x="2" y="4" width="1" height="1" fill={SKIN} />
+            <rect className="pm-eye" x="3" y="4" width="1" height="1" fill={EYE} />
+            <rect x="4" y="4" width="2" height="1" fill={SKIN} />
+            <rect x="6" y="4" width="3" height="1" fill={BROWN} />
+            {/* Row 5: face + hair back */}
+            <rect x="2" y="5" width="4" height="1" fill={SKIN} />
+            <rect x="6" y="5" width="2" height="1" fill={BROWN} />
+            {/* Row 6: chin / neck */}
+            <rect x="3" y="6" width="3" height="1" fill={SKIN} />
+          </g>
 
-      {/* TORSO — shoulders, shirt body, belt. Static; the arm groups are separate. */}
-      {/* Row 6 — shoulder pads flanking the red chest */}
-      <rect x="1" y="6" width="2" height="1" fill={GRAY} />
-      <rect x="3" y="6" width="4" height="1" fill={RED} />
-      <rect x="7" y="6" width="2" height="1" fill={GRAY} />
-      {/* Row 7 — left sleeve + shirt body. Right sleeve lives in pm-arm-r below. */}
-      <rect x="0" y="7" width="2" height="1" fill={GRAY} />
-      <rect x="2" y="7" width="6" height="1" fill={RED} />
-      {/* Row 8 — left hand + shirt */}
-      <rect x="0" y="8" width="1" height="1" fill={GRAY} />
-      <rect x="2" y="8" width="6" height="1" fill={RED} />
+          {/* TORSO — shoulders, shirt body, belt. Both shoulder pads show in
+               profile because the pad caps the shoulder joint on each side. */}
+          {/* Row 7: shoulder pads + shirt */}
+          <rect x="1" y="7" width="2" height="1" fill={GRAY} />
+          <rect x="3" y="7" width="4" height="1" fill={RED} />
+          <rect x="7" y="7" width="2" height="1" fill={GRAY} />
+          {/* Row 8: shirt body (near arm is its own group below) */}
+          <rect x="2" y="8" width="5" height="1" fill={RED} />
+          {/* Row 9: shirt body */}
+          <rect x="2" y="9" width="5" height="1" fill={RED} />
+          {/* Row 10: belt */}
+          <rect x="2" y="10" width="5" height="1" fill={BLACK} />
 
-      {/* RIGHT ARM GROUP — the scratch arm (viewer's right). Animates up to the
-           head during two scratch dwells per walk cycle. Two pixels: sleeve + hand. */}
-      <g className="pm-arm-r">
-        <rect x="8" y="7" width="2" height="1" fill={GRAY} />
-        <rect x="9" y="8" width="1" height="1" fill={GRAY} />
-      </g>
+          {/* NEAR-ARM GROUP — the arm closest to the viewer in profile view.
+               Drawn hanging at the side by default; the scratch animation
+               lifts it up-forward to the head during dwells. Two pixels:
+               forearm + hand. */}
+          <g className="pm-arm-r">
+            <rect x="0" y="8" width="2" height="1" fill={GRAY} />
+            <rect x="1" y="9" width="1" height="1" fill={GRAY} />
+          </g>
 
-      {/* Belt */}
-      <rect x="2" y="9" width="6" height="1" fill={BLACK} />
-
-      {/* Pants waist */}
-      <rect x="2" y="10" width="6" height="1" fill={RED} />
-
-      {/* LEGS — each a 2x2 red block. Alternate vertical offsets make the step cycle. */}
-      <rect className="pm-leg-l" x="2" y="11" width="2" height="2" fill={RED} />
-      <rect className="pm-leg-r" x="6" y="11" width="2" height="2" fill={RED} />
-
-      {/* BOOTS — one pixel wider than each leg so they read as feet. Follow the
-           matching leg's vertical offset so the foot stays glued during walk. */}
-      <rect className="pm-foot-l" x="1" y="13" width="3" height="1" fill={BLACK} />
-      <rect className="pm-foot-r" x="6" y="13" width="3" height="1" fill={BLACK} />
-    </svg>
+          {/* PANTS + LEGS + FEET — side-view walk stance. Back leg and front
+               leg are separated by the waist gap; alternating vertical
+               offsets animate the step cycle. Feet extend one pixel
+               forward (LEFT in the default facing) as toes. */}
+          {/* Row 11: pants waist */}
+          <rect x="2" y="11" width="5" height="1" fill={RED} />
+          {/* Row 12: legs in stride — back leg (left side of sprite) + front leg */}
+          <rect className="pm-leg-l" x="2" y="12" width="1" height="1" fill={RED} />
+          <rect className="pm-leg-r" x="5" y="12" width="2" height="1" fill={RED} />
+          {/* Row 13: boots — back boot (heel) + front boot (with forward toe) */}
+          <rect className="pm-foot-l" x="1" y="13" width="2" height="1" fill={BLACK} />
+          <rect className="pm-foot-r" x="4" y="13" width="3" height="1" fill={BLACK} />
+        </svg>
+      </div>
+    </div>
   );
 }
 
