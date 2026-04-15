@@ -76,8 +76,6 @@ export default function HomeClient() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
-  // FE-09: Dark mode toggle consolidated into AppHeader — removed duplicate
-  // state and effect. AppHeader handles sis-theme persistence and class toggling.
   const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);

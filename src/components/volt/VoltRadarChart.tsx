@@ -20,7 +20,6 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/ThemeContext";
 
 /* ── Pastell-Kategoriefarben (identisch zu VoltBubbleMap) ── */
 const CATEGORY_COLORS: string[] = [
@@ -121,7 +120,6 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
   colorMode = "horizon",
   showLegend = true,
 }) => {
-  const { darkMode } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
   const [activeFilter, setActiveFilter] = useState<string>("Alle");
@@ -130,22 +128,24 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
     visible: false, x: 0, y: 0, bubble: null, color: "",
   });
 
-  const isDark = darkMode === "dark";
+  // Dark mode is intentionally stubbed as `false` until the final theme pass;
+  // any ternary keyed off `isDark` therefore resolves to the light branch.
+  const isDark = false;
 
-  /* ── Farb-Tokens (identisch zu VoltBubbleMap) ── */
-  const bg            = isDark ? "#111111" : "#FAFAFA";
-  const borderColor   = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const statsMuted    = isDark ? "rgba(255,255,255,0.38)" : "rgba(0,0,0,0.38)";
-  const statsStrong   = isDark ? "#FFFFFF" : "#0A0A0A";
-  const filterInactiveFg = isDark ? "rgba(255,255,255,0.50)" : "rgba(0,0,0,0.45)";
-  const filterInactiveBd = isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)";
-  const gridColor     = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-  const axisColor     = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
-  const quadLabelColor = isDark ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.28)";
-  const ttBg      = isDark ? "rgba(18,18,18,0.97)" : "rgba(255,255,255,0.98)";
-  const ttBorder  = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)";
-  const ttText    = isDark ? "#FFFFFF" : "#0A0A0A";
-  const ttMuted   = isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.42)";
+  /* ── Farb-Tokens (Light-Only, bis Dark-Mode-Pass; identisch zu VoltBubbleMap) ── */
+  const bg            = "#FAFAFA";
+  const borderColor   = "rgba(0,0,0,0.08)";
+  const statsMuted    = "rgba(0,0,0,0.38)";
+  const statsStrong   = "#0A0A0A";
+  const filterInactiveFg = "rgba(0,0,0,0.45)";
+  const filterInactiveBd = "rgba(0,0,0,0.12)";
+  const gridColor     = "rgba(0,0,0,0.04)";
+  const axisColor     = "rgba(0,0,0,0.10)";
+  const quadLabelColor = "rgba(0,0,0,0.28)";
+  const ttBg      = "rgba(255,255,255,0.98)";
+  const ttBorder  = "rgba(0,0,0,0.10)";
+  const ttText    = "#0A0A0A";
+  const ttMuted   = "rgba(0,0,0,0.42)";
 
   /* ── Responsive width ── */
   useEffect(() => {

@@ -19,7 +19,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import * as d3 from "d3";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/ThemeContext";
 
 /* ── Volt Kategorie-Farben ── */
 const CATEGORY_COLORS: string[] = [
@@ -200,7 +199,6 @@ export const VoltBubbleMap: React.FC<VoltBubbleMapProps> = ({
   subtitle,
   accentThreshold = 140,
 }) => {
-  const { darkMode } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeFilter, setActiveFilter] = useState<string>("Alle");
   const [containerWidth, setContainerWidth] = useState(800);
@@ -209,21 +207,24 @@ export const VoltBubbleMap: React.FC<VoltBubbleMapProps> = ({
     visible: false, x: 0, y: 0, node: null, categoryColor: "", isAccent: false,
   });
 
-  const isDark = darkMode === "dark";
+  // Dark mode is intentionally stubbed as `false` until the final theme pass;
+  // any ternary keyed off `isDark` therefore resolves to the light branch.
+  const isDark = false;
 
-  const bg            = isDark ? "#111111" : "#FAFAFA";
-  const borderColor   = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
-  const labelFill     = isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.85)";
-  const labelSubFill  = isDark ? "rgba(255,255,255,0.50)" : "rgba(10,10,10,0.45)";
-  const statsMuted    = isDark ? "rgba(255,255,255,0.38)" : "rgba(0,0,0,0.38)";
-  const statsStrong   = isDark ? "#FFFFFF" : "#0A0A0A";
-  const filterInactiveFg = isDark ? "rgba(255,255,255,0.50)" : "rgba(0,0,0,0.45)";
-  const filterInactiveBd = isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)";
-  const gridColor     = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-  const ttBg      = isDark ? "rgba(18,18,18,0.97)" : "rgba(255,255,255,0.98)";
-  const ttBorder  = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)";
-  const ttText    = isDark ? "#FFFFFF" : "#0A0A0A";
-  const ttMuted   = isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.42)";
+  /* ── Farbwerte (Light-Only, bis Dark-Mode-Pass) ── */
+  const bg            = "#FAFAFA";
+  const borderColor   = "rgba(0,0,0,0.08)";
+  const labelFill     = "rgba(10,10,10,0.85)";
+  const labelSubFill  = "rgba(10,10,10,0.45)";
+  const statsMuted    = "rgba(0,0,0,0.38)";
+  const statsStrong   = "#0A0A0A";
+  const filterInactiveFg = "rgba(0,0,0,0.45)";
+  const filterInactiveBd = "rgba(0,0,0,0.12)";
+  const gridColor     = "rgba(0,0,0,0.04)";
+  const ttBg      = "rgba(255,255,255,0.98)";
+  const ttBorder  = "rgba(0,0,0,0.10)";
+  const ttText    = "#0A0A0A";
+  const ttMuted   = "rgba(0,0,0,0.42)";
 
   // CSS-Keyframes einmalig injizieren
   useEffect(() => { injectKeyframes(); }, []);

@@ -79,7 +79,6 @@ export default function StyleGuide() {
     { label: "Colors",               href: "#colors" },
     { label: "Pastels",              href: "#pastels" },
     { label: "Signals",              href: "#signals" },
-    { label: "Dark Mode",            href: "#dark-mode" },
     { label: "Typography",           href: "#typography" },
     { label: "Spacing & Radius",     href: "#spacing-radius" },
     { label: "Shadows",              href: "#shadows" },
@@ -1003,122 +1002,8 @@ export default function StyleGuide() {
         </Section>
 
         {/* ══════════════════════════════════════════════════════
-            5. DARK MODE
+            5. DARK MODE — removed pending the final theme pass
         ══════════════════════════════════════════════════════ */}
-        <Section id="dark-mode" label="05 — Dark Mode">
-          <div
-            style={{
-              background: "#000000",
-              borderRadius: "var(--radius-2xl)",
-              padding: "32px",
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--font-code, 'JetBrains Mono', monospace)",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase" as const,
-                color: "var(--color-lime)",
-                marginBottom: 20,
-              }}
-            >
-              .dark — Token Overrides
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: 12,
-              }}
-            >
-              {[
-                { label: "Background",  hex: "#000000", token: "--color-page-bg",    textColor: "#E4FF97" },
-                { label: "Foreground",  hex: "#F5F5F5", token: "--color-text-primary", textColor: "#000000" },
-                { label: "Card",        hex: "#111111", token: "--color-surface",     textColor: "#E4FF97" },
-                { label: "Border",      hex: "#2A2A2A", token: "--color-border",      textColor: "#E4FF97" },
-                { label: "Ring / Lime", hex: "#E4FF97", token: "--color-ring",        textColor: "#000000" },
-              ].map((t) => (
-                <div
-                  key={t.token}
-                  style={{
-                    borderRadius: "var(--radius-lg)",
-                    overflow: "hidden",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: 60,
-                      background: t.hex,
-                      border: t.hex === "#000000" ? "1px solid rgba(255,255,255,0.1)" : undefined,
-                      display: "flex",
-                      alignItems: "flex-end",
-                      padding: "6px 8px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "var(--font-code, monospace)",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        color: t.textColor,
-                        opacity: 0.75,
-                      }}
-                    >
-                      {t.hex}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      padding: "8px",
-                      background: "#111111",
-                      borderTop: "1px solid rgba(255,255,255,0.06)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "#F5F5F5",
-                        marginBottom: 3,
-                      }}
-                    >
-                      {t.label}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: "var(--font-code, monospace)",
-                        fontSize: 9,
-                        color: "rgba(228,255,151,0.5)",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {t.token}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div
-            style={{
-              background: "var(--pastel-butter)",
-              border: "1px solid var(--pastel-butter-border)",
-              borderRadius: "var(--radius-lg)",
-              padding: "12px 16px",
-              fontSize: 13,
-              color: "var(--pastel-butter-text)",
-              fontFamily: "var(--font-ui)",
-            }}
-          >
-            <strong>Activation:</strong> Dark mode is triggered by adding the <code style={{ fontFamily: "var(--font-code, monospace)", background: "rgba(0,0,0,0.1)", padding: "1px 4px", borderRadius: "var(--radius-xs)" }}>.dark</code> class to the{" "}
-            <code style={{ fontFamily: "var(--font-code, monospace)", background: "rgba(0,0,0,0.1)", padding: "1px 4px", borderRadius: "var(--radius-xs)" }}>&lt;html&gt;</code> element.
-            The VoltUI system uses CSS custom property overrides — no JS theming required.
-          </div>
-        </Section>
 
         {/* ══════════════════════════════════════════════════════
             6. TYPOGRAPHY
@@ -2441,14 +2326,15 @@ export default function StyleGuide() {
               lineHeight: 1.6,
             }}
           >
-            8 chart tokens map to the 8 pastels in light mode and to a neon palette in dark mode.
-            Used for trend lines, ring segments, bar charts, and radar arcs.
+            8 chart tokens map to the 8 pastels. Used for trend lines, ring segments,
+            bar charts, and radar arcs. (The dark-mode neon palette will return with
+            the final theme pass.)
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 24 }}>
             {/* Light mode */}
             <div>
-              <div className="section-label" style={{ marginBottom: 14 }}>Light Mode — Pastel Mapping</div>
+              <div className="section-label" style={{ marginBottom: 14 }}>Pastel Mapping</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {[
                   { n: 1, pastel: "--pastel-rose",   name: "Rose",   hex: "#FFD6E0" },
@@ -2497,71 +2383,6 @@ export default function StyleGuide() {
               </div>
             </div>
 
-            {/* Dark mode */}
-            <div>
-              <div className="section-label" style={{ marginBottom: 14 }}>Dark Mode — Neon Palette</div>
-              <div
-                style={{
-                  background: "#000000",
-                  borderRadius: "var(--radius-xl)",
-                  padding: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                }}
-              >
-                {[
-                  { n: 1, hex: "#E4FF97", name: "Neon Lime"   },
-                  { n: 2, hex: "#80F0D0", name: "Neon Aqua"   },
-                  { n: 3, hex: "#F090E0", name: "Neon Orchid" },
-                  { n: 4, hex: "#80D0FF", name: "Neon Blue"   },
-                  { n: 5, hex: "#FFD080", name: "Neon Butter" },
-                  { n: 6, hex: "#FF9080", name: "Neon Coral"  },
-                  { n: 7, hex: "#C0F0A0", name: "Neon Mint"   },
-                  { n: 8, hex: "#F0D0FF", name: "Neon Lavender" },
-                ].map(({ n, hex, name }) => (
-                  <div
-                    key={n}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 32,
-                        height: 20,
-                        background: hex,
-                        borderRadius: "var(--radius-xs)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div
-                      style={{
-                        fontFamily: "var(--font-code, monospace)",
-                        fontSize: 10,
-                        color: "rgba(228,255,151,0.5)",
-                        width: 60,
-                      }}
-                    >
-                      --chart-{n}
-                    </div>
-                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{name}</div>
-                    <div
-                      style={{
-                        marginLeft: "auto",
-                        fontFamily: "var(--font-code, monospace)",
-                        fontSize: 10,
-                        color: "rgba(255,255,255,0.3)",
-                      }}
-                    >
-                      {hex}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </Section>
 

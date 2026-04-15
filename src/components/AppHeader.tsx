@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Activity, Moon, Sun, Menu } from "lucide-react";
+import { Activity, Menu } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useLocale } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
@@ -22,36 +22,17 @@ const NAV_ITEMS: Array<{
 
 /**
  * Global navigation header — identical design to the Home page header.
- * Used by ALL pages. Logo + Title + Nav + Dark Mode + Locale.
+ * Used by ALL pages. Logo + Title + Nav + Locale.
+ *
+ * Dark mode was intentionally removed pending a dedicated pass at the end of
+ * the design cycle; do not reintroduce without a coordinated theming plan
+ * covering every `.dark` / `.volt-dark` rule in globals.css and volt-ui.css.
  */
 export function AppHeader() {
   const { locale, toggleLocale } = useLocale();
   const pathname = usePathname();
   const de = locale === "de";
-  const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("sis-theme");
-    if (stored === "dark") {
-      setDarkMode(true);
-      document.documentElement.classList.add("dark", "volt-dark");
-    }
-  }, []);
-
-  const toggleDark = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    if (next) {
-      document.documentElement.classList.add("dark", "volt-dark");
-      localStorage.setItem("sis-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark", "volt-dark");
-      localStorage.setItem("sis-theme", "light");
-    }
-  };
 
   const isActive = (href: string) =>
     href === "/"
@@ -138,14 +119,6 @@ export function AppHeader() {
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
             ><Activity size={14} strokeWidth={2} /></button>
-          </Tooltip>
-          <Tooltip content={darkMode ? (de ? "Light Mode" : "Light mode") : (de ? "Dark Mode" : "Dark mode")} placement="bottom">
-            <button onClick={toggleDark}
-              aria-label={darkMode ? (de ? "Light Mode aktivieren" : "Activate light mode") : (de ? "Dark Mode aktivieren" : "Activate dark mode")}
-              style={{ padding: 0, borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.15s", width: 30, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-heading, #0A0A0A)"; el.style.background = "rgba(228,255,151,0.5)"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "transparent"; }}
-            >{darkMode ? <Sun size={14} strokeWidth={2} /> : <Moon size={14} strokeWidth={2} />}</button>
           </Tooltip>
           <Tooltip content={locale === "de" ? "Sprache: DE → EN" : "Language: EN → DE"} placement="bottom">
             <button onClick={toggleLocale}

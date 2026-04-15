@@ -29,7 +29,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/ThemeContext";
 
 /* ══════════════════════════════════════════════════════════════════════════════
    TYPEN
@@ -601,8 +600,9 @@ const VoltNodeCanvas: React.FC<VoltNodeCanvasProps> = ({
   onNodeChange,
   onNodeSelect,
 }) => {
-  const { darkMode } = useTheme();
-  const isDark = darkMode === "dark";
+  // Dark mode is intentionally stubbed as `false` until the final theme pass;
+  // every ternary keyed off `isDark` therefore resolves to the light branch.
+  const isDark = false;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{

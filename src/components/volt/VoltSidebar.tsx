@@ -1,15 +1,16 @@
 /**
  * VoltSidebar – Volt UI
- * Hell: Weißer Hintergrund + schwarzer Text + Schwarz für aktive Items
- * Dark: Dunkler Hintergrund + Weiß für aktive Items
- * Auto-Scroll: aktives Item scrollt immer in den sichtbaren Bereich
- * V2-Kategorie: dezenter Trennstrich, Link-Verhalten (eigene Route)
+ * Weißer Hintergrund + schwarzer Text + Schwarz für aktive Items.
+ * Auto-Scroll: aktives Item scrollt immer in den sichtbaren Bereich.
+ * V2-Kategorie: dezenter Trennstrich, Link-Verhalten (eigene Route).
+ *
+ * Dark-mode branching intentionally stripped — the theme toggle will be
+ * reintroduced as part of the final design pass.
  */
 
 import React, { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Moon, Sun, ExternalLink } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { ExternalLink } from "lucide-react";
 
 export interface VoltSidebarSection {
   title: string;
@@ -35,9 +36,6 @@ export interface VoltSidebarProps extends Omit<React.HTMLAttributes<HTMLElement>
 export const VoltSidebar: React.FC<VoltSidebarProps> = ({
   sections, activeId, onSelect, logo, className, ...props
 }) => {
-  const { darkMode, toggleDarkMode } = useTheme();
-  const isDark = darkMode === "dark";
-
   const navRef    = useRef<HTMLElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
   const asideRef  = useRef<HTMLElement>(null);
@@ -70,22 +68,18 @@ export const VoltSidebar: React.FC<VoltSidebarProps> = ({
     }
   }, [activeId]);
 
-  /* ── Farbwerte je nach Modus ── */
-  const bg          = isDark ? "#0F0F0F" : "#FFFFFF";
-  const borderColor = isDark ? "#2A2A2A" : "#E8E8E8";
-  const labelColor  = isDark ? "rgba(255,255,255,0.25)" : "#AAAAAA";
-  const trackBg     = isDark ? "#2A2A2A" : "#F0F0F0";
-  const trackFill   = isDark ? "rgba(255,255,255,0.35)" : "rgba(10,10,10,0.25)";
-  const textMuted   = isDark ? "rgba(255,255,255,0.50)" : "#6B6B6B";
-  const textHover   = isDark ? "#FFFFFF" : "#0A0A0A";
-  const hoverBg     = isDark ? "rgba(255,255,255,0.06)" : "#F5F5F5";
-  const descColor   = isDark ? "rgba(255,255,255,0.25)" : "#AAAAAA";
-  const footerText  = isDark ? "rgba(255,255,255,0.25)" : "#AAAAAA";
-  const btnBorder   = isDark ? "#2A2A2A" : "#E8E8E8";
-  const btnText     = isDark ? "rgba(255,255,255,0.50)" : "#6B6B6B";
-  const btnHoverBg  = isDark ? "#1A1A1A" : "#F0F0F0";
-  const dotColor    = isDark ? "rgba(255,255,255,0.25)" : "rgba(10,10,10,0.20)";
-  const footerMono  = isDark ? "rgba(255,255,255,0.20)" : "#CCCCCC";
+  /* ── Farbwerte (Light-Only, bis Dark-Mode-Pass) ── */
+  const bg          = "#FFFFFF";
+  const borderColor = "#E8E8E8";
+  const labelColor  = "#AAAAAA";
+  const trackBg     = "#F0F0F0";
+  const trackFill   = "rgba(10,10,10,0.25)";
+  const textMuted   = "#6B6B6B";
+  const textHover   = "#0A0A0A";
+  const hoverBg     = "#F5F5F5";
+  const descColor   = "#AAAAAA";
+  const dotColor    = "rgba(10,10,10,0.20)";
+  const footerMono  = "#CCCCCC";
 
   // Aktives Item: Lime-Gelb (#E4FF97) auf Schwarz – original Volt UI Stil
   const activeBg    = "#E4FF97";
@@ -286,32 +280,11 @@ export const VoltSidebar: React.FC<VoltSidebarProps> = ({
 
       {/* ── Footer ── */}
       <div className="px-4 py-4 flex-shrink-0" style={{ borderTop: `1px solid ${borderColor}` }}>
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[0.6rem] font-mono uppercase tracking-wider" style={{ color: footerText }}>
-            Erscheinungsbild
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: dotColor }} />
+          <span className="text-[0.55rem] font-mono" style={{ color: footerMono }}>
+            Volt UI · React 19 · Tailwind 4
           </span>
-          <button
-            onClick={toggleDarkMode}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
-            style={{ border: `1px solid ${btnBorder}`, color: btnText, background: "transparent" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = btnHoverBg; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-          >
-            {isDark ? (
-              <><Sun className="w-3 h-3" /><span>Hell</span></>
-            ) : (
-              <><Moon className="w-3 h-3" /><span>Dunkel</span></>
-            )}
-          </button>
-        </div>
-
-        <div className="pt-2" style={{ borderTop: `1px solid ${borderColor}50` }}>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: dotColor }} />
-            <span className="text-[0.55rem] font-mono" style={{ color: footerMono }}>
-              Volt UI · React 19 · Tailwind 4
-            </span>
-          </div>
         </div>
       </div>
     </aside>
