@@ -82,6 +82,7 @@ export * from "./VoltSheet";
 export * from "./VoltPopover";
 export * from "./VoltDropdownMenu";
 export * from "./VoltAccordion";
+export * from "./VoltConfirm";
 
 // Primitive Table (composable sub-components)
 export * from "./VoltTablePrimitive";

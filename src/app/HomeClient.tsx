@@ -614,6 +614,16 @@ export default function HomeClient() {
       const allNodes = [qNode, ...derived];
 
       // Get or create a canvas project
+      // API-Envelope-Fix: Alle /api/v1/canvas-Responses laufen durch
+      // apiSuccess() → { ok: true, data: { canvas } }. Alter Code las
+      // json.canvas direkt und bekam immer undefined zurueck — projectId
+      // blieb leer, die nachfolgende PATCH wurde per `if (!projectId)
+      // return` uebersprungen, und der canvas_state blieb NULL. Das
+      // erklaert den User-Report "Projekte werden nicht gespeichert und
+      // sind alle leer". Unwrap defensiv: beide Shapes akzeptieren, falls
+      // irgendwo noch ein alter Handler unverpackt antwortet.
+      const unwrapCanvas = (json: any) => json?.data?.canvas ?? json?.canvas;
+
       let projectId = activeProjectIdRef.current;
 
       if (!projectId) {
@@ -623,10 +633,16 @@ export default function HomeClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: "Aktuelles Projekt" }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.error("[syncToCanvasDb] POST /api/v1/canvas failed", res.status);
+          return;
+        }
         const json = await res.json();
-        projectId = json.canvas?.id;
-        if (!projectId) return;
+        projectId = unwrapCanvas(json)?.id;
+        if (!projectId) {
+          console.error("[syncToCanvasDb] canvas id missing in response", json);
+          return;
+        }
         activeProjectIdRef.current = projectId;
         setActiveProjectId(projectId);
       }
@@ -637,8 +653,9 @@ export default function HomeClient() {
       let existingConns: any[] = [];
       if (existingRes.ok) {
         const json = await existingRes.json();
-        if (json.canvas?.canvas_state) {
-          const state = JSON.parse(json.canvas.canvas_state);
+        const existingCanvas = unwrapCanvas(json);
+        if (existingCanvas?.canvas_state) {
+          const state = JSON.parse(existingCanvas.canvas_state);
           existingNodes = state.nodes ?? [];
           existingConns = state.conns ?? [];
           // Offset new nodes below existing ones
@@ -659,11 +676,14 @@ export default function HomeClient() {
         v: 2,
       };
 
-      await fetchWithTimeout(`/api/v1/canvas/${projectId}`, {
+      const patchRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasState: mergedState }),
       });
+      if (!patchRes.ok) {
+        console.error("[syncToCanvasDb] PATCH canvas_state failed", patchRes.status);
+      }
     } catch (e) {
       console.error("[syncToCanvasDb]", e);
     }
@@ -699,7 +719,8 @@ export default function HomeClient() {
             body: JSON.stringify({ name: `Szenario: ${topic.substring(0, 50)}` }),
           });
           const json = await res.json();
-          const pid = json.canvas?.id;
+          // API-Envelope-Fix (apiSuccess wrappt alles in { ok, data }).
+          const pid = (json?.data?.canvas ?? json?.canvas)?.id;
           if (pid) {
             activeProjectIdRef.current = pid;
             setActiveProjectId(pid);
@@ -992,7 +1013,8 @@ export default function HomeClient() {
         return;
       }
       const json = await res.json();
-      const pid = json.canvas?.id;
+      // API-Envelope-Fix: apiSuccess → { ok, data: { canvas } }.
+      const pid = (json?.data?.canvas ?? json?.canvas)?.id;
       if (!pid) { setFrameworkLoading(false); return; }
       activeProjectIdRef.current = pid;
       setActiveProjectId(pid);

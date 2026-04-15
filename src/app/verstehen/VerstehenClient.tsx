@@ -89,8 +89,15 @@ export default function VerstehenClient() {
         return r.json();
       })
       .then(data => {
-        if (data.trends?.length > 0) {
-          const dbTrends = data.trends as TrendDot[];
+        // API-Envelope-Fix: /api/v1/trends liefert `{ ok, data: { trends } }`
+        // (apiSuccess-Wrapper), alter Code las aber data.trends direkt —
+        // result was always length 0, setTrends wurde nie aufgerufen, und
+        // der initial-megaTrends-State blieb ohne Classify-Ring, was im
+        // Radar zu einem leeren Plot fuehrte, sobald die API irgendwas
+        // zurueckgab. Defensive: beide Shapes akzeptieren.
+        const list = data?.data?.trends ?? data?.trends;
+        if (Array.isArray(list) && list.length > 0) {
+          const dbTrends = list as TrendDot[];
           const dbByName = new Map(dbTrends.map((t: TrendDot) => [t.name.toLowerCase(), t]));
           const merged = megaTrends.map(mt => {
             const db = dbByName.get(mt.name.toLowerCase());
@@ -98,10 +105,17 @@ export default function VerstehenClient() {
             return { ...mt, relevance: db.relevance, confidence: db.confidence, impact: db.impact, ring: db.ring, velocity: db.velocity ?? mt.velocity, signalCount: db.signalCount ?? mt.signalCount };
           });
           setTrends(classifyTrends(merged));
+        } else {
+          // API lieferte keine Trends — zumindest die statischen
+          // megaTrends classifizieren, damit der Radar nicht leer ist.
+          setTrends(classifyTrends(megaTrends));
         }
       })
       .catch((e) => {
         setTrendsError(e instanceof Error ? e.message : String(e));
+        // Bei API-Fehler: classify wenigstens die statischen megaTrends,
+        // damit der Radar nicht voellig leer bleibt.
+        setTrends(classifyTrends(megaTrends));
       })
       .finally(() => setTrendsLoading(false));
   }, []);
@@ -392,7 +406,8 @@ export default function VerstehenClient() {
                     });
                     if (!res.ok) return;
                     const json = await res.json();
-                    const pid = json.canvas?.id;
+                    // API-Envelope-Fix: apiSuccess → { ok, data: { canvas } }.
+                    const pid = (json?.data?.canvas ?? json?.canvas)?.id;
                     if (!pid) return;
                     await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
                       method: "PATCH",

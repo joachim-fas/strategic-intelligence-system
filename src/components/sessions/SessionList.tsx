@@ -11,6 +11,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+// voltConfirm ersetzt window.confirm fuer destruktive Aktionen. Der
+// native OS-Dialog haelt sich nicht an das Volt-Design und fuehlt sich
+// als Fremdkoerper an — jetzt in-app Modal mit konsistenter Typo/Spacing.
+import { voltConfirm } from "@/components/volt";
 import {
   FRAMEWORK_CATEGORIES,
   type FrameworkCategory,
@@ -192,11 +196,15 @@ export function SessionList({ mode, de }: Props) {
 
   const deleteSession = async (id: string, name: string) => {
     if (busyId) return;
-    const confirmed = window.confirm(
-      de
-        ? `Projekt dauerhaft löschen?\n\n„${name}"\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
-        : `Permanently delete project?\n\n"${name}"\n\nThis action cannot be undone.`
-    );
+    const confirmed = await voltConfirm({
+      title: de ? "Projekt dauerhaft löschen?" : "Permanently delete project?",
+      message: de
+        ? `„${name}"\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
+        : `"${name}"\n\nThis action cannot be undone.`,
+      confirmLabel: de ? "Löschen" : "Delete",
+      cancelLabel: de ? "Abbrechen" : "Cancel",
+      variant: "destructive",
+    });
     if (!confirmed) return;
     setBusyId(id);
     try {
