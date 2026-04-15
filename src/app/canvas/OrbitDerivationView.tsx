@@ -118,8 +118,48 @@ function buildSpine(focusId: string, allNodes: DerivCanvasNode[]): Spine | null 
   if (!query) return null;
 
   const qr: QueryResult | null = query.result ?? null;
-  const matchedTrends = qr?.matchedTrends ?? [];
-  const matchedEdges = qr?.matchedEdges ?? focus.causalEdges ?? [];
+
+  // Fallback 1 — some older canvases (pre-flattening-transfer) persisted only
+  // a `causalgraph` child node with its edges, but never populated the query's
+  // `result.matchedTrends / matchedEdges`. Find that child and read from it
+  // directly so the Orbit Stage-3 (Trends) and Stage-4 (Edges) columns don't
+  // stay at 0 even when the data is visibly present elsewhere on the canvas.
+  const causalChild = allNodes.find(
+    n => n.parentId === query.id && n.nodeType === "causalgraph",
+  );
+  const childEdges = causalChild?.causalEdges ?? [];
+  const childNameMap = causalChild?.causalTrendNames ?? {};
+
+  // Synthesize minimal MatchedTrend entries from the causal child when the
+  // query's matchedTrends is missing. We only have (id, name) from the name
+  // map + edges, so the rest is filled with neutral defaults. This is enough
+  // for the spine to light up correctly; the user can still open the trend
+  // detail for full data.
+  const fallbackTrends: MatchedTrend[] = Object.entries(childNameMap).map(
+    ([id, name]) => ({
+      id,
+      name: name || id,
+      category: "other",
+      tags: [],
+      relevance: 0.5,
+      confidence: 0.5,
+      impact: 0.5,
+      velocity: "stable",
+      ring: "assess",
+      signalCount: 0,
+    }),
+  );
+
+  const matchedTrends =
+    (qr?.matchedTrends && qr.matchedTrends.length > 0)
+      ? qr.matchedTrends
+      : fallbackTrends;
+
+  const matchedEdges =
+    (qr?.matchedEdges && qr.matchedEdges.length > 0)
+      ? qr.matchedEdges
+      : (childEdges.length > 0 ? childEdges : (focus.causalEdges ?? []));
+
   const usedSignals = qr?.usedSignals ?? [];
 
   // Focus stage

@@ -127,14 +127,52 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
    * canvas afterward falls back to the user's normal active canvas.
    *
    * Field names are mapped to the canvas's `QueryResult` interface:
-   *   briefing.causalChain → result.causalAnalysis
-   * Shape-incompatible fields (matchedTrends uses {trend, ...} here vs.
-   * the canvas's flat {id, name, ...}) are simply omitted — the canvas's
-   * dimensions/causalgraph cards render conditionally on those arrays
-   * and gracefully skip when absent.
+   *   briefing.causalChain     → result.causalAnalysis
+   *   briefing.matchedTrends   → result.matchedTrends (shape flattened)
+   *   briefing.matchedEdges    → result.matchedEdges  (passed through)
+   *
+   * The briefing wraps each trend in a `{ trend, queryRelevance, ... }`
+   * envelope, while the canvas's `MatchedTrend` type is flat. We flatten
+   * it here so the canvas's OrbitDerivationView, dimensions card, and
+   * causalgraph card all see non-empty arrays and light up their counts
+   * (SIGNALE / TRENDS / KAUSAL) correctly. Without this mapping the Orbit
+   * Stage-3 (Trends) column stayed at 0 even when the briefing clearly
+   * had trends — because qr.matchedTrends was undefined after transfer.
    */
   const openInCanvas = () => {
     try {
+      // Flatten the briefing's {trend, queryRelevance, ...} envelope to the
+      // canvas's flat MatchedTrend shape. The briefing can also expose the
+      // shape already flat (older responses) — handle both.
+      const flatTrends = Array.isArray(b.matchedTrends)
+        ? b.matchedTrends.map((m: any) => {
+            const t = m?.trend ?? m; // unwrap envelope or pass through
+            if (!t || !t.id) return null;
+            return {
+              id: t.id,
+              name: t.name ?? t.id,
+              category: t.category ?? "other",
+              tags: Array.isArray(t.tags) ? t.tags : [],
+              relevance: typeof t.relevance === "number" ? t.relevance : 0.5,
+              confidence: typeof t.confidence === "number" ? t.confidence : 0.5,
+              impact: typeof t.impact === "number" ? t.impact : 0.5,
+              velocity: t.velocity ?? "stable",
+              ring: t.ring ?? "assess",
+              signalCount: typeof t.signalCount === "number" ? t.signalCount : 0,
+              queryRelevance: typeof m?.queryRelevance === "number"
+                ? m.queryRelevance
+                : (typeof t.queryRelevance === "number" ? t.queryRelevance : undefined),
+            };
+          }).filter(Boolean)
+        : [];
+
+      // matchedEdges may or may not exist on the briefing — pass through if so.
+      const edges = Array.isArray((b as any).matchedEdges)
+        ? (b as any).matchedEdges
+        : Array.isArray((briefing as any).matchedEdges)
+          ? (briefing as any).matchedEdges
+          : [];
+
       const result = {
         synthesis: briefing.synthesis,
         reasoningChains: briefing.reasoningChains,
@@ -149,6 +187,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         regulatoryContext: briefing.regulatoryContext,
         causalAnalysis: briefing.causalChain,
         usedSignals: b.usedSignals ?? briefing.usedSignals,
+        matchedTrends: flatTrends,
+        matchedEdges: edges,
       };
       localStorage.setItem(
         "sis-transfer-to-canvas",
