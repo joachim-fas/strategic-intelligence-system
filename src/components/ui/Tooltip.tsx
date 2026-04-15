@@ -28,12 +28,30 @@ export function Tooltip({
 }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [shiftX, setShiftX] = useState(0);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // After the tooltip becomes visible, measure it and — for the centered
+  // "top"/"bottom" placements — clamp it horizontally so it never overflows
+  // the viewport. Without this, a trigger near the right edge (e.g. the
+  // DE/EN toggle in the header) causes the tooltip to get pushed off-screen
+  // and wrap badly. We nudge the element back with a translateX shift.
+  useEffect(() => {
+    if (!visible || !tooltipRef.current) return;
+    if (placement !== "top" && placement !== "bottom") return;
+    const el = tooltipRef.current;
+    const rect = el.getBoundingClientRect();
+    const PAD = 8;
+    let shift = 0;
+    if (rect.right > window.innerWidth - PAD) shift = (window.innerWidth - PAD) - rect.right;
+    else if (rect.left < PAD) shift = PAD - rect.left;
+    setShiftX(shift);
+  }, [visible, pos.left, pos.top, placement]);
 
   const show = useCallback(() => {
     if (disabled || !content) return;
@@ -81,6 +99,7 @@ export function Tooltip({
   const hide = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setVisible(false);
+    setShiftX(0);
   }, []);
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
@@ -95,13 +114,13 @@ export function Tooltip({
     };
     switch (placement) {
       case "top":
-        return { ...base, bottom: `calc(100vh - ${pos.top}px)`, left: pos.left, transform: "translateX(-50%)" };
+        return { ...base, bottom: `calc(100vh - ${pos.top}px)`, left: pos.left, transform: `translateX(calc(-50% + ${shiftX}px))` };
       case "top-start":
         return { ...base, bottom: `calc(100vh - ${pos.top}px)`, left: pos.left };
       case "top-end":
         return { ...base, bottom: `calc(100vh - ${pos.top}px)`, right: `calc(100vw - ${pos.left}px)` };
       case "bottom":
-        return { ...base, top: pos.top, left: pos.left, transform: "translateX(-50%)" };
+        return { ...base, top: pos.top, left: pos.left, transform: `translateX(calc(-50% + ${shiftX}px))` };
       case "left":
         return { ...base, top: pos.top, right: `calc(100vw - ${pos.left}px)`, transform: "translateY(-50%)" };
       case "right":
@@ -124,7 +143,10 @@ export function Tooltip({
         boxShadow: "0 4px 16px rgba(0,0,0,0.45)",
         border: "1px solid rgba(255,255,255,0.08)",
         backdropFilter: "blur(6px)",
-        wordBreak: "break-word",
+        // Keep short labels on a single line; only wrap long sentences.
+        whiteSpace: "normal",
+        wordBreak: "normal",
+        overflowWrap: "anywhere",
         animation: "sis-tooltip-in 0.12s ease",
       }}
     >

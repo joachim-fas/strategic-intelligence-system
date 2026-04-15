@@ -105,7 +105,9 @@ function FrameworkCard({ fw, de }: { fw: FrameworkMeta; de: boolean }) {
   const name = de ? fw.name.de : fw.name.en;
   const subtitle = de ? fw.subtitle.de : fw.subtitle.en;
   const timeHorizon = de ? fw.timeHorizon.de : fw.timeHorizon.en;
-  const intensityLabels = { low: "Low", medium: "Medium", high: "High", "very-high": "Sehr hoch" };
+  const intensityLabels = de
+    ? { low: "Niedrig", medium: "Mittel", high: "Hoch", "very-high": "Sehr hoch" }
+    : { low: "Low", medium: "Medium", high: "High", "very-high": "Very high" };
 
   return (
     <a
