@@ -32,6 +32,47 @@ import {
 import dynamic from "next/dynamic";
 const RadarView = dynamic(() => import("@/components/radar/RadarView"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", fontSize: 12, color: "#999" }}>Radar laden…</div> });
 const CausalGraphView = dynamic(() => import("@/components/radar/CausalGraphView"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", fontSize: 12, color: "#999" }}>Kausalnetz laden…</div> });
+
+/**
+ * Build a query string enriched with framework-specific directives. The LLM
+ * sees the framework name + methodology + any captured context fields as a
+ * bracketed prefix followed by the actual question. The briefing that comes
+ * back runs through the SAME 7-stage pipeline as a regular hero query — the
+ * framework only shapes WHAT the LLM produces, not the reveal mechanics.
+ *
+ * Kept as a top-level helper (not a hook) so both the textarea Enter handler
+ * and the click handler in the modal can call it without duplicating logic.
+ */
+function buildFrameworkQuery(
+  fw: {
+    name: string; nameEn: string;
+    methodology: string; methodologyEn: string;
+    guidance?: { fields?: Array<{ key: string; labelDe: string; labelEn: string }> };
+  },
+  topic: string,
+  fieldValues: Record<string, string>,
+  locale: "de" | "en",
+): string {
+  const name = locale === "de" ? fw.name : fw.nameEn;
+  const method = locale === "de" ? fw.methodology : fw.methodologyEn;
+  const lines: string[] = [];
+  lines.push(`[${locale === "de" ? "Strategisches Framework" : "Strategic framework"}: ${name}]`);
+  lines.push(`[${locale === "de" ? "Methodik" : "Methodology"}: ${method}]`);
+  if (fw.guidance?.fields) {
+    for (const f of fw.guidance.fields) {
+      const v = fieldValues[f.key]?.trim();
+      if (!v) continue;
+      const rawLabel = locale === "de" ? f.labelDe : f.labelEn;
+      // Strip "(optional)" so the LLM sees a clean key: value line.
+      const cleanLabel = rawLabel.replace(/\s*\((optional|optional)\)\s*$/i, "");
+      lines.push(`[${cleanLabel}: ${v}]`);
+    }
+  }
+  lines.push("");
+  lines.push(`${locale === "de" ? "Frage" : "Question"}: ${topic.trim()}`);
+  return lines.join("\n");
+}
+
 export default function HomeClient() {
   const { locale, toggleLocale } = useLocale();
   const [baseTrends, setBaseTrends] = useState<TrendDot[]>(megaTrends);
@@ -626,6 +667,56 @@ export default function HomeClient() {
       });
   }, [query, trends, locale, toggleLocale, contextProfile, isAnalyzing, syncToCanvasDb]);
 
+  // Framework submit: route framework-modal topics through the same 7-stage
+  // pipeline as hero queries, with a framework-specific directive prefix so the
+  // LLM shapes its synthesis/scenarios/decisionFramework around that method.
+  //
+  // The canvas is created UP FRONT with a framework-prefixed name so it shows
+  // up in the project list right away; handleSubmit's syncToCanvasDb then
+  // reuses that same canvas via activeProjectIdRef.current. No template build
+  // is run — the LLM produces the real content, no placeholder query cards.
+  const launchFrameworkAnalysis = useCallback(async () => {
+    if (!frameworkModal || !frameworkTopic.trim() || frameworkLoading) return;
+    setFrameworkLoading(true);
+    try {
+      const fw = FRAMEWORKS.find(f => f.id === frameworkModal.templateId);
+      if (!fw) { setFrameworkLoading(false); return; }
+      const mainTopic = frameworkTopic.trim();
+      const enrichedQuery = buildFrameworkQuery(fw, mainTopic, frameworkFieldValues, locale);
+
+      // Create the canvas so it carries the framework label and lands in the
+      // project list even if the user navigates away before the pipeline ends.
+      // Pipeline output gets appended into this canvas via syncToCanvasDb.
+      const res = await fetchWithTimeout("/api/v1/canvas", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
+      });
+      if (!res.ok) {
+        setFrameworkLoading(false);
+        alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project.");
+        return;
+      }
+      const json = await res.json();
+      const pid = json.canvas?.id;
+      if (!pid) { setFrameworkLoading(false); return; }
+      activeProjectIdRef.current = pid;
+      setActiveProjectId(pid);
+
+      // Close the modal, clear its state, then run the hero-query pipeline
+      // with the enriched query — user now watches the SequentialPipeline
+      // reveal on Home exactly as a normal hero query would.
+      setFrameworkModal(null);
+      setFrameworkTopic("");
+      setFrameworkFieldValues({});
+      setFrameworkLoading(false);
+      await handleSubmit(enrichedQuery);
+    } catch (err) {
+      setFrameworkLoading(false);
+      console.error("[launchFrameworkAnalysis]", err);
+      alert(locale === "de" ? "Fehler beim Starten der Analyse." : "Error starting analysis.");
+    }
+  }, [frameworkModal, frameworkTopic, frameworkLoading, frameworkFieldValues, locale, handleSubmit]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") { e.preventDefault(); handleSubmit(); }
   };
@@ -856,49 +947,7 @@ export default function HomeClient() {
                       // Enter submits, Shift+Enter inserts a newline
                       if (e.key === "Enter" && !e.shiftKey && frameworkTopic.trim() && !frameworkLoading) {
                         e.preventDefault();
-                        setFrameworkLoading(true);
-                        try {
-                          const { TEMPLATES, FRAMEWORKS: FWS } = await import("@/lib/canvas-templates");
-                          const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
-                          if (!tmpl) { setFrameworkLoading(false); return; }
-                          // Compose a richer topic string with optional field values.
-                          // Canvas NAME keeps the framework label prefix + main topic
-                          // (so framework-detect by name prefix keeps working).
-                          // Canvas QUERIES receive the enriched topic with appended context.
-                          const fw = FWS.find(f => f.id === frameworkModal.templateId);
-                          const fieldParts: string[] = [];
-                          if (fw?.guidance?.fields) {
-                            for (const f of fw.guidance.fields) {
-                              const v = frameworkFieldValues[f.key]?.trim();
-                              if (v) fieldParts.push(`${locale === "de" ? f.labelDe : f.labelEn}: ${v}`);
-                            }
-                          }
-                          const mainTopic = frameworkTopic.trim();
-                          const enrichedTopic = fieldParts.length
-                            ? `${mainTopic} (${fieldParts.join("; ")})`
-                            : mainTopic;
-                          const result = tmpl.build(enrichedTopic);
-                          const res = await fetchWithTimeout("/api/v1/canvas", {
-                            method: "POST", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
-                          });
-                          if (!res.ok) { setFrameworkLoading(false); return; }
-                          const json = await res.json();
-                          const pid = json.canvas?.id;
-                          if (!pid) { setFrameworkLoading(false); return; }
-                          await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
-                            method: "PATCH", headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
-                          });
-                          activeProjectIdRef.current = pid;
-                          setActiveProjectId(pid);
-                          setFrameworkLoading(false);
-                          setFrameworkModal(null);
-                          window.location.href = `/canvas?project=${pid}`;
-                        } catch (err) {
-                          setFrameworkLoading(false);
-                          console.error(err);
-                        }
+                        await launchFrameworkAnalysis();
                       }
                     }}
                     onFocus={() => setFrameworkTopicFocused(true)}
@@ -1028,49 +1077,7 @@ export default function HomeClient() {
                         justifyContent: "flex-end",
                       }}>
                         <button
-                          onClick={async () => {
-                            if (!frameworkTopic.trim() || frameworkLoading) return;
-                            setFrameworkLoading(true);
-                            try {
-                              const { TEMPLATES, FRAMEWORKS: FWS } = await import("@/lib/canvas-templates");
-                              const tmpl = TEMPLATES.find(x => x.id === frameworkModal.templateId);
-                              if (!tmpl) { setFrameworkLoading(false); return; }
-                              const fwInner = FWS.find(f => f.id === frameworkModal.templateId);
-                              const fieldParts: string[] = [];
-                              if (fwInner?.guidance?.fields) {
-                                for (const f of fwInner.guidance.fields) {
-                                  const v = frameworkFieldValues[f.key]?.trim();
-                                  if (v) fieldParts.push(`${locale === "de" ? f.labelDe : f.labelEn}: ${v}`);
-                                }
-                              }
-                              const mainTopic = frameworkTopic.trim();
-                              const enrichedTopic = fieldParts.length
-                                ? `${mainTopic} (${fieldParts.join("; ")})`
-                                : mainTopic;
-                              const result = tmpl.build(enrichedTopic);
-                              const res = await fetchWithTimeout("/api/v1/canvas", {
-                                method: "POST", headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ name: `${frameworkModal.label}: ${mainTopic}` }),
-                              });
-                              if (!res.ok) { setFrameworkLoading(false); alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project."); return; }
-                              const json = await res.json();
-                              const pid = json.canvas?.id;
-                              if (!pid) { setFrameworkLoading(false); return; }
-                              await fetchWithTimeout(`/api/v1/canvas/${pid}`, {
-                                method: "PATCH", headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ canvasState: { nodes: result.nodes, conns: result.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
-                              });
-                              activeProjectIdRef.current = pid;
-                              setActiveProjectId(pid);
-                              setFrameworkLoading(false);
-                              setFrameworkModal(null);
-                              window.location.href = `/canvas?project=${pid}`;
-                            } catch (err) {
-                              setFrameworkLoading(false);
-                              console.error(err);
-                              alert(locale === "de" ? "Fehler beim Erstellen der Analyse." : "Error creating analysis.");
-                            }
-                          }}
+                          onClick={launchFrameworkAnalysis}
                           disabled={frameworkLoading || !frameworkTopic.trim()}
                           className={frameworkLoading || !frameworkTopic.trim() ? "" : "sis-shimmer-btn"}
                           style={{
@@ -1098,7 +1105,7 @@ export default function HomeClient() {
                           }}
                         >
                           {frameworkLoading
-                            ? (locale === "de" ? "Projekt wird erstellt…" : "Creating project…")
+                            ? (locale === "de" ? "Analyse wird gestartet…" : "Starting analysis…")
                             : (locale === "de" ? "Analyse starten →" : "Start analysis →")}
                         </button>
                       </div>
