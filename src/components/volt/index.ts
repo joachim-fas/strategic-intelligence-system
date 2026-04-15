@@ -62,6 +62,11 @@ export * from "./VoltLabel";
 export * from "./VoltKbd";
 export * from "./VoltSpinner";
 
+// Icons — zentraler Adapter fuer das Icon-Set. Call-Sites sollen kuenftig
+// aus Volt importieren statt direkt aus lucide, damit ein spaeterer
+// Set-Swap an einer Stelle passiert (siehe VoltIcon.tsx).
+export * from "./VoltIcon";
+
 // Navigation
 export * from "./VoltBreadcrumb";
 

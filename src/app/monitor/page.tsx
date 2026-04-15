@@ -122,12 +122,39 @@ function LogLine({ entry }: { entry: ActivityLogEntry }) {
   );
 }
 
+// Konfigurations-Status eines Connectors, wie von
+// /api/v1/sources/status geliefert. Spiegelt src/lib/connector-config.ts.
+interface SourceConfigStatus {
+  name: string;
+  displayName: string;
+  signalCount: number;
+  lastFetch: string | null;
+  newestHours: number | null;
+  status: "ok" | "stale" | "inactive";
+  config: {
+    status: "ok" | "missing-required" | "missing-optional";
+    missing: string[];
+    registerUrl: string | null;
+    note: string | null;
+  };
+}
+
+interface SourcesStatusPayload {
+  connectors: SourceConfigStatus[];
+  totalSignals: number;
+  healthy: number;
+  stale: number;
+  inactive: number;
+  needsKey: number;
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MonitorPage() {
   const { locale } = useLocale();
   const de = locale === "de";
   const [data, setData] = useState<MonitorData | null>(null);
+  const [sources, setSources] = useState<SourcesStatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
@@ -144,11 +171,23 @@ export default function MonitorPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetchWithTimeout("/api/v1/monitor");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      // Zwei Calls parallel: der klassische /monitor-Report plus die
+      // neue /sources/status-Route mit Config-Status pro Connector.
+      // So bleibt die /monitor-Route unveraendert und wir bekommen
+      // gleichzeitig den Konfigurations-Einblick.
+      const [monitorRes, sourcesRes] = await Promise.all([
+        fetchWithTimeout("/api/v1/monitor"),
+        fetchWithTimeout("/api/v1/sources/status"),
+      ]);
+      if (!monitorRes.ok) throw new Error(`HTTP ${monitorRes.status}`);
+      const json = await monitorRes.json();
       const d = json.data ?? json;
       setData(d);
+      if (sourcesRes.ok) {
+        const sJson = await sourcesRes.json();
+        const payload = (sJson.data ?? sJson) as SourcesStatusPayload;
+        setSources(payload);
+      }
       setError(null);
       setLastRefresh(new Date());
       addLog("fetch", `Monitor-Daten geladen: ${d.signals.total} Signale, ${d.trends.total} Trends`);
@@ -391,6 +430,160 @@ export default function MonitorPage() {
                 </div>
               </div>
             </div>
+
+            {/* ── Datenquellen-Gesundheit: Konfigurations-Luecken ──
+                 Zeigt welche Connectors aktuell KEINE Signale liefern und
+                 warum. Wichtigster Fall: `missing-required` — eine Quelle
+                 bleibt stumm weil ihr API-Key fehlt. Der Monitor zeigt
+                 direkt welche ENV-Variable fehlt und wo man sich fuer
+                 den Key registriert. Zweiter Fall: `missing-optional` —
+                 Quelle laeuft, aber mit Rate-Limit-Drossel (z.B. GitHub
+                 ohne Token). Gruene Pille = alles ok. */}
+            {sources && (
+              <div style={{
+                background: "var(--volt-surface-raised)", border: "1px solid var(--color-border)",
+                borderRadius: 12, padding: 20, marginBottom: 20,
+              }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)" }}>
+                    {de ? "Datenquellen-Gesundheit" : "Data Source Health"}
+                  </div>
+                  <div style={{
+                    fontFamily: "var(--volt-font-mono)", fontSize: 11,
+                    color: "var(--color-text-muted)", letterSpacing: "0.04em",
+                  }}>
+                    <span style={{ color: "#1A9E5A", fontWeight: 600 }}>{sources.healthy}</span> ok
+                    {" · "}<span style={{ color: "#F5A623", fontWeight: 600 }}>{sources.stale}</span> stale
+                    {" · "}<span style={{ color: "#9B9B9B", fontWeight: 600 }}>{sources.inactive}</span> inaktiv
+                    {sources.needsKey > 0 && (
+                      <>{" · "}<span style={{ color: "#E8402A", fontWeight: 700 }}>{sources.needsKey}</span> {de ? "ohne Key" : "missing key"}</>
+                    )}
+                  </div>
+                </div>
+
+                {/* Kritische Luecken: fehlende erforderliche Keys */}
+                {sources.connectors.filter(c => c.config.status === "missing-required").length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{
+                      fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.10em", textTransform: "uppercase",
+                      color: "#E8402A", marginBottom: 8,
+                    }}>
+                      {de ? "❌ Aktivierung erforderlich — API-Key fehlt" : "❌ Activation required — API key missing"}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {sources.connectors.filter(c => c.config.status === "missing-required").map(c => (
+                        <div key={c.name} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 12px",
+                          background: "var(--signal-negative-light)",
+                          border: "1px solid var(--signal-negative-border)",
+                          borderRadius: 6, fontSize: 12,
+                        }}>
+                          <span style={{ fontWeight: 600, color: "var(--color-text-primary)", minWidth: 110 }}>{c.displayName}</span>
+                          <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--signal-negative-text)" }}>
+                            {c.config.missing.join(" + ")}
+                          </span>
+                          {c.config.note && (
+                            <span style={{ flex: 1, color: "var(--color-text-muted)", fontSize: 11 }}>{c.config.note}</span>
+                          )}
+                          {c.config.registerUrl && (
+                            <a href={c.config.registerUrl} target="_blank" rel="noopener noreferrer" style={{
+                              fontSize: 11, fontWeight: 600,
+                              padding: "3px 10px", borderRadius: 5,
+                              background: "#0A0A0A", color: "#fff",
+                              textDecoration: "none", flexShrink: 0,
+                            }}>
+                              {de ? "Key holen →" : "Get key →"}
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Nicht kritisch: optionale Keys fehlen (Rate-Limit) */}
+                {sources.connectors.filter(c => c.config.status === "missing-optional").length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{
+                      fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.10em", textTransform: "uppercase",
+                      color: "#F5A623", marginBottom: 8,
+                    }}>
+                      {de ? "⚠ Rate-Limit — optionaler Key empfohlen" : "⚠ Rate limit — optional key recommended"}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {sources.connectors.filter(c => c.config.status === "missing-optional").map(c => (
+                        <div key={c.name} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "6px 12px",
+                          background: "var(--pastel-butter)",
+                          border: "1px solid var(--pastel-butter-border)",
+                          borderRadius: 6, fontSize: 12,
+                        }}>
+                          <span style={{ fontWeight: 600, color: "var(--color-text-primary)", minWidth: 110 }}>{c.displayName}</span>
+                          <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--pastel-butter-text)" }}>
+                            {c.config.missing.join(" + ")}
+                          </span>
+                          {c.config.note && (
+                            <span style={{ flex: 1, color: "var(--color-text-muted)", fontSize: 11 }}>{c.config.note}</span>
+                          )}
+                          {c.config.registerUrl && (
+                            <a href={c.config.registerUrl} target="_blank" rel="noopener noreferrer" style={{
+                              fontSize: 11, fontWeight: 600,
+                              padding: "3px 10px", borderRadius: 5,
+                              background: "transparent", color: "var(--color-text-primary)",
+                              border: "1px solid var(--color-border)",
+                              textDecoration: "none", flexShrink: 0,
+                            }}>
+                              {de ? "Key holen →" : "Get key →"}
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Inaktive Sources OHNE Config-Problem: Connector laeuft aber liefert 0 Signale */}
+                {sources.connectors.filter(c => c.status === "inactive" && c.config.status === "ok").length > 0 && (
+                  <div>
+                    <div style={{
+                      fontFamily: "var(--volt-font-mono)", fontSize: 10, fontWeight: 700,
+                      letterSpacing: "0.10em", textTransform: "uppercase",
+                      color: "var(--color-text-muted)", marginBottom: 8,
+                    }}>
+                      {de ? "○ Ohne Config-Problem, aber stumm (Pipeline pruefen)" : "○ No config issue, still silent (check pipeline)"}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {sources.connectors.filter(c => c.status === "inactive" && c.config.status === "ok").map(c => (
+                        <span key={c.name} style={{
+                          fontSize: 11, padding: "3px 8px", borderRadius: 5,
+                          fontFamily: "var(--volt-font-mono)",
+                          background: "var(--volt-surface)",
+                          border: "1px solid var(--color-border)",
+                          color: "var(--color-text-muted)",
+                        }}>
+                          {c.displayName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alles gut — kein Handlungsbedarf */}
+                {sources.needsKey === 0 && sources.inactive === 0 && (
+                  <div style={{
+                    fontSize: 12, color: "#1A9E5A", fontWeight: 500,
+                    padding: "10px 12px", background: "var(--pastel-mint)",
+                    borderRadius: 6,
+                  }}>
+                    {de ? "✓ Alle konfigurierten Quellen liefern aktiv Signale." : "✓ All configured sources are actively delivering signals."}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Connector Registry ────────────────────────────── */}
             <div style={{

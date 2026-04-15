@@ -1,4 +1,8 @@
 import { useState } from "react";
+// Icons laufen ueber den Volt-Adapter (src/components/volt/VoltIcon.tsx),
+// damit wir spaeter das Icon-Set zentral tauschen koennen, ohne 40
+// Call-Sites einzeln anfassen zu muessen.
+import { VIconThumbsUp, VIconThumbsDown } from "@/components/volt";
 
 // ─── Data Types ───────────────────────────────────────────────────────────────
 
@@ -284,37 +288,84 @@ function PerspectiveCard({
           borderTop: "1px solid var(--color-border)",
         }}
       >
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["up", "down"] as const).map((r) => (
-            <button
-              key={r}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRatingClick(p.id, r);
-              }}
-              style={{
-                fontSize: 12,
-                padding: "2px 6px",
-                borderRadius: 4,
-                border: "1px solid transparent",
-                cursor: "pointer",
-                background:
-                  ratings[p.id] === r
+        {/* Feedback-Rating: "Hilft diese Dimension weiter?"
+             Vorher: nackte 👍/👎-Emojis ohne Label. User wusste nicht, ob
+             er damit die Relevanz, die Richtigkeit oder seine Zustimmung
+             bewertet. Jetzt lucide-Icons + kurzes Label, per Tooltip die
+             Semantik: das Rating geht an /api/v1/bsc-ratings und hilft,
+             kuenftige Briefings zu kalibrieren.
+             Toggle-Verhalten: zweiter Klick auf dasselbe Rating setzt es
+             zurueck (siehe handleRating weiter unten). */}
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+          title={
+            locale === "de"
+              ? "Hilft diese Einschaetzung? Dein Feedback kalibriert kuenftige Briefings."
+              : "Does this assessment help? Your feedback calibrates future briefings."
+          }
+        >
+          <span
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase" as const,
+              color: "var(--color-text-muted)",
+            }}
+          >
+            {locale === "de" ? "Hilft?" : "Helps?"}
+          </span>
+          {(["up", "down"] as const).map((r) => {
+            const active = ratings[p.id] === r;
+            const label =
+              r === "up"
+                ? locale === "de" ? "Hilfreich" : "Helpful"
+                : locale === "de" ? "Nicht hilfreich" : "Not helpful";
+            return (
+              <button
+                key={r}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRatingClick(p.id, r);
+                }}
+                aria-label={label}
+                aria-pressed={active}
+                title={label}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: active ? 600 : 500,
+                  padding: "2px 7px",
+                  borderRadius: 4,
+                  border: `1px solid ${
+                    active
+                      ? r === "up" ? "var(--color-success)" : "var(--color-danger)"
+                      : "var(--color-border)"
+                  }`,
+                  cursor: "pointer",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  background: active
                     ? r === "up"
                       ? "var(--pastel-mint, #ECFDF5)"
                       : "var(--pastel-rose, #FEF2F2)"
                     : "transparent",
-                color:
-                  ratings[p.id] === r
+                  color: active
                     ? r === "up"
                       ? "var(--color-success)"
                       : "var(--color-danger)"
                     : "var(--color-text-muted)",
-              }}
-            >
-              {r === "up" ? "👍" : "👎"}
-            </button>
-          ))}
+                  transition: "all 0.12s",
+                }}
+              >
+                {r === "up"
+                  ? <VIconThumbsUp size={11} strokeWidth={2} />
+                  : <VIconThumbsDown size={11} strokeWidth={2} />}
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </div>
         <button
           onClick={(e) => {

@@ -217,8 +217,31 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
       )}
 
       {/* ── Card header ────────────────────────────────────────── */}
+      {/* Query-Titel frueher "whiteSpace: nowrap" + ellipsis. Bei langen
+           Fragen wurde der Titel auf "Wie entwickelt sich die Mobilit..."
+           abgeschnitten — die eigentliche Frage war versteckt. Jetzt
+           wrappen auf max 2 Zeilen (-webkit-line-clamp) mit klarer
+           Display-Typografie, damit der Kopf des Briefings tatsaechlich
+           zeigt, worum es geht. */}
       <div className="card-header">
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", color: "var(--volt-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 16,
+            fontWeight: 600,
+            lineHeight: 1.35,
+            letterSpacing: "-0.01em",
+            fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+            color: "var(--volt-text)",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical" as const,
+            overflow: "hidden",
+            wordBreak: "break-word",
+          }}
+          title={entry.query}
+        >
           {entry.query}
         </span>
         {isLoading && (
@@ -477,14 +500,16 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 ? `${briefing.causalChain.length} Ketten visualisiert`
                 : `${briefing.causalChain.length} chains visualized`}
             >
+              {/* Klick auf Kausal-Netz-Knoten wurde in der ersten Ergebnis-
+                   ansicht deaktiviert: User-Feedback war, dass der direkte
+                   "Analysiere diesen Knoten"-Follow-up an dieser Stelle
+                   verwirrt — das Briefing soll sich erst setzen, bevor
+                   eine neue Query losgefeuert wird. Follow-up-Queries auf
+                   Knoten passieren weiterhin im Orbit / Canvas / Detail-
+                   Panel, dort ist der Kontext ausreichend. */}
               <CausalOrbit
                 chains={briefing.causalChain}
                 locale={locale}
-                onNodeClick={(node) => onFollowUp?.(
-                  locale === "de"
-                    ? `Analysiere den Knoten "${node}" im Kontext von: ${entry.query}`
-                    : `Analyze the node "${node}" in the context of: ${entry.query}`
-                )}
               />
             </VoltSectionCard>
           )}
@@ -553,14 +578,22 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
 
-          {/* ═══ LEVEL 3: CONTEXT INFOBLOCKS (InfoBlocks, side-by-side on wide screens) ═══ */}
-
+          {/* ═══ LEVEL 3: CONTEXT INFOBLOCKS ═══
+               Frueher: 3-spaltig bei minmax(300px, 1fr) — hat auf dem
+               Briefing-Container (max ~960px) drei Blocks nebeneinander
+               gequetscht. Drei enge Spalten mit je ~30 Zeichen pro Zeile
+               ergeben schlechten Lesefluss, vor allem bei zusammen-
+               haengenden Absaetzen wie "Strategische Interpretation".
+               Jetzt: Single-Column bis mindestens 900px Container-Breite,
+               zwei Spalten nur auf sehr breiten Layouts. Ergebnis: jeder
+               Block liest sich als eigenstaendiger Absatz mit 60-80
+               Zeichen pro Zeile — Lesbarkeit statt Dichte. */}
           {(b.interpretation || b.newsContext || b.decisionFramework) && (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 520px), 1fr))",
+                gap: 14,
               }}
             >
               {b.interpretation && (
@@ -592,20 +625,57 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
 
           {/* ═══ LEVEL 4: SOURCES + FOLLOW-UPS + DETAILS ═══ */}
 
-          {/* Suggested Tags */}
+          {/* Suggested Tags ("LLM-Tags") — Sprung-Einstiege aus dem LLM /
+               lokaler Tag-Wolke. Vorher wurden sie gerendert, aber der
+               async-LLM-Pfad setzte `suggestedTags` nicht, deshalb blieb
+               die Zeile auf Home leer. Fix in intelligence-engine.ts —
+               hier nur die Click-Robustheit: statt des bruechigen
+               input[type=text]-DOM-Hacks nutzen wir den durchgereichten
+               onFollowUp-Callback, so dass ein Klick sauber eine neue
+               Query triggert. */}
           {b.suggestedTags?.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div
+              style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
+              aria-label={locale === "de" ? "Verwandte Begriffe" : "Related tags"}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.10em",
+                  textTransform: "uppercase" as const,
+                  color: "var(--volt-text-faint, #AAA)",
+                  marginRight: 2,
+                }}
+              >
+                {locale === "de" ? "Verwandt" : "Related"}
+              </span>
               {b.suggestedTags.map((tag: string, i: number) => (
                 <button
                   key={i}
                   className="chip chip-neutral"
+                  title={locale === "de" ? `Nachfrage zu "${tag}"` : `Follow up on "${tag}"`}
                   onClick={() => {
-                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-                    if (input) {
-                      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-                      setter?.call(input, tag);
-                      input.dispatchEvent(new Event("input", { bubbles: true }));
-                      input.focus();
+                    if (onFollowUp) {
+                      onFollowUp(
+                        locale === "de"
+                          ? `Was bedeutet "${tag}" im Kontext von: ${entry.query}`
+                          : `What does "${tag}" mean in the context of: ${entry.query}`,
+                      );
+                      return;
+                    }
+                    // Fallback: versuche sowohl input als auch textarea zu
+                    // finden, weil Home + Canvas unterschiedliche Elemente
+                    // verwenden.
+                    const field = (document.querySelector('textarea') as HTMLTextAreaElement | null)
+                      ?? (document.querySelector('input[type="text"]') as HTMLInputElement | null);
+                    if (field) {
+                      const proto = field instanceof HTMLTextAreaElement
+                        ? window.HTMLTextAreaElement.prototype
+                        : window.HTMLInputElement.prototype;
+                      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+                      setter?.call(field, tag);
+                      field.dispatchEvent(new Event("input", { bubbles: true }));
+                      field.focus();
                     }
                   }}
                 >

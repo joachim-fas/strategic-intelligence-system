@@ -18,13 +18,35 @@ export function SynthesisBlock({ text, locale, isHelp }: {
 
   return (
     <div style={{ fontFamily: "var(--font-ui)" }}>
-      <p className="text-body" style={{ color: "var(--color-text-secondary)", margin: 0, fontFamily: "var(--font-ui)" }}>{shown}</p>
+      {/* Synthesis ist der Hero-Text des Briefings — die eigentliche
+           Antwort. Frueher mit --color-text-secondary gerendert, was den
+           wichtigsten Text gegenueber Section-Headers abschwaechte.
+           Jetzt: --color-text-primary + 16px mit 1.7 line-height fuer
+           komfortables Lesen mehrerer Saetze, und max-width 72ch als
+           Lesbarkeits-Guard (Briefings sind Text, keine Zeitungsspalten
+           — 72 Zeichen pro Zeile ist der klassische Lesbarkeits-Korridor). */}
+      <p
+        style={{
+          color: "var(--color-text-primary)",
+          margin: 0,
+          fontFamily: "var(--font-ui)",
+          fontSize: 16,
+          lineHeight: 1.7,
+          fontWeight: 400,
+          letterSpacing: "-0.005em",
+          maxWidth: "72ch",
+        }}
+      >
+        {shown}
+      </p>
       {hasMore && !isHelp && (
         <button onClick={() => setExpanded(e => !e)} style={{
-          marginTop: 6,
+          marginTop: 8,
           fontFamily: "var(--font-mono)",
           fontSize: 11,
-          letterSpacing: "0.03em",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase" as const,
+          fontWeight: 600,
           color: "var(--volt-text-faint, #9B9B9B)",
           background: "none",
           border: "none",

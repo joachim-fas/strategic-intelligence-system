@@ -42,8 +42,11 @@ import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
   ArrowDown, ArrowRight, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
-  Sparkles,
 } from "lucide-react";
+// Sparkles laeuft ueber den Volt-Adapter. Die uebrigen Icons in dieser
+// Datei bleiben bis zum Icon-Set-Swap vorerst auf lucide — eine
+// Komplett-Migration der Canvas-Toolbar ist ein eigener Task.
+import { VIconSparkles } from "@/components/volt";
 import type {
   UsedSignal, Scenario, Reference, MatchedTrend,
   MatchedEdge, DimensionEntry, QueryResult,
@@ -6874,7 +6877,7 @@ export default function CanvasPage() {
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
               >
-                <Sparkles size={12} />
+                <VIconSparkles size={12} />
                 <span>{de ? "Zusammenfassung" : "Summary"}</span>
               </button>
             </Tooltip>

@@ -3,6 +3,7 @@ import path from "path";
 import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
 import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
+import { getConnectorConfigStatus } from "@/lib/connector-config";
 
 ensureEnvLoaded();
 
@@ -40,22 +41,35 @@ export async function GET() {
     // DB not ready yet
   }
 
-  // Merge with connector list so all connectors appear even if no signals
-  const result = connectors.map((c) => ({
-    name: c.name,
-    displayName: c.displayName,
-    signalCount: stats[c.name]?.count ?? 0,
-    lastFetch: stats[c.name]?.lastFetch ?? null,
-    newestHours: stats[c.name]?.newestHours ?? null,
-    status: getStatus(stats[c.name]?.newestHours ?? null, stats[c.name]?.count ?? 0),
-  }));
+  // Merge with connector list so all connectors appear even if no signals.
+  // Zusaetzlich wird pro Connector geprueft, ob seine ENV-Key-Abhaengigkeiten
+  // erfuellt sind — damit der Monitor sagen kann "inaktiv weil Key fehlt",
+  // statt "einfach nur stumm".
+  const result = connectors.map((c) => {
+    const configStatus = getConnectorConfigStatus(c.name);
+    return {
+      name: c.name,
+      displayName: c.displayName,
+      signalCount: stats[c.name]?.count ?? 0,
+      lastFetch: stats[c.name]?.lastFetch ?? null,
+      newestHours: stats[c.name]?.newestHours ?? null,
+      status: getStatus(stats[c.name]?.newestHours ?? null, stats[c.name]?.count ?? 0),
+      config: {
+        status: configStatus.status,
+        missing: configStatus.missing,
+        registerUrl: configStatus.config?.registerUrl ?? null,
+        note: configStatus.config?.note ?? null,
+      },
+    };
+  });
 
   const totalSignals = result.reduce((s, c) => s + c.signalCount, 0);
   const healthy = result.filter((c) => c.status === "ok").length;
   const stale = result.filter((c) => c.status === "stale").length;
   const inactive = result.filter((c) => c.status === "inactive").length;
+  const needsKey = result.filter((c) => c.config.status === "missing-required").length;
 
-  return apiSuccess({ connectors: result, totalSignals, healthy, stale, inactive }, 200, CACHE_HEADERS.short);
+  return apiSuccess({ connectors: result, totalSignals, healthy, stale, inactive, needsKey }, 200, CACHE_HEADERS.short);
 }
 
 function getStatus(newestHours: number | null, count: number): "ok" | "stale" | "inactive" {

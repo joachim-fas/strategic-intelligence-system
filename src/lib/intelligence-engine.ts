@@ -308,6 +308,24 @@ export async function queryIntelligenceAsync(
       activeStage = null;
     }
 
+    // Tag-Wolke fuer das Briefing: vorher nur im Sync-Fallback gesetzt, im
+     // async-Pfad (der auf Home+Canvas genutzt wird) war das Feld immer
+     // leer. Darum zeigte die Tag-Chip-Zeile im Briefing nichts. Wir nutzen
+     // jetzt dieselbe lokale generateTagCloud-Funktion, ergaenzt um die
+     // ggf. vom LLM zurueckgegebenen Keywords (falls Schema erweitert
+     // wird), damit der User Sprung-Einstiege wie "AI", "Klima",
+     // "Geopolitik" wieder im Briefing sieht. */
+    const q = query.toLowerCase().trim();
+    const localTags = generateTagCloud(q, matchedTrends, allTrends, locale);
+    const llmTags: string[] = Array.isArray(llmResult.keywords)
+      ? llmResult.keywords.filter((t: unknown): t is string => typeof t === "string" && t.length > 1)
+      : Array.isArray(llmResult.suggestedTags)
+        ? llmResult.suggestedTags.filter((t: unknown): t is string => typeof t === "string" && t.length > 1)
+        : [];
+    // LLM-Tags zuerst (falls vorhanden = hoehere Relevanz), dann lokale
+    // Ergaenzungen auf maximal 15 aufgefuellt — deduped.
+    const mergedTags = Array.from(new Set([...llmTags, ...localTags])).slice(0, 15);
+
     return {
       query,
       matchedTrends,
@@ -329,6 +347,7 @@ export async function queryIntelligenceAsync(
       signalSummary: `${totalSignals} signals across ${matchedTrends.length} trends`,
       confidence: llmResult.confidence ?? 0.5,
       dataPoints: totalSignals,
+      suggestedTags: mergedTags,
     };
   } catch {
     return null;
