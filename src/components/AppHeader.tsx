@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Activity, Menu } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useLocale } from "@/lib/locale-context";
+import { TenantSwitcher } from "@/components/tenant/TenantSwitcher";
 import { usePathname } from "next/navigation";
 
 // Main navigation — only core workflow items.
@@ -121,6 +122,13 @@ export function AppHeader() {
 
         {/* Right side actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {/* Tenant-Switcher: primaeres "Wo bin ich gerade?"-Element.
+               Rendert nur, wenn eine aktive Tenant-Mitgliedschaft
+               vorhanden ist (Dev-Mode: Default Workspace, Prod:
+               tatsaechlich eingeloggter User). Single-Tenant-Users
+               bekommen nur einen statischen Chip, erst ab 2 Orgas
+               oder System-Admin-Rolle wird das Dropdown aktiv. */}
+          <TenantSwitcher />
           {/* Activity Monitor toggle (Ctrl+M) */}
           <Tooltip content={de ? "Activity Monitor (Ctrl+M)" : "Activity Monitor (Ctrl+M)"} placement="bottom">
             <button

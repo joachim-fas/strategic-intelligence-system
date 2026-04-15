@@ -65,7 +65,7 @@ export default function SessionsPage() {
               fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em",
               color: "var(--volt-text, #0A0A0A)", margin: 0, lineHeight: 1.15,
             }}>
-              Projekte
+              {de ? "Projekte" : "Projects"}
             </h1>
             {/* Volt UI Primary Button: 14px/600, h-36, px-20, rounded-lg (8px), bg-lime, tracking-tight */}
             <button
