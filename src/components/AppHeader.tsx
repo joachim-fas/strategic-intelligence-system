@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Activity, Menu } from "lucide-react";
@@ -33,6 +33,17 @@ export function AppHeader() {
   const pathname = usePathname();
   const de = locale === "de";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // One-shot migration: older sessions may have left `.dark` / `.volt-dark` on
+  // <html> via localStorage. Those classes no longer have CSS rules after the
+  // dark-mode removal, but they still flip Tailwind `dark:` utilities and any
+  // consumer that checks for the class. Strip them once on mount so the page
+  // renders in the clean light-mode baseline it always rendered in.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    document.documentElement.classList.remove("dark", "volt-dark");
+    try { window.localStorage.removeItem("sis-theme"); } catch {}
+  }, []);
 
   const isActive = (href: string) =>
     href === "/"
