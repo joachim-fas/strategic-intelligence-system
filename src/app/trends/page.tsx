@@ -1,16 +1,16 @@
 /**
- * /trends — Trend-Vollübersicht (Server Component wrapper).
+ * /trends — now a thin redirect to /verstehen?tab=trends.
  *
- * Previously redirected to /verstehen?tab=radar. Now renders a dedicated
- * trend overview page so users have a direct, scannable entry point to
- * ALL tracked trends (grouped by Adopt / Trial / Assess / Hold), without
- * having to cross the Knowledge Cockpit's tab switcher first.
- *
- * Interactive content lives in TrendsClient (client component).
+ * The trend overview (ALL trends grouped by Adopt/Trial/Assess/Hold) used to
+ * be a standalone page with its own hero + TrendsClient shell. It now lives
+ * inside the Knowledge Cockpit as the "Trends" tab alongside Radar, Netzwerk,
+ * Signale, and Quellen — matching the user's model of "one cockpit, many
+ * views". Existing bookmarks and internal links to /trends keep working via
+ * this redirect.
  */
 
-import TrendsClient from "./TrendsClient";
+import { redirect } from "next/navigation";
 
 export default function TrendsPage() {
-  return <TrendsClient />;
+  redirect("/verstehen?tab=trends");
 }

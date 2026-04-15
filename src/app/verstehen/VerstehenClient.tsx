@@ -50,6 +50,12 @@ const QuellenTable = dynamic(() => import("@/components/verstehen/QuellenTable")
   ssr: false,
   loading: () => <ViewLoading label="Quellen" />,
 });
+// TrendOverview — reused from /trends so both entry points stay in sync.
+// ALL trends grouped by Adopt / Trial / Assess / Hold, sorted by relevance.
+const TrendOverview = dynamic(() => import("@/components/verstehen/TrendOverview"), {
+  ssr: false,
+  loading: () => <ViewLoading label="Trends" />,
+});
 
 function ViewLoading({ label }: { label: string }) {
   return (
@@ -59,12 +65,13 @@ function ViewLoading({ label }: { label: string }) {
   );
 }
 
-// ── View modes (Tabs) — 4 tabs, Methodik moved to /verstehen/methodik ──────
+// ── View modes (Tabs) — Radar + Trends overview + Network + Signals + Sources ──
 
-type Tab = "radar" | "netzwerk" | "signale" | "quellen";
+type Tab = "radar" | "trends" | "netzwerk" | "signale" | "quellen";
 
 const TABS: { key: Tab; labelDe: string; labelEn: string }[] = [
   { key: "radar",    labelDe: "Radar",    labelEn: "Radar" },
+  { key: "trends",   labelDe: "Trends",   labelEn: "Trends" },
   { key: "netzwerk", labelDe: "Netzwerk", labelEn: "Network" },
   { key: "signale",  labelDe: "Signale",  labelEn: "Signals" },
   { key: "quellen",  labelDe: "Quellen",  labelEn: "Sources" },
@@ -193,7 +200,7 @@ export default function VerstehenClient() {
       window.location.replace("/verstehen/methodik");
       return;
     }
-    if (urlTab && (["radar", "netzwerk", "signale", "quellen"] as Tab[]).includes(urlTab as Tab)) {
+    if (urlTab && (["radar", "trends", "netzwerk", "signale", "quellen"] as Tab[]).includes(urlTab as Tab)) {
       setActiveTabState(urlTab as Tab);
     }
   }, []);
@@ -366,12 +373,12 @@ export default function VerstehenClient() {
         {/* Left: Visualization */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* UX-15 / EDGE-20: Loading indicator and error state for trend data */}
-          {trendsLoading && (activeTab === "radar" || activeTab === "netzwerk") && (
+          {trendsLoading && (activeTab === "radar" || activeTab === "trends" || activeTab === "netzwerk") && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--volt-text-muted, #6B6B6B)", fontSize: 13 }}>
               {de ? "Trends laden\u2026" : "Loading trends\u2026"}
             </div>
           )}
-          {trendsError && (activeTab === "radar" || activeTab === "netzwerk") && (
+          {trendsError && (activeTab === "radar" || activeTab === "trends" || activeTab === "netzwerk") && (
             <div role="alert" style={{
               margin: "24px", padding: "20px 22px",
               background: "var(--volt-negative-light, #FEF2F2)",
@@ -411,6 +418,15 @@ export default function VerstehenClient() {
             />
           )}
 
+          {activeTab === "trends" && !trendsLoading && (
+            <TrendOverview
+              trends={trends}
+              locale={locale}
+              onTrendClick={handleTrendClick}
+              selectedId={selectedId}
+            />
+          )}
+
           {activeTab === "netzwerk" && !trendsLoading && (
             <div style={{ padding: "20px 24px 40px" }}>
               <CausalGraphView
@@ -443,10 +459,10 @@ export default function VerstehenClient() {
           )}
         </div>
 
-        {/* Right: Detail Panel — only shown on radar/netzwerk where it makes sense.
+        {/* Right: Detail Panel — shown on radar/trends/netzwerk where it makes sense.
              On narrow viewports (< 768px) the panel overlays full-width as a
              fixed sheet; on wider screens it sits as a sticky sidebar. */}
-        {selectedTrend && (activeTab === "radar" || activeTab === "netzwerk") && (
+        {selectedTrend && (activeTab === "radar" || activeTab === "trends" || activeTab === "netzwerk") && (
           <div style={isMobile ? {
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             zIndex: 50,
