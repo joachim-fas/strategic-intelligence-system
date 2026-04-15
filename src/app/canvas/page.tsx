@@ -38,6 +38,8 @@ import {
 } from "@/components/volt/VoltDropdownMenu";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useLocale } from "@/lib/locale-context";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
@@ -4858,6 +4860,13 @@ export default function CanvasPage() {
   const [panY, setPanY] = useState(0);
   const [zoom, setZoom] = useState(1);
   const { locale } = useLocale();
+  // Tenant-Scope fuer Client-localStorage. Der Hook ist SSR-hydratisiert, aber
+  // wir spiegeln in einen Ref, damit Callbacks (onSave, loadProject, delete,
+  // Init-Effect) den aktuellen Tenant sehen, ohne bei jedem Rerender neu
+  // erzeugt zu werden.
+  const activeTenantId = useActiveTenantId();
+  const tenantIdRef = useRef<string | null>(activeTenantId);
+  useEffect(() => { tenantIdRef.current = activeTenantId; }, [activeTenantId]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [orbitSubMode, setOrbitSubMode] = useState<"ableitung" | "netzwerk">("ableitung");
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
@@ -5091,7 +5100,8 @@ export default function CanvasPage() {
       setSelectedId(null); setCmdVisible(false);
       setSaveStatus(null);
       hasAutoNamedRef.current = false;
-      try { localStorage.setItem("sis-active-canvas", newCanvas.id); } catch {}
+      const tid0 = tenantIdRef.current;
+      if (tid0) tenantStorage.set(tid0, TENANT_STORAGE_KEYS.activeCanvas, newCanvas.id);
       try { window.history.replaceState(null, "", `/canvas?project=${newCanvas.id}`); } catch {}
       await loadProjects();
       // Show template picker for the new project
@@ -5123,7 +5133,10 @@ export default function CanvasPage() {
       if (res.status === 404) {
         // Project was deleted — clear stale references
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
-        try { localStorage.removeItem("sis-active-canvas"); } catch {}
+        {
+          const tid404 = tenantIdRef.current;
+          if (tid404) tenantStorage.remove(tid404, TENANT_STORAGE_KEYS.activeCanvas);
+        }
         try { localStorage.removeItem("sis-history-v2"); } catch {}
         setProjectId(null); setProjectName(""); setSaveStatus(null);
         setNodes([]); setConnections([]);
@@ -5144,7 +5157,10 @@ export default function CanvasPage() {
       setSaveStatus(null);
       // Reset auto-naming flag so the next first-query can rename this session
       hasAutoNamedRef.current = false;
-      try { localStorage.setItem("sis-active-canvas", id); } catch {}
+      {
+        const tidL = tenantIdRef.current;
+        if (tidL) tenantStorage.set(tidL, TENANT_STORAGE_KEYS.activeCanvas, id);
+      }
       // Keep URL in sync so bookmarks / refresh / back-button all work
       try { window.history.replaceState(null, "", `/canvas?project=${id}`); } catch {}
       const canvasState = canvas.canvas_state;
@@ -5214,7 +5230,10 @@ export default function CanvasPage() {
       if (projectId === id) {
         setProjectId(null); setProjectName(""); setSaveStatus(null);
         setNodes([]); setConnections([]);
-        try { localStorage.removeItem("sis-active-canvas"); } catch {}
+        {
+          const tidD = tenantIdRef.current;
+          if (tidD) tenantStorage.remove(tidD, TENANT_STORAGE_KEYS.activeCanvas);
+        }
         // Clear ?project= from URL so refresh shows empty state, not a dead ID
         try { window.history.replaceState(null, "", "/canvas"); } catch {}
       }
@@ -5230,14 +5249,33 @@ export default function CanvasPage() {
   }, [de, projectId, showProjectError]);
 
   // ── Init ──────────────────────────────────────────────────────────────────
-
+  // Gate Init auf `activeTenantId`: ohne aktiven Tenant koennen wir die
+  // tenant-scoped Keys nicht lesen. Beim ersten Lauf wandern vorhandene
+  // Legacy-Keys per `migrateLegacy` in den Scope, damit bestehende Nutzer
+  // ihren zuletzt offenen Canvas behalten. `initRanRef` verhindert, dass
+  // der Effect bei spaeteren Tenant-Wechseln erneut zuschlaegt — der
+  // harte Reload in `switchTenant` nimmt sich dieser Faelle an.
+  const initRanRef = useRef(false);
   useEffect(() => {
-    // locale is fixed to "de" for now
+    if (initRanRef.current) return;
+    if (!activeTenantId) return; // wait until tenant is known
+    initRanRef.current = true;
+
+    // Einmalige Migration der 4 Legacy-Keys in den Tenant-Scope. Idempotent:
+    // wenn die gescopten Keys schon gesetzt sind, tut migrateLegacy nichts.
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.canvasHistory);
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.canvasProject);
 
     loadProjects();
 
     // Check if transferring an analysis from main page
-    const transferRaw = (() => { try { const v = localStorage.getItem("sis-transfer-to-canvas"); localStorage.removeItem("sis-transfer-to-canvas"); return v; } catch { return null; } })();
+    const transferRaw = (() => {
+      const v = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
+      tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
+      return v;
+    })();
     if (transferRaw) {
       try {
         const { query, result } = JSON.parse(transferRaw);
@@ -5259,14 +5297,18 @@ export default function CanvasPage() {
       } catch { /* ignore malformed transfer data */ }
     }
 
-    // Resolve which project to load: URL param > one-shot localStorage > persisted active canvas
+    // Resolve which project to load: URL param > one-shot tenant-scoped storage > persisted active canvas
     const urlProjectId = (() => { try { return new URLSearchParams(window.location.search).get("project"); } catch { return null; } })();
-    const fromProjects = (() => { try { const v = localStorage.getItem("sis-canvas-project"); localStorage.removeItem("sis-canvas-project"); return v; } catch { return null; } })();
-    const activeId = urlProjectId ?? fromProjects ?? (() => { try { return localStorage.getItem("sis-active-canvas"); } catch { return null; } })();
+    const fromProjects = (() => {
+      const v = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.canvasProject);
+      tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.canvasProject);
+      return v;
+    })();
+    const activeId = urlProjectId ?? fromProjects ?? tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
 
     if (activeId) {
-      // Persist immediately so localStorage is in sync with the URL param
-      try { localStorage.setItem("sis-active-canvas", activeId); } catch {}
+      // Persist immediately so the tenant-scoped key is in sync with the URL param
+      tenantStorage.set(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas, activeId);
       // Use the proper loadProject function which handles schema versions,
       // error states, 404 cleanup, and localStorage persistence correctly.
       loadProject(activeId);
@@ -5283,7 +5325,7 @@ export default function CanvasPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTenantId]);
 
   // Seed the undo history with the initial state once nodes are loaded
   const historySeededRef = useRef(false);
@@ -8708,9 +8750,9 @@ export default function CanvasPage() {
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
             }}>🗑</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>Karte löschen?</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>{de ? "Karte löschen?" : "Delete card?"}</p>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {label} · nicht rückgängig machbar · Enter zum Bestätigen
+                {label} · {de ? "nicht rückgängig machbar · Enter zum Bestätigen" : "cannot be undone · press Enter to confirm"}
               </p>
             </div>
             <button
@@ -8718,11 +8760,11 @@ export default function CanvasPage() {
               style={{ background: "var(--signal-negative-light, #FDEEE9)", border: "1.5px solid var(--signal-negative-border, #F4A090)", color: "var(--signal-negative-text, #A01A08)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E8402A"; el.style.color = "#fff"; el.style.borderColor = "#E8402A"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "var(--signal-negative-light, #FDEEE9)"; el.style.color = "var(--signal-negative-text, #A01A08)"; el.style.borderColor = "var(--signal-negative-border, #F4A090)"; }}
-            >Löschen</button>
+            >{de ? "Löschen" : "Delete"}</button>
             <button
               onClick={() => setDeleteConfirmId(null)}
               style={{ background: "transparent", border: "1.5px solid var(--color-border)", color: "var(--color-text-secondary)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
-            >Abbrechen</button>
+            >{de ? "Abbrechen" : "Cancel"}</button>
           </div>
         );
       })()}

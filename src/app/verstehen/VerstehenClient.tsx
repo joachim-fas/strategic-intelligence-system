@@ -20,6 +20,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useLocale } from "@/lib/locale-context";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
@@ -82,6 +84,7 @@ const TABS: { key: Tab; labelDe: string; labelEn: string }[] = [
 export default function VerstehenClient() {
   const { locale } = useLocale();
   const de = locale === "de";
+  const activeTenantId = useActiveTenantId();
 
   // Trends data — megaTrends as base, overlay DB scores if available.
   const [trends, setTrends] = useState<TrendDot[]>(megaTrends);
@@ -507,7 +510,7 @@ export default function VerstehenClient() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ canvasState: { nodes: template.nodes, conns: template.conns, pan: { x: 0, y: 0 }, zoom: 0.7, v: 2 } }),
                     });
-                    localStorage.setItem("sis-active-canvas", pid);
+                    if (activeTenantId) tenantStorage.set(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas, pid);
                     window.location.href = `/canvas?project=${pid}`;
                   } catch (e) { console.error(e); }
                 }}

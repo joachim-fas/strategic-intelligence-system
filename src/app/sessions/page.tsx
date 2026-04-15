@@ -11,12 +11,15 @@ import { useState } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { SessionList } from "@/components/sessions/SessionList";
 import { SessionsSubNav } from "@/components/sessions/SessionsSubNav";
 
 export default function SessionsPage() {
   const { locale } = useLocale();
   const de = locale === "de";
+  const activeTenantId = useActiveTenantId();
   const [creating, setCreating] = useState(false);
 
   const createNewSession = async () => {
@@ -32,7 +35,7 @@ export default function SessionsPage() {
       const json = await res.json();
       const id = (json.data ?? json)?.canvas?.id;
       if (id) {
-        try { localStorage.setItem("sis-active-canvas", id); } catch {}
+        if (activeTenantId) tenantStorage.set(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas, id);
         window.location.href = `/canvas?project=${id}`;
       }
     } catch (e) {

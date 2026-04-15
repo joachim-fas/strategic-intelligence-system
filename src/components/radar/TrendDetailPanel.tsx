@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { TrendDot, RING_COLORS, TIME_HORIZON_COLORS, DURATION_CONFIG, DIRECTION_CONFIG, FOCUS_CONFIG, TrendClassification } from "@/types";
 import { useLocale } from "@/lib/locale-context";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { Locale } from "@/lib/i18n";
 import { t, getRingLabel } from "@/lib/i18n";
 import { getTrendSources, resolveSource, getTotalSourceCount, TrendSourceRef } from "@/lib/trend-sources";
@@ -15,7 +17,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 /**
  * TrendActionsBar — kontextbewusste Primaerwahl + Vertiefen-Link.
  *
- * Client-only: liest `sis-active-canvas` aus localStorage beim Mount
+ * Client-only: liest den tenant-scoped "sis-active-canvas"-Key beim Mount
  * und entscheidet damit, ob der Primary-Button auf "Im aktuellen Projekt
  * fragen" (Projekt da) oder "Neues Projekt starten" (kein Projekt)
  * zeigt. Die Entscheidung passiert hydration-sicher erst nach dem
@@ -23,15 +25,17 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * angezeigt, damit Server und Client-Render dieselbe Markup liefern.
  */
 function TrendActionsBar({ trend, locale }: { trend: TrendDot; locale: Locale }) {
+  const activeTenantId = useActiveTenantId();
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   useEffect(() => {
-    try {
-      const id = localStorage.getItem("sis-active-canvas");
-      if (id) setActiveProjectId(id);
-    } catch {
-      /* SSR or blocked storage — stays null, falls to "new project" */
-    }
-  }, []);
+    if (!activeTenantId) return;
+    // Einmalmigration: falls der User bereits Pre-Multi-Tenant-State im
+    // un-gescopten Key hat, ziehen wir ihn in den Scope, damit der
+    // "im aktuellen Projekt fragen"-Zweig nicht verlorengeht.
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+    const id = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+    if (id) setActiveProjectId(id);
+  }, [activeTenantId]);
 
   const deepDiveQuery = locale === "de"
     ? `Deep Dive: ${trend.name} — Treiber, Signale, Szenarien`

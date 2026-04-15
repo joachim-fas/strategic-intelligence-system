@@ -3,6 +3,8 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { IntelligenceBriefing } from "@/lib/intelligence-engine";
 import { TrendDot } from "@/types";
 import { Locale } from "@/lib/i18n";
@@ -79,6 +81,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   const isHelp = entry.query === "/help";
   const isLoading = entry.isLoading ?? false; // explicit boolean — not a string comparison
   const b = briefing as any; // Extended fields from LLM
+  // Tenant-Scope fuer den /canvas-Handoff via localStorage.
+  const activeTenantId = useActiveTenantId();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSignals, setShowSignals] = useState(true); // default OPEN for transparency
@@ -190,10 +194,13 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         matchedTrends: flatTrends,
         matchedEdges: edges,
       };
-      localStorage.setItem(
-        "sis-transfer-to-canvas",
-        JSON.stringify({ query: entry.query, result }),
-      );
+      if (activeTenantId) {
+        tenantStorage.set(
+          activeTenantId,
+          TENANT_STORAGE_KEYS.transferToCanvas,
+          JSON.stringify({ query: entry.query, result }),
+        );
+      }
       window.location.href = "/canvas";
     } catch (e) {
       console.error("[openInCanvas]", e);

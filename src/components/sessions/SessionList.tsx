@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { useActiveTenantId } from "@/lib/tenant-context";
+import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 // voltConfirm ersetzt window.confirm fuer destruktive Aktionen. Der
 // native OS-Dialog haelt sich nicht an das Volt-Design und fuehlt sich
 // als Fremdkoerper an — jetzt in-app Modal mit konsistenter Typo/Spacing.
@@ -79,6 +81,16 @@ function formatAbsolute(iso: string, de: boolean): string {
 }
 
 export function SessionList({ mode, de }: Props) {
+  // Tenant-Scope fuer localStorage-Writes. `activeTenantId` ist SSR-
+  // hydratisiert, kann aber `null` sein, wenn die Komponente ohne Session
+  // rendert (Logout-Flow). Wir ziehen Alt-Daten einmalig in den Scope, damit
+  // Nutzer die gerade offene Session nach dem Tenant-Rollout nicht
+  // verlieren.
+  const activeTenantId = useActiveTenantId();
+  useEffect(() => {
+    if (!activeTenantId) return;
+    tenantStorage.migrateLegacy(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+  }, [activeTenantId]);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,10 +166,10 @@ export function SessionList({ mode, de }: Props) {
         body: JSON.stringify({ archived: true }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      try {
-        const active = localStorage.getItem("sis-active-canvas");
-        if (active === id) localStorage.removeItem("sis-active-canvas");
-      } catch {}
+      if (activeTenantId) {
+        const active = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+        if (active === id) tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+      }
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
@@ -210,10 +222,10 @@ export function SessionList({ mode, de }: Props) {
     try {
       const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      try {
-        const active = localStorage.getItem("sis-active-canvas");
-        if (active === id) localStorage.removeItem("sis-active-canvas");
-      } catch {}
+      if (activeTenantId) {
+        const active = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+        if (active === id) tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas);
+      }
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
@@ -267,10 +279,12 @@ export function SessionList({ mode, de }: Props) {
     }
   };
 
-  // active canvas id (only relevant in active mode)
-  const activeCanvasId = (() => {
-    try { return typeof window !== "undefined" ? localStorage.getItem("sis-active-canvas") : null; } catch { return null; }
-  })();
+  // active canvas id (only relevant in active mode), tenant-scoped so two
+  // tenants in the same browser cannot cross-contaminate the "currently
+  // open" marker.
+  const activeCanvasId = activeTenantId
+    ? tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas)
+    : null;
 
   // Annotate sessions with their derived framework category.
   const annotated = useMemo(
@@ -705,7 +719,7 @@ export function SessionList({ mode, de }: Props) {
             ) : (
               <a
                 href={`/canvas?project=${s.id}`}
-                onClick={() => { try { localStorage.setItem("sis-active-canvas", s.id); } catch {} }}
+                onClick={() => { if (activeTenantId) tenantStorage.set(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas, s.id); }}
                 style={{
                   minWidth: 0, overflow: "hidden",
                   textDecoration: "none", color: "inherit",
