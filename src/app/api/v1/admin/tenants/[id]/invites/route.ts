@@ -18,6 +18,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { getSqliteHandle } from "@/db";
 import { apiSuccess, apiError, parseBody, requireSystemAdmin } from "@/lib/api-helpers";
+import { sendMail, renderInviteNewUserEmail, renderMembershipAddedEmail, getAppUrl } from "@/lib/emails";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +98,18 @@ export async function POST(request: Request, { params }: Params) {
       JSON.stringify({ membershipId, userId: user.id, email: normalizedEmail, role: data!.role }),
     );
 
+    // Email: "Du wurdest zu <Tenant> hinzugefuegt" — non-blocking,
+    // Fehler beim Versand kippen die API-Response nicht um.
+    const inviterName = lookupInviterName(d, actorId);
+    const added = renderMembershipAddedEmail({
+      tenantName: tenant.name,
+      role: data!.role,
+      appUrl: getAppUrl(),
+      inviterName,
+      locale: "de",
+    });
+    void sendMail({ to: normalizedEmail, subject: added.subject, html: added.html, text: added.text });
+
     return apiSuccess({
       kind: "direct",
       membershipId,
@@ -128,6 +141,23 @@ export async function POST(request: Request, { params }: Params) {
     JSON.stringify({ inviteId, email: normalizedEmail, role: data!.role }),
   );
 
+  // Email: "Du wurdest eingeladen" inkl. Accept-URL. Auch hier
+  // non-blocking — wenn Mail-Versand fehlschlaegt, bekommt der Admin
+  // den Accept-Link immer noch in der API-Response zurueck und kann
+  // ihn manuell teilen.
+  const inviterName = lookupInviterName(d, actorId);
+  const appUrl = getAppUrl();
+  const inviteUrl = `${appUrl}/invite/accept?token=${token}`;
+  const invited = renderInviteNewUserEmail({
+    tenantName: tenant.name,
+    role: data!.role,
+    inviteUrl,
+    inviterName,
+    locale: "de",
+    expiresAt,
+  });
+  void sendMail({ to: normalizedEmail, subject: invited.subject, html: invited.html, text: invited.text });
+
   // Accept URL is a relative path — the client composes it with
   // window.location.origin. We also return it so the admin UI
   // can show it for manual-share-flow.
@@ -139,6 +169,26 @@ export async function POST(request: Request, { params }: Params) {
     expiresAt,
     acceptPath: `/invite/accept?token=${token}`,
   }, 201);
+}
+
+/**
+ * Helper for rendering "Invited by <Name>" in outgoing emails. Returns
+ * null if the actor id is missing or the user row has no name — the
+ * template falls back to "Ein Kollege / A colleague" in that case.
+ */
+function lookupInviterName(
+  d: ReturnType<typeof getSqliteHandle>,
+  actorId: string | null,
+): string | null {
+  if (!actorId) return null;
+  try {
+    const row = d.prepare("SELECT name, email FROM users WHERE id = ?")
+      .get(actorId) as { name: string | null; email: string | null } | undefined;
+    if (!row) return null;
+    return row.name ?? row.email ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function DELETE(request: Request, { params }: Params) {

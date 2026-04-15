@@ -71,6 +71,14 @@ interface Invite {
   created_at: string;
 }
 
+interface AuditEntry {
+  id: string;
+  action: string;
+  target: unknown;
+  createdAt: string;
+  actor: { id: string; name: string | null; email: string | null } | null;
+}
+
 export function TenantDetailClient({ tenantId }: { tenantId: string }) {
   const { locale } = useLocale();
   const de = locale === "de";
@@ -79,6 +87,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -88,9 +97,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [tRes, mRes] = await Promise.all([
+      const [tRes, mRes, aRes] = await Promise.all([
         fetchWithTimeout(`/api/v1/admin/tenants/${tenantId}`),
         fetchWithTimeout(`/api/v1/admin/tenants/${tenantId}/memberships`),
+        fetchWithTimeout(`/api/v1/admin/tenants/${tenantId}/audit?limit=20`),
       ]);
       if (!tRes.ok) throw new Error(`tenant HTTP ${tRes.status}`);
       if (!mRes.ok) throw new Error(`memberships HTTP ${mRes.status}`);
@@ -104,6 +114,17 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       setStats(tData.stats);
       setMembers(mData.members as Member[]);
       setInvites(mData.invites as Invite[]);
+
+      // Audit-Log ist nice-to-have — Fehler hier sollen die Hauptansicht
+      // nicht kippen. Log-Panel zeigt dann einfach "unavailable".
+      if (aRes.ok) {
+        const aJson = await aRes.json().catch(() => null);
+        const aData = aJson?.data ?? aJson ?? {};
+        setAuditEntries((aData.entries ?? []) as AuditEntry[]);
+      } else {
+        setAuditEntries([]);
+      }
+
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -396,6 +417,65 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
               </section>
             )}
 
+            {/* Audit-Log: letzte 20 administrative Aktionen in diesem
+                 Tenant (Tenant-Create, Member-Add/Remove, Rolle-Change,
+                 Invite-Sent/Revoked/Accepted, Archive/Restore). Ein
+                 voller Viewer mit Filtern + Pagination ist spaeter
+                 geplant; hier reicht der Preview fuer die haeufigste
+                 Admin-Frage "was hat wer wann in dieser Orga geaendert?". */}
+            {auditEntries.length > 0 && (
+              <section style={{ marginTop: 28 }}>
+                <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)", margin: "0 0 10px" }}>
+                  {de ? "Aktivitaet" : "Activity"}
+                </h2>
+                <div style={{
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 12, overflow: "hidden",
+                  background: "var(--volt-surface-raised, #fff)",
+                }}>
+                  {auditEntries.map((entry, i) => (
+                    <div
+                      key={entry.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "160px 1fr 160px",
+                        gap: 14,
+                        padding: "10px 14px",
+                        borderBottom: i < auditEntries.length - 1 ? "1px solid var(--color-border)" : "none",
+                        alignItems: "start",
+                        fontSize: 12,
+                      }}
+                    >
+                      <span style={{
+                        fontFamily: "var(--volt-font-mono)", fontSize: 10,
+                        fontWeight: 700, letterSpacing: "0.04em",
+                        color: actionColor(entry.action),
+                        textTransform: "uppercase" as const,
+                      }}>
+                        {entry.action}
+                      </span>
+                      <span style={{ color: "var(--color-text-primary)", lineHeight: 1.5 }}>
+                        {renderAuditDetail(entry, de)}
+                      </span>
+                      <span style={{ fontSize: 10, color: "var(--color-text-muted)", textAlign: "right" as const, fontFamily: "var(--volt-font-mono)" }}>
+                        {new Date(entry.createdAt).toLocaleString(de ? "de-DE" : "en-US", {
+                          month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                        })}
+                        {entry.actor?.email && (
+                          <>
+                            <br />
+                            <span style={{ color: "var(--color-text-faint, #AAA)" }}>
+                              {entry.actor.name ?? entry.actor.email}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {recentAcceptUrl && (
               <div style={{
                 marginTop: 18, padding: "12px 14px",
@@ -623,4 +703,66 @@ function btnPrimary(saving: boolean, disabled: boolean): React.CSSProperties {
     cursor: saving ? "wait" : "pointer",
     opacity: disabled ? 0.4 : 1,
   };
+}
+
+/**
+ * Audit-Aktions-Farbe: destruktive Aktionen rot, neutrale grau,
+ * create/accept gruen. Der Set der Aktionen ist klein genug, um die
+ * Zuordnung fest zu halten (statt regex auf Suffixe).
+ */
+function actionColor(action: string): string {
+  if (action.endsWith(".removed") || action.endsWith(".deleted") || action.endsWith(".revoked") || action.endsWith(".archived")) {
+    return "#C0341D";
+  }
+  if (action.endsWith(".created") || action.endsWith(".added") || action.endsWith(".accepted") || action.endsWith(".restored")) {
+    return "#0F6038";
+  }
+  if (action.endsWith(".sent")) return "#1A4A8A";
+  if (action.endsWith(".changed") || action.endsWith(".updated")) return "#7A5C00";
+  return "#6B6B6B";
+}
+
+/**
+ * Rendert die Audit-Zeile in lesbarem Deutsch/Englisch. Die `target`-
+ * Payload variiert je nach action; wir formatieren die bekannten Felder
+ * inline und fallen bei unbekannten Actions auf JSON-Preview zurueck.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderAuditDetail(entry: { action: string; target: any; actor: { name: string | null; email: string | null } | null }, de: boolean): React.ReactNode {
+  const t = entry.target ?? {};
+  switch (entry.action) {
+    case "tenant.created":
+      return de ? <>Mandant <strong>{t.name}</strong> angelegt ({t.slug})</> : <>Tenant <strong>{t.name}</strong> created ({t.slug})</>;
+    case "tenant.updated":
+      return de ? <>Stammdaten aktualisiert</> : <>Tenant data updated</>;
+    case "tenant.archived":
+      return de ? <>Mandant archiviert</> : <>Tenant archived</>;
+    case "tenant.restored":
+      return de ? <>Mandant wiederhergestellt</> : <>Tenant restored</>;
+    case "tenant.deleted":
+      return de ? <>Mandant endgueltig geloescht</> : <>Tenant permanently deleted</>;
+    case "member.added":
+      return de ? <><strong>{t.email ?? t.userId}</strong> als {t.role} hinzugefuegt</> : <><strong>{t.email ?? t.userId}</strong> added as {t.role}</>;
+    case "member.removed":
+      return de ? <>Mitglied entfernt (Rolle: {t.role})</> : <>Member removed (role: {t.role})</>;
+    case "role.changed":
+      return de ? <>Rolle geaendert: {t.from} → <strong>{t.to}</strong></> : <>Role changed: {t.from} → <strong>{t.to}</strong></>;
+    case "invite.sent":
+      return de ? <>Einladung an <strong>{t.email}</strong> gesendet ({t.role})</> : <>Invite sent to <strong>{t.email}</strong> ({t.role})</>;
+    case "invite.revoked":
+      return de ? <>Einladung fuer <strong>{t.email}</strong> zurueckgezogen</> : <>Invite for <strong>{t.email}</strong> revoked</>;
+    case "invite.accepted":
+      return de ? <>Einladung angenommen ({t.role})</> : <>Invite accepted ({t.role})</>;
+    default:
+      // Unbekannte Action: knapp JSON-Preview, damit wenigstens die
+      // rohe Info sichtbar ist statt eine leere Zeile.
+      try {
+        const preview = typeof entry.target === "object" && entry.target
+          ? JSON.stringify(entry.target).slice(0, 120)
+          : String(entry.target ?? "");
+        return <span style={{ color: "var(--color-text-muted)" }}>{preview}</span>;
+      } catch {
+        return null;
+      }
+  }
 }
