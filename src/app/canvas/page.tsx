@@ -5062,11 +5062,22 @@ export default function CanvasPage() {
         _schemaVersion: CANVAS_SCHEMA_VERSION, // FIXED: EDGE-08 — Include schema version in saved state
         userGroups: userGroupsRef.current.length > 0 ? userGroupsRef.current : undefined,
       };
-      await fetchWithTimeout(`/api/v1/canvas/${id}`, {
+      // BUGFIX: previously `await fetchWithTimeout(...)` without an .ok check —
+      // a 401/403/404/500 response would still resolve the promise, fall
+      // through to setSaveStatus("saved") and clear isDirtyRef. The user
+      // thought their work was persisted while the canvas_state column
+      // stayed empty in the DB. Now we surface the error instead.
+      const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canvasState: state }),
       });
+      if (!res.ok) {
+        console.error("[saveCanvasToDb] PATCH failed", res.status);
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus(null), 4000);
+        return;
+      }
       setSaveStatus("saved");
       isDirtyRef.current = false;
       // Refresh project list to update updated_at
@@ -6089,7 +6100,11 @@ export default function CanvasPage() {
         // Auto-rename session after first successful query if still has default name
         const pid = projectIdRef.current;
         if (pid && !hasAutoNamedRef.current) {
-          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "New project"];
+          // BUGFIX: "Aktuelles Projekt" (what Home's syncToCanvasDb uses when it
+          // creates a canvas on-the-fly) was missing — so Home-created canvases
+          // kept the generic name forever and piled up as duplicates in the
+          // project list. "New Project" (capital P) added to mirror /projects/page.tsx.
+          const DEFAULT_NAMES = ["Aktuelle Session", "Neue Session", "Neues Projekt", "Aktuelles Projekt", "New project", "New Project"];
           // Use a function updater pattern: read current name from state
           setProjectName(prevName => {
             if (DEFAULT_NAMES.includes(prevName) || !prevName.trim()) {

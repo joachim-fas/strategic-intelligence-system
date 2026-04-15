@@ -652,6 +652,11 @@ export default function HomeClient() {
       const unwrapCanvas = (json: any) => json?.data?.canvas ?? json?.canvas;
 
       let projectId = activeProjectIdRef.current;
+      // Track whether we just created this row so we can clean it up if the
+      // subsequent state-write fails. Without cleanup, a failed PATCH leaves
+      // an empty-state row in the project list (user-visible symptom: "meine
+      // Projekte-Liste quillt mit 'Aktuelles Projekt' ohne Inhalt ueber").
+      let createdInThisCall = false;
 
       if (!projectId) {
         // Create new canvas project
@@ -672,6 +677,7 @@ export default function HomeClient() {
         }
         activeProjectIdRef.current = projectId;
         setActiveProjectId(projectId);
+        createdInThisCall = true;
       }
 
       // Load existing canvas state, append new nodes
@@ -710,6 +716,17 @@ export default function HomeClient() {
       });
       if (!patchRes.ok) {
         console.error("[syncToCanvasDb] PATCH canvas_state failed", patchRes.status);
+        // If we created the row moments ago and the state write failed, we
+        // have an empty "Aktuelles Projekt" row with no content. Best-effort
+        // cleanup: delete the orphaned row and drop our local refs so the
+        // next query starts fresh instead of appending to a dead id.
+        if (createdInThisCall) {
+          try {
+            await fetchWithTimeout(`/api/v1/canvas/${projectId}`, { method: "DELETE" });
+          } catch {}
+          activeProjectIdRef.current = null;
+          setActiveProjectId(null);
+        }
       }
     } catch (e) {
       console.error("[syncToCanvasDb]", e);

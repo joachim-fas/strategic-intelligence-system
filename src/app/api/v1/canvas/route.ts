@@ -12,7 +12,7 @@
  */
 
 import { getSqliteHandle } from "@/db";
-import { apiSuccess, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
+import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 
 // GET — list canvas projects for the active tenant
 //   /api/v1/canvas                 → active only (archived_at IS NULL)
@@ -84,10 +84,11 @@ export async function POST(req: Request) {
   if (ctx.errorResponse) return ctx.errorResponse;
   // Viewers are read-only within a tenant.
   if (ctx.role === "viewer") {
-    return apiSuccess(
-      { ok: false, error: { message: "Viewers cannot create projects", code: "INSUFFICIENT_TENANT_ROLE" } },
-      403,
-    );
+    // BUGFIX: previously `apiSuccess({ ok: false, error: {...} }, 403)` which
+    // produced a double-envelope (`{ ok: true, data: { ok: false, error } }`
+    // with HTTP 403) and broke client-side error handling. apiError emits the
+    // canonical `{ ok: false, error: { message, code } }` shape.
+    return apiError("Viewers cannot create projects", 403, "INSUFFICIENT_TENANT_ROLE");
   }
 
   const body = await req.json().catch(() => ({}));
