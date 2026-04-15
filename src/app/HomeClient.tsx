@@ -1513,9 +1513,15 @@ export default function HomeClient() {
                 </div>
               )}
 
-              {/* Letzte Projekte — compact list directly below the command line */}
+              {/* Letzte Projekte — compact list directly below the command line.
+                   marginTop was 72 (too big for the centered flex layout → list
+                   got clipped below the viewport on shorter screens); reduced to
+                   28 so the block reliably sits above the SignalTicker.
+                   Slice is 5 instead of 6 for the same reason. Row padding is
+                   7/10 instead of 10/8 — still comfortable to click on but
+                   buys ~15px of vertical space without feeling cramped. */}
               {pastSessions.length > 0 && (
-                <div style={{ marginTop: 72 }}>
+                <div style={{ marginTop: 28 }}>
                   <div style={{
                     fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
                     fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
@@ -1528,7 +1534,7 @@ export default function HomeClient() {
                     listStyle: "none", margin: 0, padding: 0,
                     borderTop: "1px solid var(--volt-border, #E8E8E8)",
                   }}>
-                    {pastSessions.slice(0, 6).map((s) => (
+                    {pastSessions.slice(0, 5).map((s) => (
                       <li key={s.id} style={{ borderBottom: "1px solid var(--volt-border, #E8E8E8)" }}>
                         <a
                           href={`/canvas?project=${s.id}`}
@@ -1538,7 +1544,7 @@ export default function HomeClient() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             gap: 16,
-                            padding: "10px 8px",
+                            padding: "7px 10px",
                             textDecoration: "none",
                             color: "var(--volt-text, #0A0A0A)",
                             transition: "background-color 120ms ease",
@@ -1577,6 +1583,106 @@ export default function HomeClient() {
                   </ul>
                 </div>
               )}
+
+              {/* Top-Trends-Vorschau — Einstiegspunkt zur Trend-Vollansicht.
+                   Die Startseite zeigt jetzt auch die 5 relevantesten Trends
+                   aus dem Radar (sortiert nach relevance × impact × confidence),
+                   damit der Nutzer ohne Umweg ueber /verstehen in das Trend-
+                   Material einsteigen kann. Klick auf einen Trend oeffnet
+                   /trends mit Ziel-Anker, "Alle Trends anzeigen" geht direkt
+                   auf die Uebersicht. Mit 5 Pills bei Zeilenumbruch bleibt die
+                   Blockhoehe ~2 Zeilen und sprengt die Centered-Hero-Hoehe
+                   nicht. */}
+              {trends.length > 0 && (() => {
+                const topTrends = [...trends]
+                  .sort((a, b) => {
+                    const sa = (a.relevance ?? 0) * (a.impact ?? 0.5) * (a.confidence ?? 0.5);
+                    const sb = (b.relevance ?? 0) * (b.impact ?? 0.5) * (b.confidence ?? 0.5);
+                    return sb - sa;
+                  })
+                  .slice(0, 5);
+                const ringColor: Record<string, string> = {
+                  adopt: "#0F6038", trial: "#1A4A8A", assess: "#7A5C00", hold: "#6B7280",
+                };
+                return (
+                  <div style={{ marginTop: 28 }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      marginBottom: 10, gap: 12,
+                    }}>
+                      <div style={{
+                        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase" as const,
+                        color: "var(--volt-text-faint, #BBB)",
+                      }}>
+                        {locale === "de" ? "Top-Trends" : "Top Trends"}
+                      </div>
+                      <a
+                        href="/trends"
+                        style={{
+                          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                          fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                          color: "var(--volt-text-muted, #6B6B6B)",
+                          textDecoration: "none",
+                          transition: "color 120ms ease",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "var(--volt-text, #0A0A0A)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "var(--volt-text-muted, #6B6B6B)"; }}
+                      >
+                        {locale === "de" ? "Alle Trends anzeigen →" : "View all trends →"}
+                      </a>
+                    </div>
+                    <div style={{
+                      display: "flex", flexWrap: "wrap", gap: 8,
+                    }}>
+                      {topTrends.map((t) => {
+                        const color = ringColor[t.ring ?? "assess"] ?? ringColor.assess;
+                        return (
+                          <a
+                            key={t.id}
+                            href="/trends"
+                            onClick={() => setSelectedTrend(t)}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 8,
+                              padding: "6px 12px",
+                              borderRadius: 999,
+                              border: "1px solid var(--volt-border, #E8E8E8)",
+                              background: "var(--volt-surface-raised, #fff)",
+                              textDecoration: "none",
+                              color: "var(--volt-text, #0A0A0A)",
+                              fontSize: 12,
+                              fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                              transition: "border-color 120ms ease, background-color 120ms ease",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = color;
+                              e.currentTarget.style.backgroundColor = `${color}10`;
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)";
+                              e.currentTarget.style.backgroundColor = "var(--volt-surface-raised, #fff)";
+                            }}
+                          >
+                            <span style={{
+                              width: 6, height: 6, borderRadius: "50%",
+                              background: color, flexShrink: 0,
+                            }} />
+                            <span style={{ fontWeight: 600, letterSpacing: "-0.01em" }}>{t.name}</span>
+                            <span style={{
+                              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                              fontSize: 9, color: "var(--volt-text-faint, #AAA)",
+                              textTransform: "uppercase" as const, letterSpacing: "0.08em",
+                            }}>
+                              {(t.ring ?? "assess").toUpperCase()}
+                            </span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
