@@ -11,11 +11,12 @@
  *      followed by a marker span lets us read the exact pixel position of
  *      where the caret sits — including after soft wraps in a multi-line
  *      textarea.
- *   3. Drawing a `<div>` at that position with `mix-blend-mode: multiply`.
- *      `multiply` with the SIS lime (#E4FF97) keeps the cursor visibly lime
- *      on white surfaces while leaving dark text underneath readable —
- *      multiply(white, lime) = lime, multiply(black, lime) = black. That
- *      matches the terminal feel: a colored block that doesn't hide text.
+ *   3. Drawing a `<div>` at that position as an opaque colored block.
+ *      We render opaque (no mix-blend-mode) so light pastel framework
+ *      tints — e.g. #F0D4FF or #D4E8FF — stay visibly on white surfaces.
+ *      The glyph under the cursor is hidden while the block is "on" and
+ *      reappears each half-cycle when the blink animation takes it to
+ *      zero opacity, which is the standard DOS/terminal behaviour.
  *
  * The component renders absolute-positioned children into its nearest
  * positioned ancestor, so the CALLER must wrap the target in a
@@ -34,8 +35,9 @@ export interface BlockCursorProps {
   /** Whether the target currently has focus. Cursor only shows when true. */
   focused: boolean;
   /** Cursor fill color. Defaults to the SIS signature electric lime
-   *  (#E4FF97) which combined with `mix-blend-mode: multiply` renders as
-   *  lime on white surfaces and preserves black text underneath. */
+   *  (#E4FF97). The block is rendered opaque, so any color passed in —
+   *  including the pastel framework tints — shows up at full saturation
+   *  on white surfaces. */
   color?: string;
   /** Minimum cursor width in px — used at end-of-input or over zero-width
    *  characters so the cursor stays visibly clickable. */
@@ -167,11 +169,11 @@ export default function BlockCursor({
             width: rect.width,
             height: rect.height,
             background: color,
-            // `multiply` keeps the cursor visibly lime on white surfaces
-            // while letting black glyph pixels stay black — the terminal
-            // effect without the dark inversion that `difference` produces
-            // for light colors.
-            mixBlendMode: "multiply",
+            // Opaque block. The blink animation already cycles the cursor
+            // between visible and invisible, so glyphs underneath reappear
+            // every half-second — we don't need a blend mode to keep them
+            // readable, and an opaque block guarantees the chosen color
+            // (lime, framework pastel, whatever) is faithfully on-screen.
             pointerEvents: "none",
             animation: "sis-blink 1s steps(1, end) infinite",
             zIndex: 2,

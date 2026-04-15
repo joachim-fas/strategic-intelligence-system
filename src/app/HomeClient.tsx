@@ -193,13 +193,6 @@ export default function HomeClient() {
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
   const [frameworkTopicFocused, setFrameworkTopicFocused] = useState(false);
-  // Tracks whether the user has actually interacted with the framework
-  // topic textarea (click / keypress / typing) since the modal opened.
-  // We can't rely on `frameworkTopicFocused` alone because the modal
-  // programmatically focuses the textarea on open — which would hide the
-  // placeholder before the user ever interacted with it. Reset to false on
-  // every modal-open so the preview text is shown again for the next run.
-  const [frameworkTopicInteracted, setFrameworkTopicInteracted] = useState(false);
   // Phase 1 guidance: values of optional structured fields per framework.
   // Keys match FrameworkField.key in canvas-templates.ts. Cleared whenever
   // the modal opens for a new framework.
@@ -1024,13 +1017,9 @@ export default function HomeClient() {
                     background: "var(--volt-surface-raised, #fff)",
                     position: "relative",
                   }}
-                  // Mousedown bubbles up from the textarea AND fires when the
-                  // padding around it is clicked — both paths mean the user
-                  // actively engaged with the field. We set the interacted
-                  // flag here so the placeholder hides exactly on click,
-                  // independent of the programmatic focus that runs on modal
-                  // open.
-                  onMouseDown={() => setFrameworkTopicInteracted(true)}
+                  // Clicking anywhere in the padded container forwards focus
+                  // to the textarea — both focus and placeholder-hide are
+                  // then driven by the native focus event.
                   onClick={() => frameworkTopicRef.current?.focus()}
                 >
                   <textarea
@@ -1046,10 +1035,6 @@ export default function HomeClient() {
                       el.style.height = `${el.scrollHeight}px`;
                     }}
                     onKeyDown={async (e) => {
-                      // Any keypress inside the field counts as user
-                      // interaction — covers tab-in + typing without
-                      // requiring a mouse click.
-                      setFrameworkTopicInteracted(true);
                       // Enter submits, Shift+Enter inserts a newline
                       if (e.key === "Enter" && !e.shiftKey && frameworkTopic.trim() && !frameworkLoading) {
                         e.preventDefault();
@@ -1058,13 +1043,15 @@ export default function HomeClient() {
                     }}
                     onFocus={() => setFrameworkTopicFocused(true)}
                     onBlur={() => setFrameworkTopicFocused(false)}
-                    // Placeholder stays visible after the modal auto-focuses
-                    // (it's the user's only preview of what to write) and
-                    // only disappears once the user actually engages — click
-                    // or keypress. Native empty-value behaviour still kicks
-                    // in once typing starts.
+                    // Placeholder and cursor are mutually exclusive: while
+                    // the field is unfocused the preview text is visible
+                    // and the BlockCursor is hidden; clicking (or tabbing)
+                    // in switches both — placeholder clears and cursor
+                    // appears. This exactly mirrors the user spec "Cursor
+                    // und Vorschautext dürfen nicht zeitgleich in der
+                    // Command-Line stehen".
                     placeholder={
-                      frameworkTopicInteracted
+                      frameworkTopicFocused
                         ? ""
                         : locale === "de"
                           ? "Formuliere eine vollständige, konkrete Frage…"
@@ -1368,8 +1355,8 @@ export default function HomeClient() {
                     role="button"
                     tabIndex={0}
                     aria-label={`${t.label} — ${t.desc}`}
-                    onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setFrameworkTopicInteracted(false); setTimeout(() => frameworkTopicRef.current?.focus(), 100); }}
-                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); setFrameworkTopicInteracted(false); setTimeout(() => frameworkTopicRef.current?.focus(), 100); } }}
+                    onClick={() => { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); }}
+                    onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { setFrameworkModal(t); setFrameworkTopic(""); setFrameworkFieldValues({}); } }}
                     className="sis-framework-btn cursor-pointer"
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
