@@ -124,11 +124,19 @@ export default function VerstehenClient() {
   // Live sources count — pulled from /api/v1/feed sourceStatus. No more
   // hardcoded "47" lies. Falls back to the total connector count if the
   // endpoint is unreachable.
+  //
+  // API-Envelope-Fix: /api/v1/feed wrappt via apiSuccess() → { ok, data: { ...
+  // sourceStatus } }. Alter Code las data.sourceStatus direkt, bekam immer
+  // undefined zurueck und setSourcesCount wurde nie aufgerufen — der UI-Text
+  // zeigte dadurch dauerhaft die connectors.length-Fallbackzahl statt der
+  // tatsaechlichen Live-Quellen-Anzahl. Defensive-Unwrap akzeptiert beide
+  // Shapes.
   const [sourcesCount, setSourcesCount] = useState<number | null>(null);
   useEffect(() => {
     fetchWithTimeout("/api/v1/feed")
       .then(r => r.json())
-      .then(data => {
+      .then(json => {
+        const data = json?.data ?? json;
         const list = data?.sourceStatus ?? [];
         if (Array.isArray(list) && list.length > 0) setSourcesCount(list.length);
       })
