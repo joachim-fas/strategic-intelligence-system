@@ -182,19 +182,9 @@ export default function HomeClient() {
   // Phase 5: Custom session title override (otherwise auto-generated from first query)
   const [customSessionTitle, setCustomSessionTitle] = useState<string | null>(null);
   // Phase 5: Past sessions for the picker dropdown
-  const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; queryCount: number; updatedAt?: string }>>([]);
+  const [pastSessions, setPastSessions] = useState<Array<{ id: string; name: string; nodeCount: number; queryCount: number; cardCount: number; updatedAt?: string }>>([]);
   const activeProjectIdRef = useRef<string | null>(null);
   const [selectedTrend, setSelectedTrend] = useState<TrendDot | null>(null);
-  // Live stats for the hero mono line — fetched on mount, loading state until ready
-  const [liveStats, setLiveStats] = useState<{ sources: number; trends: number; sessions: number } | null>(null);
-  useEffect(() => {
-    Promise.all([
-      fetchWithTimeout("/api/v1/trends").then(r => r.json()).then(d => (d.data?.trends ?? d.trends)?.length ?? 0).catch(() => 0),
-      fetchWithTimeout("/api/v1/canvas").then(r => r.json()).then(d => (d.data?.canvases ?? d.canvases ?? []).length).catch(() => 0),
-    ]).then(([trendCount, sessionCount]) => {
-      setLiveStats({ sources: connectors.length, trends: trendCount, sessions: sessionCount });
-    });
-  }, []);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -243,10 +233,14 @@ export default function HomeClient() {
             name: c.name || "Unbenannt",
             // Previously this mapped queryCount into nodeCount, so the Home
             // list showed "6 Nodes" for a project with 6 queries but 65 cards.
-            // API already returns both — keep them distinct so the label can
-            // match the canvas language ("Abfragen · Karten").
+            // API now also returns `cardCount` (nodes minus queries) so the
+            // "Karten"-label on Home matches the canvas toolbar exactly,
+            // instead of one view counting queries as cards and the other not.
             nodeCount: c.nodeCount || 0,
             queryCount: c.queryCount || 0,
+            cardCount: typeof c.cardCount === "number"
+              ? c.cardCount
+              : Math.max(0, (c.nodeCount || 0) - (c.queryCount || 0)),
             updatedAt: c.updated_at,
           }));
         setPastSessions(sessions);
@@ -1484,7 +1478,7 @@ export default function HomeClient() {
                             <span>
                               {s.queryCount} {locale === "de" ? (s.queryCount === 1 ? "Abfrage" : "Abfragen") : (s.queryCount === 1 ? "Query" : "Queries")}
                               {" · "}
-                              {s.nodeCount} {locale === "de" ? (s.nodeCount === 1 ? "Karte" : "Karten") : (s.nodeCount === 1 ? "Card" : "Cards")}
+                              {s.cardCount} {locale === "de" ? (s.cardCount === 1 ? "Karte" : "Karten") : (s.cardCount === 1 ? "Card" : "Cards")}
                             </span>
                             {s.updatedAt && (
                               <span>{new Date(s.updatedAt).toLocaleDateString(locale === "de" ? "de-DE" : "en-US", { month: "short", day: "numeric" })}</span>

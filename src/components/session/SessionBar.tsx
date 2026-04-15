@@ -73,6 +73,10 @@ export interface SessionBarSession {
   id: string;
   name: string;
   nodeCount: number;
+  /** Non-query nodes (what the user thinks of as "cards"). Optional so older
+   * callers still work, but new code should always pass it so the picker
+   * number matches the canvas toolbar exactly. */
+  cardCount?: number;
   updatedAt?: string;
 }
 
@@ -312,7 +316,13 @@ export function SessionBar({
                   color: "var(--muted-foreground)",
                   letterSpacing: "0.04em",
                 }}>
-                  {s.nodeCount} {de ? (s.nodeCount === 1 ? "Karte" : "Karten") : (s.nodeCount === 1 ? "card" : "cards")}
+                  {(() => {
+                    // Prefer cardCount when the caller provides it; fall back
+                    // to nodeCount so older callers don't break. This keeps
+                    // the picker label consistent with the canvas toolbar.
+                    const n = typeof s.cardCount === "number" ? s.cardCount : s.nodeCount;
+                    return `${n} ${de ? (n === 1 ? "Karte" : "Karten") : (n === 1 ? "card" : "cards")}`;
+                  })()}
                 </div>
               </button>
             ))}

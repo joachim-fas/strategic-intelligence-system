@@ -59,6 +59,11 @@ export async function GET(req: Request) {
         }
       } catch {}
     }
+    // cardCount = everything that isn't a query root. This is what the Canvas
+    // toolbar shows ("6 Abfragen · 59 Karten") and what the user thinks of as
+    // "cards". Surfacing it from the API keeps Home / SessionBar / Canvas in
+    // sync with one source of truth instead of each view re-deriving it.
+    const cardCount = Math.max(0, nodeCount - queryCount);
     return {
       id: r.id,
       name: r.name,
@@ -66,6 +71,7 @@ export async function GET(req: Request) {
       hasState: !!r.canvas_state,
       nodeCount,
       queryCount,
+      cardCount,
       created_at: r.created_at,
       updated_at: r.updated_at,
       archived_at: r.archived_at,

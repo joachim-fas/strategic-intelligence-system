@@ -77,9 +77,14 @@ const NODE_LAYER: Record<string, CanvasLayer> = {
   dimensions: "analyse", causalgraph: "analyse",
   note: "karte", idea: "karte", list: "karte", file: "datei",
 };
+// The "karte" layer groups user-created free-form items (note/idea/list).
+// The label here used to be "Karten", which collided with the stats counter
+// on the same toolbar row ("X Abfragen · Y Karten") — same word, two different
+// meanings. Renaming the filter chip to "Notizen" resolves the collision
+// without touching the stats counter that users expect to see total cards.
 const LAYER_LABELS: Record<CanvasLayer, { de: string; color: string }> = {
   analyse: { de: "Analyse", color: "#1A9E5A" },
-  karte:   { de: "Karten",  color: "#F97316" },
+  karte:   { de: "Notizen", color: "#F97316" },
   datei:   { de: "Dateien", color: "#4A6CF7" },
 };
 
