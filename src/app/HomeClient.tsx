@@ -73,6 +73,76 @@ function buildFrameworkQuery(
   return lines.join("\n");
 }
 
+/**
+ * Placeholder that takes over the hero command-line slot while the pipeline
+ * is running. Shows an animated shimmer bar + pulsing dot + mm:ss clock. The
+ * SequentialPipeline card still renders inside the history column below with
+ * full per-stage detail — this one's just a compact "we're thinking" marker
+ * that keeps the hero slot busy so the input doesn't look idle while the LLM
+ * streams. Identical look is used at both render sites (session + first-visit)
+ * so reasoning feels the same everywhere.
+ */
+function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: "de" | "en" }) {
+  const seconds = Math.floor(elapsedMs / 1000);
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={locale === "de" ? `Reasoning läuft, ${mm} Minuten ${ss} Sekunden` : `Reasoning in progress, ${mm} minutes ${ss} seconds`}
+      style={{
+        display: "flex", alignItems: "center", gap: 14,
+        padding: "0 22px",
+        minHeight: 56,
+        borderRadius: "var(--volt-radius-lg, 14px)",
+        border: "1.5px solid var(--volt-border, #E8E8E8)",
+        background: "var(--volt-surface-raised, #fff)",
+        position: "relative", overflow: "hidden",
+      }}
+    >
+      {/* Thin shimmer sweep pinned to the top edge. Clipped by overflow:hidden. */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, transparent 0%, #E4FF97 50%, transparent 100%)",
+          animation: "sis-reasoning-shimmer 1.8s linear infinite",
+        }}
+      />
+      {/* Pulsing dot as the focal animation. */}
+      <span
+        aria-hidden="true"
+        style={{
+          width: 10, height: 10, borderRadius: "50%",
+          background: "var(--volt-lime, #E4FF97)",
+          border: "1px solid rgba(0,0,0,0.12)",
+          animation: "sis-reasoning-pulse 1.6s ease-in-out infinite",
+          flexShrink: 0,
+        }}
+      />
+      <span style={{
+        flex: 1,
+        fontSize: 14, fontWeight: 600,
+        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+        color: "var(--volt-text, #0A0A0A)",
+        letterSpacing: "-0.01em",
+      }}>
+        {locale === "de" ? "Reasoning läuft …" : "Reasoning in progress …"}
+      </span>
+      <span style={{
+        fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+        fontSize: 13, fontWeight: 600,
+        color: "var(--volt-text-muted, #6B6B6B)",
+        letterSpacing: "0.06em", fontVariantNumeric: "tabular-nums",
+        flexShrink: 0,
+      }}>
+        {mm}:{ss}
+      </span>
+    </div>
+  );
+}
+
 export default function HomeClient() {
   const { locale, toggleLocale } = useLocale();
   const [baseTrends, setBaseTrends] = useState<TrendDot[]>(megaTrends);
@@ -95,6 +165,17 @@ export default function HomeClient() {
 
   const [query, setQuery] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // Reasoning timer: tracks how long the current analysis has been running.
+  // The indicator that replaces the command-line while reasoning is active
+  // renders this as an mm:ss clock next to the shimmer animation.
+  const [reasoningElapsedMs, setReasoningElapsedMs] = useState(0);
+  useEffect(() => {
+    if (!isAnalyzing) { setReasoningElapsedMs(0); return; }
+    const startedAt = Date.now();
+    setReasoningElapsedMs(0);
+    const id = setInterval(() => setReasoningElapsedMs(Date.now() - startedAt), 200);
+    return () => clearInterval(id);
+  }, [isAnalyzing]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   // Phase 1+2: Active node within the session. Null = latest. Non-null = user has picked a specific node.
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
@@ -199,8 +280,11 @@ export default function HomeClient() {
     el.style.height = `${el.scrollHeight}px`;
   }, [query]);
 
-  // Focus input on load
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Focus input on load, and again whenever a reasoning cycle finishes so
+  // the user can immediately type a follow-up. The textarea is unmounted
+  // while isAnalyzing is true (ReasoningIndicator takes its slot), so we
+  // refocus after it remounts.
+  useEffect(() => { if (!isAnalyzing) inputRef.current?.focus(); }, [isAnalyzing]);
 
   // ── Sync analysis results to Canvas DB ─────────────────────────────────
   // Creates a QueryNode + DerivedNodes and saves them to the active canvas
@@ -771,64 +855,63 @@ export default function HomeClient() {
           position: "relative",
         }}>
           {/* Command line for session state (history exists) — stays at top.
-               alignItems: flex-end so the submit button stays bottom-aligned
-               with the last line of the textarea when content grows to 2+
-               rows. minHeight preserves the 56px look for the 1-line state. */}
+               While reasoning is active, the input is replaced with a compact
+               ReasoningIndicator (shimmer + pulse + mm:ss clock) so the hero
+               slot doesn't sit with a disabled button — the SequentialPipeline
+               card below carries the detailed stage reveal. */}
           {(!isFirstVisit || showFullRadar) && (
-            <div
-              style={{
-                display: "flex", alignItems: "flex-end", gap: 10,
-                padding: "10px 10px 10px 22px",
-                minHeight: 56,
-                borderRadius: "var(--volt-radius-lg, 14px)",
-                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
-                transition: "border-color 150ms ease",
-                background: "var(--volt-surface-raised, #fff)",
-                position: "relative",
-              }}
-              onClick={() => inputRef.current?.focus()}
-            >
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                placeholder={inputFocused ? "" : (locale === "de" ? "Projekt vertiefen oder neue Frage stellen…" : "Deepen project or ask a new question…")}
+            isAnalyzing ? (
+              <ReasoningIndicator elapsedMs={reasoningElapsedMs} locale={locale} />
+            ) : (
+              <div
                 style={{
-                  flex: 1, border: "none", outline: "none", background: "transparent",
-                  color: "var(--volt-text, #0A0A0A)",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-                  lineHeight: 1.5,
-                  resize: "none", overflow: "hidden",
-                  padding: "7px 0",
-                  // Match the old input: Enter submits, so block the native newline char
-                  // from rendering visible whitespace before the handler kicks in.
+                  display: "flex", alignItems: "flex-end", gap: 10,
+                  padding: "10px 10px 10px 22px",
+                  minHeight: 56,
+                  borderRadius: "var(--volt-radius-lg, 14px)",
+                  border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                  transition: "border-color 150ms ease",
+                  background: "var(--volt-surface-raised, #fff)",
+                  position: "relative",
                 }}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              {(query || isAnalyzing) && (
-                <button onClick={() => handleSubmit()}
-                  disabled={isAnalyzing}
-                  className={isAnalyzing ? "" : "sis-shimmer-btn"}
+                onClick={() => inputRef.current?.focus()}
+              >
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  placeholder={inputFocused ? "" : (locale === "de" ? "Projekt vertiefen oder neue Frage stellen…" : "Deepen project or ask a new question…")}
                   style={{
-                    fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
-                    borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                    background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
-                    color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
-                    border: "none", cursor: isAnalyzing ? "wait" : "pointer",
-                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                    flex: 1, border: "none", outline: "none", background: "transparent",
+                    color: "var(--volt-text, #0A0A0A)",
+                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                    lineHeight: 1.5,
+                    resize: "none", overflow: "hidden",
+                    padding: "7px 0",
                   }}
-                >
-                  {isAnalyzing
-                    ? (locale === "de" ? "Analysiere…" : "Analyzing…")
-                    : (locale === "de" ? "Analysieren →" : "Analyze →")}
-                </button>
-              )}
-            </div>
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {query && (
+                  <button onClick={() => handleSubmit()}
+                    className="sis-shimmer-btn"
+                    style={{
+                      fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
+                      borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
+                      background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
+                      border: "none", cursor: "pointer",
+                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                    }}
+                  >
+                    {locale === "de" ? "Analysieren →" : "Analyze →"}
+                  </button>
+                )}
+              </div>
+            )
           )}
 
           {/* Framework Topic Modal */}
@@ -1295,59 +1378,59 @@ export default function HomeClient() {
               maxWidth: 700, margin: "0 auto", width: "100%",
               position: "relative", zIndex: 1,
             }}>
-              <div
-                style={{
-                  display: "flex", alignItems: "flex-end", gap: 10,
-                  padding: "10px 10px 10px 22px",
-                  minHeight: 56,
-                  borderRadius: "var(--volt-radius-lg, 14px)",
-                  border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
-                  transition: "border-color 150ms ease, box-shadow 150ms ease",
-                  background: "var(--volt-surface-raised, #fff)",
-                  boxShadow: inputFocused ? "0 6px 24px rgba(228,255,151,0.35), 0 2px 8px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.04)",
-                  position: "relative",
-                }}
-                onClick={() => inputRef.current?.focus()}
-              >
-                <textarea
-                  ref={inputRef}
-                  rows={1}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
-                  placeholder={inputFocused ? "" : (locale === "de" ? "Oder frage direkt etwas Strategisches…" : "Or ask something strategic directly…")}
+              {isAnalyzing ? (
+                <ReasoningIndicator elapsedMs={reasoningElapsedMs} locale={locale} />
+              ) : (
+                <div
                   style={{
-                    flex: 1, border: "none", outline: "none", background: "transparent",
-                    color: "var(--volt-text, #0A0A0A)",
-                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
-                    lineHeight: 1.5,
-                    resize: "none", overflow: "hidden",
-                    padding: "7px 0",
+                    display: "flex", alignItems: "flex-end", gap: 10,
+                    padding: "10px 10px 10px 22px",
+                    minHeight: 56,
+                    borderRadius: "var(--volt-radius-lg, 14px)",
+                    border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1.5px solid var(--volt-border, #E8E8E8)",
+                    transition: "border-color 150ms ease, box-shadow 150ms ease",
+                    background: "var(--volt-surface-raised, #fff)",
+                    boxShadow: inputFocused ? "0 6px 24px rgba(228,255,151,0.35), 0 2px 8px rgba(0,0,0,0.06)" : "0 4px 16px rgba(0,0,0,0.04)",
+                    position: "relative",
                   }}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {(query || isAnalyzing) && (
-                  <button onClick={() => handleSubmit()}
-                    disabled={isAnalyzing}
-                    className={isAnalyzing ? "" : "sis-shimmer-btn"}
+                  onClick={() => inputRef.current?.focus()}
+                >
+                  <textarea
+                    ref={inputRef}
+                    rows={1}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    placeholder={inputFocused ? "" : (locale === "de" ? "Oder frage direkt etwas Strategisches…" : "Or ask something strategic directly…")}
                     style={{
-                      fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
-                      borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
-                      background: isAnalyzing ? "var(--volt-surface, #F7F7F7)" : "var(--volt-lime, #E4FF97)",
-                      color: isAnalyzing ? "var(--volt-text-muted)" : "#0A0A0A",
-                      border: "none", cursor: isAnalyzing ? "wait" : "pointer",
-                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                      flex: 1, border: "none", outline: "none", background: "transparent",
+                      color: "var(--volt-text, #0A0A0A)",
+                      fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 15,
+                      lineHeight: 1.5,
+                      resize: "none", overflow: "hidden",
+                      padding: "7px 0",
                     }}
-                  >
-                    {isAnalyzing
-                      ? (locale === "de" ? "Analysiere…" : "Analyzing…")
-                      : (locale === "de" ? "Analysieren →" : "Analyze →")}
-                  </button>
-                )}
-              </div>
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {query && (
+                    <button onClick={() => handleSubmit()}
+                      className="sis-shimmer-btn"
+                      style={{
+                        fontSize: 13, fontWeight: 600, height: 36, padding: "0 18px",
+                        borderRadius: "var(--volt-radius-md, 10px)", flexShrink: 0,
+                        background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
+                        border: "none", cursor: "pointer",
+                        fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                      }}
+                    >
+                      {locale === "de" ? "Analysieren →" : "Analyze →"}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Letzte Projekte — compact list directly below the command line */}
               {pastSessions.length > 0 && (

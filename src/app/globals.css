@@ -797,6 +797,18 @@ h1, h2, h3, h4, h5, h6 {
   50%, 100% { opacity: 0; }
 }
 
+/* Reasoning indicator: thin shimmer sweeping across the top edge of the bar */
+@keyframes sis-reasoning-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+/* Reasoning indicator: pulsing dot with outward halo */
+@keyframes sis-reasoning-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(228,255,151,0.75); transform: scale(1); }
+  70%  { box-shadow: 0 0 0 10px rgba(228,255,151,0); transform: scale(1.08); }
+  100% { box-shadow: 0 0 0 0 rgba(228,255,151,0); transform: scale(1); }
+}
+
 /* Hero background with lime radial orbs */
 .sis-hero-bg {
   position: relative;
