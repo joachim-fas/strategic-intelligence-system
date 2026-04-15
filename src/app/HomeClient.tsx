@@ -75,13 +75,55 @@ function buildFrameworkQuery(
 }
 
 /**
+ * Tiny 8-bit character that walks right-to-left along the bottom edge of
+ * the ReasoningIndicator while a query is running. Built as a single SVG
+ * with labelled `<rect>` parts so CSS keyframes can drive each body part
+ * independently (legs alternate for the walk cycle, the right arm raises
+ * to scratch, the head turns during a "looking around" dwell). See the
+ * sis-pm-* keyframes in globals.css for how the timings stay in sync.
+ *
+ * The pixel art is explicit 1-unit-per-pixel at viewBox 14x16, rendered at
+ * 28x32 CSS px so the blocks stay sharp. `image-rendering: pixelated`
+ * prevents browsers from smoothing the edges if they decide to rasterize.
+ */
+function PixelMan() {
+  return (
+    <svg
+      className="sis-pixel-man"
+      width="28" height="32" viewBox="0 0 14 16"
+      aria-hidden="true"
+    >
+      {/* Head group — rotates around the neck joint during the "look" dwell */}
+      <g className="pm-head">
+        <rect x="5" y="0" width="4" height="4" fill="#0A0A0A" />
+        {/* Lime eye — faces left (toward walk direction) */}
+        <rect className="pm-eye" x="5" y="2" width="1" height="1" fill="#E4FF97" />
+      </g>
+      {/* Torso */}
+      <rect x="5" y="4" width="4" height="4" fill="#0A0A0A" />
+      {/* Left arm (viewer's left, character's right side as drawn) — swings with walk */}
+      <rect x="4" y="4" width="1" height="3" fill="#0A0A0A" />
+      {/* Right arm — the scratch arm (viewer's right). Raises to the head during scratch dwells. */}
+      <rect className="pm-arm-r" x="9" y="4" width="1" height="3" fill="#0A0A0A" />
+      {/* Legs — alternating step cycle */}
+      <rect className="pm-leg-l" x="5" y="8" width="1" height="5" fill="#0A0A0A" />
+      <rect className="pm-leg-r" x="8" y="8" width="1" height="5" fill="#0A0A0A" />
+      {/* Feet — match their leg's vertical offset so the figure stays grounded */}
+      <rect className="pm-foot-l" x="4" y="12" width="2" height="1" fill="#0A0A0A" />
+      <rect className="pm-foot-r" x="8" y="12" width="2" height="1" fill="#0A0A0A" />
+    </svg>
+  );
+}
+
+/**
  * Placeholder that takes over the hero command-line slot while the pipeline
- * is running. Shows an animated shimmer bar + pulsing dot + mm:ss clock. The
- * SequentialPipeline card still renders inside the history column below with
- * full per-stage detail — this one's just a compact "we're thinking" marker
- * that keeps the hero slot busy so the input doesn't look idle while the LLM
- * streams. Identical look is used at both render sites (session + first-visit)
- * so reasoning feels the same everywhere.
+ * is running. Shows an animated shimmer bar + pulsing dot + mm:ss clock and
+ * a pixel-man walking along the bottom edge. The SequentialPipeline card
+ * still renders inside the history column below with full per-stage detail —
+ * this one's just a compact "we're thinking" marker that keeps the hero slot
+ * busy so the input doesn't look idle while the LLM streams. Identical look
+ * is used at both render sites (session + first-visit) so reasoning feels
+ * the same everywhere.
  */
 function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: "de" | "en" }) {
   const seconds = Math.floor(elapsedMs / 1000);
@@ -94,8 +136,10 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
   //   - the bottom progress pill glides (indeterminate = "work in flight")
   //   - the typing dots after the label animate in sequence (language model = "composing")
   //   - the card glow breathes (ambient = "alive")
-  // The stagger between them (1.8s / 2.4s / 2.0s / 1.5s / 2.8s) keeps the
-  // rhythm asymmetric and organic — synced loops would read as a single
+  //   - a tiny pixel-art character walks right-to-left along the bottom edge,
+  //     pausing to scratch its head or look around (long-running idle fun)
+  // The stagger between them (1.8s / 2.4s / 2.0s / 1.5s / 2.8s / 18s) keeps
+  // the rhythm asymmetric and organic — synced loops would read as a single
   // blinking mass.
   return (
     <div
@@ -105,7 +149,10 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       style={{
         display: "flex", alignItems: "center", gap: 14,
         padding: "16px 22px",
-        minHeight: 64,
+        // Bumped from 64 → 84 so the pixel-man has its own lane at the bottom
+        // of the card without covering the label or timer. The progress pill
+        // still lives at the very bottom; the man walks just above it.
+        minHeight: 84,
         borderRadius: "var(--volt-radius-lg, 14px)",
         border: "1.5px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
@@ -177,6 +224,12 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       }}>
         {mm}:{ss}
       </span>
+      {/* Pixel-man promenade — a tiny 8-bit character walking right-to-left
+           along the bottom of the card, pausing to scratch its head or look
+           around. Absolute-positioned so it doesn't affect flex layout of
+           the label/timer above. See PixelMan() + sis-pm-* keyframes for
+           the animation details. */}
+      <PixelMan />
       {/* Indeterminate progress pill — a slim lime capsule that glides across
            the full width. Purely ambient: signals "work is flowing", not any
            specific percentage. */}
@@ -904,13 +957,15 @@ export default function HomeClient() {
           padding: isFirstVisit && !showFullRadar ? "0" : "20px 24px 0",
           position: "relative",
         }}>
-          {/* Command line for session state (history exists) — stays at top.
-               The input now stays visible continuously; the ReasoningIndicator
-               moved to sit UNDER the BriefingResult card so the user can
-               already queue the next question while the current one is still
-               streaming. That's a much better editor-like feel than swapping
-               the whole input out. */}
-          {(!isFirstVisit || showFullRadar) && (
+          {/* Command line for session state (history exists) — stays at top
+               while no query is running. During reasoning it disappears so
+               the only active UI is the ReasoningIndicator (with its pixel-
+               man promenade) directly above the pipeline card. Having the
+               empty input simultaneously visible at the top read as visual
+               noise — the user explicitly asked for it to go away during
+               reasoning, and it reappears as soon as the query completes
+               so the next question can be queued. */}
+          {(!isFirstVisit || showFullRadar) && !isAnalyzing && (
             <div
               style={{
                 display: "flex", alignItems: "flex-end", gap: 10,
