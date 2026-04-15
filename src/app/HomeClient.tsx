@@ -155,12 +155,55 @@ export default function HomeClient() {
 
   // ── Sync analysis results to Canvas DB ─────────────────────────────────
   // Creates a QueryNode + DerivedNodes and saves them to the active canvas
-  // project so Canvas/Board views show the same data as Standard view.
+  // project so Canvas/Board/Orbit views show the same data as Standard view.
+  //
+  // Critical: the `result` field must match the QueryResult shape the canvas
+  // consumes — flat `MatchedTrend[]` for `matchedTrends`, separate `matchedEdges`
+  // array, and `usedSignals`. Previously we stored the wrapper-shaped briefing
+  // directly which left the Orbit Signale/Trends/Kausal columns at 0.
   const syncToCanvasDb = useCallback(async (query: string, briefing: any, entryId: string) => {
     try {
       const now = Date.now();
       const uid = () => Math.random().toString(36).slice(2, 10);
       const QX = 80, DX = 580;
+
+      // ── Build a canvas-compatible QueryResult from the briefing ──────────
+      // briefing.matchedTrends is TrendMatch[] (wrapper), but the canvas reads
+      // QueryResult.matchedTrends as MatchedTrend[] (flat). Prefer the raw API
+      // array when queryIntelligenceAsync passed it through.
+      const rawMatchedTrends = Array.isArray(briefing.matchedTrendsRaw) && briefing.matchedTrendsRaw.length > 0
+        ? briefing.matchedTrendsRaw
+        : (briefing.matchedTrends ?? []).map((m: any) => {
+            const t = m?.trend ?? m;
+            return {
+              id: t?.id, name: t?.name, category: t?.category,
+              tags: t?.tags ?? [], relevance: t?.relevance ?? 0,
+              confidence: t?.confidence ?? 0, impact: t?.impact ?? 0,
+              velocity: t?.velocity ?? "stable", ring: t?.ring ?? "",
+              signalCount: t?.signalCount ?? 0,
+            };
+          }).filter((t: any) => !!t.id);
+
+      const matchedEdges = Array.isArray(briefing.matchedEdges) ? briefing.matchedEdges : [];
+
+      const canvasResult = {
+        synthesis: briefing.synthesis,
+        reasoningChains: briefing.reasoningChains,
+        matchedTrendIds: rawMatchedTrends.map((t: any) => t.id),
+        keyInsights: briefing.keyInsights,
+        scenarios: briefing.scenarios,
+        decisionFramework: briefing.decisionFramework,
+        references: briefing.references,
+        followUpQuestions: briefing.followUpQuestions,
+        confidence: briefing.confidence,
+        interpretation: briefing.interpretation,
+        newsContext: briefing.newsContext,
+        regulatoryContext: briefing.regulatoryContext,
+        causalAnalysis: briefing.causalChain,
+        usedSignals: briefing.usedSignals,
+        matchedTrends: rawMatchedTrends,
+        matchedEdges,
+      };
 
       // Create QueryNode
       const qId = `sync-${entryId}`;
@@ -168,46 +211,66 @@ export default function HomeClient() {
         id: qId, nodeType: "query", x: QX, y: 80,
         query, locale: "de", status: "done",
         synthesis: briefing.synthesis ?? "",
-        result: briefing, collapsed: false, createdAt: now,
+        result: canvasResult, collapsed: false, createdAt: now,
       };
 
-      // Create DerivedNodes (simplified version of computeDerivedNodes)
+      // Create DerivedNodes (layout mirrors canvas computeDerivedNodes:
+      // Col A = insights + decision + followups, Col B = scenarios,
+      // Col C = causalgraph — so Orbit "KAUSAL" column fills when edges exist)
       const derived: any[] = [];
       const conns: any[] = [];
-      let yOff = 80;
+      const colA_X = DX, colB_X = DX + 320, colC_X = DX + 640;
+      let colA_Y = 80;
 
-      // Insights
+      // Col A: Insights
       (briefing.keyInsights ?? []).slice(0, 3).forEach((ins: string) => {
         const id = uid();
-        derived.push({ id, nodeType: "insight", x: DX, y: yOff, parentId: qId, content: ins, queryText: ins, createdAt: now });
+        derived.push({ id, nodeType: "insight", x: colA_X, y: colA_Y, parentId: qId, content: ins, queryText: ins, createdAt: now });
         conns.push({ from: qId, to: id, derived: true });
-        yOff += 180;
+        colA_Y += 180;
       });
 
-      // Scenarios — position in a second column, stacked vertically
+      // Col B: Scenarios
       let scenarioY = 80;
       (briefing.scenarios ?? []).slice(0, 4).forEach((s: any) => {
         const id = uid();
-        derived.push({ id, nodeType: "scenario", x: DX + 320, y: scenarioY, parentId: qId, content: s.description, label: s.name, colorKey: s.type ?? "baseline", probability: s.probability, keyDrivers: s.keyDrivers, queryText: s.name, createdAt: now });
+        derived.push({ id, nodeType: "scenario", x: colB_X, y: scenarioY, parentId: qId, content: s.description, label: s.name, colorKey: s.type ?? "baseline", probability: s.probability, keyDrivers: s.keyDrivers, queryText: s.name, createdAt: now });
         conns.push({ from: qId, to: id, derived: true });
         scenarioY += 200;
       });
 
-      // Decision
+      // Col A (continued): Decision
       if (briefing.decisionFramework) {
         const id = uid();
-        derived.push({ id, nodeType: "decision", x: DX, y: yOff, parentId: qId, content: briefing.decisionFramework, queryText: "Entscheidungsrahmen", createdAt: now });
+        derived.push({ id, nodeType: "decision", x: colA_X, y: colA_Y, parentId: qId, content: briefing.decisionFramework, queryText: "Entscheidungsrahmen", createdAt: now });
         conns.push({ from: qId, to: id, derived: true });
-        yOff += 180;
+        colA_Y += 180;
       }
 
-      // Follow-ups
+      // Col A (continued): Follow-ups
       (briefing.followUpQuestions ?? []).slice(0, 3).forEach((fq: string) => {
         const id = uid();
-        derived.push({ id, nodeType: "followup", x: DX, y: yOff, parentId: qId, content: fq, queryText: fq, createdAt: now });
+        derived.push({ id, nodeType: "followup", x: colA_X, y: colA_Y, parentId: qId, content: fq, queryText: fq, createdAt: now });
         conns.push({ from: qId, to: id, derived: true });
-        yOff += 140;
+        colA_Y += 140;
       });
+
+      // Col C: Causalgraph — only when we have at least 2 edges between matched trends
+      if (matchedEdges.length >= 2) {
+        const trendNameMap: Record<string, string> = {};
+        rawMatchedTrends.forEach((t: any) => { if (t.id) trendNameMap[t.id] = t.name; });
+        const id = uid();
+        derived.push({
+          id, nodeType: "causalgraph",
+          x: colC_X, y: 80, parentId: qId,
+          content: "Kausalnetz", label: "KAUSALNETZ",
+          queryText: "Vertiefen: Kausalnetz — welche Treiber sind am wirkungsmächtigsten?",
+          causalEdges: matchedEdges,
+          causalTrendNames: trendNameMap,
+          createdAt: now,
+        });
+        conns.push({ from: qId, to: id, derived: true });
+      }
 
       const allNodes = [qNode, ...derived];
 

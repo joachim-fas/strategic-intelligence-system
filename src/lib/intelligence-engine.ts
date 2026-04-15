@@ -1,4 +1,4 @@
-import { TrendDot, DURATION_CONFIG, DIRECTION_CONFIG, FOCUS_CONFIG } from "@/types";
+import { TrendDot, DURATION_CONFIG, DIRECTION_CONFIG, FOCUS_CONFIG, MatchedTrend, MatchedEdge } from "@/types";
 import { findConcepts } from "./semantic-engine";
 import { getEdgesForTrend, getDrivers, getEffects, calculateCascadeDepth } from "./causal-graph";
 import { getRegulationsForTrend, getRegulatoryPressure } from "./regulations";
@@ -46,6 +46,20 @@ export interface IntelligenceBriefing {
   newsContext?: string;
   decisionFramework?: string;
   usedSignals?: { source: string; title: string; url: string | null; strength: number | null; date: string }[];
+  /**
+   * Raw matched trends in the flat MatchedTrend shape that the API delivers.
+   * Kept alongside `matchedTrends: TrendMatch[]` so canvas/orbit views that
+   * consume `QueryResult.matchedTrends` get the shape they expect without
+   * each caller re-flattening the wrapper.
+   */
+  matchedTrendsRaw?: MatchedTrend[];
+  /**
+   * Causal edges between matched trends — needed by the Orbit "Kausal" column
+   * and the Canvas causalgraph node. Previously dropped in the async path;
+   * now propagated so the Home flow reaches feature parity with the canvas
+   * command-line flow.
+   */
+  matchedEdges?: MatchedEdge[];
   balancedScorecard?: {
     perspectives: Array<{
       id: string;
@@ -309,6 +323,8 @@ export async function queryIntelligenceAsync(
       newsContext: llmResult.newsContext,
       decisionFramework: llmResult.decisionFramework,
       usedSignals: llmResult.usedSignals,
+      matchedTrendsRaw: llmResult.matchedTrends,
+      matchedEdges: llmResult.matchedEdges,
       balancedScorecard: llmResult.balancedScorecard,
       signalSummary: `${totalSignals} signals across ${matchedTrends.length} trends`,
       confidence: llmResult.confidence ?? 0.5,
