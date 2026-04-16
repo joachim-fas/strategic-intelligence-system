@@ -32,7 +32,8 @@ export async function PATCH(req: Request, context: Params) {
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null as null | { pinned?: boolean });
+    if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
     const d = getSqliteHandle();
     if (typeof body.pinned === "boolean") {
       d.prepare("UPDATE project_queries SET pinned = ? WHERE id = ?").run(body.pinned ? 1 : 0, qid);

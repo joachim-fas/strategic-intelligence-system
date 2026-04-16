@@ -91,6 +91,10 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
     if (!activeProjectId || saving || saved) return;
     setSaving(true);
     try {
+      // Briefing payloads are heavy (synthesis + chains + scenarios +
+      // references) and on a cold dev-server the target route takes
+      // 30-60 s to compile. Give this POST a 90 s budget instead of the
+      // default 30 s so first-save after a restart actually completes.
       const res = await fetchWithTimeout(`/api/v1/projects/${activeProjectId}/queries`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,10 +116,16 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           },
           locale,
         }),
-      });
+      }, 90_000);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSaved(true);
-    } catch { /* ignore */ }
+    } catch (err) {
+      // Log instead of silently swallowing — the "Projekte werden
+      // nicht gespeichert" reports had zero signal in the UI because
+      // this catch was empty.
+      // eslint-disable-next-line no-console
+      console.error("[saveToProject]", err);
+    }
     setSaving(false);
   };
 

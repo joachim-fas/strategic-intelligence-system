@@ -24,7 +24,8 @@ export async function PATCH(req: Request, context: Params) {
       return apiError("Viewers cannot rename projects", 403, "INSUFFICIENT_TENANT_ROLE");
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null as null | { name?: string; description?: string | null });
+    if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
     const { name, description } = body;
 
     // SEC-13: Input validation

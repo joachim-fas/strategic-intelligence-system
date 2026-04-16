@@ -51,8 +51,12 @@ export async function POST(req: Request) {
       return apiError("Viewers cannot save query versions", 403, "INSUFFICIENT_TENANT_ROLE");
     }
 
-    const body = await req.json();
-    const { canvasNodeId, radarId, queryText, locale, result } = body;
+    const body = await req.json().catch(() => null as null | Record<string, unknown>);
+    if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
+    const { canvasNodeId, radarId, queryText, locale, result } = body as {
+      canvasNodeId?: string; radarId?: string | null; queryText?: string;
+      locale?: string; result?: unknown;
+    };
     if (!canvasNodeId || !queryText || !result) {
       return apiError("Missing required fields", 400, "VALIDATION_ERROR");
     }
@@ -62,15 +66,22 @@ export async function POST(req: Request) {
     if (radarId && !assertRadarInTenant(radarId, ctx.tenantId)) {
       return apiError("Radar not found in tenant", 404, "NOT_FOUND");
     }
+    // `result` is `unknown` after the defensive parse; narrow it once
+    // before reading fields so downstream stays typed.
+    const r = (result ?? {}) as {
+      confidence?: number;
+      matchedTrends?: unknown[];
+      usedSignals?: unknown[];
+    };
     const id = saveQueryVersion({
       canvasNodeId,
       radarId: radarId ?? null,
       queryText,
       locale: locale ?? "de",
       result,
-      confidence: result.confidence ?? null,
-      matchedTrendCount: Array.isArray(result.matchedTrends) ? result.matchedTrends.length : null,
-      signalCount: Array.isArray(result.usedSignals) ? result.usedSignals.length : null,
+      confidence: r.confidence ?? null,
+      matchedTrendCount: Array.isArray(r.matchedTrends) ? r.matchedTrends.length : null,
+      signalCount: Array.isArray(r.usedSignals) ? r.usedSignals.length : null,
     });
     return apiSuccess({ id }, 201);
   } catch (err) {

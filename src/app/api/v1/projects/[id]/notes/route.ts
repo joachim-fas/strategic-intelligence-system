@@ -34,7 +34,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return apiError("Project not found", 404, "NOT_FOUND");
   }
 
-  const { content, queryId } = await req.json();
+  const body = await req.json().catch(() => null as null | { content?: string; queryId?: string });
+  if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
+  const { content, queryId } = body;
   if (!content) return apiError("Content required", 400, "VALIDATION_ERROR");
 
   const d = getSqliteHandle();

@@ -50,7 +50,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return apiError("Project not found", 404, "NOT_FOUND");
   }
 
-  const { query, result, locale, contextProfile } = await req.json();
+  // Defensive JSON parse: if the client aborts mid-stream (e.g. the
+  // fetchWithTimeout 30s ceiling fires while the server compiles the
+  // route on first hit) the body is empty and JSON.parse throws. Turn
+  // that into a 400 so the save UI can surface the right error message
+  // instead of a 500 that looks like a server bug.
+  const body = await req.json().catch(() => null as null | Record<string, unknown>);
+  if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
+  const { query, result, locale, contextProfile } = body as {
+    query?: string; result?: unknown; locale?: string; contextProfile?: unknown;
+  };
   if (!query) return apiError("Query required", 400, "VALIDATION_ERROR");
 
   const d = getSqliteHandle();
@@ -103,7 +112,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const url = new URL(req.url);
   const qid = url.searchParams.get("qid");
   if (!qid) return apiError("qid required", 400, "VALIDATION_ERROR");
-  const { pinned } = await req.json();
+  const body = await req.json().catch(() => null as null | { pinned?: boolean });
+  if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
+  const { pinned } = body;
   const d = getSqliteHandle();
   d.prepare("UPDATE project_queries SET pinned = ? WHERE id = ? AND radar_id = ?").run(pinned ? 1 : 0, qid, id);
   return apiSuccess({ updated: true });

@@ -47,7 +47,8 @@ export async function PATCH(req: Request, context: Params) {
     if (!assertNoteInTenant(id, nid, ctx.tenantId)) {
       return NextResponse.json({ error: "not found" }, { status: 404 });
     }
-    const body = await req.json();
+    const body = await req.json().catch(() => null as null | { content?: string });
+    if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
     const { content } = body;
     if (!content?.trim()) return NextResponse.json({ error: "content required" }, { status: 400 });
     const d = getSqliteHandle();

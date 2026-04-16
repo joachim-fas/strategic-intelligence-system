@@ -6915,30 +6915,41 @@ export default function CanvasPage() {
           {/* Zusammenfassung — separate Navigations-Button direkt neben der
                View-Group. Frueher lag dieser Einstieg in der SessionBar auf
                der Startseite; die SessionBar wurde entfernt, damit die
-               Briefing-Ansicht ruhig bleibt. Der Button navigiert auf die
-               Read-Only-Zusammenfassungsseite und ist nur aktiv, wenn ein
-               projectId verfuegbar ist — sonst haetten wir eine tote Route. */}
-          {projectId && (
-            <Tooltip content={de ? "Zusammenfassung: Ergebnisse des Projekts als Briefing" : "Summary: project results as briefing"} placement="bottom">
-              <button
-                onClick={() => { window.location.href = `/canvas/${projectId}/zusammenfassung`; }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                  fontSize: 11, fontWeight: 600, padding: "5px 11px",
-                  borderRadius: 8, border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  cursor: "pointer", transition: "all 0.12s",
-                  fontFamily: "var(--font-ui)",
-                }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
-              >
-                <VIconSparkles size={12} />
-                <span>{de ? "Zusammenfassung" : "Summary"}</span>
-              </button>
-            </Tooltip>
-          )}
+               Briefing-Ansicht ruhig bleibt. Der Button ist IMMER sichtbar,
+               damit der Einstieg ins Briefing nicht verschwindet, wenn der
+               User auf /canvas landet bevor ein Projekt gesetzt ist — ohne
+               projectId leitet der Klick zur Projektliste weiter. */}
+          <Tooltip
+            content={
+              projectId
+                ? (de ? "Zusammenfassung: Ergebnisse des Projekts als Briefing" : "Summary: project results as briefing")
+                : (de ? "Kein aktives Projekt — zur Projektliste" : "No active project — go to projects")
+            }
+            placement="bottom"
+          >
+            <button
+              onClick={() => {
+                window.location.href = projectId
+                  ? `/canvas/${projectId}/zusammenfassung`
+                  : "/projects";
+              }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                fontSize: 11, fontWeight: 600, padding: "5px 11px",
+                borderRadius: 8, border: "1px solid var(--color-border)",
+                background: "transparent",
+                color: projectId ? "var(--color-text-secondary)" : "var(--color-text-muted)",
+                cursor: "pointer", transition: "all 0.12s",
+                fontFamily: "var(--font-ui)",
+                opacity: projectId ? 1 : 0.75,
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = projectId ? "var(--color-text-secondary)" : "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >
+              <VIconSparkles size={12} />
+              <span>{de ? "Zusammenfassung" : "Summary"}</span>
+            </button>
+          </Tooltip>
         </div>
 
         {/* ── RIGHT: Compact action buttons ─────────────────────────── */}
