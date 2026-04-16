@@ -5,24 +5,26 @@ import { usePathname } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 /**
- * Routes that SHOULD show the live signal ticker. These are the "work
- * surfaces" where incoming signals add situational awareness:
+ * Routes that SHOULD show the live signal ticker. These are the
+ * situational-awareness surfaces where an incoming signal pulse adds
+ * value:
  *   - /cockpit : Knowledge Cockpit (trends / radar / signals)
  *   - /monitor : data source health, naturally wants live pulse
- *   - /canvas  : workspace, often open for long stretches
  *   - /projects: strategic projects list
  *
- * Everywhere else (home, admin, settings, docs, impressum, invite
- * landing) the ticker is decorative noise that also collides with the
- * fixed-position Footer — it sits at bottom:0 with a higher z-index
- * and hides the legal/navigation row. We explicitly do NOT render it
- * on those routes.
+ * Explicitly NOT allowed:
+ *   - /canvas  — the workspace is a focused editing surface; the
+ *     scrolling marquee competes with the save-status indicator, the
+ *     zoom/pan controls, and the toolbar. User asked for it gone.
+ *   - / (home), /admin, /settings, /impressum, /dokumentation,
+ *     /komponenten — either not signal-oriented or already have their
+ *     own live sections. The ticker also collides with the fixed-
+ *     position Footer at those routes.
  */
 function shouldShowTicker(pathname: string | null): boolean {
   if (!pathname) return false;
   if (pathname === "/cockpit" || pathname.startsWith("/cockpit/")) return true;
   if (pathname === "/monitor" || pathname.startsWith("/monitor/")) return true;
-  if (pathname === "/canvas" || pathname.startsWith("/canvas/")) return true;
   if (pathname === "/projects" || pathname.startsWith("/projects/")) return true;
   return false;
 }
@@ -106,11 +108,12 @@ export default function SignalTicker() {
 
   if (!routeAllowsTicker || isIframe || signals.length === 0) return null;
 
-  // The Footer component also renders at position:fixed; bottom:0 and
-  // is hidden on /canvas only. On every other allowed route, lift the
-  // ticker above the footer so both are visible — footer height is
-  // roughly 38px (12px padding top/bottom + ~14px content line-height).
-  const bottomOffset = pathname?.startsWith("/canvas") ? 0 : 40;
+  // The Footer component also renders at position:fixed; bottom:0.
+  // Lift the ticker above the footer so both are visible — footer
+  // height is roughly 38 px (12 px padding top/bottom + ~14 px content
+  // line-height). /canvas is already excluded above so no exception
+  // needed here.
+  const bottomOffset = 40;
 
   // Duplicate the list so the CSS animation can loop seamlessly — the keyframe
   // translates by -50%, which lands the second copy exactly where the first
