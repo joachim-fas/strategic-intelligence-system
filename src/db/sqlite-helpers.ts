@@ -115,8 +115,19 @@ export function ensureMultiTenantSchema(db: Database.Database): void {
 
   // Lookup indexes we will rely on in every scoped query.
   db.exec(`CREATE INDEX IF NOT EXISTS radars_tenant_id ON radars(tenant_id)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS bsc_ratings_tenant_id ON bsc_ratings(tenant_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS scenarios_tenant_id ON scenarios(tenant_id)`);
+
+  // bsc_ratings: widen the uniqueness boundary to include tenant_id so
+  // two tenants can vote differently on the same (queryHash,
+  // perspectiveId). The pre-tenant schema had UNIQUE(query_hash,
+  // perspective_id) inlined in the CREATE TABLE — we cannot drop that
+  // in-place without a table rebuild on SQLite. The tenant-aware index
+  // is still added here so new rows honour the target invariant; the
+  // legacy autoindex will co-exist on installations that originated
+  // before tenants. A future migration can table-rebuild to shed the
+  // legacy constraint cleanly.
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS bsc_ratings_tenant_unique
+    ON bsc_ratings(tenant_id, query_hash, perspective_id)`);
 }
 
 /**
