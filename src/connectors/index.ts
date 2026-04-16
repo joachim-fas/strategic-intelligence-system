@@ -71,6 +71,12 @@ import { nextstrainConnector } from "./nextstrain";
 import { steamspyConnector } from "./steamspy";
 import { googleNgramConnector } from "./google-ngram";
 import { usgsEarthquakeConnector } from "./usgs-earthquake";
+// RSS / Atom feeds — curated key-free sources from the Notion RSS registry
+// (2026-04). Each feed gets its own SourceConnector via buildRssFeedConnector.
+import { buildRssFeedConnector } from "./rss-feed";
+import { RSS_FEED_CONFIGS } from "./rss-feeds";
+
+const rssConnectors: SourceConnector[] = RSS_FEED_CONFIGS.map(buildRssFeedConnector);
 
 export const connectors: SourceConnector[] = [
   // Tech & Developer signals
@@ -154,6 +160,9 @@ export const connectors: SourceConnector[] = [
   steamspyConnector,
   googleNgramConnector,
   usgsEarthquakeConnector,
+  // Curated RSS / Atom feeds (key-free). ~36 sources across news, science,
+  // institutions, think tanks, tech, and humanitarian crises.
+  ...rssConnectors,
 ];
 
 export function getConnector(name: string): SourceConnector | undefined {
