@@ -1,7 +1,31 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+
+/**
+ * Routes that SHOULD show the live signal ticker. These are the "work
+ * surfaces" where incoming signals add situational awareness:
+ *   - /cockpit : Knowledge Cockpit (trends / radar / signals)
+ *   - /monitor : data source health, naturally wants live pulse
+ *   - /canvas  : workspace, often open for long stretches
+ *   - /projects: strategic projects list
+ *
+ * Everywhere else (home, admin, settings, docs, impressum, invite
+ * landing) the ticker is decorative noise that also collides with the
+ * fixed-position Footer — it sits at bottom:0 with a higher z-index
+ * and hides the legal/navigation row. We explicitly do NOT render it
+ * on those routes.
+ */
+function shouldShowTicker(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/cockpit" || pathname.startsWith("/cockpit/")) return true;
+  if (pathname === "/monitor" || pathname.startsWith("/monitor/")) return true;
+  if (pathname === "/canvas" || pathname.startsWith("/canvas/")) return true;
+  if (pathname === "/projects" || pathname.startsWith("/projects/")) return true;
+  return false;
+}
 
 interface TickerSignal {
   id: string;
@@ -45,18 +69,24 @@ function sourceColor(src: string): string {
 }
 
 export default function SignalTicker() {
+  const pathname = usePathname();
   const [signals, setSignals] = useState<TickerSignal[]>([]);
   const [isIframe, setIsIframe] = useState(false);
   const [paused, setPaused] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const routeAllowsTicker = shouldShowTicker(pathname);
 
   // Detect iframe embed (hide ticker inside Workspace / Canvas iframes)
   useEffect(() => {
     try { setIsIframe(window.self !== window.top); } catch { setIsIframe(true); }
   }, []);
 
-  // Initial fetch + auto-refresh every 2 minutes
+  // Initial fetch + auto-refresh every 2 minutes — only on routes that
+  // actually render the ticker, so we don't keep a pointless 2-minute
+  // interval running on /, /admin, /settings.
   useEffect(() => {
+    if (!routeAllowsTicker) return;
     const load = () => {
       fetchWithTimeout("/api/v1/feed/ticker?limit=60&hours=48")
         .then(r => r.json())
@@ -72,9 +102,15 @@ export default function SignalTicker() {
     return () => {
       if (refreshTimer.current) clearInterval(refreshTimer.current);
     };
-  }, []);
+  }, [routeAllowsTicker]);
 
-  if (isIframe || signals.length === 0) return null;
+  if (!routeAllowsTicker || isIframe || signals.length === 0) return null;
+
+  // The Footer component also renders at position:fixed; bottom:0 and
+  // is hidden on /canvas only. On every other allowed route, lift the
+  // ticker above the footer so both are visible — footer height is
+  // roughly 38px (12px padding top/bottom + ~14px content line-height).
+  const bottomOffset = pathname?.startsWith("/canvas") ? 0 : 40;
 
   // Duplicate the list so the CSS animation can loop seamlessly — the keyframe
   // translates by -50%, which lands the second copy exactly where the first
@@ -89,7 +125,7 @@ export default function SignalTicker() {
       aria-label="Live signal ticker"
       style={{
         position: "fixed",
-        bottom: 0,
+        bottom: bottomOffset,
         left: 0,
         right: 0,
         zIndex: 30,
