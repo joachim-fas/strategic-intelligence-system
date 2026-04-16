@@ -21,9 +21,12 @@ function getDb() {
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  // Upper bound raised from 100 → 200 so the LiveSignalStream's default
-  // `?limit=200` actually gets that many signals. Lower bound stays at 10.
-  const limit = Math.max(10, Math.min(200, Number(url.searchParams.get("limit") ?? "60")));
+  // Upper bound 200 so the LiveSignalStream's default `?limit=200`
+  // actually gets that many signals. Lower bound 1 — an earlier
+  // minimum-of-10 clamp was silently returning 10 rows when callers
+  // asked for 5, which violates the contract. If the ticker needs a
+  // floor for smooth scrolling, the client should set its own default.
+  const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit") ?? "60")));
   const hours = Math.max(6, Math.min(168, Number(url.searchParams.get("hours") ?? "48")));
   // NEW: max rows per source. This is the diversity knob. Default 10 — with
   // 27 active sources in the DB that caps each at 10, so 270 candidate rows

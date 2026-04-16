@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
 import { emitActivity } from "@/lib/activity-bus";
+import { requirePipelineTrigger } from "@/lib/api-helpers";
 
 // Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
 ensureEnvLoaded();
@@ -52,7 +53,14 @@ function mergeTrends(megaBase: TrendDot[], liveTrends: TrendDot[]): TrendDot[] {
   return Array.from(merged.values()).sort((a, b) => b.relevance - a.relevance);
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  // SEC audit 2026-04: previously anonymous — any client could
+  // trigger a full connector fan-out, burning external API quotas
+  // and in-memory state. Requires a system-admin session or the
+  // CRON_SECRET bearer.
+  const gate = await requirePipelineTrigger(req);
+  if (gate.errorResponse) return gate.errorResponse;
+
   if (isRunning) {
     return NextResponse.json(
       { success: false, error: { code: "CONFLICT", message: "Pipeline is already running", status: 409 } },

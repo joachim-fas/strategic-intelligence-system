@@ -998,7 +998,7 @@ export default function KomponentenPage() {
           {/* ================================================================ FEEDBACK ================================================================ */}
           <Section id="alerts" title="VoltAlert" description={de ? "Kontextuelle Benachrichtigungen: info, success, warning, error." : "Contextual notifications."}>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <VoltAlert variant="info" title="Info">{de ? "56 Quellen synchronisiert." : "56 sources synchronized."}</VoltAlert>
+              <VoltAlert variant="info" title="Info">{de ? "Pipeline läuft — neue Signale werden geladen." : "Pipeline running — new signals loading."}</VoltAlert>
               <VoltAlert variant="success" title={de ? "Analyse abgeschlossen" : "Analysis complete"}>{de ? "3 Szenarien generiert." : "3 scenarios generated."}</VoltAlert>
               <VoltAlert variant="warning" title="Rate-Limit">{de ? "API-Kontingent bei 85%." : "API quota at 85%."}</VoltAlert>
               {alertVisible && <VoltAlert variant="error" title={de ? "Verbindungsfehler" : "Connection error"} dismissible onDismiss={() => setAlertVisible(false)}>{de ? "API nicht erreichbar." : "API unreachable."}</VoltAlert>}

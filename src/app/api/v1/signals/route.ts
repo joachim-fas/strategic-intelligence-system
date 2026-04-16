@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureEnvLoaded } from "@/lib/env";
 import { storeSignals, pruneOldSignals, getSignalAge } from "@/lib/signals";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
-import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
+import { apiSuccess, CACHE_HEADERS, requirePipelineTrigger } from "@/lib/api-helpers";
 
 // Bootstrap .env.local for paths with spaces (e.g. "Meine Ablage")
 ensureEnvLoaded();
@@ -24,6 +24,12 @@ export async function GET(request: Request) {
 
 // POST — run connectors and persist signals
 export async function POST(request: Request) {
+  // SEC audit 2026-04: previously anonymous — any client could trigger
+  // all connectors to run + write to live_signals. Now requires a
+  // system-admin session or CRON_SECRET bearer.
+  const gate = await requirePipelineTrigger(request);
+  if (gate.errorResponse) return gate.errorResponse;
+
   const clientIp = request.headers.get("x-forwarded-for") || "unknown";
   if (!checkRateLimit(clientIp, 60, 60000)) {
     return tooManyRequests();

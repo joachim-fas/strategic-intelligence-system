@@ -13,6 +13,20 @@ import {
   VoltSeparator,
   VoltTabs,
 } from "@/components/volt";
+import { connectors } from "@/connectors";
+import { megaTrends } from "@/lib/mega-trends";
+import { TREND_EDGES } from "@/lib/causal-graph";
+import { GLOBAL_REGULATIONS } from "@/lib/regulations";
+
+/* ─── Live system counts ──────────────────────────────────────
+ * Previously this page hardcoded "57 Connectors", "40 Trends",
+ * "102 Kanten", "15 Regulierungen". After the RSS expansion
+ * (now ~100 connectors) the literals were lying. Read the real
+ * numbers from the registries at render time. */
+const CONNECTOR_COUNT = connectors.length;
+const TREND_COUNT = megaTrends.length;
+const EDGE_COUNT = TREND_EDGES.length;
+const REGULATION_COUNT = GLOBAL_REGULATIONS.length;
 
 /* ─── Types ──────────────────────────────────────────────────── */
 type TLine = {
@@ -226,7 +240,7 @@ export default function Dokumentation() {
     { num: 4, t: de ? "Trend-Laden aus SQLite" : "Load Trends from SQLite", d: de ? "trends-Tabelle, Fallback auf mega-trends.ts" : "trends table, fallback to mega-trends.ts" },
     { num: 5, t: de ? "Signal-Freshness-Check" : "Signal Freshness Check", d: de ? "Neueste Signale > 6h alt -> Pipeline auto-refresh (fire-and-forget)" : "Newest signals > 6h old -> pipeline auto-refresh (fire-and-forget)" },
     { num: 6, t: "Signal-Retrieval (RAG)", d: de ? "getRelevantSignals(query, 12) -- Keyword-Matching, Cross-Language Aliases, Score >= 2" : "getRelevantSignals(query, 12) -- keyword matching, cross-language aliases, score >= 2" },
-    { num: 7, t: de ? "System-Prompt aufbauen" : "Build System Prompt", d: de ? "buildSystemPrompt() -- 40 Trends + 15 Regulierungen + 102 Kanten + Live-Signale + STEEP+V + PFLICHTEN + JSON-Schema" : "buildSystemPrompt() -- 40 trends + 15 regulations + 102 edges + live signals + STEEP+V + PFLICHTEN + JSON schema" },
+    { num: 7, t: de ? "System-Prompt aufbauen" : "Build System Prompt", d: de ? `buildSystemPrompt() -- ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Kanten + Live-Signale + STEEP+V + PFLICHTEN + JSON-Schema` : `buildSystemPrompt() -- ${TREND_COUNT} trends + ${REGULATION_COUNT} regulations + ${EDGE_COUNT} edges + live signals + STEEP+V + PFLICHTEN + JSON schema` },
     { num: 8, t: de ? "previousContext (SEC-10)" : "previousContext (SEC-10)", d: de ? "Synthesis auf 6.000 Zeichen begrenzen, sanitisieren, als Assistant-Message" : "Truncate synthesis to 6,000 chars, sanitize, inject as assistant message" },
     { num: 9, t: "LLM-Streaming (Anthropic API)", d: de ? "claude-sonnet-4-6, max_tokens: 12.000, SSE-Streaming, Retry bis 3x bei 429/529" : "claude-sonnet-4-6, max_tokens: 12,000, SSE streaming, retry up to 3x on 429/529" },
     { num: 10, t: de ? "Synthese-Extraktion während Streaming" : "Synthesis Extraction During Streaming", d: de ? "Progressive JSON-Parsing, Delta-Extraktion für Live-Anzeige" : "Progressive JSON parsing, delta extraction for live display" },
@@ -265,7 +279,7 @@ export default function Dokumentation() {
               : "Complete technical reference of the Strategic Intelligence System. All claims are extracted from source code and 1:1 verifiable."}
           </p>
           <div className="flex flex-wrap gap-2">
-            {["Next.js 15", "React 19", "Claude claude-sonnet-4-6", "SQLite + WAL", "57 Connectors", "Zod", "SSE Streaming"].map((t) => (
+            {["Next.js 15", "React 19", "Claude claude-sonnet-4-6", "SQLite + WAL", `${CONNECTOR_COUNT} Connectors`, "Zod", "SSE Streaming"].map((t) => (
               <VoltBadge key={t} variant="outline" size="sm">{t}</VoltBadge>
             ))}
           </div>
@@ -273,10 +287,10 @@ export default function Dokumentation() {
 
         {/* ── Key Stats ────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <VoltStat label="Live-Connectors" value={57} variant="lime" />
-          <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={40} />
-          <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={102} />
-          <VoltStat label={de ? "Regulierungen" : "Regulations"} value={15} />
+          <VoltStat label="Live-Connectors" value={CONNECTOR_COUNT} variant="lime" />
+          <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={TREND_COUNT} />
+          <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={EDGE_COUNT} />
+          <VoltStat label={de ? "Regulierungen" : "Regulations"} value={REGULATION_COUNT} />
         </div>
 
         {/* ── Two-column layout ────────────────────────────────── */}
@@ -332,8 +346,8 @@ export default function Dokumentation() {
                 <VoltCardContent className="space-y-6 p-6">
                   <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Das SIS (Strategic Intelligence System) ist ein Denk-Instrument auf Think-Tank-Niveau mit explizitem EU-Fokus. Es verbindet 57 Live-Datenquellen mit einem kuratierten Wissensgraphen (40 Trends, 102 kausale Kanten, 15 Regulierungen) und einem LLM-Analysekern (Claude claude-sonnet-4-6) zu einem Retrieval-Augmented-Generation (RAG) System, das strategische Fragen strukturiert und belegt beantwortet."
-                      : "SIS (Strategic Intelligence System) is a thinking instrument at think-tank level with an explicit EU focus. It connects 57 live data sources with a curated knowledge graph (40 trends, 102 causal edges, 15 regulations) and an LLM analysis core (Claude claude-sonnet-4-6) into a RAG system that answers strategic questions in a structured and evidence-based way."}
+                      ? `Das SIS (Strategic Intelligence System) ist ein Denk-Instrument auf Think-Tank-Niveau mit explizitem EU-Fokus. Es verbindet ${CONNECTOR_COUNT} Live-Datenquellen mit einem kuratierten Wissensgraphen (${TREND_COUNT} Trends, ${EDGE_COUNT} kausale Kanten, ${REGULATION_COUNT} Regulierungen) und einem LLM-Analysekern (Claude claude-sonnet-4-6) zu einem Retrieval-Augmented-Generation (RAG) System, das strategische Fragen strukturiert und belegt beantwortet.`
+                      : `SIS (Strategic Intelligence System) is a thinking instrument at think-tank level with an explicit EU focus. It connects ${CONNECTOR_COUNT} live data sources with a curated knowledge graph (${TREND_COUNT} trends, ${EDGE_COUNT} causal edges, ${REGULATION_COUNT} regulations) and an LLM analysis core (Claude claude-sonnet-4-6) into a RAG system that answers strategic questions in a structured and evidence-based way.`}
                   </p>
 
                   <SubH>{de ? "RAG-Architektur (Datenfluss)" : "RAG Architecture (Data Flow)"}</SubH>
@@ -342,8 +356,11 @@ export default function Dokumentation() {
                     variant="dark"
                     maxHeight="none"
                     lines={tl(
+// Dynamic counts — the literals "57 Connectors" / "Top 40 Trends" /
+// "15 Regulierungen" / "102 Kausale Kanten" drifted post-RSS merge.
+// Render from the live registries so the diagram is always honest.
 `┌──────────────────────────────────────────────────────────┐
-│  57 Connectors (APIs)                                    │
+│  ${String(CONNECTOR_COUNT).padEnd(3, " ")}Connectors (APIs)                                   │
 │  HackerNews, GDELT, Eurostat, WHO, ACLED, arXiv, ...    │
 └────────────────────────────┬─────────────────────────────┘
                              │ storeSignals()
@@ -357,7 +374,7 @@ export default function Dokumentation() {
                              v
 ┌──────────────────────────────────────────────────────────┐
 │  System Prompt Builder (buildSystemPrompt)                │
-│  Top 40 Trends + 15 Regulierungen + 102 Kausale Kanten  │
+│  Top ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Kausale Kanten   │
 │  + formatierte Live-Signale + STEEP+V Framework          │
 │  + EU JRC 14 Megatrends + 7 PFLICHTEN + JSON-Schema      │
 └────────────────────────────┬─────────────────────────────┘
@@ -391,10 +408,10 @@ export default function Dokumentation() {
                       { label: "LLM", value: "Claude claude-sonnet-4-6, max 12.000 tokens, Anthropic API v2023-06-01" },
                       { label: de ? "Datenbank" : "Database", value: "SQLite via better-sqlite3, WAL-Modus, Trend + live_signals Tabelle" },
                       { label: "Frontend", value: "Next.js 15, React 19, TypeScript, Volt UI" },
-                      { label: de ? "Datenquellen" : "Data Sources", value: de ? "57 Live-Connectors, 42+ institutionelle Forschungsquellen" : "57 live connectors, 42+ institutional research sources" },
+                      { label: de ? "Datenquellen" : "Data Sources", value: de ? `${CONNECTOR_COUNT} Live-Connectors, institutionelle Forschungsquellen + Open-API-Quellen` : `${CONNECTOR_COUNT} live connectors, institutional research + open-API sources` },
                       { label: "Streaming", value: "SSE (Server-Sent Events), progressive JSON extraction" },
                       { label: "Validation", value: "Zod Schema, Input Sanitization, Rate Limiting" },
-                      { label: de ? "Wissensgraph" : "Knowledge Graph", value: de ? "40 Trends, 102 kausale Kanten, 15 Regulierungen" : "40 trends, 102 causal edges, 15 regulations" },
+                      { label: de ? "Wissensgraph" : "Knowledge Graph", value: de ? `${TREND_COUNT} Trends, ${EDGE_COUNT} kausale Kanten, ${REGULATION_COUNT} Regulierungen` : `${TREND_COUNT} trends, ${EDGE_COUNT} causal edges, ${REGULATION_COUNT} regulations` },
                       { label: "API", value: de ? "Retry bis 3x bei 429/529, Exponential Backoff" : "Retry up to 3x on 429/529, exponential backoff" },
                     ].map((item) => (
                       <div
@@ -418,14 +435,14 @@ export default function Dokumentation() {
                 ══════════════════════════════════════════════════ */}
             <section id="connectors" className="scroll-mt-20">
               <SectionHeading num="02">
-                {de ? "Daten-Connectors (57 gesamt)" : "Data Connectors (57 total)"}
+                {de ? `Daten-Connectors (${CONNECTOR_COUNT} gesamt)` : `Data Connectors (${CONNECTOR_COUNT} total)`}
               </SectionHeading>
               <VoltCard>
                 <VoltCardContent className="space-y-4 p-6">
                   <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Alle 57 Connectors, gruppiert nach Kategorie. Jeder Connector liefert strukturierte Signale (Titel, Inhalt, URL, Datum, Stärke) in die SQLite-Datenbank."
-                      : "All 57 connectors, grouped by category. Each connector delivers structured signals (title, content, URL, date, strength) to the SQLite database."}
+                      ? `Alle ${CONNECTOR_COUNT} Connectors, gruppiert nach Kategorie. Jeder Connector liefert strukturierte Signale (Titel, Inhalt, URL, Datum, Stärke) in die SQLite-Datenbank.`
+                      : `All ${CONNECTOR_COUNT} connectors, grouped by category. Each connector delivers structured signals (title, content, URL, date, strength) to the SQLite database.`}
                   </p>
 
                   <VoltAlert variant="info">
@@ -450,8 +467,8 @@ export default function Dokumentation() {
                 <VoltCardContent className="space-y-6 p-6">
                   <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Das Signal-Retrieval ist die Brücke zwischen den 57 Connectors und dem LLM-Prompt. Es findet die thematisch relevantesten Signale für eine gegebene Nutzeranfrage. Quellcode: signals.ts"
-                      : "Signal retrieval bridges the 57 connectors and the LLM prompt. It finds the most topically relevant signals for a given user query. Source: signals.ts"}
+                      ? `Das Signal-Retrieval ist die Brücke zwischen den ${CONNECTOR_COUNT} Connectors und dem LLM-Prompt. Es findet die thematisch relevantesten Signale für eine gegebene Nutzeranfrage. Quellcode: signals.ts`
+                      : `Signal retrieval bridges the ${CONNECTOR_COUNT} connectors and the LLM prompt. It finds the most topically relevant signals for a given user query. Source: signals.ts`}
                   </p>
 
                   <SubH>{de ? "Keyword-Extraktion" : "Keyword Extraction"}</SubH>
@@ -680,11 +697,11 @@ export default function Dokumentation() {
                       L("  Ring:adopt Rel:98% Conf:95% Imp:98% rising Dur:permanent"),
                       L("  Focus:strategic,investment Signals:500 Sources:PwC,EY"),
                       L(""),
-                      L("REGULIERUNGEN (15 Frameworks):", "comment"),
+                      L(`REGULIERUNGEN (${REGULATION_COUNT} Frameworks):`, "comment"),
                       L("- EU:AI Act [enforcing] -> mega-ai-transformation(reshapes)"),
                       L("- US:CHIPS Act [enforcing] -> mega-technological-disruption"),
                       L(""),
-                      L("KAUSALE VERBINDUNGEN (102 Kanten):", "comment"),
+                      L(`KAUSALE VERBINDUNGEN (${EDGE_COUNT} Kanten):`, "comment"),
                       L("mega-climate --drives(95%)--> mega-energy-transition"),
                       L("mega-ai --drives(95%)--> mega-future-of-work"),
                       L("mega-geopolitical --dampens(70%)--> mega-connectivity"),
@@ -1249,10 +1266,10 @@ export default function Dokumentation() {
                   </p>
 
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={40} variant="lime" size="sm" />
-                    <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={102} size="sm" />
-                    <VoltStat label={de ? "Regulierungen" : "Regulations"} value={15} size="sm" />
-                    <VoltStat label={de ? "Quellen" : "Sources"} value="42+" size="sm" />
+                    <VoltStat label={de ? "Kuratierte Trends" : "Curated Trends"} value={TREND_COUNT} variant="lime" size="sm" />
+                    <VoltStat label={de ? "Kausale Kanten" : "Causal Edges"} value={EDGE_COUNT} size="sm" />
+                    <VoltStat label={de ? "Regulierungen" : "Regulations"} value={REGULATION_COUNT} size="sm" />
+                    <VoltStat label={de ? "Quellen" : "Sources"} value={CONNECTOR_COUNT} size="sm" />
                   </div>
 
                   <VoltSeparator />
@@ -1634,8 +1651,8 @@ export default function Dokumentation() {
                       { de: "Schwächste Abdeckung: Kultur, Sport, Unterhaltung, lokale/regionale Themen.", en: "Weakest coverage: Culture, Sports, Entertainment, local topics." },
                       { de: "Einzelnes LLM (Claude claude-sonnet-4-6) -- keine modellübergreifende Verifikation.", en: "Single LLM (Claude claude-sonnet-4-6) -- no cross-model verification." },
                       { de: "Rate Limiting In-Memory, resets bei Server-Neustart.", en: "Rate limiting in-memory, resets on server restart." },
-                      { de: "System-Prompt enthält nur Top 40 Trends.", en: "System prompt contains only top 40 trends." },
-                      { de: "Kausale Kanten (102) statisch kodiert. Kein UI zum Bearbeiten.", en: "Causal edges (102) statically coded. No edit UI." },
+                      { de: `System-Prompt enthält nur Top ${TREND_COUNT} Trends.`, en: `System prompt contains only top ${TREND_COUNT} trends.` },
+                      { de: `Kausale Kanten (${EDGE_COUNT}) statisch kodiert. Kein UI zum Bearbeiten.`, en: `Causal edges (${EDGE_COUNT}) statically coded. No edit UI.` },
                       { de: "previousContext: nur die letzte Frage/Antwort, kein Multi-Turn-Gedächtnis.", en: "previousContext: only last Q&A, no multi-turn memory." },
                     ].map((item, i) => (
                       <div

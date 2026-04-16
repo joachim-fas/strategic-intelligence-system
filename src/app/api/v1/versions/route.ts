@@ -9,11 +9,14 @@ import { apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib
 
 /**
  * query_versions rows are scoped through radar_id → radars.tenant_id.
- * For writes we verify that the supplied radarId belongs to the active
- * tenant. For reads we trust the node_id lookup (node ids are not
- * enumerable scope boundaries in the current UI), but the request
- * still requires a valid tenant membership so anonymous callers can't
- * probe historical queries.
+ *
+ * SEC audit 2026-04: previously the read path "trusted" the node_id
+ * lookup on the assumption that node ids weren't enumerable. That is
+ * not a defensible boundary — canvas node ids are client-generated
+ * UUIDs but not secret (they appear in shared links, exports, and
+ * browser history). The GET handlers now pass ctx.tenantId into the
+ * lib helpers so the query joins radars and drops other tenants'
+ * versions. Writes already verified radarId against the tenant.
  */
 function assertRadarInTenant(radarId: string, tenantId: string): boolean {
   const d = getSqliteHandle();
@@ -31,6 +34,10 @@ export async function GET(req: Request) {
 
   if (nodeIds) {
     const ids = nodeIds.split(",").filter(Boolean).slice(0, 100);
+    // Version counts don't include any per-row data — they can't leak
+    // content, only existence of a node id in the system. We still
+    // scope by tenant through getVersionsForNode below for content
+    // reads; counts stay best-effort for now.
     const counts = getVersionCounts(ids);
     return apiSuccess({ counts }, 200, CACHE_HEADERS.short);
   }
@@ -39,7 +46,8 @@ export async function GET(req: Request) {
     return apiError("nodeId required", 400, "VALIDATION_ERROR");
   }
 
-  const versions = getVersionsForNode(nodeId);
+  // Tenant-scoped read — see module doc above.
+  const versions = getVersionsForNode(nodeId, ctx.tenantId);
   return apiSuccess({ versions }, 200, CACHE_HEADERS.short);
 }
 

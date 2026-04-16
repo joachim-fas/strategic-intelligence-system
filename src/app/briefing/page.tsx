@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/lib/locale-context";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
+import { connectors } from "@/connectors";
+import { megaTrends } from "@/lib/mega-trends";
 
 /**
  * /briefing — Print-optimized intelligence briefing
@@ -66,7 +68,11 @@ function BriefingContent() {
         {entry.query}
       </h1>
       <p style={{ fontSize: 12, color: "var(--volt-text-faint, #999)", margin: "0 0 32px", fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", letterSpacing: "0.04em" }}>
-        STEEP+V · EU-Fokus · 50 Echtzeit-Quellen · 39 Trends
+        {/* Source + trend counts used to be hardcoded "50" / "39". With
+             ~100 connectors and a growing trend registry those numbers
+             were lying. Use the live registry so the sub-header is
+             always honest. */}
+        STEEP+V · EU-Fokus · {connectors.length} Echtzeit-Quellen · {megaTrends.length} Trends
       </p>
 
       {/* Synthesis */}

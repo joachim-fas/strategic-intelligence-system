@@ -85,11 +85,16 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   const activeTenantId = useActiveTenantId();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showSignals, setShowSignals] = useState(true); // default OPEN for transparency
 
   const saveToProject = async () => {
-    if (!activeProjectId || saving || saved) return;
+    // Allow retry after a previous failure — but guard against repeated
+    // clicks while a save is in flight or after a successful save.
+    if (!activeProjectId || saving) return;
+    if (saved) return;
     setSaving(true);
+    setSaveError(null);
     try {
       // Briefing payloads are heavy (synthesis + chains + scenarios +
       // references) and on a cold dev-server the target route takes
@@ -117,14 +122,25 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           locale,
         }),
       }, 90_000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        // Try to surface the server's error message if the envelope carries one.
+        let message = `HTTP ${res.status}`;
+        try {
+          const body = await res.json();
+          if (body?.error?.message) message = body.error.message;
+          else if (body?.error) message = String(body.error);
+        } catch { /* non-JSON body */ }
+        throw new Error(message);
+      }
       setSaved(true);
     } catch (err) {
-      // Log instead of silently swallowing — the "Projekte werden
-      // nicht gespeichert" reports had zero signal in the UI because
-      // this catch was empty.
+      // Previously the catch was empty — "Projekte werden nicht
+      // gespeichert" had zero signal in the UI. Now we surface both
+      // to the console (developer) and an inline error banner (user).
+      const msg = err instanceof Error ? err.message : String(err);
       // eslint-disable-next-line no-console
       console.error("[saveToProject]", err);
+      setSaveError(locale === "de" ? `Speichern fehlgeschlagen: ${msg}` : `Save failed: ${msg}`);
     }
     setSaving(false);
   };
@@ -268,16 +284,21 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         )}
         {activeProjectId && !isLoading && !isHelp && briefing.synthesis && (
           <Tooltip
-            content={saved
-              ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
-              : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
+            content={saveError
+              ? saveError
+              : saved
+                ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
+                : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
             placement="bottom"
           >
             <Button
               variant="ghost" size="sm"
               onClick={saveToProject}
               disabled={saved || saving}
-              className={cn("text-[12px] px-3 h-7 gap-1.5", saved ? "text-[#1A9E5A]" : "text-[#9B9B9B]")}
+              className={cn(
+                "text-[12px] px-3 h-7 gap-1.5",
+                saved ? "text-[#1A9E5A]" : saveError ? "text-[#D93636]" : "text-[#9B9B9B]",
+              )}
             >
               {saved ? (
                 <>
@@ -286,6 +307,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 </>
               ) : saving ? (
                 <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+              ) : saveError ? (
+                locale === "de" ? "Erneut versuchen" : "Try again"
               ) : (
                 locale === "de" ? "Speichern" : "Save"
               )}

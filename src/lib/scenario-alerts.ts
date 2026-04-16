@@ -50,17 +50,35 @@ export function getAlertsForNode(canvasNodeId: string): ScenarioAlert[] {
   }
 }
 
-/** Get unresolved alert counts for multiple canvas nodes (batch). */
-export function getAlertCounts(canvasNodeIds: string[]): Record<string, number> {
+/**
+ * Get unresolved alert counts for multiple canvas nodes (batch).
+ *
+ * When `tenantId` is provided, the query joins `radars` and drops
+ * counts for alerts whose radar lives in a different tenant. Calls
+ * without `tenantId` retain the pre-tenant global behaviour; new
+ * call-sites should always pass one so the count leak (node IDs from
+ * other tenants being probeable) doesn't re-open.
+ */
+export function getAlertCounts(
+  canvasNodeIds: string[],
+  tenantId?: string,
+): Record<string, number> {
   if (canvasNodeIds.length === 0) return {};
   const d = db();
   try {
     const placeholders = canvasNodeIds.map(() => "?").join(",");
-    const rows = d.prepare(`
-      SELECT canvas_node_id, COUNT(*) as c FROM scenario_alerts
-      WHERE canvas_node_id IN (${placeholders}) AND dismissed_at IS NULL
-      GROUP BY canvas_node_id
-    `).all(...canvasNodeIds) as Array<{ canvas_node_id: string; c: number }>;
+    const sql = tenantId
+      ? `SELECT a.canvas_node_id, COUNT(*) as c FROM scenario_alerts a
+          LEFT JOIN radars r ON r.id = a.radar_id
+          WHERE a.canvas_node_id IN (${placeholders})
+            AND a.dismissed_at IS NULL
+            AND (a.radar_id IS NULL OR r.tenant_id = ?)
+          GROUP BY a.canvas_node_id`
+      : `SELECT canvas_node_id, COUNT(*) as c FROM scenario_alerts
+          WHERE canvas_node_id IN (${placeholders}) AND dismissed_at IS NULL
+          GROUP BY canvas_node_id`;
+    const args = tenantId ? [...canvasNodeIds, tenantId] : canvasNodeIds;
+    const rows = d.prepare(sql).all(...args) as Array<{ canvas_node_id: string; c: number }>;
     const result: Record<string, number> = {};
     for (const r of rows) result[r.canvas_node_id] = r.c;
     return result;
@@ -69,11 +87,30 @@ export function getAlertCounts(canvasNodeIds: string[]): Record<string, number> 
   }
 }
 
-/** Dismiss an alert. */
-export function dismissAlert(id: string): void {
+/**
+ * Dismiss an alert.
+ *
+ * Returns `true` if a row was updated, `false` otherwise (unknown id or
+ * cross-tenant). When `tenantId` is provided, the UPDATE joins radars
+ * so a tenant-A member can't dismiss a tenant-B alert by guessing its
+ * id. Alerts with a null radar_id stay globally-dismissable — they're
+ * orphaned and nobody should be surfacing them anyway.
+ */
+export function dismissAlert(id: string, tenantId?: string): boolean {
   const d = db();
   try {
-    d.prepare(`UPDATE scenario_alerts SET dismissed_at = datetime('now') WHERE id = ?`).run(id);
+    const stmt = tenantId
+      ? d.prepare(`
+          UPDATE scenario_alerts
+          SET dismissed_at = datetime('now')
+          WHERE id = ?
+            AND (
+              radar_id IS NULL
+              OR EXISTS (SELECT 1 FROM radars r WHERE r.id = scenario_alerts.radar_id AND r.tenant_id = ?)
+            )`)
+      : d.prepare(`UPDATE scenario_alerts SET dismissed_at = datetime('now') WHERE id = ?`);
+    const result = tenantId ? stmt.run(id, tenantId) : stmt.run(id);
+    return Number(result.changes ?? 0) > 0;
   } finally {
     d.close();
   }

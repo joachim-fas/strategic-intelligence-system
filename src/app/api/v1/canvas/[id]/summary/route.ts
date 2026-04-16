@@ -12,16 +12,19 @@
  */
 
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
 import type { Database as DatabaseType } from "better-sqlite3";
-import path from "path";
+import { getSqliteHandle } from "@/db";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
+import { requireTenantContext } from "@/lib/api-helpers";
 
-function db() {
-  const d = new Database(path.join(process.cwd(), "local.db"));
-  d.pragma("journal_mode = WAL");
-  return d;
+// Single shared DB handle — previously this file opened a fresh
+// `new Database(...)` per request, which bypassed the migration and
+// pragma chain everything else in the codebase routes through. That
+// also meant no `foreign_keys = ON`, no dev-user materialisation, and
+// no tenant-schema guarantees on the connection.
+function db(): DatabaseType {
+  return getSqliteHandle();
 }
 
 function extractJSON(text: string): any | null {
@@ -440,28 +443,24 @@ Find the red thread. Name the patterns. Uncover the contradictions. Show the ope
 
 // ─── GET: return cached summary if it matches current session state ───
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // DAT-13: Ensure DB handle is always closed
+  // SEC audit 2026-04: Was previously unauthenticated + unscoped —
+  // any caller with a radar UUID could read another tenant's canvas
+  // summary + project_queries. Now gated by tenant context and the
+  // SELECT is tenant-filtered.
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+
   const d = db();
-  let row: { canvas_state: string | null } | undefined;
-  let queries: SummaryQuery[] = [];
-  try {
-    row = d.prepare("SELECT canvas_state FROM radars WHERE id = ?").get(id) as { canvas_state: string | null } | undefined;
-    if (row) {
-      let state: any = null;
-      try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
-      // Merge canvas + project_queries so briefings saved via "Add to
-      // Project" also count toward the Zusammenfassung.
-      queries = collectProjectQueries(d, id, state);
-    }
-  } finally {
-    d.close();
-  }
+  const row = d
+    .prepare("SELECT canvas_state FROM radars WHERE id = ? AND tenant_id = ?")
+    .get(id, ctx.tenantId) as { canvas_state: string | null } | undefined;
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let state: any = null;
   try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
+  const queries = collectProjectQueries(d, id, state);
   const currentHash = hashSession(queries);
 
   const cached = state?.summary;
@@ -487,6 +486,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // ─── POST: generate or regenerate the meta-synthesis ───
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  // SEC audit 2026-04: previously unauthenticated + unscoped — see GET.
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+  // Viewers read-only; regenerating a summary mutates canvas_state.summary.
+  if (ctx.role === "viewer") {
+    return NextResponse.json(
+      { error: "Viewers cannot generate summaries" },
+      { status: 403 },
+    );
+  }
+
   // SEC-11: Rate limit LLM endpoints — 20 requests per IP per hour
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (!checkRateLimit(`canvas-summary:${clientIp}`, 20, 3_600_000)) {
@@ -503,8 +513,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const d = db();
-  const row = d.prepare("SELECT canvas_state FROM radars WHERE id = ?").get(id) as { canvas_state: string | null } | undefined;
-  if (!row) { d.close(); return NextResponse.json({ error: "Not found" }, { status: 404 }); }
+  const row = d
+    .prepare("SELECT canvas_state FROM radars WHERE id = ? AND tenant_id = ?")
+    .get(id, ctx.tenantId) as { canvas_state: string | null } | undefined;
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let state: any = null;
   try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
@@ -513,7 +525,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const queries = collectProjectQueries(d, id, state);
 
   if (queries.length < 1) {
-    d.close();
     return NextResponse.json(
       { error: locale === "de" ? "Dieses Projekt enthält noch keine Analysen." : "This project contains no analyses yet." },
       { status: 400 }
@@ -560,7 +571,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               continue;
             }
             send({ type: "error", error: `API error ${res.status}: ${errText.slice(0, 200)}` });
-            d.close();
+            // NOTE: `d` is the shared singleton handle — do NOT close.
             controller.close();
             return;
           }
@@ -604,7 +615,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       if (!modelUsed || !fullText) {
         send({ type: "error", error: "Alle Modelle fehlgeschlagen. Bitte später erneut versuchen." });
-        d.close();
         controller.close();
         return;
       }
@@ -612,21 +622,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const result = extractJSON(fullText);
       if (!result || !result.redThread) {
         send({ type: "error", error: "Meta-Synthese konnte nicht geparst werden. Bitte erneut versuchen." });
-        d.close();
         controller.close();
         return;
       }
 
       // TODO: DAT-10 — Race condition: concurrent save from Canvas page can overwrite summary. Fix: use separate summary column or row-level locking.
-      // Cache it in canvas_state.summary
+      // Cache it in canvas_state.summary. Tenant filter on UPDATE prevents
+      // a stale handle / wrong-id from clobbering another tenant's canvas.
       try {
         const updatedState = { ...(state || {}), summary: { hash: hashSession(queries), data: result, generatedAt: Date.now(), modelUsed } };
-        d.prepare("UPDATE radars SET canvas_state = ?, updated_at = datetime('now') WHERE id = ?")
-          .run(JSON.stringify(updatedState), id);
-      } catch (e) {
-        // Non-fatal — just don't cache
+        d.prepare("UPDATE radars SET canvas_state = ?, updated_at = datetime('now') WHERE id = ? AND tenant_id = ?")
+          .run(JSON.stringify(updatedState), id, ctx.tenantId);
+      } catch {
+        // Non-fatal — just don't cache.
       }
-      d.close();
+      // NOTE: `d` is the shared singleton handle — do NOT close.
 
       send({ type: "complete", result, modelUsed, queryCount: queries.length });
       controller.close();

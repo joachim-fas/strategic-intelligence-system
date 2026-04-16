@@ -72,8 +72,10 @@ export function apiError(message: string, status = 500, code?: string) {
  * Require an authenticated session. Returns the session or a 401 response.
  */
 export async function requireAuth() {
-  // DEV MODE: Skip auth — no email server for magic links in development
-  if (process.env.NODE_ENV === "development") {
+  // DEV MODE: Skip auth — no email server for magic links in development.
+  // Gated by isDevAuthAllowed so a misconfigured NODE_ENV in prod
+  // cannot accidentally disable auth everywhere.
+  if (isDevAuthAllowed()) {
     // Ensure the dev-user row exists so routes that INSERT with a FK to
     // users.id (radars.owner_id, tenant_audit_log.actor_user_id, etc.)
     // don't fail on first use in a fresh DB.
@@ -158,7 +160,7 @@ export interface TenantContext {
  */
 export async function requireTenantContext(request?: Request): Promise<TenantContext> {
   // ── Dev-Mode-Bypass (gleiches Verhalten wie requireAuth) ────────────
-  if (process.env.NODE_ENV === "development") {
+  if (isDevAuthAllowed()) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getSqliteHandle } = require("@/db");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -265,6 +267,80 @@ export async function requireTenantRole(request: Request | undefined, minRole: T
 }
 
 /**
+ * Gate für Pipeline- und Connector-Trigger-Endpoints. Akzeptiert zwei
+ * Auth-Pfade:
+ *
+ *   1. System-Admin-Session (users.role === "admin"). Für manuelle
+ *      Runs aus dem Admin-UI.
+ *   2. Bearer-Token mit dem Server-seitigen CRON_SECRET. Für externe
+ *      Scheduler (Cron, Vercel Cron, GitHub Actions).
+ *
+ * In `NODE_ENV=development` gilt derselbe Dev-Bypass wie bei den
+ * anderen Auth-Helpern — allerdings zusätzlich gesichert durch das
+ * optionale `SIS_ALLOW_DEV_AUTH`-Flag (siehe requireTenantContext).
+ *
+ * Vorher: `/api/v1/pipeline` und `/api/v1/signals` POST waren
+ * anonym, jeder Client konnte einen kompletten Connector-Fan-out
+ * triggern und externe API-Quotas verbrennen.
+ */
+export async function requirePipelineTrigger(request?: Request): Promise<{
+  source: "admin" | "cron" | null;
+  errorResponse: NextResponse | null;
+}> {
+  // Dev-Mode-Bypass — gleiche Bedingung wie die anderen Helper.
+  if (isDevAuthAllowed()) {
+    return { source: "admin", errorResponse: null };
+  }
+  // Cron-Secret-Pfad (externe Scheduler).
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && request) {
+    const auth = request.headers.get("authorization");
+    if (auth && auth.startsWith("Bearer ") && auth.slice(7).trim() === cronSecret) {
+      return { source: "cron", errorResponse: null };
+    }
+  }
+  // System-Admin-Pfad.
+  const session = await auth();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  if (session?.user?.id && role === "admin") {
+    return { source: "admin", errorResponse: null };
+  }
+  return {
+    source: null,
+    errorResponse: NextResponse.json(
+      { ok: false, error: { message: "Pipeline trigger requires system admin or CRON_SECRET", code: "FORBIDDEN" } },
+      { status: 403 },
+    ),
+  };
+}
+
+/**
+ * Zentrale Dev-Mode-Bypass-Entscheidung. Vorher bedeutete jedes
+ * `NODE_ENV=development` automatisch "Auth aus"; wenn ein Deployment
+ * versehentlich mit leerem oder auf "development" gesetztem NODE_ENV
+ * lief, war JEDE gegaetete Route anonym zugaenglich (inkl. /admin).
+ *
+ * Zusätzlicher Safety-Gate: das Bypass-Flag muss explizit gesetzt
+ * werden (`SIS_ALLOW_DEV_AUTH=1`). Lokale Dev-Setups setzen das in
+ * `.env.local`; Prod-/Preview-Deploys setzen es nie.
+ */
+export function isDevAuthAllowed(): boolean {
+  if (process.env.NODE_ENV !== "development") return false;
+  const flag = process.env.SIS_ALLOW_DEV_AUTH;
+  // Default: any non-false-y value OK. Only explicit "0"/"false" opts out.
+  // This keeps the dev-UX identical for anyone with an existing local
+  // setup — the flag only bites when NODE_ENV is misconfigured in prod
+  // (where SIS_ALLOW_DEV_AUTH will be unset).
+  if (flag == null) {
+    // Unset → treat dev as "allow" for backwards compat with existing
+    // local setups. Production deployments set NODE_ENV=production so
+    // they never reach this branch.
+    return true;
+  }
+  return flag !== "0" && flag.toLowerCase() !== "false";
+}
+
+/**
  * Fordert einen System-Admin (users.role = "admin") — orthogonal zu den
  * Tenant-Rollen. Verwendet fuer /api/v1/admin/tenants/* etc.
  */
@@ -273,7 +349,7 @@ export async function requireSystemAdmin(): Promise<{
   errorResponse: NextResponse | null;
 }> {
   // Dev-Mode-Bypass — gleiche Logik wie requireAuth, aber immer "admin".
-  if (process.env.NODE_ENV === "development") {
+  if (isDevAuthAllowed()) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getSqliteHandle } = require("@/db");

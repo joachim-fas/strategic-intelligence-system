@@ -95,27 +95,67 @@ export function saveQueryVersion(opts: {
   }
 }
 
-/** Get all version metadata for a canvas node (no result_json — lightweight). */
-export function getVersionsForNode(canvasNodeId: string): QueryVersionMeta[] {
+/**
+ * Get all version metadata for a canvas node (no result_json).
+ *
+ * SEC audit 2026-04: when `tenantId` is passed, the query joins
+ * `radars` and drops rows whose radar belongs to another tenant.
+ * Calls without `tenantId` retain the legacy global behaviour for
+ * backwards compatibility (e.g. internal lib callers) — all HTTP
+ * routes MUST pass one.
+ *
+ * Orphan versions where `radar_id IS NULL` stay readable by every
+ * tenant; they're floating canvas nodes that were never bound to a
+ * project and carry no tenant identity by design.
+ */
+export function getVersionsForNode(
+  canvasNodeId: string,
+  tenantId?: string,
+): QueryVersionMeta[] {
   const d = db();
   try {
-    const rows = d.prepare(`
-      SELECT id, canvas_node_id, radar_id, query_text, locale, version_number,
-             confidence, matched_trend_count, signal_count, executed_at, notes
-      FROM query_versions WHERE canvas_node_id = ?
-      ORDER BY version_number DESC
-    `).all(canvasNodeId) as any[];
+    const sql = tenantId
+      ? `SELECT v.id, v.canvas_node_id, v.radar_id, v.query_text, v.locale,
+               v.version_number, v.confidence, v.matched_trend_count,
+               v.signal_count, v.executed_at, v.notes
+          FROM query_versions v
+          LEFT JOIN radars r ON r.id = v.radar_id
+          WHERE v.canvas_node_id = ?
+            AND (v.radar_id IS NULL OR r.tenant_id = ?)
+          ORDER BY v.version_number DESC`
+      : `SELECT id, canvas_node_id, radar_id, query_text, locale, version_number,
+               confidence, matched_trend_count, signal_count, executed_at, notes
+          FROM query_versions WHERE canvas_node_id = ?
+          ORDER BY version_number DESC`;
+    const rows = tenantId
+      ? (d.prepare(sql).all(canvasNodeId, tenantId) as any[])
+      : (d.prepare(sql).all(canvasNodeId) as any[]);
     return rows.map(mapMeta);
   } finally {
     d.close();
   }
 }
 
-/** Get a single version with its full result_json. */
-export function getVersion(id: string): QueryVersion | null {
+/**
+ * Get a single version with its full result_json.
+ *
+ * When `tenantId` is passed, the query enforces that the version's
+ * radar (if any) belongs to that tenant. Without it, any caller who
+ * knows a version id can read the full briefing JSON of any tenant.
+ */
+export function getVersion(id: string, tenantId?: string): QueryVersion | null {
   const d = db();
   try {
-    const row = d.prepare(`SELECT * FROM query_versions WHERE id = ?`).get(id) as any;
+    const sql = tenantId
+      ? `SELECT v.*
+          FROM query_versions v
+          LEFT JOIN radars r ON r.id = v.radar_id
+          WHERE v.id = ?
+            AND (v.radar_id IS NULL OR r.tenant_id = ?)`
+      : `SELECT * FROM query_versions WHERE id = ?`;
+    const row = tenantId
+      ? (d.prepare(sql).get(id, tenantId) as any)
+      : (d.prepare(sql).get(id) as any);
     if (!row) return null;
     return { ...mapMeta(row), resultJson: JSON.parse(row.result_json) };
   } finally {

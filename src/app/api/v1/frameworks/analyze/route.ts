@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
+import { requireTenantContext } from "@/lib/api-helpers";
 
 /** Repair truncated JSON by closing open structures. */
 function tryRepairJSON(text: string): any | null {
@@ -732,6 +733,13 @@ async function callAnthropicStream(
 }
 
 export async function POST(req: Request) {
+  // SEC audit 2026-04: previously anonymous. Anthropic API costs are
+  // real; rate-limit by IP alone is not enough to stop an attacker
+  // from burning tokens. Requiring a tenant context ties calls to an
+  // identifiable user and allows per-tenant billing later.
+  const ctx = await requireTenantContext(req);
+  if (ctx.errorResponse) return ctx.errorResponse;
+
   // SEC-11: Rate limit LLM endpoints — 20 requests per IP per hour
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (!checkRateLimit(`framework-analyze:${clientIp}`, 20, 3_600_000)) {
@@ -743,8 +751,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
-  const body = await req.json();
-  const { frameworkId, topic, step, context, locale } = body;
+  const body = await req.json().catch(() => null as null | Record<string, unknown>);
+  if (!body) {
+    return NextResponse.json({ error: "Invalid or empty JSON body" }, { status: 400 });
+  }
+  const { frameworkId, topic, step, context, locale } = body as {
+    frameworkId?: string; topic?: string; step?: string;
+    context?: unknown; locale?: string;
+  };
 
   if (!frameworkId || !topic || !step) {
     return NextResponse.json({ error: "Missing frameworkId, topic, or step" }, { status: 400 });
@@ -786,9 +800,16 @@ export async function POST(req: Request) {
       .trim();
   };
 
-  const safeTopic = sanitizeForPrompt(topic);
-  const safeContext = sanitizeForPrompt(context || "");
-  const userPrompt = promptBuilder(safeTopic, step, safeContext, locale || "de");
+  const safeTopic = sanitizeForPrompt(String(topic ?? ""));
+  // `context` is typed `unknown` after the defensive JSON parse above.
+  // Coerce to string: if the client passed a JSON object, stringify it;
+  // otherwise use as-is. Empty fallback keeps the prompt well-formed.
+  const contextText =
+    typeof context === "string" ? context
+      : context == null ? ""
+      : JSON.stringify(context);
+  const safeContext = sanitizeForPrompt(contextText);
+  const userPrompt = promptBuilder(safeTopic, step as string, safeContext, locale || "de");
 
   const systemPrompt = `Du bist ein Senior-Strategieberater im Strategic Intelligence System (SIS). Du lieferst strukturierte, datengestützte Analysen. Antworte IMMER als valides JSON — kein Markdown-Codefence, kein Fließtext davor/danach, NUR das JSON-Objekt. Sei konkret: nenne echte Unternehmen, echte Zahlen, echte Regulierungen. Sprache: ${locale === "de" ? "Deutsch" : "English"}.`;
 
