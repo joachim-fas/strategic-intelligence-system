@@ -13,6 +13,7 @@
 
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
+import type { Database as DatabaseType } from "better-sqlite3";
 import path from "path";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
@@ -51,11 +52,7 @@ function sanitizeForPrompt(input: string): string {
     .trim();
 }
 
-/**
- * Extract all query-like nodes from a canvas state and return their
- * synthesis, insights, scenarios for the meta-synthesis input.
- */
-function extractQueriesFromCanvas(canvasState: any): Array<{
+interface SummaryQuery {
   query: string;
   synthesis: string;
   keyInsights: string[];
@@ -63,33 +60,130 @@ function extractQueriesFromCanvas(canvasState: any): Array<{
   interpretation?: string;
   decisionFramework?: string;
   timestamp?: number;
-}> {
+  source: "canvas" | "project";
+}
+
+/**
+ * Normalize one result-shaped blob (from either a canvas query node's
+ * `.result` or a `project_queries.result_json`) into the summary input
+ * format. Extracted so canvas + project_queries stay in lock-step.
+ */
+function queryFromResult(
+  queryText: string,
+  result: Record<string, unknown> | null | undefined,
+  synthesisRaw: string,
+  timestamp: number | undefined,
+  source: "canvas" | "project",
+): SummaryQuery {
+  const r = (result ?? {}) as Record<string, unknown>;
+  const insights = Array.isArray(r.keyInsights) ? (r.keyInsights as unknown[]) : [];
+  const scenarios = Array.isArray(r.scenarios) ? (r.scenarios as unknown[]) : [];
+  return {
+    query: sanitizeForPrompt(queryText),
+    synthesis: sanitizeForPrompt((synthesisRaw || (r.synthesis as string) || "").slice(0, 1500)),
+    keyInsights: insights.slice(0, 5).map((i) => sanitizeForPrompt(String(i))),
+    scenarios: scenarios.slice(0, 3).map((s) => {
+      const sc = (s ?? {}) as Record<string, unknown>;
+      return {
+        name: sanitizeForPrompt(String(sc.name ?? sc.title ?? "")),
+        description: sanitizeForPrompt(String(sc.description ?? "").slice(0, 200)),
+        probability: typeof sc.probability === "number" ? sc.probability : undefined,
+      };
+    }),
+    interpretation: sanitizeForPrompt(String(r.interpretation ?? "").slice(0, 400)),
+    decisionFramework: sanitizeForPrompt(String(r.decisionFramework ?? "").slice(0, 400)),
+    timestamp,
+    source,
+  };
+}
+
+/**
+ * Extract all query-like nodes from a canvas state and return their
+ * synthesis, insights, scenarios for the meta-synthesis input.
+ */
+function extractQueriesFromCanvas(canvasState: any): SummaryQuery[] {
   if (!canvasState?.nodes) return [];
-  const queries: any[] = [];
+  const queries: SummaryQuery[] = [];
   for (const node of canvasState.nodes) {
     if (node.nodeType !== "query") continue;
     if (!node.query) continue;
-    const result = node.result || {};
-    queries.push({
-      query: sanitizeForPrompt(node.query),
-      synthesis: sanitizeForPrompt((node.synthesis || result.synthesis || "").slice(0, 1500)),
-      keyInsights: Array.isArray(result.keyInsights)
-        ? result.keyInsights.slice(0, 5).map((i: string) => sanitizeForPrompt(i))
-        : [],
-      scenarios: Array.isArray(result.scenarios)
-        ? result.scenarios.slice(0, 3).map((s: any) => ({
-            name: sanitizeForPrompt(s.name || s.title || ""),
-            description: sanitizeForPrompt((s.description || "").slice(0, 200)),
-            probability: s.probability,
-          }))
-        : [],
-      interpretation: sanitizeForPrompt((result.interpretation || "").slice(0, 400)),
-      decisionFramework: sanitizeForPrompt((result.decisionFramework || "").slice(0, 400)),
-      timestamp: node.createdAt,
-    });
+    queries.push(
+      queryFromResult(
+        node.query,
+        node.result ?? null,
+        node.synthesis ?? "",
+        typeof node.createdAt === "number" ? node.createdAt : undefined,
+        "canvas",
+      ),
+    );
   }
   queries.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
   return queries;
+}
+
+/**
+ * Pull queries that were saved to this project through the "Add to
+ * Project" flow on the briefing page. These live in `project_queries`
+ * with a `result_json` column and are invisible to the canvas-only
+ * extractor above — yet they contain the same synthesis shape and
+ * absolutely belong in the Zusammenfassung. Without this the
+ * Zusammenfassung looked empty for users who worked primarily from
+ * the home-page briefing flow (reported as "funktioniert nicht
+ * ordentlich").
+ *
+ * We dedupe against canvas queries by normalized query text: if the
+ * same question appears on both sides, the canvas copy wins because
+ * it tends to carry richer session metadata.
+ */
+function extractQueriesFromProject(
+  db: DatabaseType,
+  radarId: string,
+  existing: SummaryQuery[],
+): SummaryQuery[] {
+  const seen = new Set(existing.map((q) => q.query.trim().toLowerCase()));
+  const rows = db
+    .prepare(
+      `SELECT query, result_json, created_at
+       FROM project_queries
+       WHERE radar_id = ?
+       ORDER BY created_at ASC`,
+    )
+    .all(radarId) as Array<{ query: string; result_json: string | null; created_at: string }>;
+
+  const out: SummaryQuery[] = [];
+  for (const row of rows) {
+    const key = (row.query ?? "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = row.result_json ? (JSON.parse(row.result_json) as Record<string, unknown>) : null;
+    } catch {
+      parsed = null;
+    }
+    // created_at is ISO-ish ("2026-04-16 07:44:53"), convert to epoch ms for sorting.
+    const ts = row.created_at ? Date.parse(row.created_at.replace(" ", "T")) : undefined;
+    out.push(
+      queryFromResult(row.query, parsed, (parsed?.synthesis as string) ?? "", Number.isFinite(ts) ? (ts as number) : undefined, "project"),
+    );
+  }
+  return out;
+}
+
+/**
+ * Canonical query list for a project: canvas nodes + project_queries,
+ * deduped and sorted chronologically so the LLM sees the real order.
+ */
+function collectProjectQueries(
+  db: DatabaseType,
+  radarId: string,
+  canvasState: unknown,
+): SummaryQuery[] {
+  const canvasQueries = extractQueriesFromCanvas(canvasState);
+  const projectQueries = extractQueriesFromProject(db, radarId, canvasQueries);
+  const merged = [...canvasQueries, ...projectQueries];
+  merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  return merged;
 }
 
 /**
@@ -108,13 +202,99 @@ function hashSession(queries: any[]): string {
 }
 
 /**
+ * Degraded single-query prompt — same JSON output schema so the client
+ * doesn't need a second renderer. Instead of "cross-query patterns" we
+ * ask for structural themes inside the single analysis; instead of
+ * "tensions between queries" we surface trade-offs named in the
+ * briefing; instead of "cross-query refs" we point at the single query
+ * (index 0). The schema contract is preserved.
+ */
+function buildSingleQueryReviewPrompt(
+  query: { query: string; synthesis: string; keyInsights: string[]; scenarios: Array<{ name: string; description: string; probability?: number }>; interpretation?: string; decisionFramework?: string },
+  locale: string,
+): { system: string; user: string } {
+  const de = locale === "de";
+  const system = de
+    ? `Du bist ein Senior-Stratege im SIS. Dieses Projekt enthaelt bisher GENAU EINE Analyse. Deine Aufgabe: keinen zweiten Briefing-Durchlauf schreiben — sondern die bestehende Analyse als strategischer Sparring-Partner auseinandernehmen.
+
+Liefere in EXAKT dem Schema unten:
+
+- sessionTitle: knappe Benennung der Frage (4-6 Woerter).
+- realQuestion: die eigentliche strategische Frage hinter der Formulierung (1 Satz, scharf).
+- redThread: 2-4 Saetze. Der implizite gedankliche Rahmen der Analyse.
+- crossQueryPatterns: 3-5 STRUKTURELLE Themen/Muster, die in der einen Analyse quer liegen. queryRefs ist immer [0].
+- tensions: 2-4 Trade-offs, Spannungen oder Widersprueche, die in der Analyse bereits angelegt sind. between ist immer [0].
+- metaDecisionFramework: 3-5 nicht-verhandelbare Handlungsmaximen aus der Analyse.
+- openFlanks: 2-4 konkrete Folgefragen, die der User jetzt stellen sollte.
+- confidence: 0..1, realistisch eingeschaetzt.
+- critique: 1-2 Saetze, ehrlich zur Tiefe und Belastbarkeit dieser einen Analyse.
+
+Antworte ausschliesslich als valides JSON — kein Markdown, kein Vorwort. Sprache: Deutsch.`
+    : `You are a Senior Strategist in SIS. This project contains EXACTLY ONE analysis so far. Your job: do not rewrite the briefing — take it apart as a strategic sparring partner.
+
+Deliver EXACTLY this schema:
+
+- sessionTitle: concise framing of the question (4-6 words).
+- realQuestion: the real strategic question behind the framing (1 sharp sentence).
+- redThread: 2-4 sentences. The implicit frame of the analysis.
+- crossQueryPatterns: 3-5 STRUCTURAL themes inside this single analysis. queryRefs is always [0].
+- tensions: 2-4 trade-offs / contradictions already present in the analysis. between is always [0].
+- metaDecisionFramework: 3-5 non-negotiable principles from the analysis.
+- openFlanks: 2-4 concrete follow-up questions the user should now ask.
+- confidence: realistic 0..1.
+- critique: 1-2 honest sentences on the depth / reliability of this single analysis.
+
+Respond only as valid JSON — no markdown, no preamble. Language: English.`;
+
+  const bodyParts: string[] = [`<query index="0">`, `  <question>${query.query}</question>`];
+  if (query.synthesis) bodyParts.push(`  <synthesis>${query.synthesis}</synthesis>`);
+  if (query.keyInsights.length > 0) {
+    bodyParts.push(`  <insights>`);
+    query.keyInsights.forEach((ins: string) => bodyParts.push(`    - ${ins}`));
+    bodyParts.push(`  </insights>`);
+  }
+  if (query.scenarios.length > 0) {
+    bodyParts.push(`  <scenarios>`);
+    query.scenarios.forEach((s) => bodyParts.push(`    - ${s.name}: ${s.description}${s.probability ? ` (${Math.round(s.probability * 100)}%)` : ""}`));
+    bodyParts.push(`  </scenarios>`);
+  }
+  if (query.interpretation) bodyParts.push(`  <interpretation>${query.interpretation}</interpretation>`);
+  if (query.decisionFramework) bodyParts.push(`  <decisionFramework>${query.decisionFramework}</decisionFramework>`);
+  bodyParts.push(`</query>`);
+
+  const user = de
+    ? `Hier ist die einzelne Analyse in diesem Projekt. Zieh sie auseinander: roter Faden, strukturelle Themen, Trade-offs, Prinzipien, offene Flanken.
+
+<sessions>
+${bodyParts.join("\n")}
+</sessions>`
+    : `Here is the single analysis in this project. Take it apart: red thread, structural themes, trade-offs, principles, open flanks.
+
+<sessions>
+${bodyParts.join("\n")}
+</sessions>`;
+
+  return { system, user };
+}
+
+/**
  * The meta-synthesis system prompt. This is where brilliance is earned or lost.
+ *
+ * With ≥2 queries we do the classic cross-query meta-synthesis (red
+ * thread + patterns + tensions + open flanks). With exactly 1 query
+ * there's no "cross-query" signal, so we degrade to a single-query
+ * deep-dive review that keeps the same output schema — the UI renders
+ * the same cards either way.
  */
 function buildMetaSynthesisPrompt(queries: Array<any>, locale: string): {
   system: string;
   user: string;
 } {
   const de = locale === "de";
+
+  if (queries.length === 1) {
+    return buildSingleQueryReviewPrompt(queries[0], locale);
+  }
 
   const system = de
     ? `Du bist ein Senior-Stratege im Strategic Intelligence System (SIS).
@@ -265,8 +445,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // DAT-13: Ensure DB handle is always closed
   const d = db();
   let row: { canvas_state: string | null } | undefined;
+  let queries: SummaryQuery[] = [];
   try {
     row = d.prepare("SELECT canvas_state FROM radars WHERE id = ?").get(id) as { canvas_state: string | null } | undefined;
+    if (row) {
+      let state: any = null;
+      try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
+      // Merge canvas + project_queries so briefings saved via "Add to
+      // Project" also count toward the Zusammenfassung.
+      queries = collectProjectQueries(d, id, state);
+    }
   } finally {
     d.close();
   }
@@ -274,7 +462,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   let state: any = null;
   try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
-  const queries = extractQueriesFromCanvas(state);
   const currentHash = hashSession(queries);
 
   const cached = state?.summary;
@@ -290,7 +477,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     summary: null,
     cached: false,
     queryCount: queries.length,
-    canGenerate: queries.length >= 2,
+    // A single query with rich analysis is still worth synthesizing —
+    // we re-frame the prompt for the 1-query case. Only count=0
+    // genuinely has nothing to work with.
+    canGenerate: queries.length >= 1,
   });
 }
 
@@ -318,12 +508,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let state: any = null;
   try { state = row.canvas_state ? JSON.parse(row.canvas_state) : null; } catch {}
-  const queries = extractQueriesFromCanvas(state);
+  // Merge canvas + project_queries so briefings saved outside the canvas
+  // also feed the Zusammenfassung.
+  const queries = collectProjectQueries(d, id, state);
 
-  if (queries.length < 2) {
+  if (queries.length < 1) {
     d.close();
     return NextResponse.json(
-      { error: locale === "de" ? "Mindestens 2 Analysen für eine Meta-Synthese erforderlich." : "At least 2 analyses required for meta-synthesis." },
+      { error: locale === "de" ? "Dieses Projekt enthält noch keine Analysen." : "This project contains no analyses yet." },
       { status: 400 }
     );
   }

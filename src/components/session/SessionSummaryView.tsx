@@ -386,11 +386,14 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         {/* ─── State: Init (no cached summary, waiting to generate) ─── */}
         {loadingState === "init" && (
           <div style={{ marginTop: 20 }}>
-            {queryCount < 2 ? (
-              <VoltInfoBlock variant="info" label={de ? "Noch zu wenig Daten" : "Not enough data"}>
+            {queryCount < 1 ? (
+              // Truly empty project — no canvas queries, nothing saved
+              // through "Add to Project" either. Point the user at the
+              // home-page briefing flow instead of showing a dead CTA.
+              <VoltInfoBlock variant="info" label={de ? "Noch keine Analysen" : "No analyses yet"}>
                 {de
-                  ? `Diese Session enthält ${queryCount} Analyse${queryCount === 1 ? "" : "n"}. Eine Meta-Synthese benötigt mindestens 2 Queries, um Muster und Widersprüche erkennen zu können.`
-                  : `This session contains ${queryCount} analys${queryCount === 1 ? "is" : "es"}. A meta-synthesis requires at least 2 queries to identify patterns and contradictions.`
+                  ? "In diesem Projekt gibt es noch keine Analysen. Starte eine Analyse auf der Startseite oder im Node-Canvas und speichere sie ins Projekt, damit die Zusammenfassung etwas zu synthetisieren hat."
+                  : "This project has no analyses yet. Run a briefing on the home page or in the Node Canvas and save it to this project so the summary has something to synthesize."
                 }
               </VoltInfoBlock>
             ) : (
@@ -410,16 +413,22 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                   color: "var(--foreground)",
                   margin: "0 0 8px",
                 }}>
-                  {de ? `Meta-Synthese für ${queryCount} Analysen` : `Meta-Synthesis for ${queryCount} Analyses`}
+                  {queryCount === 1
+                    ? (de ? "Review deiner Analyse" : "Review of your analysis")
+                    : (de ? `Meta-Synthese für ${queryCount} Analysen` : `Meta-Synthesis for ${queryCount} Analyses`)}
                 </h2>
                 <p style={{
                   fontSize: 14, lineHeight: 1.6, color: "var(--muted-foreground)",
                   maxWidth: 540, margin: "0 auto 20px",
                   fontFamily: "var(--font-ui)",
                 }}>
-                  {de
-                    ? "Das System liest alle Analysen, identifiziert Cross-Query-Muster, deckt Widersprüche auf und zeigt dir, welche Fragen du nicht gestellt hast, aber hättest stellen müssen. Das dauert etwa 30 Sekunden."
-                    : "The system reads all analyses, identifies cross-query patterns, uncovers contradictions, and shows you which questions you didn't ask but should have. Takes about 30 seconds."
+                  {queryCount === 1
+                    ? (de
+                        ? "Das System zieht deine Analyse als strategischer Sparring-Partner auseinander — struktureller roter Faden, Trade-offs, die nicht-verhandelbaren Prinzipien und die Fragen, die du als Nächstes stellen solltest. Etwa 20 Sekunden."
+                        : "The system takes your analysis apart as a strategic sparring partner — structural red thread, trade-offs, the non-negotiable principles, and the questions you should ask next. About 20 seconds.")
+                    : (de
+                        ? "Das System liest alle Analysen, identifiziert Cross-Query-Muster, deckt Widersprüche auf und zeigt dir, welche Fragen du nicht gestellt hast, aber hättest stellen müssen. Das dauert etwa 30 Sekunden."
+                        : "The system reads all analyses, identifies cross-query patterns, uncovers contradictions, and shows you which questions you didn't ask but should have. Takes about 30 seconds.")
                   }
                 </p>
                 <button
@@ -440,7 +449,9 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                   onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
                 >
                   <Sparkles size={14} />
-                  <span>{de ? "Meta-Synthese generieren" : "Generate Meta-Synthesis"}</span>
+                  <span>{queryCount === 1
+                    ? (de ? "Review generieren" : "Generate Review")
+                    : (de ? "Meta-Synthese generieren" : "Generate Meta-Synthesis")}</span>
                 </button>
               </div>
             )}
