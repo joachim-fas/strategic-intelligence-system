@@ -24,7 +24,7 @@
  *   }
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
 import { useTenant } from "@/lib/tenant-context";
@@ -285,17 +285,15 @@ export function TenantSettingsClient() {
             {/* ── Branding ─────────────────────────────────────────── */}
             <SectionCard title={de ? "Branding" : "Branding"} hint={
               de
-                ? "Logo fuer den Header (optional, URL). Upload-Flow folgt, bis dahin bitte eine gehostete URL angeben."
-                : "Header logo (optional, URL). Upload flow is pending — for now please provide a hosted URL."
+                ? "Header-Logo (PNG, JPEG, SVG oder WebP, max. 512 KB). Alternativ URL einer gehosteten Datei."
+                : "Header logo (PNG, JPEG, SVG or WebP, max 512 KB). Or link to a hosted URL."
             }>
-              <Field label={de ? "Logo-URL" : "Logo URL"}>
-                <input
-                  type="url" value={logoUrl} onChange={e => setLogoUrl(e.target.value)}
-                  disabled={!canEditSettings}
-                  placeholder="https://…/logo.svg"
-                  style={inputStyle(!canEditSettings)}
-                />
-              </Field>
+              <LogoUploadField
+                logoUrl={logoUrl}
+                onChange={setLogoUrl}
+                canEdit={canEditSettings}
+                locale={locale}
+              />
             </SectionCard>
 
             {/* ── Save-Zeile ───────────────────────────────────────── */}
@@ -386,4 +384,164 @@ function inputStyle(disabled: boolean): React.CSSProperties {
 
 function safeParse(s: string): TenantSettings {
   try { return JSON.parse(s) as TenantSettings; } catch { return {}; }
+}
+
+/**
+ * LogoUploadField — zwei Pfade in einem Control: direkter File-Upload
+ * (POST /api/v1/tenant/settings/logo) oder manueller URL-Eintrag fuer
+ * extern gehostete Logos. Preview direkt daneben (transparenter
+ * Checkered-Hintergrund, damit Weissabgleich von PNG/SVG sichtbar ist).
+ *
+ * Der Upload schreibt direkt in tenants.settings.logoUrl; das
+ * umschliessende Save-Formular uebernimmt den neuen Wert beim naechsten
+ * PATCH automatisch, weil es aus denselben State liest.
+ */
+function LogoUploadField({
+  logoUrl,
+  onChange,
+  canEdit,
+  locale,
+}: {
+  logoUrl: string;
+  onChange: (v: string) => void;
+  canEdit: boolean;
+  locale: "de" | "en";
+}) {
+  const de = locale === "de";
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/v1/tenant/settings/logo", {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+      }
+      const url = json?.data?.url as string | undefined;
+      if (url) onChange(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = async () => {
+    setUploading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/tenant/settings/logo", { method: "DELETE" });
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      onChange("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        {/* Preview */}
+        <div
+          style={{
+            flexShrink: 0,
+            width: 72, height: 72, borderRadius: 10,
+            border: "1px solid var(--color-border)",
+            background: logoUrl
+              ? `#fff url("${logoUrl}") center / contain no-repeat`
+              : "repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 50% / 12px 12px",
+            overflow: "hidden",
+          }}
+          aria-label={de ? "Logo-Vorschau" : "Logo preview"}
+        />
+        {/* Actions */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={!canEdit || uploading}
+              style={{
+                fontSize: 12, fontWeight: 600,
+                padding: "6px 12px", borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                background: canEdit && !uploading ? "var(--volt-surface, #fff)" : "var(--color-surface-2, #F5F5F5)",
+                color: "var(--color-text-primary)",
+                cursor: canEdit && !uploading ? "pointer" : "not-allowed",
+                fontFamily: "var(--volt-font-ui)",
+              }}
+            >
+              {uploading
+                ? (de ? "Lade hoch…" : "Uploading…")
+                : (logoUrl ? (de ? "Logo ersetzen" : "Replace logo") : (de ? "Logo hochladen" : "Upload logo"))}
+            </button>
+            {logoUrl && canEdit && (
+              <button
+                type="button"
+                onClick={remove}
+                disabled={uploading}
+                style={{
+                  fontSize: 12, fontWeight: 500,
+                  padding: "6px 12px", borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  background: "transparent",
+                  color: "var(--signal-negative-text, #C0341D)",
+                  cursor: uploading ? "wait" : "pointer",
+                  fontFamily: "var(--volt-font-ui)",
+                }}
+              >
+                {de ? "Entfernen" : "Remove"}
+              </button>
+            )}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+              e.target.value = "";
+            }}
+          />
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            {de ? "Maximal 512 KB. PNG / JPEG / SVG / WebP." : "Max 512 KB. PNG / JPEG / SVG / WebP."}
+          </div>
+        </div>
+      </div>
+      {/* URL fallback — fuer gehostete Logos ohne Upload */}
+      <Field label={de ? "Oder Logo-URL" : "Or logo URL"}>
+        <input
+          type="url"
+          value={logoUrl}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={!canEdit}
+          placeholder="https://…/logo.svg"
+          style={inputStyle(!canEdit)}
+        />
+      </Field>
+      {error && (
+        <div style={{
+          fontSize: 12, padding: "6px 10px", borderRadius: 6,
+          background: "var(--signal-negative-light)", color: "var(--signal-negative-text)",
+        }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
 }

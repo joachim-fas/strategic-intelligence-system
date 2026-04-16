@@ -269,6 +269,26 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                     {de ? "Archiviert" : "Archived"}
                   </span>
                 )}
+                {/* Data-Export: DSGVO-kompatibler JSON-Dump eines
+                     Mandanten, oft gebraucht vor Archive oder Delete.
+                     GET-Link triggert direkten Download (Content-
+                     Disposition: attachment). Server schreibt
+                     'tenant.exported' als Audit-Entry. */}
+                <a
+                  href={`/api/v1/admin/tenants/${tenantId}/export`}
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: 12, fontWeight: 600,
+                    padding: "4px 12px", borderRadius: 6,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--volt-surface-raised, #fff)",
+                    color: "var(--color-text-primary)",
+                    textDecoration: "none",
+                  }}
+                  title={de ? "Kompletter JSON-Export (DSGVO)" : "Full JSON export (GDPR)"}
+                >
+                  ↓ {de ? "Export (JSON)" : "Export (JSON)"}
+                </a>
               </div>
             </div>
 
