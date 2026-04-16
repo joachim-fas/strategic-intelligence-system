@@ -226,3 +226,65 @@ export function getDefaultTenantId(db: Database.Database): string {
   // Nothing there yet — run the full path so we also get a row.
   return ensureDefaultTenant(db).tenantId;
 }
+
+/**
+ * Stable id for the synthetic dev-mode user.
+ *
+ * Every API helper that bypasses auth in `NODE_ENV=development` hands
+ * routes a `user.id` of "dev-user". The routes then stamp that id into
+ * `radars.owner_id`, `tenant_audit_log.actor_user_id`, etc. — all of
+ * which have FOREIGN KEY references to `users.id`. If the row does not
+ * exist the very first canvas create returns `SQLITE_CONSTRAINT_FOREIGNKEY`
+ * and the Canvas page "doesn't open" (the init effect's POST fails
+ * silently and the user sees the blank empty state forever).
+ *
+ * `ensureDevUser` is idempotent: it upserts the row and makes sure the
+ * user is an `owner` of the default tenant. Safe to call on every
+ * request; the three statements run in µs against SQLite's page cache.
+ */
+export const DEV_USER_ID = "dev-user";
+export const DEV_USER_EMAIL = "dev@localhost";
+
+export function ensureDevUser(db: Database.Database): string {
+  // Materialise the row if missing. The `users` table shape varies by
+  // auth-adapter version; use a conservative superset of the known
+  // columns so this works against both the current NextAuth adapter
+  // (id, email, name, email_verified, image) and the older prototype
+  // schema (id, email, role, created_at).
+  const existing = db.prepare(`SELECT id FROM users WHERE id = ?`).get(DEV_USER_ID) as { id: string } | undefined;
+  if (!existing) {
+    try {
+      db.prepare(
+        `INSERT INTO users (id, email, name, role) VALUES (?, ?, 'Dev User', 'admin')`,
+      ).run(DEV_USER_ID, DEV_USER_EMAIL);
+    } catch {
+      // Fallback for schemas that don't have the `role`/`name` columns —
+      // just insert the mandatory fields.
+      try {
+        db.prepare(`INSERT INTO users (id, email) VALUES (?, ?)`).run(
+          DEV_USER_ID,
+          DEV_USER_EMAIL,
+        );
+      } catch {
+        // If both attempts fail, something structural is off with the
+        // users table. Swallow and let the downstream FK failure surface
+        // with context rather than masking it here.
+      }
+    }
+  }
+
+  // Owner membership in the default tenant. tenant_memberships has a
+  // UNIQUE(tenant_id, user_id) index, so this INSERT is a safe no-op on
+  // repeat runs — the catch handles the constraint violation silently.
+  const tenantId = getDefaultTenantId(db);
+  try {
+    db.prepare(
+      `INSERT INTO tenant_memberships (id, tenant_id, user_id, role)
+       VALUES (?, ?, ?, 'owner')`,
+    ).run(uuid(db), tenantId, DEV_USER_ID);
+  } catch {
+    /* already a member — ignore */
+  }
+
+  return DEV_USER_ID;
+}

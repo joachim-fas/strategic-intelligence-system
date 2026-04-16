@@ -74,6 +74,16 @@ export function apiError(message: string, status = 500, code?: string) {
 export async function requireAuth() {
   // DEV MODE: Skip auth — no email server for magic links in development
   if (process.env.NODE_ENV === "development") {
+    // Ensure the dev-user row exists so routes that INSERT with a FK to
+    // users.id (radars.owner_id, tenant_audit_log.actor_user_id, etc.)
+    // don't fail on first use in a fresh DB.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getSqliteHandle } = require("@/db");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { ensureDevUser } = require("@/db/sqlite-helpers");
+      ensureDevUser(getSqliteHandle());
+    } catch { /* DB not ready — caller will surface any real error */ }
     return {
       session: { user: { id: "dev-user", email: "dev@localhost", role: "admin" } },
       errorResponse: null,
@@ -152,18 +162,23 @@ export async function requireTenantContext(request?: Request): Promise<TenantCon
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getSqliteHandle } = require("@/db");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getDefaultTenantId } = require("@/db/sqlite-helpers");
+    const { getDefaultTenantId, ensureDevUser, DEV_USER_ID, DEV_USER_EMAIL } = require("@/db/sqlite-helpers");
     let tenantId: string;
+    let userId: string = DEV_USER_ID;
     try {
       const db = getSqliteHandle();
       tenantId = getDefaultTenantId(db);
+      // Materialise the dev-user row on first hit so INSERTs with
+      // owner_id / actor_user_id FKs to users.id don't fail. Cheap +
+      // idempotent.
+      userId = ensureDevUser(db);
     } catch {
       // Falls DB in manchen Pfaden (z.B. Edge) nicht verfuegbar ist —
       // Request bleibt ohne Tenant. Die Routes sollten das nicht treffen.
       tenantId = "default-dev-tenant";
     }
     return {
-      user: { id: "dev-user", email: "dev@localhost", role: "admin" },
+      user: { id: userId, email: DEV_USER_EMAIL, role: "admin" },
       tenantId,
       role: "owner",
       memberships: [{ id: tenantId, name: "Default Workspace", slug: "default", role: "owner" }],
@@ -259,6 +274,13 @@ export async function requireSystemAdmin(): Promise<{
 }> {
   // Dev-Mode-Bypass — gleiche Logik wie requireAuth, aber immer "admin".
   if (process.env.NODE_ENV === "development") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getSqliteHandle } = require("@/db");
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { ensureDevUser } = require("@/db/sqlite-helpers");
+      ensureDevUser(getSqliteHandle());
+    } catch { /* DB not ready */ }
     return {
       session: { user: { id: "dev-user", email: "dev@localhost", role: "admin" } },
       errorResponse: null,
