@@ -42,8 +42,8 @@ import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
-  TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, Zap,
-  ArrowDown, ArrowRight, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
+  TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, CircleDot, Plus, Zap,
+  ArrowDown, ArrowRight, ChevronDown, ChevronUp, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
 } from "lucide-react";
 // Sparkles laeuft ueber den Volt-Adapter. Die uebrigen Icons in dieser
 // Datei bleiben bis zum Icon-Set-Swap vorerst auf lucide — eine
@@ -5091,21 +5091,27 @@ export default function CanvasPage() {
   }, []);
 
   const createNewProject = useCallback(async () => {
-    const name = window.prompt(de ? "Projektname:" : "Project name:", de ? "Neues Projekt" : "New project");
-    if (!name?.trim()) return;
+    // Skip the native window.prompt (design-system mismatch + blocked in
+    // some contexts). Create with a timestamped placeholder name and
+    // auto-open the in-header rename input so the user can type the real
+    // name inline — consistent with the rest of the app's UX.
+    const now = new Date();
+    const stamp = now.toLocaleDateString(de ? "de-DE" : "en-US", { day: "2-digit", month: "2-digit" })
+      + " " + now.toLocaleTimeString(de ? "de-DE" : "en-US", { hour: "2-digit", minute: "2-digit" });
+    const placeholder = `${de ? "Neues Projekt" : "New project"} · ${stamp}`;
     setProjectOp("creating");
     try {
       const res = await fetchWithTimeout("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: placeholder }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const json = await res.json();
       const newCanvas = (json.data ?? json).canvas;
       if (!newCanvas?.id) throw new Error("API returned no canvas ID");
       setProjectId(newCanvas.id);
-      setProjectName(name.trim());
+      setProjectName(placeholder);
       setNodes([]); setConnections([]);
       setPanX(0); setPanY(0); setZoom(1);
       setSelectedId(null); setCmdVisible(false);
@@ -5115,7 +5121,10 @@ export default function CanvasPage() {
       if (tid0) tenantStorage.set(tid0, TENANT_STORAGE_KEYS.activeCanvas, newCanvas.id);
       try { window.history.replaceState(null, "", `/canvas?project=${newCanvas.id}`); } catch {}
       await loadProjects();
-      // Show template picker for the new project
+      // Focus the inline rename so the user can type the real name
+      // immediately — replaces the old window.prompt flow.
+      setEditingName(true);
+      // Template picker opens after the rename commits (or cancels).
       setShowTemplatePicker(true);
       setTemplateTopic("");
     } catch (e) {
@@ -6770,13 +6779,16 @@ export default function CanvasPage() {
             </span>
           )}
 
-          {/* Dropdown toggle */}
+          {/* Dropdown toggle — chevron from lucide instead of Unicode ▴/▾
+               so the button matches the rest of the app's icon set. */}
           <button
             onClick={() => setProjectDropdownOpen(o => !o)}
-            style={{ padding: "3px 7px", fontSize: 10, background: "transparent", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", color: "var(--color-text-muted)", transition: "all 0.12s", lineHeight: 1 }}
+            aria-label={de ? "Projektliste öffnen" : "Open project list"}
+            aria-expanded={projectDropdownOpen}
+            style={{ padding: "3px 5px", background: "transparent", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", color: "var(--color-text-muted)", transition: "all 0.12s", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
-          >{projectDropdownOpen ? "▴" : "▾"}</button>
+          >{projectDropdownOpen ? <ChevronUp size={13} strokeWidth={2} /> : <ChevronDown size={13} strokeWidth={2} />}</button>
 
           {/* Save status */}
           {projectId && saveStatus && (
@@ -6809,7 +6821,7 @@ export default function CanvasPage() {
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; }}
               >
-                <span style={{ fontSize: 14, fontWeight: 300, lineHeight: 1, color: "#1A9E5A" }}>+</span>
+                <Plus size={14} strokeWidth={2} style={{ color: "#1A9E5A", flexShrink: 0 }} />
                 {de ? "Neues Projekt erstellen" : "Create new project"}
               </button>
               {projects.length === 0 ? (
@@ -6830,9 +6842,18 @@ export default function CanvasPage() {
                     onMouseEnter={e => { if (p.id !== projectId) (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
                     onMouseLeave={e => { if (p.id !== projectId) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
-                    <span style={{ fontSize: 11, color: p.id === projectId ? "var(--color-brand)" : "var(--color-text-muted)", flexShrink: 0 }}>
-                      {p.id === projectId ? "◆" : p.hasState ? "◈" : "○"}
-                    </span>
+                    {/* Lucide icons replace the old Unicode glyphs (◆◈○)
+                         — matches the rest of the app's design language:
+                         active project = CheckCircle2 in brand lime,
+                         project with content = CircleDot,
+                         empty project = outlined Circle. */}
+                    {p.id === projectId ? (
+                      <CheckCircle2 size={13} strokeWidth={2.25} style={{ color: "#1A9E5A", flexShrink: 0 }} />
+                    ) : p.hasState ? (
+                      <CircleDot size={13} strokeWidth={2} style={{ color: "var(--color-text-secondary)", flexShrink: 0 }} />
+                    ) : (
+                      <Circle size={13} strokeWidth={1.75} style={{ color: "var(--color-text-muted)", flexShrink: 0, opacity: 0.6 }} />
+                    )}
                     <span style={{ flex: 1, fontSize: 13, fontWeight: p.id === projectId ? 600 : 400, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {p.name}
                     </span>
@@ -6842,10 +6863,11 @@ export default function CanvasPage() {
                     <button
                       onPointerDown={e => e.stopPropagation()}
                       onClick={e => { e.stopPropagation(); deleteProject(p.id); }}
-                      style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", fontSize: 11, borderRadius: 4, opacity: 0.6 }}
+                      aria-label={de ? "Projekt löschen" : "Delete project"}
+                      style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", borderRadius: 4, opacity: 0.6, display: "inline-flex", alignItems: "center" }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.opacity = "0.6"; }}
-                    >✕</button>
+                    ><X size={12} strokeWidth={2} /></button>
                   </div>
                 ))
               )}
