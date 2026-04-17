@@ -1803,7 +1803,7 @@ function TagInlineInput({ nodeId, de, onAddTag }: { nodeId: string; de: boolean;
 
 // ── CardActionsMenu (shared action dropdown for all node cards) ──────────
 
-function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag, onFollowUp, currentStatus }: {
+function CardActionsMenu({ nodeId, nodeType: _nodeType, de, onDelete, onSetStatus, onAddTag, onFollowUp, onCopy, currentStatus }: {
   nodeId: string;
   nodeType: string;
   de: boolean;
@@ -1811,6 +1811,9 @@ function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag
   onSetStatus: (id: string, status: NodeStatus) => void;
   onAddTag: (id: string, tag: string) => void;
   onFollowUp?: (id: string, prefill?: string) => void;
+  /** When provided, adds a "Copy" entry next to "Follow-up". Used on
+   *  query cards so the three-dot menu matches the DetailPanel footer. */
+  onCopy?: (id: string) => void;
   currentStatus?: NodeStatus;
 }) {
   const [tagInput, setTagInput] = useState("");
@@ -1839,6 +1842,12 @@ function CardActionsMenu({ nodeId, nodeType, de, onDelete, onSetStatus, onAddTag
           <VoltDropdownMenuItem onClick={() => onFollowUp(nodeId)}>
             <MessageSquarePlus size={14} />
             {de ? "Folgefrage stellen" : "Ask follow-up"}
+          </VoltDropdownMenuItem>
+        )}
+        {onCopy && (
+          <VoltDropdownMenuItem onClick={() => onCopy(nodeId)}>
+            <Copy size={14} />
+            {de ? "Synthese kopieren" : "Copy synthesis"}
           </VoltDropdownMenuItem>
         )}
         <VoltDropdownMenuSeparator />
@@ -2304,7 +2313,22 @@ function QueryNodeCard({
           )}
           {accentColorForStatus && <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
           {(cardZoom === undefined || cardZoom >= 0.6) && (
-            <CardActionsMenu nodeId={node.id} nodeType="query" de={de} onDelete={onDelete} onSetStatus={onSetStatus} onAddTag={onAddTag} onFollowUp={_onFollowUp} currentStatus={node.nodeStatus} />
+            <CardActionsMenu
+              nodeId={node.id}
+              nodeType="query"
+              de={de}
+              onDelete={onDelete}
+              onSetStatus={onSetStatus}
+              onAddTag={onAddTag}
+              onFollowUp={_onFollowUp}
+              // Parity with DetailPanel footer: query cards now expose
+              // a "Copy synthesis" shortcut straight from the card's
+              // three-dot menu, not only from inside the detail panel.
+              onCopy={node.synthesis ? () => {
+                void navigator.clipboard.writeText(node.synthesis ?? "");
+              } : undefined}
+              currentStatus={node.nodeStatus}
+            />
           )}
         </div>
         {/* Content */}
@@ -4141,30 +4165,13 @@ function DetailPanel({
             </CollapsibleSection>
           )}
 
-          {/* ── Tags (editable) ─────────────────────────────────── */}
-          <CollapsibleSection title={`Tags${qNode.tags?.length ? ` (${qNode.tags.length})` : ""}`} accent="#8B5CF6" defaultOpen={!!(qNode.tags && qNode.tags.length > 0)}>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-              {(qNode.tags ?? []).map((tag, i) => {
-                const hue = Array.from(tag).reduce((h, c) => h + c.charCodeAt(0), 0) % 360;
-                return (
-                  <span key={i} style={{
-                    fontSize: 11, padding: "2px 8px", borderRadius: 12,
-                    background: `hsl(${hue}, 55%, 94%)`, border: `1px solid hsl(${hue}, 45%, 82%)`,
-                    color: `hsl(${hue}, 55%, 38%)`, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4,
-                  }}>
-                    {tag}
-                    <button onClick={() => onUpdateTags(qNode.id, (qNode.tags ?? []).filter(t => t !== tag))} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 12, color: `hsl(${hue}, 55%, 50%)`, lineHeight: 1 }}>×</button>
-                  </span>
-                );
-              })}
-            </div>
-            <TagInlineInput nodeId={qNode.id} de={de} onAddTag={(id, tag) => {
-              const trimmed = tag.trim().toLowerCase();
-              if (!trimmed) return;
-              const existing = qNode.tags ?? [];
-              if (!existing.includes(trimmed)) onUpdateTags(id, [...existing, trimmed]);
-            }} />
-          </CollapsibleSection>
+          {/* Tags used to live here as a CollapsibleSection, but the
+               DetailPanel frame below (between body and footer) renders
+               an always-visible Tags pill row with quick-add input —
+               the two widgets duplicated each other and the user
+               reported it as visually redundant. Single source of
+               truth is now the inline bar; this block is intentionally
+               left as a comment so the history is clear. */}
 
           {/* ── System-Prompt (read-only) ─────────────────────────── */}
           <CollapsibleSection title={de ? "Analyse-Parameter" : "Analysis Parameters"} accent="#6B7280" defaultOpen={false}>
@@ -5275,7 +5282,17 @@ export default function CanvasPage() {
   // ihren zuletzt offenen Canvas behalten. `initRanRef` verhindert, dass
   // der Effect bei spaeteren Tenant-Wechseln erneut zuschlaegt — der
   // harte Reload in `switchTenant` nimmt sich dieser Faelle an.
+  //
+  // `initDone` als State (nicht nur Ref) triggert das Re-Render nachdem
+  // das Init abgeschlossen ist. Es fixt den "Willkommen im Canvas"-Flash,
+  // den User beim Seitenwechsel sahen: zwischen Mount und der Resolution
+  // von activeTenantId ist projectOp=null und nodes=[], also erfüllt das
+  // Empty-State-Rendering seine Bedingungen — obwohl wir gleich ein
+  // Projekt laden werden. Jetzt gate-en wir das Empty-State auf
+  // initDone && !projectOp, sodass vor dem ersten Init-Durchlauf gar
+  // nichts gerendert wird statt des irreführenden Willkommensbildschirms.
   const initRanRef = useRef(false);
+  const [initDone, setInitDone] = useState(false);
   useEffect(() => {
     if (initRanRef.current) return;
     if (!activeTenantId) return; // wait until tenant is known
@@ -5344,6 +5361,9 @@ export default function CanvasPage() {
         setZoom(1);
       }
     }
+    // Signal "we've evaluated the init pathway" — the welcome empty
+    // state is only allowed to render after this flips.
+    setInitDone(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenantId]);
 
@@ -8390,7 +8410,13 @@ export default function CanvasPage() {
                     {i < nodes.length - 1 && <div style={{ width: 1, flex: 1, minHeight: 20, background: "var(--color-border)", marginTop: 3 }} />}
                   </div>
                   <div
-                    onClick={() => { handleSelectNode(n.id); switchViewMode("canvas"); }}
+                    // Previously this forced the view to switch to canvas
+                    // before opening the detail. That yanked the user out
+                    // of the chronological reading mode for every click.
+                    // Now the click opens the DetailPanel in place (same
+                    // overlay behaviour as Board view) and Timeline stays
+                    // on screen behind it.
+                    onClick={() => handleSelectNode(n.id)}
                     style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", borderLeft: grpColor ? `3px solid ${grpColor}` : undefined, background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
@@ -8498,14 +8524,19 @@ export default function CanvasPage() {
                 queryLabels={queryLabels}
                 de={de}
                 onSelectQuery={(qId) => {
+                  // "Vertiefen" shortcut still has to switch to canvas
+                  // because it needs the floating command-line overlay
+                  // which only exists in canvas mode.
                   if (qId.startsWith("__orbit_deepen__")) {
                     const trendLabel = qId.replace("__orbit_deepen__", "");
                     setCmdVisible(true);
                     setCmdPrefill(`Vertiefen: ${trendLabel} — Wie beeinflusst dieser Trend andere strategische Bereiche?`);
                     switchViewMode("canvas");
                   } else {
+                    // Regular query click — open the DetailPanel in place
+                    // so the user can read the analysis without losing
+                    // the network view. Same UX as Board/Timeline clicks.
                     handleSelectNode(qId);
-                    switchViewMode("canvas");
                   }
                 }}
               />
@@ -8519,16 +8550,28 @@ export default function CanvasPage() {
               selectedNodeId={selectedId}
               de={de}
               onNavigateToNode={(nodeId) => {
+                // In-place DetailPanel — same rule as Board / Timeline /
+                // Orbit-Network. Keeps the derivation chain visible
+                // behind the overlay so the user can close the panel
+                // and continue navigating the spine.
                 handleSelectNode(nodeId);
-                switchViewMode("canvas");
               }}
             />
           </div>
         )}
 
         {/* ── Empty state ─────────────────────────────────────────── */}
-        {/* Embedded empty state — subtle hint */}
-        {viewMode === "canvas" && isEmpty && embedded && hydrated && (
+        {/* Both the embedded and standalone empty states are now gated
+             on `initDone && !projectOp && !projectId`. Without this
+             gate the "Willkommen im Canvas" screen flashed briefly on
+             every page navigation while the tenant context was still
+             resolving and loadProject hadn't fired yet — a real UX
+             glitch reported by the user. `initDone` turns true after
+             the init effect has evaluated, `projectOp` covers the
+             "loading project" state, and `projectId` means "we're in
+             a project, don't show welcome even if its state happens
+             to be empty right now". */}
+        {viewMode === "canvas" && isEmpty && embedded && hydrated && initDone && !projectOp && !projectId && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ textAlign: "center", color: "var(--color-text-muted)", opacity: 0.5 }}>
               <div style={{ marginBottom: 8 }}><LayoutGrid className="w-7 h-7 mx-auto" /></div>
@@ -8538,7 +8581,7 @@ export default function CanvasPage() {
           </div>
         )}
         {/* Standalone empty state */}
-        {viewMode === "canvas" && isEmpty && !cmdVisible && !embedded && hydrated && (
+        {viewMode === "canvas" && isEmpty && !cmdVisible && !embedded && hydrated && initDone && !projectOp && !projectId && (
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, background: "radial-gradient(ellipse at 30% 40%, rgba(228,255,151,0.14) 0%, transparent 55%), radial-gradient(ellipse at 70% 60%, rgba(10,10,10,0.03) 0%, transparent 50%)" }}>
             <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--color-text-muted)", marginBottom: 28, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>
               {projectId ? projectName : "Intelligence Canvas"}
