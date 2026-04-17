@@ -1,910 +1,572 @@
 "use client";
 
 /**
- * SessionSummaryView — The brilliant killer feature.
+ * SessionSummaryView — linear read of every briefing in a project.
  *
- * Renders a LLM-generated meta-synthesis of all queries in a session:
- * - Real question behind the questions
- * - Red thread (implicit system)
- * - Cross-query patterns
- * - Tensions & contradictions
- * - Meta decision framework
- * - Open flanks (what the user DIDN'T ask)
- * - Honest critique of session quality
+ * History: this view used to render an LLM-generated meta-synthesis
+ * (red thread, cross-query patterns, tensions). User feedback on
+ * 2026-04 was clear — they wanted the raw reading, not another layer
+ * of interpretation: "Eigentlich sollten nur alle Ergebnisse der
+ * jeweiligen Projekte/Analysen linear auf einer Seite lesbar sein."
  *
- * Uses Volt UI primitives throughout for consistency.
+ * Current behaviour: fetch every query attached to this project
+ * (canvas nodes + project_queries rows, deduped + chronologically
+ * ordered) and render each briefing as a clean stacked section —
+ * question, synthesis, key insights, scenarios, decision framework,
+ * follow-ups, references. Print-friendly for Cmd+P. Download as
+ * Markdown preserved from the previous version.
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale } from "@/lib/locale-context";
+import { VoltInfoBlock } from "@/components/verstehen/VoltPrimitives";
 import {
-  VoltSectionCard,
-  VoltIconBox,
-  VoltKpiCard,
-  VoltPageHeader,
-  VoltSectionLabel,
-  VoltInfoBlock,
-} from "@/components/verstehen/VoltPrimitives";
-import {
-  Sparkles,
-  Target,
-  GitBranch,
-  AlertTriangle,
-  Compass,
-  HelpCircle,
-  MessageSquare,
-  Gauge,
-  RefreshCw,
   ArrowLeft,
-  ArrowRight,
-  Layers,
   Download,
-  Zap,
+  Printer,
+  HelpCircle,
+  Target,
+  Compass,
+  Layers,
+  AlertTriangle,
+  BookOpen,
+  ExternalLink,
+  FileText,
+  CircleDot,
 } from "lucide-react";
 
-interface SummaryData {
-  sessionTitle: string;
-  realQuestion: string;
-  redThread: string;
-  crossQueryPatterns: Array<{ pattern: string; explanation: string; queryRefs: number[] }>;
-  tensions: Array<{ tension: string; between: number[]; implication: string }>;
-  metaDecisionFramework: Array<{ principle: string; rationale: string }>;
-  openFlanks: Array<{ question: string; why: string }>;
-  confidence: number;
-  critique: string;
+// ── Wire shape from GET /api/v1/canvas/[id]/summary ────────────────────────
+
+interface RegulatoryItem {
+  title?: string;
+  description?: string;
+  framework?: string;
 }
 
-interface QueryPreview {
-  index: number;
+interface Reference {
+  title?: string;
+  url?: string;
+  source?: string;
+}
+
+interface Scenario {
+  name: string;
+  description: string;
+  probability?: number;
+}
+
+interface Briefing {
   query: string;
+  synthesis: string;
+  keyInsights: string[];
+  scenarios: Scenario[];
+  interpretation?: string;
+  decisionFramework?: string;
+  regulatoryContext: Array<string | RegulatoryItem>;
+  references: Reference[];
+  followUpQuestions: string[];
+  confidence?: number;
+  createdAt?: string;
+  source?: "canvas" | "project";
 }
 
 interface SessionSummaryViewProps {
   projectId: string;
 }
 
+// ── Presentation ────────────────────────────────────────────────────────────
+
 export default function SessionSummaryView({ projectId }: SessionSummaryViewProps) {
   const { locale } = useLocale();
   const de = locale === "de";
 
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [queryCount, setQueryCount] = useState(0);
-  const [queries, setQueries] = useState<QueryPreview[]>([]);
+  const [briefings, setBriefings] = useState<Briefing[]>([]);
   const [projectName, setProjectName] = useState<string>("");
-  const [loadingState, setLoadingState] = useState<"init" | "loading" | "generating" | "ready" | "error">("init");
-  const [status, setStatus] = useState<string>("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [streamingText, setStreamingText] = useState<string>("");
 
-  // Load initial state: cached summary + canvas metadata
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoadingState("loading");
+      setLoading(true);
       try {
-        // Load canvas name
-        const canvasRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}`);
+        const [canvasRes, summaryRes] = await Promise.all([
+          fetchWithTimeout(`/api/v1/canvas/${projectId}`),
+          fetchWithTimeout(`/api/v1/canvas/${projectId}/summary`),
+        ]);
+        if (cancelled) return;
         if (canvasRes.ok) {
           const json = await canvasRes.json();
-          const canvasData = (json.data ?? json);
-          if (!cancelled) setProjectName(canvasData.canvas?.name || "");
-          // Extract queries from canvas state for reference display
-          try {
-            const state = canvasData.canvas?.canvas_state ? JSON.parse(canvasData.canvas.canvas_state) : null;
-            const qs: QueryPreview[] = [];
-            if (state?.nodes) {
-              const queryNodes = state.nodes
-                .filter((n: any) => n.nodeType === "query" && n.query)
-                .sort((a: any, b: any) => (a.createdAt || 0) - (b.createdAt || 0));
-              queryNodes.forEach((n: any, i: number) => qs.push({ index: i, query: n.query }));
-            }
-            if (!cancelled) setQueries(qs);
-          } catch {}
+          setProjectName((json.data ?? json).canvas?.name || "");
         }
-
-        // Load cached summary
-        const summaryRes = await fetchWithTimeout(`/api/v1/canvas/${projectId}/summary`);
         if (!summaryRes.ok) {
-          if (!cancelled) {
-            setError(de ? "Projekt nicht gefunden" : "Project not found");
-            setLoadingState("error");
-          }
+          setError(de ? "Projekt nicht gefunden." : "Project not found.");
+          setLoading(false);
           return;
         }
-        const json = await summaryRes.json();
-        if (cancelled) return;
-        setQueryCount(json.queryCount || 0);
-        if (json.summary) {
-          setSummary(json.summary);
-          setLoadingState("ready");
-        } else {
-          setLoadingState("init");
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setError(err.message || "Failed to load");
-          setLoadingState("error");
-        }
+        const sj = await summaryRes.json();
+        const bs = Array.isArray(sj.briefings) ? (sj.briefings as Briefing[]) : [];
+        setBriefings(bs);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [projectId, de]);
 
-  // Navigate to home and load this query as the active node.
-  // The home page reads ?node= and matches against localStorage history.
-  const navigateToQuery = useCallback((queryText: string) => {
-    const encoded = encodeURIComponent(queryText);
-    window.location.href = `/?node=${encoded}`;
-  }, []);
-
-  // Export the meta-synthesis as Markdown
   const exportMarkdown = useCallback(() => {
-    if (!summary) return;
     const lines: string[] = [];
-    lines.push(`# ${summary.sessionTitle || projectName || "Session"}`);
+    lines.push(`# ${projectName || (de ? "Projekt" : "Project")}`);
     lines.push("");
-    lines.push(`> Meta-Synthese · ${queryCount} ${de ? "Analysen" : "Analyses"} · ${Math.round((summary.confidence || 0.7) * 100)}% ${de ? "Konfidenz" : "Confidence"}`);
+    lines.push(`> ${briefings.length} ${de ? "Analysen" : "analyses"} · ${new Date().toLocaleString(de ? "de-DE" : "en-US")}`);
     lines.push("");
-    if (summary.realQuestion) {
-      lines.push(`## ${de ? "Die eigentliche Frage" : "The Real Question"}`);
+    briefings.forEach((b, i) => {
+      lines.push(`## ${String(i + 1).padStart(2, "0")}. ${b.query}`);
+      if (b.createdAt) {
+        lines.push(`_${new Date(b.createdAt).toLocaleString(de ? "de-DE" : "en-US")}_`);
+      }
       lines.push("");
-      lines.push(`**${summary.realQuestion}**`);
-      lines.push("");
-    }
-    if (summary.redThread) {
-      lines.push(`## ${de ? "Roter Faden" : "Red Thread"}`);
-      lines.push("");
-      lines.push(summary.redThread);
-      lines.push("");
-    }
-    if (summary.crossQueryPatterns?.length) {
-      lines.push(`## ${de ? "Cross-Query Muster" : "Cross-Query Patterns"}`);
-      lines.push("");
-      summary.crossQueryPatterns.forEach((p, i) => {
-        lines.push(`### ${String(i + 1).padStart(2, "0")}. ${p.pattern}`);
+      if (b.synthesis) {
+        lines.push(`### ${de ? "Synthese" : "Synthesis"}`);
         lines.push("");
-        lines.push(p.explanation);
-        if (p.queryRefs?.length) {
+        lines.push(b.synthesis);
+        lines.push("");
+      }
+      if (b.keyInsights.length > 0) {
+        lines.push(`### ${de ? "Erkenntnisse" : "Key Insights"}`);
+        lines.push("");
+        b.keyInsights.forEach((k) => lines.push(`- ${k}`));
+        lines.push("");
+      }
+      if (b.scenarios.length > 0) {
+        lines.push(`### ${de ? "Szenarien" : "Scenarios"}`);
+        lines.push("");
+        b.scenarios.forEach((s) => {
+          const pct = s.probability != null ? ` (${Math.round(s.probability * 100)}%)` : "";
+          lines.push(`**${s.name}${pct}** — ${s.description}`);
           lines.push("");
-          const refStr = p.queryRefs.map(r => {
-            const q = queries[r];
-            return q ? `Q${String(r + 1).padStart(2, "0")} (${q.query})` : `Q${String(r + 1).padStart(2, "0")}`;
-          }).join(", ");
-          lines.push(`*${de ? "Verweist auf" : "References"}: ${refStr}*`);
-        }
+        });
+      }
+      if (b.interpretation) {
+        lines.push(`### ${de ? "Interpretation" : "Interpretation"}`);
         lines.push("");
-      });
-    }
-    if (summary.tensions?.length) {
-      lines.push(`## ${de ? "Spannungen & Widersprüche" : "Tensions & Contradictions"}`);
+        lines.push(b.interpretation);
+        lines.push("");
+      }
+      if (b.decisionFramework) {
+        lines.push(`### ${de ? "Entscheidungsrahmen" : "Decision Framework"}`);
+        lines.push("");
+        lines.push(b.decisionFramework);
+        lines.push("");
+      }
+      if (b.regulatoryContext.length > 0) {
+        lines.push(`### ${de ? "Regulatorischer Kontext" : "Regulatory Context"}`);
+        lines.push("");
+        b.regulatoryContext.forEach((r) => {
+          if (typeof r === "string") lines.push(`- ${r}`);
+          else lines.push(`- **${r.title ?? r.framework ?? "—"}** — ${r.description ?? ""}`);
+        });
+        lines.push("");
+      }
+      if (b.followUpQuestions.length > 0) {
+        lines.push(`### ${de ? "Folgefragen" : "Follow-up Questions"}`);
+        lines.push("");
+        b.followUpQuestions.forEach((q) => lines.push(`- ${q}`));
+        lines.push("");
+      }
+      if (b.references.length > 0) {
+        lines.push(`### ${de ? "Quellen" : "References"}`);
+        lines.push("");
+        b.references.forEach((r) => {
+          if (r.url) lines.push(`- [${r.title ?? r.url}](${r.url})${r.source ? ` — _${r.source}_` : ""}`);
+          else if (r.title) lines.push(`- ${r.title}${r.source ? ` — _${r.source}_` : ""}`);
+        });
+        lines.push("");
+      }
+      lines.push("---");
       lines.push("");
-      summary.tensions.forEach((t) => {
-        lines.push(`### ⚡ ${t.tension}`);
-        lines.push("");
-        if (t.implication) lines.push(t.implication);
-        if (t.between?.length) {
-          lines.push("");
-          const refStr = t.between.map(r => `Q${String(r + 1).padStart(2, "0")}`).join(" ↔ ");
-          lines.push(`*${de ? "Zwischen" : "Between"}: ${refStr}*`);
-        }
-        lines.push("");
-      });
-    }
-    if (summary.metaDecisionFramework?.length) {
-      lines.push(`## ${de ? "Meta-Entscheidungsrahmen" : "Meta Decision Framework"}`);
-      lines.push("");
-      summary.metaDecisionFramework.forEach((d, i) => {
-        lines.push(`### ${String(i + 1).padStart(2, "0")}. ${d.principle}`);
-        lines.push("");
-        lines.push(d.rationale);
-        lines.push("");
-      });
-    }
-    if (summary.openFlanks?.length) {
-      lines.push(`## ${de ? "Offene Flanken" : "Open Flanks"}`);
-      lines.push("");
-      summary.openFlanks.forEach((f) => {
-        lines.push(`### → ${f.question}`);
-        lines.push("");
-        lines.push(f.why);
-        lines.push("");
-      });
-    }
-    if (summary.critique) {
-      lines.push(`## ${de ? "Ehrliche Einschätzung" : "Honest Assessment"}`);
-      lines.push("");
-      lines.push(`> ${summary.critique}`);
-      lines.push("");
-    }
-    lines.push("---");
-    lines.push("");
-    lines.push(`*${de ? "Generiert von" : "Generated by"} Strategic Intelligence System · ${new Date().toLocaleString(de ? "de-DE" : "en-US")}*`);
-
+    });
     const md = lines.join("\n");
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const safeName = (summary.sessionTitle || projectName || "session").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 60);
+    const safeName = (projectName || "project").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 60);
     a.href = url;
-    a.download = `${safeName}-meta-synthese.md`;
+    a.download = `${safeName}-zusammenfassung.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [summary, projectName, queryCount, queries, de]);
+  }, [briefings, projectName, de]);
 
-  const generate = useCallback(async () => {
-    setLoadingState("generating");
-    setStreamingText("");
-    setStatus("");
-    setError("");
-    try {
-      const res = await fetch(`/api/v1/canvas/${projectId}/summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale }),
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        setError(err);
-        setLoadingState("error");
-        return;
-      }
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let lineBuffer = "";
-      let streamedText = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        lineBuffer += decoder.decode(value, { stream: true });
-        const lines = lineBuffer.split("\n\n");
-        lineBuffer = lines.pop() ?? "";
-        for (const chunk of lines) {
-          const line = chunk.trim();
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6).trim());
-            if (event.type === "delta") {
-              streamedText += event.text;
-              setStreamingText(streamedText);
-            } else if (event.type === "status") {
-              setStatus(event.message);
-            } else if (event.type === "complete") {
-              setSummary(event.result);
-              setQueryCount(event.queryCount || queryCount);
-              setLoadingState("ready");
-            } else if (event.type === "error") {
-              setError(event.error);
-              setLoadingState("error");
-            }
-          } catch {}
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || "Generation failed");
-      setLoadingState("error");
-    }
-  }, [projectId, locale, queryCount]);
+  const headerActions = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {briefings.length > 0 && (
+        <>
+          <button
+            onClick={() => window.print()}
+            title={de ? "Drucken (Cmd+P)" : "Print (Cmd+P)"}
+            style={headerBtnStyle}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.5)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            <Printer size={13} strokeWidth={2} />
+            <span>{de ? "Drucken" : "Print"}</span>
+          </button>
+          <button
+            onClick={exportMarkdown}
+            title={de ? "Als Markdown exportieren" : "Export as Markdown"}
+            style={headerBtnStyle}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.5)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
+            <Download size={13} strokeWidth={2} />
+            <span>.md</span>
+          </button>
+        </>
+      )}
+      <Link
+        href={`/canvas?project=${projectId}`}
+        style={{ ...headerBtnStyle, textDecoration: "none" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.5)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+      >
+        <ArrowLeft size={13} strokeWidth={2} />
+        <span>Canvas</span>
+      </Link>
+    </div>
+  );
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--background)" }}>
       <AppHeader />
 
-      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", padding: "32px 24px 60px" }}>
-        {/* Page Header */}
-        <VoltPageHeader
-          icon={<Sparkles size={22} />}
-          title={summary?.sessionTitle || projectName || (de ? "Zusammenfassung" : "Summary")}
-          subtitle={de
-            ? `Meta-Synthese aller Analysen in dieser Session — identifiziert den roten Faden, Muster, Widersprüche und offene Flanken.`
-            : `Meta-synthesis of all analyses in this session — identifies the red thread, patterns, contradictions and open flanks.`
-          }
-          actions={
-            <>
-              {summary && (
-                <button
-                  onClick={exportMarkdown}
-                  title={de ? "Als Markdown exportieren" : "Export as Markdown"}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "9px 14px", borderRadius: 10,
-                    border: "1px solid var(--color-border)", background: "transparent",
-                    fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
-                    cursor: "pointer", fontFamily: "var(--font-ui)",
-                    transition: "all 0.12s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--foreground)"; e.currentTarget.style.color = "var(--foreground)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--muted-foreground)"; }}
-                >
-                  <Download size={14} />
-                  <span>{de ? "Export .md" : "Export .md"}</span>
-                </button>
-              )}
-              <button
-                onClick={() => { window.location.href = `/canvas`; }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "9px 14px", borderRadius: 10,
-                  border: "1px solid var(--color-border)", background: "transparent",
-                  fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
-                  cursor: "pointer", fontFamily: "var(--font-ui)",
-                  transition: "all 0.12s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--foreground)"; e.currentTarget.style.color = "var(--foreground)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--muted-foreground)"; }}
-              >
-                <Layers size={14} />
-                <span>Node Canvas</span>
-              </button>
-              <button
-                onClick={() => { window.location.href = "/"; }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "9px 14px", borderRadius: 10,
-                  border: "1px solid var(--color-border)", background: "transparent",
-                  fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)",
-                  cursor: "pointer", fontFamily: "var(--font-ui)",
-                }}
-              >
-                <ArrowLeft size={14} />
-                <span>{de ? "Zurück" : "Back"}</span>
-              </button>
-            </>
-          }
-        />
+      {/* Print-only overrides: hide the chrome so Cmd+P produces a clean doc. */}
+      <style>{`
+        @media print {
+          header, .sis-nav, .no-print { display: none !important; }
+          body { background: white !important; background-image: none !important; }
+          @page { margin: 2cm; }
+          .sis-briefing-section { break-inside: avoid; }
+        }
+      `}</style>
 
-        {/* ─── State: Loading initial data ─── */}
-        {loadingState === "loading" && (
-          <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--muted-foreground)", fontSize: 13 }}>
-            <div className="animate-pulse">{de ? "Session wird geladen…" : "Loading session…"}</div>
-          </div>
-        )}
-
-        {/* ─── State: Error ─── */}
-        {loadingState === "error" && (
-          <VoltInfoBlock variant="error" label={de ? "Fehler" : "Error"}>
-            {error || (de ? "Ein unbekannter Fehler ist aufgetreten." : "An unknown error occurred.")}
-            <div style={{ marginTop: 12 }}>
-              <button
-                onClick={generate}
-                style={{
-                  padding: "8px 14px", borderRadius: 8,
-                  border: "1px solid var(--destructive)", background: "transparent",
-                  color: "var(--destructive)", fontSize: 12, fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {de ? "Erneut versuchen" : "Try again"}
-              </button>
+      <main style={{ maxWidth: 860, margin: "0 auto", width: "100%", padding: "32px 24px 96px" }}>
+        {/* ─── Hero ─── */}
+        <div style={{ marginBottom: 28 }} className="no-print-actions">
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+                color: "var(--color-text-muted, #6B6B6B)",
+                fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                marginBottom: 8,
+              }}>
+                <FileText size={11} strokeWidth={2} />
+                {de ? "Zusammenfassung" : "Summary"}
+              </div>
+              <h1 style={{
+                margin: 0,
+                fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+                fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em",
+                color: "var(--color-text-heading, #0A0A0A)",
+                lineHeight: 1.15,
+              }}>
+                {projectName || (de ? "Projekt" : "Project")}
+              </h1>
+              <p style={{
+                margin: "6px 0 0", fontSize: 13,
+                color: "var(--color-text-muted)",
+                fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+              }}>
+                {loading
+                  ? (de ? "Lade Analysen …" : "Loading analyses…")
+                  : briefings.length === 0
+                    ? (de ? "Keine Analysen in diesem Projekt." : "No analyses in this project yet.")
+                    : (de
+                        ? `${briefings.length} ${briefings.length === 1 ? "Analyse" : "Analysen"} · chronologisch`
+                        : `${briefings.length} ${briefings.length === 1 ? "analysis" : "analyses"} · chronological`)}
+              </p>
             </div>
+            {headerActions}
+          </div>
+        </div>
+
+        {/* ─── Error state ─── */}
+        {error && !loading && (
+          <VoltInfoBlock variant="error" label={de ? "Fehler" : "Error"}>
+            {error}
           </VoltInfoBlock>
         )}
 
-        {/* ─── State: Init (no cached summary, waiting to generate) ─── */}
-        {loadingState === "init" && (
-          <div style={{ marginTop: 20 }}>
-            {queryCount < 1 ? (
-              // Truly empty project — no canvas queries, nothing saved
-              // through "Add to Project" either. Point the user at the
-              // home-page briefing flow instead of showing a dead CTA.
-              <VoltInfoBlock variant="info" label={de ? "Noch keine Analysen" : "No analyses yet"}>
-                {de
-                  ? "In diesem Projekt gibt es noch keine Analysen. Starte eine Analyse auf der Startseite oder im Node-Canvas und speichere sie ins Projekt, damit die Zusammenfassung etwas zu synthetisieren hat."
-                  : "This project has no analyses yet. Run a briefing on the home page or in the Node Canvas and save it to this project so the summary has something to synthesize."
-                }
-              </VoltInfoBlock>
-            ) : (
-              <div style={{
-                padding: "40px 32px",
-                borderRadius: 16,
-                border: "1px solid var(--color-border)",
-                background: "color-mix(in srgb, var(--volt-lime, #E4FF97) 12%, transparent)",
-                textAlign: "center",
-              }}>
-                <div style={{ display: "inline-flex", marginBottom: 16 }}>
-                  <VoltIconBox icon={<Sparkles size={22} />} variant="lime" size={52} rounded="full" />
-                </div>
-                <h2 style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em",
-                  color: "var(--foreground)",
-                  margin: "0 0 8px",
-                }}>
-                  {queryCount === 1
-                    ? (de ? "Review deiner Analyse" : "Review of your analysis")
-                    : (de ? `Meta-Synthese für ${queryCount} Analysen` : `Meta-Synthesis for ${queryCount} Analyses`)}
-                </h2>
-                <p style={{
-                  fontSize: 14, lineHeight: 1.6, color: "var(--muted-foreground)",
-                  maxWidth: 540, margin: "0 auto 20px",
-                  fontFamily: "var(--font-ui)",
-                }}>
-                  {queryCount === 1
-                    ? (de
-                        ? "Das System zieht deine Analyse als strategischer Sparring-Partner auseinander — struktureller roter Faden, Trade-offs, die nicht-verhandelbaren Prinzipien und die Fragen, die du als Nächstes stellen solltest. Etwa 20 Sekunden."
-                        : "The system takes your analysis apart as a strategic sparring partner — structural red thread, trade-offs, the non-negotiable principles, and the questions you should ask next. About 20 seconds.")
-                    : (de
-                        ? "Das System liest alle Analysen, identifiziert Cross-Query-Muster, deckt Widersprüche auf und zeigt dir, welche Fragen du nicht gestellt hast, aber hättest stellen müssen. Das dauert etwa 30 Sekunden."
-                        : "The system reads all analyses, identifies cross-query patterns, uncovers contradictions, and shows you which questions you didn't ask but should have. Takes about 30 seconds.")
-                  }
-                </p>
-                <button
-                  onClick={generate}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 8,
-                    padding: "12px 24px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "var(--foreground, #0A0A0A)",
-                    color: "var(--background, #fff)",
-                    fontFamily: "var(--font-ui)",
-                    fontSize: 13, fontWeight: 700,
-                    cursor: "pointer",
-                    transition: "all 0.12s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.02)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-                >
-                  <Sparkles size={14} />
-                  <span>{queryCount === 1
-                    ? (de ? "Review generieren" : "Generate Review")
-                    : (de ? "Meta-Synthese generieren" : "Generate Meta-Synthesis")}</span>
-                </button>
-              </div>
-            )}
-          </div>
+        {/* ─── Empty state ─── */}
+        {!loading && !error && briefings.length === 0 && (
+          <VoltInfoBlock variant="info" label={de ? "Noch keine Analysen" : "No analyses yet"}>
+            {de
+              ? "In diesem Projekt ist noch keine Analyse gespeichert. Starte eine Abfrage auf der Startseite oder im Node-Canvas — sobald ein Briefing erstellt wird, erscheint es hier."
+              : "No analyses saved to this project yet. Run a query on the home page or in the node canvas — as soon as a briefing lands, it shows up here."}
+          </VoltInfoBlock>
         )}
 
-        {/* ─── State: Generating (streaming) ─── */}
-        {loadingState === "generating" && (
-          <div style={{ marginTop: 20 }}>
-            <div style={{
-              padding: "32px",
-              borderRadius: 16,
-              border: "1px solid var(--color-border)",
-              background: "var(--card)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                <VoltIconBox icon={<Sparkles size={18} className="animate-pulse" />} variant="lime" size={40} rounded="full" />
-                <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>
-                    {de ? "Analysiere Muster zwischen Queries…" : "Analyzing patterns between queries…"}
-                  </div>
-                  {status && (
-                    <div style={{
-                      fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
-                      letterSpacing: "0.06em", textTransform: "uppercase" as const,
-                      color: "var(--muted-foreground)", marginTop: 4,
-                      display: "inline-flex", alignItems: "center", gap: 6,
-                    }}>
-                      <Zap size={11} strokeWidth={2.25} />
-                      {status}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {streamingText && (
-                <div style={{
-                  fontSize: 11, lineHeight: 1.7,
-                  color: "var(--muted-foreground)",
-                  fontFamily: "var(--font-mono)",
-                  maxHeight: 240, overflow: "auto",
-                  whiteSpace: "pre-wrap",
-                  padding: "12px 14px",
-                  background: "var(--muted, #F7F7F7)",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                }}>
-                  <span
-                    className="animate-pulse"
-                    style={{
-                      display: "inline-block",
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: "#1A9E5A",
-                      marginRight: 8,
-                      verticalAlign: "middle",
-                    }}
-                  />
-                  {streamingText.slice(-500)}
-                </div>
-              )}
-            </div>
+        {/* ─── Linear briefing stack ─── */}
+        {!loading && briefings.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+            {briefings.map((b, i) => (
+              <BriefingSection key={i} briefing={b} index={i} de={de} />
+            ))}
           </div>
         )}
-
-        {/* ─── State: Ready (summary loaded) ─── */}
-        {loadingState === "ready" && summary && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 20 }}>
-
-            {/* KPI Hero Row */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 10,
-            }}>
-              <VoltKpiCard
-                variant="lime"
-                label={de ? "Konfidenz" : "Confidence"}
-                value={`${Math.round((summary.confidence || 0.7) * 100)}%`}
-                subLabel={de ? "Meta-Synthese-Qualität" : "Meta-synthesis quality"}
-                icon={<Gauge size={16} />}
-              />
-              <VoltKpiCard
-                variant="light"
-                label={de ? "Analysen" : "Analyses"}
-                value={queryCount}
-                subLabel={de ? "Queries synthetisiert" : "Queries synthesized"}
-                icon={<MessageSquare size={16} />}
-              />
-              <VoltKpiCard
-                variant="light"
-                label={de ? "Muster" : "Patterns"}
-                value={summary.crossQueryPatterns?.length || 0}
-                subLabel={de ? "Cross-Query Beobachtungen" : "Cross-query observations"}
-                icon={<GitBranch size={16} />}
-              />
-              <VoltKpiCard
-                variant="dark"
-                label={de ? "Offene Flanken" : "Open Flanks"}
-                value={summary.openFlanks?.length || 0}
-                subLabel={de ? "Fehlende kritische Fragen" : "Missing critical questions"}
-                icon={<HelpCircle size={16} />}
-              />
-            </div>
-
-            {/* Real Question — the sharpest cut */}
-            {summary.realQuestion && (
-              <div style={{
-                padding: "28px 32px",
-                borderRadius: 16,
-                background: "color-mix(in srgb, var(--volt-lime, #E4FF97) 20%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--volt-lime, #E4FF97) 60%, transparent)",
-              }}>
-                <div style={{
-                  fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase" as const,
-                  color: "#2A3A00", marginBottom: 10,
-                }}>
-                  {de ? "Die eigentliche Frage" : "The real question"}
-                </div>
-                <p style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 22, fontWeight: 700,
-                  letterSpacing: "-0.02em", lineHeight: 1.3,
-                  color: "var(--foreground)",
-                  margin: 0,
-                }}>
-                  {summary.realQuestion}
-                </p>
-              </div>
-            )}
-
-            {/* Red Thread */}
-            {summary.redThread && (
-              <VoltSectionCard
-                icon={<Target size={18} />}
-                iconVariant="lime"
-                title={de ? "Roter Faden" : "Red Thread"}
-                subtitle={de ? "Was die Queries zusammen erzählen" : "What the queries tell together"}
-              >
-                <p style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: 15, lineHeight: 1.7,
-                  color: "var(--foreground)",
-                  margin: 0,
-                }}>
-                  {summary.redThread}
-                </p>
-              </VoltSectionCard>
-            )}
-
-            {/* Cross-Query Patterns */}
-            {summary.crossQueryPatterns && summary.crossQueryPatterns.length > 0 && (
-              <VoltSectionCard
-                icon={<GitBranch size={18} />}
-                iconVariant="blue"
-                title={de ? "Cross-Query Muster" : "Cross-Query Patterns"}
-                subtitle={de
-                  ? `${summary.crossQueryPatterns.length} strukturelle Beobachtungen über mehrere Queries`
-                  : `${summary.crossQueryPatterns.length} structural observations across multiple queries`
-                }
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {summary.crossQueryPatterns.map((p, i) => (
-                    <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <VoltIconBox
-                        icon={<span style={{ fontSize: 11, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{String(i + 1).padStart(2, "0")}</span>}
-                        variant="blue"
-                        size={30}
-                        rounded="full"
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontFamily: "var(--font-display)",
-                          fontSize: 15, fontWeight: 700,
-                          color: "var(--foreground)",
-                          marginBottom: 4,
-                          letterSpacing: "-0.01em",
-                        }}>
-                          {p.pattern}
-                        </div>
-                        <p style={{
-                          fontSize: 13, lineHeight: 1.6,
-                          color: "var(--muted-foreground)",
-                          margin: "0 0 8px",
-                          fontFamily: "var(--font-ui)",
-                        }}>
-                          {p.explanation}
-                        </p>
-                        {p.queryRefs && p.queryRefs.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {p.queryRefs.map(ref => {
-                              const q = queries[ref];
-                              if (!q) return null;
-                              return (
-                                <button
-                                  key={ref}
-                                  onClick={() => navigateToQuery(q.query)}
-                                  title={de ? `Zur Analyse springen: ${q.query}` : `Jump to analysis: ${q.query}`}
-                                  style={{
-                                    display: "inline-flex", alignItems: "center", gap: 4,
-                                    padding: "3px 8px", borderRadius: 9999,
-                                    background: "var(--muted, #F7F7F7)",
-                                    border: "1px solid var(--color-border)",
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: 9, fontWeight: 600,
-                                    color: "var(--muted-foreground)",
-                                    maxWidth: 200,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                    cursor: "pointer",
-                                    transition: "all 0.12s",
-                                  }}
-                                  onMouseEnter={e => {
-                                    e.currentTarget.style.borderColor = "var(--foreground)";
-                                    e.currentTarget.style.color = "var(--foreground)";
-                                    e.currentTarget.style.background = "var(--card, #fff)";
-                                  }}
-                                  onMouseLeave={e => {
-                                    e.currentTarget.style.borderColor = "var(--color-border)";
-                                    e.currentTarget.style.color = "var(--muted-foreground)";
-                                    e.currentTarget.style.background = "var(--muted, #F7F7F7)";
-                                  }}
-                                >
-                                  <span style={{ opacity: 0.6 }}>Q{String(ref + 1).padStart(2, "0")}</span>
-                                  <span>{q.query.length > 20 ? q.query.slice(0, 18) + "…" : q.query}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </VoltSectionCard>
-            )}
-
-            {/* Tensions */}
-            {summary.tensions && summary.tensions.length > 0 && (
-              <VoltSectionCard
-                icon={<AlertTriangle size={18} />}
-                iconVariant="rose"
-                title={de ? "Spannungen & Widersprüche" : "Tensions & Contradictions"}
-                subtitle={de
-                  ? `${summary.tensions.length} Trade-offs aufgedeckt`
-                  : `${summary.tensions.length} trade-offs uncovered`
-                }
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {summary.tensions.map((t, i) => (
-                    <div key={i} style={{
-                      padding: "14px 16px",
-                      borderRadius: 10,
-                      background: "var(--pastel-rose, #FFD6E0)",
-                      border: "1px solid #F4A090",
-                    }}>
-                      <div style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: 14, fontWeight: 700,
-                        color: "#A0244A",
-                        marginBottom: 6,
-                        letterSpacing: "-0.01em",
-                        display: "inline-flex", alignItems: "center", gap: 8,
-                      }}>
-                        <Zap size={14} strokeWidth={2.25} />
-                        {t.tension}
-                      </div>
-                      {t.implication && (
-                        <p style={{
-                          fontSize: 12, lineHeight: 1.6,
-                          color: "#7A1A3A",
-                          margin: "0 0 8px",
-                          fontFamily: "var(--font-ui)",
-                        }}>
-                          {t.implication}
-                        </p>
-                      )}
-                      {t.between && t.between.length > 0 && (
-                        <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-                          <span style={{
-                            fontFamily: "var(--font-mono)", fontSize: 9,
-                            color: "#A0244A", opacity: 0.7, fontWeight: 700,
-                            letterSpacing: "0.06em", textTransform: "uppercase" as const,
-                          }}>
-                            {de ? "Zwischen" : "Between"}
-                          </span>
-                          {t.between.map(ref => {
-                            const q = queries[ref];
-                            return (
-                              <button
-                                key={ref}
-                                onClick={() => q && navigateToQuery(q.query)}
-                                disabled={!q}
-                                title={q ? (de ? `Zur Analyse springen: ${q.query}` : `Jump to analysis: ${q.query}`) : ""}
-                                style={{
-                                  padding: "2px 7px", borderRadius: 9999,
-                                  background: "rgba(160,36,74,0.12)",
-                                  border: "1px solid rgba(160,36,74,0.2)",
-                                  fontFamily: "var(--font-mono)",
-                                  fontSize: 9, fontWeight: 700,
-                                  color: "#A0244A",
-                                  cursor: q ? "pointer" : "default",
-                                  transition: "all 0.12s",
-                                }}
-                                onMouseEnter={e => {
-                                  if (q) e.currentTarget.style.background = "rgba(160,36,74,0.22)";
-                                }}
-                                onMouseLeave={e => {
-                                  if (q) e.currentTarget.style.background = "rgba(160,36,74,0.12)";
-                                }}
-                              >
-                                Q{String(ref + 1).padStart(2, "0")}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </VoltSectionCard>
-            )}
-
-            {/* Meta Decision Framework */}
-            {summary.metaDecisionFramework && summary.metaDecisionFramework.length > 0 && (
-              <VoltSectionCard
-                icon={<Compass size={18} />}
-                iconVariant="mint"
-                title={de ? "Meta-Entscheidungsrahmen" : "Meta Decision Framework"}
-                subtitle={de
-                  ? "Nicht-verhandelbare Handlungsmaximen, die aus dem Muster folgen"
-                  : "Non-negotiable action principles emerging from the pattern"
-                }
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {summary.metaDecisionFramework.map((d, i) => (
-                    <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                      <VoltIconBox
-                        icon={<span style={{ fontSize: 11, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{String(i + 1).padStart(2, "0")}</span>}
-                        variant="mint"
-                        size={30}
-                        rounded="full"
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          fontFamily: "var(--font-display)",
-                          fontSize: 15, fontWeight: 700,
-                          color: "var(--foreground)",
-                          marginBottom: 4,
-                          letterSpacing: "-0.01em",
-                        }}>
-                          {d.principle}
-                        </div>
-                        <p style={{
-                          fontSize: 13, lineHeight: 1.6,
-                          color: "var(--muted-foreground)",
-                          margin: 0,
-                          fontFamily: "var(--font-ui)",
-                        }}>
-                          {d.rationale}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </VoltSectionCard>
-            )}
-
-            {/* Open Flanks — the sharpest cut */}
-            {summary.openFlanks && summary.openFlanks.length > 0 && (
-              <VoltSectionCard
-                icon={<HelpCircle size={18} />}
-                iconVariant="butter"
-                title={de ? "Offene Flanken" : "Open Flanks"}
-                subtitle={de
-                  ? "Fragen, die du nicht gestellt hast, aber hättest stellen müssen"
-                  : "Questions you didn't ask but should have"
-                }
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {summary.openFlanks.map((f, i) => (
-                    <div key={i} style={{
-                      padding: "14px 16px",
-                      borderRadius: 10,
-                      background: "var(--pastel-butter, #FFF5BA)",
-                      border: "1px solid #E8D870",
-                      cursor: "pointer",
-                      transition: "all 0.12s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "translateX(2px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = "translateX(0)"; }}
-                    >
-                      <div style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: 14, fontWeight: 700,
-                        color: "#4A3800",
-                        marginBottom: 6,
-                        letterSpacing: "-0.01em",
-                        display: "inline-flex", alignItems: "center", gap: 8,
-                      }}>
-                        <ArrowRight size={14} strokeWidth={2.25} />
-                        {f.question}
-                      </div>
-                      <p style={{
-                        fontSize: 12, lineHeight: 1.6,
-                        color: "#7A5C00",
-                        margin: 0,
-                        fontFamily: "var(--font-ui)",
-                      }}>
-                        {f.why}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </VoltSectionCard>
-            )}
-
-            {/* Critique — the honest assessment */}
-            {summary.critique && (
-              <VoltInfoBlock
-                variant="info"
-                label={de ? "Ehrliche Einschätzung" : "Honest Assessment"}
-              >
-                {summary.critique}
-              </VoltInfoBlock>
-            )}
-
-            {/* Regenerate button */}
-            <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 24px" }}>
-              <button
-                onClick={generate}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--muted-foreground)",
-                  fontFamily: "var(--font-ui)",
-                  fontSize: 12, fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.12s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--foreground)"; e.currentTarget.style.color = "var(--foreground)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--muted-foreground)"; }}
-              >
-                <RefreshCw size={12} />
-                <span>{de ? "Meta-Synthese neu generieren" : "Regenerate meta-synthesis"}</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }
+
+// ── Briefing section ───────────────────────────────────────────────────────
+
+function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: number; de: boolean }) {
+  const b = briefing;
+  const confPct = b.confidence != null ? Math.round(b.confidence * 100) : null;
+
+  return (
+    <section
+      className="sis-briefing-section"
+      style={{
+        border: "1px solid var(--color-border, #E8E8E8)",
+        borderRadius: 12,
+        padding: "24px 28px",
+        background: "var(--volt-surface-raised, #FFFFFF)",
+      }}
+    >
+      {/* Question + meta */}
+      <header style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: 16, marginBottom: 20 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, marginBottom: 8,
+          fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+          color: "var(--color-text-muted)",
+          fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+        }}>
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span>{de ? "Abfrage" : "Query"}</span>
+          {confPct != null && (
+            <>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "1px 6px", borderRadius: 3,
+                background: "#E4FF97", color: "#0A0A0A",
+              }}>
+                {confPct}% {de ? "Konfidenz" : "Confidence"}
+              </span>
+            </>
+          )}
+          {b.createdAt && (
+            <>
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span>{new Date(b.createdAt).toLocaleDateString(de ? "de-DE" : "en-US", { day: "2-digit", month: "short", year: "numeric" })}</span>
+            </>
+          )}
+        </div>
+        <h2 style={{
+          margin: 0,
+          fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+          fontSize: 20, fontWeight: 700, letterSpacing: "-0.015em",
+          color: "var(--color-text-heading, #0A0A0A)",
+          lineHeight: 1.25,
+        }}>
+          {b.query}
+        </h2>
+      </header>
+
+      {/* Synthesis */}
+      {b.synthesis && (
+        <Block icon={<Target size={13} strokeWidth={2.25} />} label={de ? "Synthese" : "Synthesis"}>
+          <p style={bodyTextStyle}>{b.synthesis}</p>
+        </Block>
+      )}
+
+      {/* Key Insights */}
+      {b.keyInsights.length > 0 && (
+        <Block icon={<Compass size={13} strokeWidth={2.25} />} label={de ? "Erkenntnisse" : "Key Insights"}>
+          <ul style={bulletListStyle}>
+            {b.keyInsights.map((k, i) => (
+              <li key={i} style={bulletItemStyle}>{k}</li>
+            ))}
+          </ul>
+        </Block>
+      )}
+
+      {/* Scenarios */}
+      {b.scenarios.length > 0 && (
+        <Block icon={<Layers size={13} strokeWidth={2.25} />} label={de ? "Szenarien" : "Scenarios"}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+            {b.scenarios.map((s, i) => (
+              <div key={i} style={{
+                padding: "12px 14px", borderRadius: 10,
+                border: "1px solid var(--color-border)",
+                background: "var(--volt-surface, #FAFAFA)",
+              }}>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                  <span style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: "var(--color-text-heading)",
+                    fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
+                  }}>{s.name || (de ? "Szenario" : "Scenario")}</span>
+                  {s.probability != null && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                    }}>
+                      {Math.round(s.probability * 100)}%
+                    </span>
+                  )}
+                </div>
+                {s.description && (
+                  <p style={{ ...bodyTextStyle, margin: 0, fontSize: 12.5 }}>{s.description}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </Block>
+      )}
+
+      {/* Interpretation */}
+      {b.interpretation && (
+        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={de ? "Interpretation" : "Interpretation"}>
+          <p style={bodyTextStyle}>{b.interpretation}</p>
+        </Block>
+      )}
+
+      {/* Decision Framework */}
+      {b.decisionFramework && (
+        <Block icon={<CircleDot size={13} strokeWidth={2.25} />} label={de ? "Entscheidungsrahmen" : "Decision Framework"}>
+          <p style={bodyTextStyle}>{b.decisionFramework}</p>
+        </Block>
+      )}
+
+      {/* Regulatory Context */}
+      {b.regulatoryContext.length > 0 && (
+        <Block icon={<AlertTriangle size={13} strokeWidth={2.25} />} label={de ? "Regulatorischer Kontext" : "Regulatory Context"}>
+          <ul style={bulletListStyle}>
+            {b.regulatoryContext.map((r, i) => {
+              if (typeof r === "string") return <li key={i} style={bulletItemStyle}>{r}</li>;
+              return (
+                <li key={i} style={bulletItemStyle}>
+                  <strong style={{ color: "var(--color-text-heading)" }}>
+                    {r.title ?? r.framework ?? "—"}
+                  </strong>
+                  {r.description ? ` — ${r.description}` : ""}
+                </li>
+              );
+            })}
+          </ul>
+        </Block>
+      )}
+
+      {/* Follow-up Questions */}
+      {b.followUpQuestions.length > 0 && (
+        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={de ? "Folgefragen" : "Follow-up Questions"}>
+          <ul style={bulletListStyle}>
+            {b.followUpQuestions.map((q, i) => (
+              <li key={i} style={bulletItemStyle}>{q}</li>
+            ))}
+          </ul>
+        </Block>
+      )}
+
+      {/* References */}
+      {b.references.length > 0 && (
+        <Block icon={<BookOpen size={13} strokeWidth={2.25} />} label={de ? "Quellen" : "References"}>
+          <ul style={{ ...bulletListStyle, gap: 6 }}>
+            {b.references.map((r, i) => (
+              <li key={i} style={{ ...bulletItemStyle, display: "flex", alignItems: "baseline", gap: 6 }}>
+                {r.url ? (
+                  <a
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: "var(--color-text-heading)",
+                      textDecoration: "none",
+                      borderBottom: "1px solid var(--color-border)",
+                    }}
+                  >
+                    {r.title ?? r.url}
+                  </a>
+                ) : (
+                  <span>{r.title ?? "—"}</span>
+                )}
+                {r.url && <ExternalLink size={10} strokeWidth={1.8} style={{ color: "var(--color-text-muted)", flexShrink: 0 }} />}
+                {r.source && (
+                  <em style={{ fontStyle: "normal", color: "var(--color-text-muted)", fontSize: 11 }}>
+                    — {r.source}
+                  </em>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Block>
+      )}
+    </section>
+  );
+}
+
+// ── Small building blocks ─────────────────────────────────────────────────
+
+function Block({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6,
+        fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+        color: "var(--color-text-muted, #6B6B6B)",
+        fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+        marginBottom: 8,
+      }}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const bodyTextStyle: React.CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+  fontSize: 14,
+  lineHeight: 1.65,
+  color: "var(--color-text-primary, #1A1A1A)",
+};
+
+const bulletListStyle: React.CSSProperties = {
+  margin: 0,
+  paddingLeft: 18,
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+  fontSize: 14,
+  lineHeight: 1.55,
+  color: "var(--color-text-primary, #1A1A1A)",
+};
+
+const bulletItemStyle: React.CSSProperties = {
+  paddingLeft: 2,
+};
+
+const headerBtnStyle: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 6,
+  padding: "7px 11px", borderRadius: 8,
+  border: "1px solid var(--color-border)", background: "transparent",
+  fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)",
+  cursor: "pointer", fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+  transition: "all 0.12s",
+};

@@ -64,6 +64,14 @@ interface SummaryQuery {
   decisionFramework?: string;
   timestamp?: number;
   source: "canvas" | "project";
+  // Extra fields surfaced to the client for the linear "read all briefings"
+  // view. Kept optional so the LLM meta-synthesis prompt builder (which
+  // cares only about the fields above) is unaffected.
+  regulatoryContext?: string[] | Array<{ title?: string; description?: string; framework?: string }>;
+  references?: Array<{ title?: string; url?: string; source?: string }>;
+  followUpQuestions?: string[];
+  confidence?: number;
+  createdAt?: string;
 }
 
 /**
@@ -77,10 +85,14 @@ function queryFromResult(
   synthesisRaw: string,
   timestamp: number | undefined,
   source: "canvas" | "project",
+  createdAt?: string,
 ): SummaryQuery {
   const r = (result ?? {}) as Record<string, unknown>;
   const insights = Array.isArray(r.keyInsights) ? (r.keyInsights as unknown[]) : [];
   const scenarios = Array.isArray(r.scenarios) ? (r.scenarios as unknown[]) : [];
+  const regulatory = Array.isArray(r.regulatoryContext) ? (r.regulatoryContext as unknown[]) : [];
+  const refs = Array.isArray(r.references) ? (r.references as unknown[]) : [];
+  const followUps = Array.isArray(r.followUpQuestions) ? (r.followUpQuestions as unknown[]) : [];
   return {
     query: sanitizeForPrompt(queryText),
     synthesis: sanitizeForPrompt((synthesisRaw || (r.synthesis as string) || "").slice(0, 1500)),
@@ -97,6 +109,29 @@ function queryFromResult(
     decisionFramework: sanitizeForPrompt(String(r.decisionFramework ?? "").slice(0, 400)),
     timestamp,
     source,
+    // Pass-through for the linear-read view. Not sanitized for prompt
+    // use (prompt builder doesn't read these fields); rendering on the
+    // client handles escape.
+    regulatoryContext: regulatory.map((x) => {
+      if (typeof x === "string") return x;
+      const obj = (x ?? {}) as Record<string, unknown>;
+      return {
+        title: typeof obj.title === "string" ? obj.title : undefined,
+        description: typeof obj.description === "string" ? obj.description : undefined,
+        framework: typeof obj.framework === "string" ? obj.framework : undefined,
+      };
+    }) as SummaryQuery["regulatoryContext"],
+    references: refs.map((x) => {
+      const obj = (x ?? {}) as Record<string, unknown>;
+      return {
+        title: typeof obj.title === "string" ? obj.title : undefined,
+        url: typeof obj.url === "string" ? obj.url : undefined,
+        source: typeof obj.source === "string" ? obj.source : undefined,
+      };
+    }),
+    followUpQuestions: followUps.slice(0, 6).map((x) => String(x)),
+    confidence: typeof r.confidence === "number" ? r.confidence : undefined,
+    createdAt,
   };
 }
 
@@ -110,13 +145,15 @@ function extractQueriesFromCanvas(canvasState: any): SummaryQuery[] {
   for (const node of canvasState.nodes) {
     if (node.nodeType !== "query") continue;
     if (!node.query) continue;
+    const ts = typeof node.createdAt === "number" ? node.createdAt : undefined;
     queries.push(
       queryFromResult(
         node.query,
         node.result ?? null,
         node.synthesis ?? "",
-        typeof node.createdAt === "number" ? node.createdAt : undefined,
+        ts,
         "canvas",
+        ts ? new Date(ts).toISOString() : undefined,
       ),
     );
   }
@@ -167,7 +204,14 @@ function extractQueriesFromProject(
     // created_at is ISO-ish ("2026-04-16 07:44:53"), convert to epoch ms for sorting.
     const ts = row.created_at ? Date.parse(row.created_at.replace(" ", "T")) : undefined;
     out.push(
-      queryFromResult(row.query, parsed, (parsed?.synthesis as string) ?? "", Number.isFinite(ts) ? (ts as number) : undefined, "project"),
+      queryFromResult(
+        row.query,
+        parsed,
+        (parsed?.synthesis as string) ?? "",
+        Number.isFinite(ts) ? (ts as number) : undefined,
+        "project",
+        row.created_at ? row.created_at.replace(" ", "T") : undefined,
+      ),
     );
   }
   return out;
@@ -464,11 +508,32 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const currentHash = hashSession(queries);
 
   const cached = state?.summary;
+  // `briefings` is the new linear-read payload. Same data that the
+  // prompt builder sees, but unsanitized fields (regulatoryContext,
+  // references, followUpQuestions) included for rendering. The LLM
+  // meta-synthesis (cached.data) is kept for backwards compatibility
+  // — a future release can drop it once no client reads it.
+  const briefings = queries.map((q) => ({
+    query: q.query,
+    synthesis: q.synthesis,
+    keyInsights: q.keyInsights,
+    scenarios: q.scenarios,
+    interpretation: q.interpretation || undefined,
+    decisionFramework: q.decisionFramework || undefined,
+    regulatoryContext: q.regulatoryContext ?? [],
+    references: q.references ?? [],
+    followUpQuestions: q.followUpQuestions ?? [],
+    confidence: q.confidence,
+    createdAt: q.createdAt,
+    source: q.source,
+  }));
+
   if (cached && cached.hash === currentHash) {
     return NextResponse.json({
       summary: cached.data,
       cached: true,
       queryCount: queries.length,
+      briefings,
     });
   }
 
@@ -480,6 +545,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // we re-frame the prompt for the 1-query case. Only count=0
     // genuinely has nothing to work with.
     canGenerate: queries.length >= 1,
+    briefings,
   });
 }
 
