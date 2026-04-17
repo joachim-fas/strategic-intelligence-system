@@ -143,10 +143,22 @@ export function Tooltip({
         boxShadow: "0 4px 16px rgba(0,0,0,0.45)",
         border: "1px solid rgba(255,255,255,0.08)",
         backdropFilter: "blur(6px)",
-        // Keep short labels on a single line; only wrap long sentences.
+        // WIDTH FIX (observed 2026-04 — locale switcher tooltip was
+        // breaking "Sprache: DE → EN" into one character per line):
+        // a fixed-positioned element with `left: <near right edge>` and
+        // no explicit `width` lets the browser shrink the box to the
+        // available horizontal space. `overflowWrap: anywhere` then
+        // broke mid-word. `width: max-content` pins the box to its
+        // actual content width (capped by maxWidth), regardless of how
+        // close the trigger sits to the viewport edge. The shiftX
+        // clamp below measures the true width and nudges it back into
+        // view via transform, so the tooltip never clips.
+        width: "max-content",
         whiteSpace: "normal",
         wordBreak: "normal",
-        overflowWrap: "anywhere",
+        // `break-word` only breaks a single unbreakable word when
+        // strictly necessary — never mid-word for regular text.
+        overflowWrap: "break-word",
         animation: "sis-tooltip-in 0.12s ease",
       }}
     >

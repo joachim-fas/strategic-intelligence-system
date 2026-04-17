@@ -20,7 +20,18 @@ export async function GET() {
 
   const stream = new ReadableStream({
     start(controller) {
-      // Initial connection confirmation
+      // BUFFER-FLUSH PADDING (observed 2026-04): Next.js 15 dev server
+      // holds back small initial SSE writes until ~2 KB accumulates or
+      // several seconds elapse. A plain 13-byte ": connected\n\n" comment
+      // was not enough, so EventSource.onopen never fired in the
+      // ActivityPanel and the indicator stayed "Getrennt" forever.
+      // SSE lines starting with ":" are ignored by clients (comments),
+      // so padding the first chunk with 2 KB of colons is safe and
+      // forces the dev server to flush immediately. Downstream proxies
+      // / nginx already receive `X-Accel-Buffering: no`; this handles
+      // the Node-level buffering that's only present in dev.
+      const padding = ":" + " ".repeat(2048) + "\n";
+      controller.enqueue(encoder.encode(padding));
       controller.enqueue(encoder.encode(": connected\n\n"));
 
       // Subscribe to activity events
