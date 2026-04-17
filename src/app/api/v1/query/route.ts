@@ -336,15 +336,33 @@ export async function POST(req: Request) {
   const KEEPALIVE_MS = 15_000; // ping every 15s
   const IDLE_TIMEOUT_MS = 60_000; // close after 60s of inactivity
 
+  // Track whether the controller has been closed so send/enqueue paths
+  // can bail out cleanly instead of throwing ERR_INVALID_STATE. The
+  // idle timeout, the client-disconnect cancel callback, and the
+  // final controller.close() at end-of-stream all set this.
+  let closed = false;
+
   const stream = new ReadableStream({
     async start(controller) {
+      // Dev-server buffer flush (mirrors /api/v1/monitor/stream and
+      // /api/v1/canvas/[id]/summary). Without this, the first small
+      // status event can stall until more data accumulates — visible
+      // to the user as "nothing happens" for several seconds after
+      // submitting a query on Home.
+      try {
+        controller.enqueue(encoder.encode(":" + " ".repeat(2048) + "\n\n"));
+      } catch { /* stream already closed */ }
+
       /** Reset the idle timeout — called on every data write. */
       const resetIdleTimeout = () => {
         if (idleTimeout) clearTimeout(idleTimeout);
         idleTimeout = setTimeout(() => {
           console.warn("[query] SSE idle timeout — closing stream after 60s of inactivity");
           cleanup();
-          try { controller.close(); } catch { /* already closed */ }
+          if (!closed) {
+            closed = true;
+            try { controller.close(); } catch { /* already closed */ }
+          }
         }, IDLE_TIMEOUT_MS);
       };
 
@@ -356,10 +374,12 @@ export async function POST(req: Request) {
 
       // Start the 15s keepalive ping
       keepaliveInterval = setInterval(() => {
+        if (closed) { cleanup(); return; }
         try {
           controller.enqueue(encoder.encode(":ping\n\n"));
         } catch {
           // Stream already closed — clean up
+          closed = true;
           cleanup();
         }
       }, KEEPALIVE_MS);
@@ -367,9 +387,27 @@ export async function POST(req: Request) {
       // Start the initial idle timeout
       resetIdleTimeout();
 
+      // Resilient send: previously every enqueue could throw
+      // ERR_INVALID_STATE if the client disconnected or the idle
+      // timeout fired mid-post-processing. That threw up into the
+      // outer try/catch which then attempted ANOTHER send (to deliver
+      // an "error" event), throwing again and burying the real error.
+      // Symptom: briefing never reached the client, syncToCanvasDb
+      // never ran, project stayed empty.
+      // Now: guard every send behind the `closed` flag and swallow
+      // late enqueue errors. Post-processing runs to completion
+      // regardless of the wire state.
       const send = (obj: object) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
-        resetIdleTimeout(); // data was sent — reset idle clock
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+          resetIdleTimeout(); // data was sent — reset idle clock
+        } catch {
+          // Controller was closed between the guard and the enqueue
+          // (e.g. client tab closed). Treat as permanent close.
+          closed = true;
+          cleanup();
+        }
       };
 
       try {
@@ -430,7 +468,7 @@ export async function POST(req: Request) {
                 : "Unable to process your request. Please try again.";
           send({ type: "error", error: clientError });
           cleanup();
-          controller.close();
+          if (!closed) { closed = true; try { controller.close(); } catch {} }
           return;
         }
 
@@ -653,7 +691,7 @@ export async function POST(req: Request) {
         }
 
         cleanup();
-        controller.close();
+        if (!closed) { closed = true; try { controller.close(); } catch {} }
       } catch (err) {
         // SECURITY: Log full error server-side, send generic message to client.
         // String(err) may contain API keys, file paths, or stack traces.
@@ -661,11 +699,13 @@ export async function POST(req: Request) {
         emitActivity({ type: "query", phase: "error", message: "Stream-Fehler aufgetreten" });
         send({ type: "error", error: "An unexpected error occurred. Please try again." });
         cleanup();
-        controller.close();
+        if (!closed) { closed = true; try { controller.close(); } catch {} }
       }
     },
     cancel() {
-      // Client disconnected — clean up timers
+      // Client disconnected — flag closed so any in-flight send() in
+      // post-processing bails out silently instead of throwing.
+      closed = true;
       if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
       if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
     },

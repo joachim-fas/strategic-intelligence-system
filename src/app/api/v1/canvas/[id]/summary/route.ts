@@ -534,10 +534,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { system, user } = buildMetaSynthesisPrompt(queries, locale);
 
   const encoder = new TextEncoder();
+  // Guard flag — ReadableStream `cancel()` fires on client disconnect
+  // and flips this to true. Every send/close checks it so late
+  // post-processing (after the Anthropic stream drains) cannot throw
+  // ERR_INVALID_STATE and swallow the final "complete" event.
+  // Same hardening as /api/v1/query/route.ts.
+  let closed = false;
   const stream = new ReadableStream({
     async start(controller) {
+      // Dev-server buffer flush — same mitigation as /api/v1/monitor/stream.
+      // Without ~2 KB of padding the first small SSE write can stall until
+      // more data accumulates, which shows up as "stuck spinner" in the UI.
+      try {
+        controller.enqueue(encoder.encode(":" + " ".repeat(2048) + "\n\n"));
+      } catch { /* stream already closed before we started */ }
+
       const send = (obj: object) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+        } catch {
+          closed = true;
+        }
+      };
+      const safeClose = () => {
+        if (closed) return;
+        closed = true;
+        try { controller.close(); } catch { /* already closed */ }
       };
 
       // Model fallback chain — same strategy as framework-analyze
@@ -572,7 +595,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             }
             send({ type: "error", error: `API error ${res.status}: ${errText.slice(0, 200)}` });
             // NOTE: `d` is the shared singleton handle — do NOT close.
-            controller.close();
+            safeClose();
             return;
           }
 
@@ -639,7 +662,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // NOTE: `d` is the shared singleton handle — do NOT close.
 
       send({ type: "complete", result, modelUsed, queryCount: queries.length });
-      controller.close();
+      safeClose();
+    },
+    cancel() {
+      // Browser aborted the fetch — flag closed so any in-flight send()
+      // from post-processing bails out silently.
+      closed = true;
     },
   });
 
