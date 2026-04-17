@@ -527,7 +527,27 @@ export default function HomeClient() {
   // consumes — flat `MatchedTrend[]` for `matchedTrends`, separate `matchedEdges`
   // array, and `usedSignals`. Previously we stored the wrapper-shaped briefing
   // directly which left the Orbit Signale/Trends/Kausal columns at 0.
-  const syncToCanvasDb = useCallback(async (query: string, briefing: any, entryId: string) => {
+  /**
+   * Persist a home-page briefing into the canvas DB.
+   *
+   * Project-per-query contract (user request 2026-04):
+   * Every new home-page query gets its own `radars` row, named after
+   * the query. Follow-ups (prevCtx != null → `isFollowUp === true`)
+   * reuse the currently-active project so the follow-up chain stays
+   * together.
+   *
+   * Bonus: we ALSO write a row to `project_queries` so the briefing
+   * becomes visible to the Zusammenfassung route (which merges canvas
+   * nodes + project_queries). Without this, a home-page query that
+   * never gets opened on the canvas would not surface in the
+   * per-project summary.
+   */
+  const syncToCanvasDb = useCallback(async (
+    query: string,
+    briefing: any,
+    entryId: string,
+    isFollowUp: boolean,
+  ) => {
     try {
       const now = Date.now();
       const uid = () => Math.random().toString(36).slice(2, 10);
@@ -651,7 +671,11 @@ export default function HomeClient() {
       // irgendwo noch ein alter Handler unverpackt antwortet.
       const unwrapCanvas = (json: any) => json?.data?.canvas ?? json?.canvas;
 
-      let projectId = activeProjectIdRef.current;
+      // Follow-ups continue in the current project; fresh queries get
+      // their own brand-new project, even if an active id is still set.
+      // This implements the "jede Abfrage via der Startseite = eigenes
+      // Projekt" contract.
+      let projectId = isFollowUp ? activeProjectIdRef.current : null;
       // Track whether we just created this row so we can clean it up if the
       // subsequent state-write fails. Without cleanup, a failed PATCH leaves
       // an empty-state row in the project list (user-visible symptom: "meine
@@ -659,11 +683,16 @@ export default function HomeClient() {
       let createdInThisCall = false;
 
       if (!projectId) {
-        // Create new canvas project
+        // Derive a meaningful project name from the query. Trim, cap at 80
+        // chars (matches the validateStringLength limit in the rename route),
+        // strip trailing punctuation. Fallback for pathological inputs.
+        const rawName = query.trim().replace(/\s+/g, " ").slice(0, 80).replace(/[.,;:!?\-—–]+$/u, "");
+        const name = rawName.length >= 3 ? rawName : (locale === "de" ? "Neue Abfrage" : "New query");
+
         const res = await fetchWithTimeout("/api/v1/canvas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Aktuelles Projekt" }),
+          body: JSON.stringify({ name }),
         });
         if (!res.ok) {
           console.error("[syncToCanvasDb] POST /api/v1/canvas failed", res.status);
@@ -727,13 +756,58 @@ export default function HomeClient() {
           activeProjectIdRef.current = null;
           setActiveProjectId(null);
         }
+        return;
       }
+
+      // Also persist the briefing into `project_queries` so the
+      // Zusammenfassung route sees it. The canvas_state write above
+      // covers the canvas/board/orbit views; this second write covers
+      // the project-detail + per-project summary views. Both writes
+      // failing independently is tolerated — the canvas payload is
+      // the source of truth and the Zusammenfassung merger de-dupes.
+      //
+      // Give this POST a 90 s budget (same as BriefingResult) because
+      // the /queries route can take 30-60 s on a cold dev-server
+      // compile and a premature abort would drop the briefing.
+      fetchWithTimeout(`/api/v1/projects/${projectId}/queries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          result: {
+            synthesis: briefing.synthesis,
+            reasoningChains: briefing.reasoningChains,
+            keyInsights: briefing.keyInsights,
+            regulatoryContext: briefing.regulatoryContext,
+            causalChain: briefing.causalChain,
+            scenarios: briefing.scenarios,
+            interpretation: briefing.interpretation,
+            references: briefing.references,
+            followUpQuestions: briefing.followUpQuestions,
+            newsContext: briefing.newsContext,
+            decisionFramework: briefing.decisionFramework,
+            confidence: briefing.confidence,
+            matchedTrends: rawMatchedTrends,
+            usedSignals: briefing.usedSignals,
+          },
+          locale,
+        }),
+      }, 90_000).catch((err) => {
+        console.warn("[syncToCanvasDb] project_queries write failed", err);
+      });
     } catch (e) {
       console.error("[syncToCanvasDb]", e);
     }
-  }, []);
+  }, [locale]);
 
-  const handleSubmit = useCallback(async (overrideQuery?: string, prevCtx?: { query: string; synthesis: string }) => {
+  const handleSubmit = useCallback(async (
+    overrideQuery?: string,
+    prevCtx?: { query: string; synthesis: string },
+    // Callers that pre-create a project (framework launch, "open in
+    // canvas" handoff) need to keep that project instead of spawning a
+    // fresh one. Set `reuseActiveProject: true` in that case.
+    opts?: { reuseActiveProject?: boolean },
+  ) => {
     const q = (overrideQuery ?? query).trim();
     if (!q || isAnalyzing) return;
 
@@ -999,8 +1073,11 @@ export default function HomeClient() {
 
           setIsAnalyzing(false);
           // ── Sync to Canvas DB so Canvas/Board views show the same data ──
-          // Run AFTER setIsAnalyzing(false) so a canvas sync error doesn't block the UI
-          syncToCanvasDb(q, llmBriefing, entryId).catch(() => {});
+          // Run AFTER setIsAnalyzing(false) so a canvas sync error doesn't
+          // block the UI. `prevCtx != null` means this query was triggered
+          // as a follow-up from an earlier briefing — keep it in the same
+          // project. A fresh top-level query spawns a new project.
+          syncToCanvasDb(q, llmBriefing, entryId, !!prevCtx || !!opts?.reuseActiveProject).catch(() => {});
         } else {
           setIsAnalyzing(false);
           // ❌ LLM returned null or empty synthesis — show error, no silent fallback
@@ -1070,7 +1147,10 @@ export default function HomeClient() {
       setFrameworkTopic("");
       setFrameworkFieldValues({});
       setFrameworkLoading(false);
-      await handleSubmit(enrichedQuery);
+      // Reuse the canvas we just created; without this flag the new
+      // project-per-query rule would spawn a SECOND canvas and leave
+      // the framework-named one empty.
+      await handleSubmit(enrichedQuery, undefined, { reuseActiveProject: true });
     } catch (err) {
       setFrameworkLoading(false);
       console.error("[launchFrameworkAnalysis]", err);
