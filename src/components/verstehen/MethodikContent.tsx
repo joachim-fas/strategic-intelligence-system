@@ -761,7 +761,7 @@ function EdgeTypesGrid({ de }: { de: boolean }) {
             <line
               x1="22" y1="14" x2="98" y2="14"
               stroke={e.color}
-              strokeWidth="2"
+              strokeWidth={2}
               strokeDasharray={e.solid ? "" : "4 3"}
             />
             <polygon

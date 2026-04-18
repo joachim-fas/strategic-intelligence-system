@@ -55,9 +55,9 @@ export const IconFinder: React.FC<IconProps> = ({ size = 64, className }) => {
       <ellipse cx="24" cy="25" rx="1.5" ry="2" fill="white" opacity="0.55" />
       <ellipse cx="42" cy="25" rx="1.5" ry="2" fill="white" opacity="0.55" />
       {/* Lächeln */}
-      <path d="M19 40 Q32 52 45 40" stroke="#3A3A3A" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+      <path d="M19 40 Q32 52 45 40" stroke="#3A3A3A" strokeWidth={3.5} strokeLinecap="round" fill="none" />
       {/* Rand */}
-      <rect x="6" y="6" width="52" height="52" rx="12" stroke="white" strokeWidth="1.2" strokeOpacity="0.35" fill="none" />
+      <rect x="6" y="6" width="52" height="52" rx="12" stroke="white" strokeWidth={1.2} strokeOpacity="0.35" fill="none" />
     </svg>
   );
 };
@@ -93,9 +93,9 @@ export const IconDocument: React.FC<IconProps> = ({ size = 64, className }) => {
       <path d="M37 8 L49 8 L49 20 Z" fill="#C0C0C0" />
       <path d="M37 8 L49 20 L37 20 Z" fill="#D8D8D8" />
       {/* Linien */}
-      <line x1="19" y1="26" x2="43" y2="26" stroke="#C0C0C0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="19" y1="33" x2="43" y2="33" stroke="#C0C0C0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="19" y1="40" x2="35" y2="40" stroke="#C0C0C0" strokeWidth="2" strokeLinecap="round" />
+      <line x1="19" y1="26" x2="43" y2="26" stroke="#C0C0C0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="19" y1="33" x2="43" y2="33" stroke="#C0C0C0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="19" y1="40" x2="35" y2="40" stroke="#C0C0C0" strokeWidth={2} strokeLinecap="round" />
       {/* Glanzlicht */}
       <rect x="13" y="8" width="36" height="18" rx="3" fill="white" opacity="0.3" />
     </svg>
@@ -133,7 +133,7 @@ export const IconFolder: React.FC<IconProps> = ({ size = 64, className }) => {
       {/* Glanzlicht */}
       <path d="M8 32 L56 32 L56 42 Q32 47 8 42 Z" fill="white" opacity="0.22" />
       {/* Rand */}
-      <path d="M8 32 L8 52 Q8 56 12 56 L52 56 Q56 56 56 52 L56 32 Z" stroke="white" strokeWidth="1" strokeOpacity="0.3" fill="none" />
+      <path d="M8 32 L8 52 Q8 56 12 56 L52 56 Q56 56 56 52 L56 32 Z" stroke="white" strokeWidth={1} strokeOpacity="0.3" fill="none" />
     </svg>
   );
 };
@@ -163,9 +163,9 @@ export const IconTrash: React.FC<IconProps> = ({ size = 64, className }) => {
       {/* Körper */}
       <path d="M14 21 L16 54 Q16 58 20 58 L44 58 Q48 58 48 54 L50 21 Z" fill={`url(#${bd})`} />
       {/* Streifen */}
-      <line x1="26" y1="28" x2="25" y2="51" stroke="#AAAAAA" strokeWidth="2" strokeLinecap="round" />
-      <line x1="32" y1="28" x2="32" y2="51" stroke="#AAAAAA" strokeWidth="2" strokeLinecap="round" />
-      <line x1="38" y1="28" x2="39" y2="51" stroke="#AAAAAA" strokeWidth="2" strokeLinecap="round" />
+      <line x1="26" y1="28" x2="25" y2="51" stroke="#AAAAAA" strokeWidth={2} strokeLinecap="round" />
+      <line x1="32" y1="28" x2="32" y2="51" stroke="#AAAAAA" strokeWidth={2} strokeLinecap="round" />
+      <line x1="38" y1="28" x2="39" y2="51" stroke="#AAAAAA" strokeWidth={2} strokeLinecap="round" />
       {/* Glanzlicht */}
       <path d="M14 21 L50 21 L49 32 Q32 36 15 32 Z" fill="white" opacity="0.25" />
     </svg>
@@ -204,7 +204,7 @@ export const IconSettings: React.FC<IconProps> = ({ size = 64, className }) => {
       " fill={`url(#${bd})`} filter={`url(#${sd})`} />
       {/* Innerer Kreis */}
       <circle cx="32" cy="32" r="11" fill={`url(#${rg})`} />
-      <circle cx="32" cy="32" r="11" stroke="#AAAAAA" strokeWidth="1" fill="none" />
+      <circle cx="32" cy="32" r="11" stroke="#AAAAAA" strokeWidth={1} fill="none" />
       {/* Glanzlicht */}
       <ellipse cx="28" cy="26" rx="6" ry="4" fill="white" opacity="0.35" transform="rotate(-30 28 26)" />
     </svg>
@@ -238,7 +238,7 @@ export const IconSearch: React.FC<IconProps> = ({ size = 64, className }) => {
         transform="rotate(45 50 48.5)" filter={`url(#${sd})`} />
       {/* Linsenring */}
       <circle cx="25" cy="25" r="18" fill={`url(#${gl})`} filter={`url(#${sd})`} />
-      <circle cx="25" cy="25" r="18" stroke="#AAAAAA" strokeWidth="1.5" fill="none" />
+      <circle cx="25" cy="25" r="18" stroke="#AAAAAA" strokeWidth={1.5} fill="none" />
       {/* Glas */}
       <circle cx="25" cy="25" r="13" fill={`url(#${rg})`} />
       {/* Glanzlicht */}
@@ -276,11 +276,11 @@ export const IconCloud: React.FC<IconProps> = ({ size = 64, className }) => {
       <path d="M20 22 C23 16 29 12 36 12 C41 12 45 14 48 18 C43 17 38 19 35 23 C32 19 26 18 20 22 Z"
         fill={`url(#${sh})`} />
       {/* Pfeil nach oben */}
-      <line x1="32" y1="54" x2="32" y2="36" stroke="#999" strokeWidth="3.5" strokeLinecap="round" />
-      <polyline points="25,43 32,36 39,43" stroke="#999" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <line x1="32" y1="54" x2="32" y2="36" stroke="#999" strokeWidth={3.5} strokeLinecap="round" />
+      <polyline points="25,43 32,36 39,43" stroke="#999" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
       {/* Rand */}
       <path d="M46 42 C52 42 57 37 57 31 C57 25 52 20 46 20 C44 14 38 10 31 10 C23 10 17 15 16 23 C11 24 7 28 7 34 C7 40 11 44 17 44 Z"
-        stroke="white" strokeWidth="1.2" strokeOpacity="0.4" fill="none" />
+        stroke="white" strokeWidth={1.2} strokeOpacity="0.4" fill="none" />
     </svg>
   );
 };
@@ -334,11 +334,11 @@ export const IconNetwork: React.FC<IconProps> = ({ size = 64, className }) => {
         </filter>
       </defs>
       {/* Verbindungslinien */}
-      <line x1="32" y1="32" x2="12" y2="14" stroke="#C0C0C0" strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="32" y1="32" x2="52" y2="14" stroke="#C0C0C0" strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="32" y1="32" x2="10" y2="44" stroke="#C0C0C0" strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="32" y1="32" x2="54" y2="44" stroke="#C0C0C0" strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="32" y1="32" x2="32" y2="56" stroke="#C0C0C0" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="32" y1="32" x2="12" y2="14" stroke="#C0C0C0" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1="32" y1="32" x2="52" y2="14" stroke="#C0C0C0" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1="32" y1="32" x2="10" y2="44" stroke="#C0C0C0" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1="32" y1="32" x2="54" y2="44" stroke="#C0C0C0" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1="32" y1="32" x2="32" y2="56" stroke="#C0C0C0" strokeWidth={2.5} strokeLinecap="round" />
       {/* Satelliten-Knoten */}
       <circle cx="12" cy="14" r="6" fill={`url(#${nd})`} filter={`url(#${sd})`} />
       <circle cx="52" cy="14" r="6" fill={`url(#${nd})`} filter={`url(#${sd})`} />
@@ -347,7 +347,7 @@ export const IconNetwork: React.FC<IconProps> = ({ size = 64, className }) => {
       <circle cx="32" cy="56" r="6" fill={`url(#${nd})`} filter={`url(#${sd})`} />
       {/* Zentrum */}
       <circle cx="32" cy="32" r="10" fill={`url(#${nd})`} filter={`url(#${sd})`} />
-      <circle cx="32" cy="32" r="10" stroke="#BBBBBB" strokeWidth="1" fill="none" />
+      <circle cx="32" cy="32" r="10" stroke="#BBBBBB" strokeWidth={1} fill="none" />
       {/* Glanzlichter */}
       <ellipse cx="29" cy="29" rx="3.5" ry="2.5" fill="white" opacity="0.5" transform="rotate(-30 29 29)" />
     </svg>
@@ -374,13 +374,13 @@ export const IconMail: React.FC<IconProps> = ({ size = 64, className }) => {
       {/* Umschlag-Körper */}
       <rect x="6" y="16" width="52" height="36" rx="4" fill={`url(#${bd})`} filter={`url(#${sd})`} />
       {/* V-Falz */}
-      <path d="M6 16 L32 36 L58 16" stroke="#AAAAAA" strokeWidth="2" fill="none" strokeLinejoin="round" />
+      <path d="M6 16 L32 36 L58 16" stroke="#AAAAAA" strokeWidth={2} fill="none" strokeLinejoin="round" />
       {/* Innenfläche */}
       <path d="M6 20 L6 52 Q6 52 10 52 L54 52 Q58 52 58 48 L58 20 L32 38 Z" fill="#D8D8D8" opacity="0.4" />
       {/* Glanzlicht */}
       <rect x="6" y="16" width="52" height="16" rx="4" fill="white" opacity="0.28" />
       {/* Rand */}
-      <rect x="6" y="16" width="52" height="36" rx="4" stroke="white" strokeWidth="1" strokeOpacity="0.35" fill="none" />
+      <rect x="6" y="16" width="52" height="36" rx="4" stroke="white" strokeWidth={1} strokeOpacity="0.35" fill="none" />
     </svg>
   );
 };
@@ -415,7 +415,7 @@ export const IconCalendar: React.FC<IconProps> = ({ size = 64, className }) => {
       <rect x="18" y="5" width="5" height="12" rx="2.5" fill="#BBBBBB" />
       <rect x="41" y="5" width="5" height="12" rx="2.5" fill="#BBBBBB" />
       {/* Trennlinie */}
-      <line x1="6" y1="26" x2="58" y2="26" stroke="#C0C0C0" strokeWidth="1.5" />
+      <line x1="6" y1="26" x2="58" y2="26" stroke="#C0C0C0" strokeWidth={1.5} />
       {/* Tage-Grid */}
       {[0,1,2,3,4,5].map(col => [0,1,2].map(row => (
         <rect key={`${col}-${row}`}
@@ -463,12 +463,12 @@ export const IconCamera: React.FC<IconProps> = ({ size = 64, className }) => {
       <rect x="22" y="12" width="20" height="10" rx="4" fill="#CCCCCC" />
       {/* Linsen-Ring */}
       <circle cx="32" cy="36" r="14" fill={`url(#${ln})`} />
-      <circle cx="32" cy="36" r="14" stroke="#999" strokeWidth="1.5" fill="none" />
+      <circle cx="32" cy="36" r="14" stroke="#999" strokeWidth={1.5} fill="none" />
       {/* Linse Glas */}
       <circle cx="32" cy="36" r="10" fill={`url(#${rg})`} />
       {/* Blende-Ringe */}
-      <circle cx="32" cy="36" r="7" stroke="#AAAAAA" strokeWidth="1" fill="none" />
-      <circle cx="32" cy="36" r="4" stroke="#AAAAAA" strokeWidth="0.8" fill="none" />
+      <circle cx="32" cy="36" r="7" stroke="#AAAAAA" strokeWidth={1} fill="none" />
+      <circle cx="32" cy="36" r="4" stroke="#AAAAAA" strokeWidth={0.8} fill="none" />
       {/* Glanzlicht Linse */}
       <ellipse cx="28" cy="31" rx="3.5" ry="2.5" fill="white" opacity="0.6" transform="rotate(-25 28 31)" />
       {/* Auslöser */}
@@ -502,7 +502,7 @@ export const IconMusic: React.FC<IconProps> = ({ size = 64, className }) => {
       <path d="M35 8 Q52 14 48 28 Q42 22 35 24 Z" fill={`url(#${bd})`} />
       {/* Notenkopf */}
       <ellipse cx="24" cy="46" rx="9" ry="7" fill={`url(#${bd})`} filter={`url(#${sd})`} transform="rotate(-15 24 46)" />
-      <ellipse cx="24" cy="46" rx="9" ry="7" stroke="#AAAAAA" strokeWidth="1" fill="none" transform="rotate(-15 24 46)" />
+      <ellipse cx="24" cy="46" rx="9" ry="7" stroke="#AAAAAA" strokeWidth={1} fill="none" transform="rotate(-15 24 46)" />
       {/* Glanzlicht Kopf */}
       <ellipse cx="20" cy="43" rx="3.5" ry="2" fill="white" opacity="0.45" transform="rotate(-15 20 43)" />
       {/* Glanzlicht Hals */}
@@ -540,11 +540,11 @@ export const IconBrowser: React.FC<IconProps> = ({ size = 64, className }) => {
       <rect x="6" y="20" width="52" height="6" fill={`url(#${tb})`} />
       {/* Buttons */}
       <circle cx="17" cy="17" r="4" fill="#C0C0C0" />
-      <circle cx="17" cy="17" r="4" stroke="#AAAAAA" strokeWidth="0.8" fill="none" />
+      <circle cx="17" cy="17" r="4" stroke="#AAAAAA" strokeWidth={0.8} fill="none" />
       <circle cx="28" cy="17" r="4" fill="#C8C8C8" />
-      <circle cx="28" cy="17" r="4" stroke="#AAAAAA" strokeWidth="0.8" fill="none" />
+      <circle cx="28" cy="17" r="4" stroke="#AAAAAA" strokeWidth={0.8} fill="none" />
       <circle cx="39" cy="17" r="4" fill="#D0D0D0" />
-      <circle cx="39" cy="17" r="4" stroke="#AAAAAA" strokeWidth="0.8" fill="none" />
+      <circle cx="39" cy="17" r="4" stroke="#AAAAAA" strokeWidth={0.8} fill="none" />
       {/* URL-Bar */}
       <rect x="46" y="12" width="8" height="10" rx="3" fill="#CCCCCC" />
       {/* Content-Linien */}
@@ -584,13 +584,13 @@ export const IconNotes: React.FC<IconProps> = ({ size = 64, className }) => {
       {/* Spiralbindung links */}
       <rect x="10" y="6" width="8" height="52" rx="4" fill={`url(#${ln})`} />
       {[14, 22, 30, 38, 46].map(y => (
-        <circle key={y} cx="14" cy={y} r="3" fill="#EEEEEE" stroke="#C0C0C0" strokeWidth="1" />
+        <circle key={y} cx="14" cy={y} r="3" fill="#EEEEEE" stroke="#C0C0C0" strokeWidth={1} />
       ))}
       {/* Linien */}
-      <line x1="24" y1="18" x2="50" y2="18" stroke="#D0D0D0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="24" y1="26" x2="50" y2="26" stroke="#D0D0D0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="24" y1="34" x2="50" y2="34" stroke="#D0D0D0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="24" y1="42" x2="42" y2="42" stroke="#D0D0D0" strokeWidth="2" strokeLinecap="round" />
+      <line x1="24" y1="18" x2="50" y2="18" stroke="#D0D0D0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="24" y1="26" x2="50" y2="26" stroke="#D0D0D0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="24" y1="34" x2="50" y2="34" stroke="#D0D0D0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="24" y1="42" x2="42" y2="42" stroke="#D0D0D0" strokeWidth={2} strokeLinecap="round" />
       {/* Glanzlicht */}
       <rect x="18" y="6" width="36" height="16" rx="4" fill="white" opacity="0.28" />
     </svg>
@@ -626,9 +626,9 @@ export const IconContacts: React.FC<IconProps> = ({ size = 64, className }) => {
       <circle cx="24" cy="25" r="5" fill="#C0C0C0" />
       <path d="M14 38 Q14 32 24 32 Q34 32 34 38" fill="#C0C0C0" />
       {/* Linien rechts */}
-      <line x1="38" y1="22" x2="52" y2="22" stroke="#C8C8C8" strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="38" y1="30" x2="52" y2="30" stroke="#D0D0D0" strokeWidth="2" strokeLinecap="round" />
-      <line x1="38" y1="37" x2="48" y2="37" stroke="#D4D4D4" strokeWidth="2" strokeLinecap="round" />
+      <line x1="38" y1="22" x2="52" y2="22" stroke="#C8C8C8" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1="38" y1="30" x2="52" y2="30" stroke="#D0D0D0" strokeWidth={2} strokeLinecap="round" />
+      <line x1="38" y1="37" x2="48" y2="37" stroke="#D4D4D4" strokeWidth={2} strokeLinecap="round" />
       {/* Glanzlicht */}
       <rect x="8" y="10" width="48" height="16" rx="5" fill="white" opacity="0.28" />
     </svg>
@@ -659,7 +659,7 @@ export const IconTerminal: React.FC<IconProps> = ({ size = 64, className }) => {
       </defs>
       {/* Fenster mit sichtbarem Rahmen */}
       <rect x="6" y="8" width="52" height="48" rx="6" fill={`url(#${bd})`} filter={`url(#${sd})`} />
-      <rect x="6" y="8" width="52" height="48" rx="6" stroke="#718096" strokeWidth="1.5" fill="none" />
+      <rect x="6" y="8" width="52" height="48" rx="6" stroke="#718096" strokeWidth={1.5} fill="none" />
       {/* Toolbar */}
       <rect x="6" y="8" width="52" height="16" rx="6" fill={`url(#${tb})`} />
       <rect x="6" y="18" width="52" height="6" fill={`url(#${tb})`} />
@@ -702,7 +702,7 @@ export const IconLock: React.FC<IconProps> = ({ size = 64, className }) => {
       </defs>
       {/* Bügel */}
       <path d="M18 30 L18 20 Q18 8 32 8 Q46 8 46 20 L46 30"
-        stroke={`url(#${bd})`} strokeWidth="8" strokeLinecap="round" fill="none" filter={`url(#${sd})`} />
+        stroke={`url(#${bd})`} strokeWidth={8} strokeLinecap="round" fill="none" filter={`url(#${sd})`} />
       {/* Körper */}
       <rect x="10" y="28" width="44" height="30" rx="6" fill={`url(#${bx})`} filter={`url(#${sd})`} />
       {/* Schlüsselloch */}
@@ -712,7 +712,7 @@ export const IconLock: React.FC<IconProps> = ({ size = 64, className }) => {
       <rect x="10" y="28" width="44" height="12" rx="6" fill="white" opacity="0.28" />
       {/* Glanzlicht Bügel */}
       <path d="M18 30 L18 20 Q18 8 32 8 Q46 8 46 20 L46 30"
-        stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeOpacity="0.3" fill="none" />
+        stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeOpacity="0.3" fill="none" />
     </svg>
   );
 };

@@ -47,8 +47,8 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
             width="280" height="200" viewBox="0 0 280 200"
             style={{ background: "var(--color-page-bg)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}
           >
-            <circle cx={centerX} cy={centerY} r={radius} fill="none" stroke="var(--color-border)" strokeWidth="1" strokeDasharray="4,4" />
-            <circle cx={centerX} cy={centerY} r={radius * 0.55} fill="none" stroke="var(--color-border)" strokeWidth="0.5" strokeDasharray="2,4" />
+            <circle cx={centerX} cy={centerY} r={radius} fill="none" stroke="var(--color-border)" strokeWidth={1} strokeDasharray="4,4" />
+            <circle cx={centerX} cy={centerY} r={radius * 0.55} fill="none" stroke="var(--color-border)" strokeWidth={0.5} strokeDasharray="2,4" />
 
             {/* Chain edges */}
             {parsedChains.map((parts, ci) => {

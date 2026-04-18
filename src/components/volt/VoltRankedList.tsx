@@ -92,7 +92,7 @@ function TrendIcon({ trend }: { trend: "up" | "down" | "neutral" }) {
   }
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="flex-shrink-0">
-      <path d="M2 5H8M8 5L5.5 2.5M8 5L5.5 7.5" stroke="var(--muted-foreground)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 5H8M8 5L5.5 2.5M8 5L5.5 7.5" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

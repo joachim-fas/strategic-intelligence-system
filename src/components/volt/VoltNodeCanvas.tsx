@@ -1218,7 +1218,7 @@ const VoltNodeCanvas: React.FC<VoltNodeCanvasProps> = ({
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <path d="M2 9 L9 2 M5 9 L9 5 M8 9 L9 8"
                       stroke={isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.30)"}
-                      strokeWidth="1.5" strokeLinecap="round" />
+                      strokeWidth={1.5} strokeLinecap="round" />
                   </svg>
                 </div>
               )}
@@ -1271,7 +1271,7 @@ const VoltNodeCanvas: React.FC<VoltNodeCanvasProps> = ({
             }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
                 stroke={isDark ? "rgba(255,100,100,0.95)" : "rgba(200,40,40,0.9)"}
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="6" cy="6" r="3" />
                 <circle cx="6" cy="18" r="3" />
                 <line x1="20" y1="4" x2="8.12" y2="15.88" />

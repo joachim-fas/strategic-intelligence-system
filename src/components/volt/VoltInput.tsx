@@ -230,7 +230,7 @@ export const VoltSelect = React.forwardRef<HTMLSelectElement, VoltSelectProps>(
           {/* Chevron */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground/50">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         </div>
