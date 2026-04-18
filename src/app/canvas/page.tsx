@@ -115,134 +115,14 @@ import { FormattedText } from "./FormattedText";
 import { TagInlineInput } from "./TagInlineInput";
 
 // ── Persistence (localStorage) ────────────────────────────────────────────
+// storage helpers moved to ./storage (2026-04-18)
+import { saveToStorage, loadFromStorage } from "./storage";
 
-function saveToStorage(nodes: CanvasNode[], conns: Connection[], pan: { x: number; y: number }, zoom: number) {
-  try {
-    const saveable = nodes.filter(n =>
-      n.nodeType !== "query" || (n.status === "done" || n.status === "error")
-    );
-    const value = JSON.stringify({ nodes: saveable, conns, pan, zoom, v: 2 });
-    localStorage.setItem(STORAGE_KEY, value);
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('localStorage quota exceeded, clearing old data');
-      try { localStorage.removeItem('sis-canvas-history'); localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, conns, pan, zoom, v: 2 })); } catch {}
-    }
-  }
-}
-
-function loadFromStorage(): { nodes: CanvasNode[]; conns: Connection[]; pan: { x: number; y: number }; zoom: number } | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw);
-    if (d.v !== 2) return null;
-    return { nodes: d.nodes, conns: d.conns ?? [], pan: d.pan, zoom: d.zoom };
-  } catch { return null; }
-}
 
 // ── Streaming ─────────────────────────────────────────────────────────────
+// streaming helpers moved to ./streamQuery (2026-04-18)
+import { extractSynthesisDelta, detectStreamingPhase, streamQuery } from "./streamQuery";
 
-function extractSynthesisDelta(acc: string, sent: number): string {
-  const keyIdx = acc.indexOf('"synthesis"');
-  if (keyIdx === -1) return "";
-  const after = acc.slice(keyIdx + 11);
-  const colon = after.indexOf(":");
-  if (colon === -1) return "";
-  const rest = after.slice(colon + 1).trimStart();
-  if (!rest.startsWith('"')) return "";
-  let result = "";
-  let i = 1;
-  while (i < rest.length) {
-    const ch = rest[i];
-    if (ch === "\\") {
-      if (i + 1 >= rest.length) break;
-      const nx = rest[i + 1];
-      if (nx === "u") {
-        if (i + 5 >= rest.length) break;
-        const hex = rest.slice(i + 2, i + 6);
-        result += String.fromCharCode(parseInt(hex, 16));
-        i += 6;
-      } else {
-        result += nx === "n" ? "\n"
-               : nx === "t" ? "\t"
-               : nx === "r" ? "\r"
-               : nx === "b" ? "\b"
-               : nx === "f" ? "\f"
-               : nx === '"' ? '"'
-               : nx === "\\" ? "\\"
-               : nx === "/" ? "/"
-               : nx;
-        i += 2;
-      }
-    } else if (ch === '"') break;
-    else { result += ch; i++; }
-  }
-  return result.length > sent ? result.slice(sent) : "";
-}
-
-function detectStreamingPhase(acc: string): number {
-  if (acc.includes('"confidence"')) return 5;
-  if (acc.includes('"keyInsights"')) return 4;
-  if (acc.includes('"scenarios"')) return 3;
-  if (acc.includes('"reasoningChains"')) return 2;
-  if (acc.includes('"synthesis"')) return 1;
-  return 0;
-}
-
-// TODO: EDGE-17 — Add auto-reconnect with exponential backoff on SSE stream failures.
-// Show user notification: "Verbindung unterbrochen, reconnecting..."
-// Current implementation has no retry logic — if the stream fails, the user must re-submit.
-async function streamQuery(
-  query: string, locale: string,
-  onChunk: (c: string) => void,
-  onComplete: (r: QueryResult) => void,
-  onError: (m: string) => void,
-  onPhase?: (phase: number) => void,
-  signal?: AbortSignal,
-) {
-  try {
-    const res = await fetch("/api/v1/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, locale }),
-      signal,
-    });
-    if (!res.ok || !res.body) { onError(`HTTP ${res.status}`); return; }
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", acc = "", sent = 0;
-    let final: QueryResult | null = null;
-    let lastPhase = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n"); buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const json = line.slice(6).trim();
-        if (!json) continue;
-        try {
-          const evt = JSON.parse(json);
-          if (evt.type === "delta" && evt.text) {
-            acc += evt.text;
-            const delta = extractSynthesisDelta(acc, sent);
-            if (delta) { sent += delta.length; onChunk(delta); }
-            if (onPhase) {
-              const phase = detectStreamingPhase(acc);
-              if (phase !== lastPhase) { lastPhase = phase; onPhase(phase); }
-            }
-          } else if (evt.type === "complete" && evt.result) {
-            final = evt.result;
-          } else if (evt.type === "error") { onError(evt.error || "Fehler"); return; }
-        } catch {}
-      }
-    }
-    if (final) onComplete(final);
-    else onError("Keine Antwort erhalten");
-  } catch (e) { onError(String(e)); }
-}
 
 // ── Layout: derived card cluster ──────────────────────────────────────────
 //
