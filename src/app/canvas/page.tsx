@@ -54,16 +54,61 @@ import type {
   MatchedEdge, DimensionEntry, QueryResult,
 } from "@/types";
 
-// ── Node Status ────────────────────────────────────────────────────────────
+// Decomposition step 1 (18.04.2026 audit A5-H7): types, design
+// tokens, and pure size/time utilities previously inlined at the top
+// of this file now live in sibling modules. Behavioural parity — the
+// moved code is unchanged, only its location. Keeps the page file
+// focused on React state + render logic.
+import {
+  NODE_STATUS_META,
+  NODE_LAYER,
+  LAYER_LABELS,
+  QUERY_NODE_W,
+  QUERY_NODE_H,
+  DERIVED_W,
+  LIST_NODE_W,
+  FILE_NODE_W,
+  FILE_NODE_H,
+  DERIVED_COL_GAP_X,
+  DERIVED_COL_GAP,
+  DERIVED_ROW_GAP,
+  DIMENSIONS_CARD_H,
+  CAUSAL_GRAPH_CARD_H,
+  STORAGE_KEY,
+  CANVAS_SCHEMA_VERSION,
+  SCEN,
+} from "./constants";
+import type {
+  CanvasGroup,
+  CanvasLayer,
+  CanvasNode,
+  CanvasProject,
+  Connection,
+  ConnectionType,
+  DerivedNode,
+  DerivedType,
+  FileNode,
+  IdeaNode,
+  ListNode,
+  NodeStatus,
+  NoteNode,
+  QueryNode,
+  SortMode,
+  ViewMode,
+} from "./types";
+import {
+  formatNodeTime,
+  nodeAge,
+  estimateCardHeight,
+  estimateQueryHeight,
+  getNodeHeight,
+  getNodeWidth,
+} from "./utils";
 
-type NodeStatus = "open" | "active" | "decided" | "pinned";
-const NODE_STATUS_META: Record<NodeStatus, { color: string; label: string }> = {
-  open:    { color: "var(--color-text-muted)", label: "Offen" },
-  active:  { color: "#2563EB", label: "Aktiv" },
-  decided: { color: "#1A9E5A", label: "Entschieden" },
-  pinned:  { color: "#F5A623", label: "Gepinnt" },
-};
-
+// StatusIcon stays in this file for now — it renders JSX and only
+// has this one call-site. Extracting it would add an import edge
+// without a corresponding reuse benefit. A future decomposition
+// slice can pull it out when a second consumer appears.
 function StatusIcon({ status, size = 12 }: { status: NodeStatus; size?: number }) {
   const color = NODE_STATUS_META[status].color;
   const s: React.CSSProperties = { color, flexShrink: 0 };
@@ -74,300 +119,6 @@ function StatusIcon({ status, size = 12 }: { status: NodeStatus; size?: number }
     case "pinned":  return <Pin size={size} style={s} />;
   }
 }
-
-// ── Layer types ────────────────────────────────────────────────────────────
-
-type CanvasLayer = "analyse" | "karte" | "datei";
-const NODE_LAYER: Record<string, CanvasLayer> = {
-  query: "analyse", insight: "analyse", scenario: "analyse", decision: "analyse", followup: "analyse",
-  dimensions: "analyse", causalgraph: "analyse",
-  note: "karte", idea: "karte", list: "karte", file: "datei",
-};
-// The "karte" layer groups user-created free-form items (note/idea/list).
-// The label here used to be "Karten", which collided with the stats counter
-// on the same toolbar row ("X Abfragen · Y Karten") — same word, two different
-// meanings. Renaming the filter chip to "Notizen" resolves the collision
-// without touching the stats counter that users expect to see total cards.
-const LAYER_LABELS: Record<CanvasLayer, { de: string; color: string }> = {
-  analyse: { de: "Analyse", color: "#1A9E5A" },
-  karte:   { de: "Notizen", color: "#F97316" },
-  datei:   { de: "Dateien", color: "#4A6CF7" },
-};
-
-// ── View Mode ──────────────────────────────────────────────────────────────
-
-type ViewMode = "canvas" | "board" | "timeline" | "orbit";
-type SortMode = "tree" | "time" | "type" | "status";
-
-// ── Canvas Group ───────────────────────────────────────────────────────────
-
-interface CanvasGroup {
-  id: string;
-  nodeIds: string[];
-  label: string;
-  color: string;
-  bounds: { x: number; y: number; w: number; h: number };
-}
-
-// ── Node types ─────────────────────────────────────────────────────────────
-
-interface QueryNode {
-  id: string;
-  nodeType: "query";
-  x: number;
-  y: number;
-  query: string;
-  locale: string;
-  status: "loading" | "streaming" | "done" | "error";
-  synthesis: string;
-  result: QueryResult | null;
-  collapsed: boolean;
-  parentId?: string;
-  errorMsg?: string;
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  streamingPhase?: number; // 0=loading 1=synthesis 2=reasoning 3=scenarios 4=insights 5=done
-  nodeStatus?: NodeStatus;
-  tags?: string[];
-}
-
-type DerivedType = "insight" | "scenario" | "decision" | "followup" | "dimensions" | "causalgraph";
-
-interface DerivedNode {
-  id: string;
-  nodeType: DerivedType;
-  x: number;
-  y: number;
-  parentId: string;
-  content: string;
-  label?: string;
-  colorKey?: string;
-  probability?: number;
-  queryText: string;
-  sources?: UsedSignal[];   // top signals from parent query
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  nodeStatus?: NodeStatus;
-  // Enriched fields (all optional — backwards-compatible)
-  keyDrivers?: string[];                       // für Szenario-Karten
-  dimensionData?: DimensionEntry[];            // für Dimensions-Karten
-  causalEdges?: MatchedEdge[];                 // für Kausalnetz-Karten
-  causalTrendNames?: Record<string, string>;   // id→name lookup
-  tags?: string[];
-}
-
-// ── Additional node types ─────────────────────────────────────────────────
-
-interface NoteNode {
-  id: string;
-  nodeType: "note";
-  x: number;
-  y: number;
-  content: string;
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  parentId?: string;
-  nodeStatus?: NodeStatus;
-  tags?: string[];
-}
-
-interface IdeaNode {
-  id: string;
-  nodeType: "idea";
-  x: number;
-  y: number;
-  title: string;
-  content: string;
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  parentId?: string;
-  nodeStatus?: NodeStatus;
-  tags?: string[];
-}
-
-interface ListNode {
-  id: string;
-  nodeType: "list";
-  x: number;
-  y: number;
-  title: string;
-  items: string[];
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  parentId?: string;
-  nodeStatus?: NodeStatus;
-  tags?: string[];
-}
-
-interface FileNode {
-  id: string;
-  nodeType: "file";
-  x: number;
-  y: number;
-  fileName: string;
-  fileSize: number;
-  fileType: string;
-  fileUrl: string;
-  textContent?: string;
-  loading?: boolean;
-  createdAt: number;
-  customWidth?: number;
-  customHeight?: number;
-  parentId?: string;
-  nodeStatus?: NodeStatus;
-  tags?: string[];
-}
-
-type CanvasNode = QueryNode | DerivedNode | NoteNode | IdeaNode | ListNode | FileNode;
-
-type ConnectionType = "derived" | "builds-on" | "contradicts" | "validates" | "refreshed";
-
-interface Connection {
-  from: string;
-  to: string;
-  derived?: boolean;
-  refreshed?: boolean; // temporal chain: re-run of same query
-  connectionType?: ConnectionType;
-  note?: string;       // optional edge annotation
-}
-
-interface CanvasProject {
-  id: string;
-  name: string;
-  hasState: boolean;
-  updated_at: string;
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const QUERY_NODE_W       = 420;
-const QUERY_NODE_H       = QUERY_NODE_W;  // square base
-const DERIVED_W          = 300;
-const LIST_NODE_W        = 280;
-const FILE_NODE_W        = 300;
-const FILE_NODE_H        = 300; // default height matches width for square-ish file cards
-const DERIVED_COL_GAP_X  = 64;
-const DERIVED_COL_GAP    = 32;
-const DERIVED_ROW_GAP    = 36;
-const DIMENSIONS_CARD_H  = 192;
-const CAUSAL_GRAPH_CARD_H = 222;
-
-// ── Time helpers ──────────────────────────────────────────────────────────
-
-function formatNodeTime(ms: number): string {
-  return new Date(ms).toLocaleString("de-DE", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
-
-function nodeAge(ms: number): "fresh" | "aging" | "stale" {
-  const d = Date.now() - ms;
-  if (d < 2 * 86400000) return "fresh";  // < 2 days
-  if (d < 7 * 86400000) return "aging";  // 2–7 days
-  return "stale";                         // > 7 days
-}
-
-// ── Height estimation ──────────────────────────────────────────────────────
-
-function estimateCardHeight(
-  type: DerivedType, content: string, label?: string, hasSources = false
-): number {
-  if (type === "dimensions") return DIMENSIONS_CARD_H;
-  if (type === "causalgraph") return CAUSAL_GRAPH_CARD_H;
-  const CHARS_PER_LINE = 32;
-  const LINE_H   = 20;
-  // Cards render all content without truncation via FormattedText — no cap on lines
-  const contentLines = Math.max(1, Math.ceil(content.length / CHARS_PER_LINE));
-  const labelLines   = label ? Math.min(3, Math.ceil(label.length / CHARS_PER_LINE)) : 0;
-
-  const HEADER    = 44;
-  const FOOTER    = 44;
-  const PAD       = 20;
-  const SOURCES   = hasSources ? 26 : 0;
-  const TIMESTAMP = 18;
-  const BUFFER    = 28;
-
-  let h: number;
-  if (type === "scenario") {
-    h = HEADER + PAD + 42 + labelLines * LINE_H + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
-  } else if (type === "decision") {
-    // Decision cards contain multi-step frameworks — add ~20% extra height vs insight
-    h = Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
-  } else {
-    h = HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
-  }
-  // Cards render with minimum height = DERIVED_W; never estimate less than that
-  return Math.max(DERIVED_W, h);
-}
-
-// ── Universal node dimension helpers (used by layout algorithms) ───────────
-
-function getNodeWidth(n: CanvasNode): number {
-  if (n.customWidth) return n.customWidth;
-  if (n.nodeType === "query") return QUERY_NODE_W;
-  if (n.nodeType === "list") return LIST_NODE_W;
-  if (n.nodeType === "note") return 280;
-  if (n.nodeType === "idea") return 300;
-  if (n.nodeType === "file") return FILE_NODE_W;
-  return DERIVED_W;
-}
-
-// Content-aware query-card height. Without this all QUERY cards would share
-// the 420px square default, which looks uniform/boxy at scale and wastes
-// vertical space for queries with short or empty synthesis. We cap at
-// QUERY_NODE_H so cards never grow taller than the square base — taller
-// than square is unreadable in the canvas.
-function estimateQueryHeight(n: QueryNode): number {
-  const synthesis = n.synthesis ?? "";
-  const HEADER = 44;
-  const PAD_Y = 24;
-  const EXTRAS = 60;      // fingerprint / signals / tags / fade area
-  const CHARS_PER_LINE = 44;
-  const LINE_H = 20;
-  if (!synthesis) {
-    // No synthesis yet — either loading or a placeholder card.
-    // Give just enough room for the compact derivation summary block.
-    return 180;
-  }
-  const lines = Math.min(14, Math.ceil(synthesis.length / CHARS_PER_LINE));
-  const h = HEADER + PAD_Y + lines * LINE_H + EXTRAS;
-  return Math.max(220, Math.min(QUERY_NODE_H, h));
-}
-
-function getNodeHeight(n: CanvasNode): number {
-  if (n.customHeight) return n.customHeight;
-  if (n.nodeType === "query") return estimateQueryHeight(n as QueryNode);
-  if (n.nodeType === "dimensions") return DIMENSIONS_CARD_H;
-  if (n.nodeType === "causalgraph") return CAUSAL_GRAPH_CARD_H;
-  if (n.nodeType === "list") return 200;
-  if (n.nodeType === "note") return 160;
-  if (n.nodeType === "idea") return 300;
-  if (n.nodeType === "file") return FILE_NODE_H;
-  // Derived nodes: use content-based estimation
-  const dn = n as DerivedNode;
-  const hasSrc = (dn.sources?.length ?? 0) > 0;
-  return estimateCardHeight(dn.nodeType as DerivedType, dn.content || "", dn.label, hasSrc);
-}
-
-const STORAGE_KEY = "sis-canvas-v2";
-
-// FIXED: EDGE-08 — Schema version for canvas state migration
-const CANVAS_SCHEMA_VERSION = 1;
-
-// ── Scenario colours ──────────────────────────────────────────────────────
-
-const SCEN: Record<string, { color: string; bg: string; border: string; label: string; labelEn: string }> = {
-  optimistic:  { color: "var(--pastel-mint-text)",   bg: "var(--signal-positive-light)", border: "var(--signal-positive-border)", label: "Optimistisch", labelEn: "Optimistic" },
-  baseline:    { color: "var(--pastel-blue-text)",   bg: "var(--pastel-blue)",            border: "var(--pastel-blue-border)",     label: "Basisfall",    labelEn: "Baseline"   },
-  pessimistic: { color: "var(--signal-negative-text)", bg: "var(--signal-negative-light)", border: "var(--signal-negative-border)", label: "Pessimistisch",labelEn: "Pessimistic" },
-  wildcard:    { color: "var(--pastel-butter-text)", bg: "var(--pastel-butter)",           border: "var(--pastel-butter-border)",   label: "Wildcard",     labelEn: "Wildcard"   },
-};
 
 // ── Persistence (localStorage) ────────────────────────────────────────────
 
