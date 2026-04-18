@@ -23,12 +23,6 @@
 // - Stores in ONE canonical table
 // - Returns from that table for all consumers
 
-// TODO: ARC-06 — DUAL PIPELINE IMPLEMENTATIONS
-// pipeline/route.ts: Promise.allSettled, parallel, stores in-memory
-// pipeline.ts: for-loop (now with concurrency), stores in DB
-// Completely different behavior depending on call path.
-// FIX: Consolidate into one pipeline implementation.
-
 import { connectors, type RawSignal } from "@/connectors";
 import { groupSignalsByTopic, scoreTrend } from "@/lib/scoring";
 import { megaTrends } from "@/lib/mega-trends";
