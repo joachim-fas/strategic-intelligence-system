@@ -20,6 +20,12 @@
  */
 
 import { Database, Network, TrendingUp, Filter, Eye, GitBranch, AlertCircle, Layers, Cpu, BarChart3, Map as MapIcon } from "lucide-react";
+import { connectors } from "@/connectors";
+
+// Audit A3-M4 (18.04.2026): "48+ offene Quellen" in the pipeline
+// diagram was hardcoded. Post-RSS-merge the real count is ~100, so
+// the diagram lied. Derive at module load from the live registry.
+const CONNECTOR_COUNT = connectors.length;
 
 interface Props {
   de: boolean;
@@ -308,7 +314,7 @@ function PipelineDiagram({ de }: { de: boolean }) {
       icon: <Layers size={24} strokeWidth={1.75} />,
       phase: "INPUT",
       title: "Rohsignale",
-      desc: "48+ offene Quellen, Push- und Pull-Feeds, 15-Min-Takt",
+      desc: `${CONNECTOR_COUNT} offene Quellen, Push- und Pull-Feeds, 15-Min-Takt`,
       bg: "#D5E5FA",           // light blue
     },
     {
@@ -337,7 +343,7 @@ function PipelineDiagram({ de }: { de: boolean }) {
       icon: <Layers size={24} strokeWidth={1.75} />,
       phase: "INPUT",
       title: "Raw Signals",
-      desc: "48+ open sources, push and pull feeds, 15-min cadence",
+      desc: `${CONNECTOR_COUNT} open sources, push and pull feeds, 15-min cadence`,
       bg: "#D5E5FA",
     },
     {

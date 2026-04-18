@@ -63,18 +63,12 @@ const NEWS_FEEDS: RssFeedConfig[] = [
     keywordMapping: GENERAL_NEWS_MAPPING,
     tags: ["news", "international"],
   },
-  {
-    name: "reuters_top_rss",
-    displayName: "Reuters (Top News)",
-    // Reuters sunset their public RSS in 2020 — the connector will surface
-    // as inactive in /monitor until they bring it back or we replace with
-    // a Reuters-via-GDELT query. Kept in the registry because the Notion
-    // page lists it and it's cheap to retry.
-    feedUrl: "https://feeds.reuters.com/reuters/topNews",
-    defaultTopic: "Geopolitical Fragmentation",
-    keywordMapping: GENERAL_NEWS_MAPPING,
-    tags: ["news", "international"],
-  },
+  // Reuters sunset their public RSS in 2020; the connector fired a
+  // failed fetch on every pipeline run, polluted the /monitor logs,
+  // and produced zero signals. Audit A3-L2 (18.04.2026) recommended
+  // removal. Reuters coverage is still reachable via the existing
+  // GDELT connector's global-media scope. Re-add an entry here only
+  // if Reuters brings back a public feed.
   {
     name: "aljazeera_rss",
     displayName: "Al Jazeera (All)",

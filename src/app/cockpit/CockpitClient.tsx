@@ -28,6 +28,7 @@ import { megaTrends } from "@/lib/mega-trends";
 import { classifyTrends } from "@/lib/classify";
 import { TREND_EDGES } from "@/lib/causal-graph";
 import { VoltTabs } from "@/components/volt";
+import { isStale } from "@/lib/freshness";
 import { connectors } from "@/connectors";
 import dynamic from "next/dynamic";
 
@@ -193,10 +194,10 @@ export default function CockpitClient() {
           setFreshness({
             signalCount: data.signalCount,
             newestAgeHours: Number(data.newestAgeHours ?? 0),
-            // Treat anything > 24h as stale in the Cockpit UI — that's
-            // longer than the Vercel cron interval (4h) so a single miss
-            // shouldn't alarm, but a day of silence should.
-            stale: Number(data.newestAgeHours ?? 0) > 24,
+            // Audit A3-M2 (18.04.2026): route through the shared
+            // FRESHNESS_THRESHOLDS so Cockpit / ActivityPanel /
+            // sources-status always agree. Was hardcoded > 24h here.
+            stale: isStale(Number(data.newestAgeHours ?? 0)),
           });
         }
       })

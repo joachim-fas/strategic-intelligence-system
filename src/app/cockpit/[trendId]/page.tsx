@@ -69,7 +69,7 @@ export default function TrendDetailPage() {
             <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>
               ID: {trendId}
             </div>
-            <Link href="/cockpit?lens=trends" style={{
+            <Link href="/cockpit?tab=trends" style={{
               fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10,
               background: "var(--volt-black, #0A0A0A)", color: "var(--volt-white, #fff)",
               textDecoration: "none", display: "inline-block",
@@ -90,7 +90,7 @@ export default function TrendDetailPage() {
         {/* Back link + breadcrumb */}
         <div style={{ flex: 1, padding: "24px 24px 80px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-            <Link href="/cockpit?lens=trends" style={{
+            <Link href="/cockpit?tab=trends" style={{
               fontFamily: "var(--volt-font-ui)", fontSize: 13, color: "var(--color-text-muted)",
               textDecoration: "none",
             }}>
@@ -141,7 +141,7 @@ export default function TrendDetailPage() {
           </a>
 
           <a
-            href={`/cockpit?lens=network`}
+            href={`/cockpit?tab=netzwerk`}
             className="volt-card"
             style={{
               display: "block", padding: "14px 16px", marginBottom: 8,
@@ -160,7 +160,7 @@ export default function TrendDetailPage() {
           </a>
 
           <a
-            href={`/cockpit?lens=radar`}
+            href={`/cockpit?tab=radar`}
             className="volt-card"
             style={{
               display: "block", padding: "14px 16px",

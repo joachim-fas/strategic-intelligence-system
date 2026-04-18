@@ -30,10 +30,18 @@ export default function SignInClient() {
       if (res.ok || res.redirected) {
         setSubmitted(true);
       } else {
-        setError("Sign-in failed. Your email may not be on the allowlist.");
+        // Audit A5-M3 (18.04.2026): sign-in error strings were the
+        // only untranslated copy on the auth surface — English-only
+        // regardless of locale, which lands jarring for German users
+        // on the first interactive screen.
+        setError(de
+          ? "Anmeldung fehlgeschlagen. Deine E-Mail ist möglicherweise nicht freigeschaltet."
+          : "Sign-in failed. Your email may not be on the allowlist.");
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(de
+        ? "Netzwerkfehler. Bitte erneut versuchen."
+        : "Network error. Please try again.");
     }
   }
 

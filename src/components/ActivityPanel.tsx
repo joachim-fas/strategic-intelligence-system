@@ -21,6 +21,8 @@ import { useActivityStream } from "@/lib/use-activity-stream";
 import type { ActivityEvent } from "@/lib/use-activity-stream";
 import { useLocale } from "@/lib/locale-context";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { connectors } from "@/connectors";
+import { freshnessTier, FRESHNESS_COLOR } from "@/lib/freshness";
 import Link from "next/link";
 
 // ── Monitor API response shape ────────────────────────────────────────────
@@ -71,10 +73,11 @@ function formatTime(iso: string, locale = "de-DE"): string {
   });
 }
 
+// Audit A3-M2 (18.04.2026): route through the shared threshold
+// constant so Cockpit, ActivityPanel, and /api/v1/sources/status
+// agree on what "fresh" / "stale" means.
 function freshnessColor(hours: number): string {
-  if (hours <= 6) return "#059669";   // green
-  if (hours <= 24) return "#D97706";  // amber
-  return "#DC2626";                   // red
+  return FRESHNESS_COLOR[freshnessTier(hours)];
 }
 
 function freshnessLabel(hours: number): string {
@@ -158,7 +161,11 @@ export function ActivityPanel() {
   const newestHours = monitorData?.signals?.newestHours ?? null;
   const totalSignals = monitorData?.signals?.total ?? 0;
   const sourceCount = monitorData?.signals?.bySource?.length ?? 0;
-  const totalConnectors = monitorData?.knowledgeBase?.connectors ?? 57;
+  // Audit A3-M3 (18.04.2026): fallback used to be hardcoded `57`.
+  // Post-RSS-merge the real count is ~100, so the `/ 57` denominator
+  // lied on every panel-open during the brief loading gap before
+  // /api/v1/monitor responds. Read the live registry length instead.
+  const totalConnectors = monitorData?.knowledgeBase?.connectors ?? connectors.length;
 
   return (
     <>
@@ -404,7 +411,7 @@ export function ActivityPanel() {
               </div>
             </div>
           ) : (
-            events.map((event) => <EventRow key={event.id} event={event} />)
+            events.map((event) => <EventRow key={event.id} event={event} locale={de ? "de-DE" : "en-US"} />)
           )}
         </div>
 
@@ -467,7 +474,7 @@ function Placeholder() {
   );
 }
 
-function EventRow({ event }: { event: ActivityEvent }) {
+function EventRow({ event, locale }: { event: ActivityEvent; locale: string }) {
   const isError = event.phase === "error";
   const PhaseIcon = PHASE_ICONS[event.phase] ?? Circle;
   const iconColor = isError
@@ -509,7 +516,7 @@ function EventRow({ event }: { event: ActivityEvent }) {
           fontFamily: "var(--volt-font-mono, monospace)",
           marginLeft: "auto",
         }}>
-          {formatTime(event.timestamp)}
+          {formatTime(event.timestamp, locale)}
         </span>
       </div>
 

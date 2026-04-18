@@ -4,6 +4,7 @@ import { ensureEnvLoaded } from "@/lib/env";
 import { connectors } from "@/connectors";
 import { apiSuccess, CACHE_HEADERS } from "@/lib/api-helpers";
 import { getConnectorConfigStatus } from "@/lib/connector-config";
+import { FRESHNESS_THRESHOLDS } from "@/lib/freshness";
 
 ensureEnvLoaded();
 
@@ -72,8 +73,13 @@ export async function GET() {
   return apiSuccess({ connectors: result, totalSignals, healthy, stale, inactive, needsKey }, 200, CACHE_HEADERS.short);
 }
 
+// Audit A3-M2 (18.04.2026): shared FRESHNESS_THRESHOLDS constant so
+// the Cockpit, ActivityPanel, and this endpoint agree. Previously
+// this file used 12h as the stale cutoff while the Cockpit used 24h
+// and the ActivityPanel used 24h — a connector could be green in
+// one surface and orange in another.
 function getStatus(newestHours: number | null, count: number): "ok" | "stale" | "inactive" {
   if (count === 0 || newestHours === null) return "inactive";
-  if (newestHours > 12) return "stale";
+  if (newestHours > FRESHNESS_THRESHOLDS.WARN_HOURS) return "stale";
   return "ok";
 }
