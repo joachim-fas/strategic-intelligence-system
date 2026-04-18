@@ -1841,6 +1841,63 @@ export default function HomeClient() {
         {/* Results — Phase 1+2: Session Bar + Active Node rendering. Only rendered when there is content, so the empty-state gradient command line can claim the full flex space. Bottom padding clears the fixed SignalTicker. */}
         {!isFirstVisit && (
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 60px", maxWidth: 960, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Audit finding A1-H1 (18.04.2026): in-session users had no
+               visible input to fire another query. The only entry point
+               was a follow-up button inside the briefing card, which is
+               not always the next question the user wants to ask. This
+               compact command line sits at the top of the session view
+               and shares the same inputRef / query / handleSubmit state
+               as the hero. Keeps Enter-to-submit and focus behaviour
+               consistent with the empty-state input. */}
+          {!isAnalyzing && (
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 10px 8px 18px",
+                marginBottom: 4,
+                borderRadius: "var(--volt-radius-lg, 12px)",
+                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
+                background: "var(--volt-surface-raised, #fff)",
+                boxShadow: inputFocused ? "0 4px 16px rgba(228,255,151,0.3)" : "0 1px 3px rgba(0,0,0,0.03)",
+                transition: "border-color 150ms ease, box-shadow 150ms ease",
+              }}
+              onClick={() => inputRef.current?.focus()}
+            >
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                placeholder={locale === "de" ? "Nächste Frage …" : "Next question …"}
+                style={{
+                  flex: 1, border: "none", outline: "none", background: "transparent",
+                  color: "var(--volt-text, #0A0A0A)",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 14,
+                  lineHeight: 1.5, resize: "none", overflow: "hidden", padding: "5px 0",
+                }}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {query && (
+                <button
+                  onClick={() => handleSubmit()}
+                  style={{
+                    fontSize: 12, fontWeight: 600, height: 30, padding: "0 14px",
+                    borderRadius: "var(--volt-radius-md, 8px)", flexShrink: 0,
+                    background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
+                    border: "none", cursor: "pointer",
+                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                  }}
+                >
+                  {locale === "de" ? "Analysieren →" : "Analyze →"}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Session Bar removed: the step-pill bar (with Zusammenfassung /
                Canvas shortcuts) was intentionally dropped from the briefing
                view so each result stands on its own. Project switching and
@@ -1866,19 +1923,19 @@ export default function HomeClient() {
                   onTrendClick={setSelectedTrend}
                   activeProjectId={activeProjectId}
                   onFollowUp={(q) => {
+                    // Audit finding A1-H4 (18.04.2026): clicking a
+                    // follow-up used to auto-submit the LLM call with
+                    // no confirmation — one accidental click fired a
+                    // new briefing. Now we just pre-fill the top
+                    // command line and focus it; the user presses
+                    // Enter (or clicks Analysieren) to actually fire
+                    // the query. Gives a cancel opportunity.
                     setQuery(q);
-                    const ctxMessages: { query: string; synthesis: string }[] = [];
-                    if (activeEntry.parentQuery) {
-                      const parent = history.find(h => h.query === activeEntry.parentQuery && h.briefing?.synthesis);
-                      if (parent?.briefing?.synthesis) {
-                        ctxMessages.push({ query: parent.query, synthesis: parent.briefing.synthesis.slice(0, 2000) });
-                      }
-                    }
-                    if (activeEntry.briefing?.synthesis && activeEntry.briefing.synthesis.length > 50) {
-                      ctxMessages.push({ query: activeEntry.query, synthesis: activeEntry.briefing.synthesis.slice(0, 2000) });
-                    }
-                    const prevCtx = ctxMessages.length > 0 ? ctxMessages[ctxMessages.length - 1] : undefined;
-                    handleSubmit(q, prevCtx);
+                    setTimeout(() => {
+                      inputRef.current?.focus();
+                      inputRef.current?.setSelectionRange(q.length, q.length);
+                      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 50);
                   }}
                 />
               </div>

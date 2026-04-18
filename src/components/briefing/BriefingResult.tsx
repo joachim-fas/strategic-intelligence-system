@@ -282,19 +282,29 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             {locale === "de" ? "Analysiere…" : "Analyzing…"}
           </span>
         )}
-        {activeProjectId && !isLoading && !isHelp && briefing.synthesis && (
+        {/* Audit finding A1-H2 (18.04.2026): Save button used to be
+             gated on `activeProjectId &&`. But `activeProjectId` is
+             set by syncToCanvasDb which runs with `.catch(() => {})`.
+             If the DB write fails silently the button never appears
+             and the user assumes persistence succeeded. Now the
+             button always renders when a briefing synthesis exists;
+             if there's no active project yet, the click is disabled
+             and the tooltip explains why. */}
+        {!isLoading && !isHelp && briefing.synthesis && (
           <Tooltip
-            content={saveError
-              ? saveError
-              : saved
-                ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
-                : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
+            content={!activeProjectId
+              ? (locale === "de" ? "Kein aktives Projekt — Projekt wird automatisch beim Speichern angelegt" : "No active project — saving will create one")
+              : saveError
+                ? saveError
+                : saved
+                  ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
+                  : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
             placement="bottom"
           >
             <Button
               variant="ghost" size="sm"
               onClick={saveToProject}
-              disabled={saved || saving}
+              disabled={!activeProjectId || saved || saving}
               className={cn(
                 "text-[12px] px-3 h-7 gap-1.5",
                 saved ? "text-[#1A9E5A]" : saveError ? "text-[#D93636]" : "text-[#9B9B9B]",
@@ -502,8 +512,13 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 ? `${briefing.keyInsights.length} strategische Punkte`
                 : `${briefing.keyInsights.length} strategic points`}
             >
+              {/* Audit finding A1-H3 (18.04.2026): previously
+                   sliced to 3 and dumped insights 4..N into the
+                   Regulatory Context accordion with a Sparkles icon —
+                   wrong section, collapsed by default, easy to miss.
+                   Now all insights render here in order. */}
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {briefing.keyInsights.slice(0, 3).map((insight: string, i: number) => (
+                {briefing.keyInsights.map((insight: string, i: number) => (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
                     <VoltIconBox
                       icon={<span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)" }}>{String(i + 1).padStart(2, "0")}</span>}
@@ -926,12 +941,10 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                     {reg}
                   </div>
                 ))}
-                {briefing.keyInsights?.length > 3 && briefing.keyInsights.slice(3).map((insight: string, i: number) => (
-                  <div key={`ki-${i}`} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4 }}>
-                    <Sparkles size={12} style={{ color: "var(--muted-foreground)", flexShrink: 0, marginTop: 3 }} />
-                    <span style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.55 }}>{insight}</span>
-                  </div>
-                ))}
+                {/* Insights > 3 used to be appended here with a Sparkles
+                     icon — wrong section and hidden by default. Removed
+                     in the A1-H3 audit fix; all insights now render in
+                     the Key Insights section above. */}
               </div>
             </details>
           )}
