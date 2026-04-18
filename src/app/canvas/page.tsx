@@ -1,19 +1,42 @@
 "use client";
 
-// TODO: ARC-01 / FE-14 — CANVAS GOD-FILE DECOMPOSITION
-// This file is ~7100 lines with 40+ useState hooks, 20+ useEffect, 20 internal components,
-// 500+ inline styles, and 200+ hardcoded colors. Every change recompiles the entire file.
-// FIX: Split into feature modules:
-//   - hooks/useCanvasState.ts (nodes, connections, selection, undo/redo)
-//   - hooks/useCanvasStreaming.ts (LLM streaming, abort controllers)
-//   - hooks/useCanvasKeyboard.ts (keyboard shortcuts, slash commands)
-//   - hooks/useCanvasPersistence.ts (DB save, localStorage, BroadcastChannel)
-//   - components/canvas/NodeRenderer.tsx (node cards by type)
-//   - components/canvas/CanvasToolbar.tsx (toolbar, view mode switcher)
-//   - components/canvas/CanvasModals.tsx (delete confirm, project switcher)
-//   - components/canvas/DetailPanel.tsx (right-side detail panel)
-//   - components/canvas/MiniMap.tsx (minimap component)
-//   - lib/canvas-utils.ts (uid, layout, snap-to-grid)
+// ── Canvas decomposition status (audit ARC-01 / FE-14, updated 2026-04-18)
+//
+// This file started at ~9015 lines with 40+ useState hooks, 20+ useEffect,
+// 20 internal components, 500+ inline styles. It's now ~4350 lines. The
+// remaining weight is the `CanvasPage` component itself — state + event
+// handlers + view-mode switching. Presentational components and pure-logic
+// helpers have been extracted; the component split below is deliberately
+// paused until there's a concrete UX reason to keep cutting (hook-based
+// refactoring is a different class of change than function extraction).
+//
+// DONE (extracted into sibling files of this file):
+//   - nodes/*            — 8 per-type card renderers (Note/Idea/List/File,
+//                          Query/Derived, Dimensions, CausalGraph)
+//   - DetailPanel.tsx    — the single-card inspector with all sub-helpers
+//   - OrbitGraphView.tsx + OrbitDerivationView.tsx — Orbit views
+//   - ConnectionsSVG.tsx — edge-layer renderer
+//   - NodePicker.tsx     — "+ card" dropdown + type list
+//   - Minimap.tsx        — bottom-right pan overview (+ NODE_MINIMAP_COLOR)
+//   - CommandLine.tsx    — floating query-input bar
+//   - derivation.ts      — computeDerivedNodes, buildDimensionData, uid
+//   - streamQuery.ts     — SSE client + retry/reconnect (EDGE-17 2026-04-18)
+//   - storage.ts         — localStorage save/load helpers
+//   - seedData.ts        — test + demo fixtures
+//   - utils.ts           — shared helpers (formatFileSize, node sizing, …)
+//   - types.ts, constants.ts — shared shapes + size tokens
+//
+// STILL HERE (remainder of this file):
+//   - CanvasPage main component: state (40+ useState/useRef), global pointer
+//     + keyboard handlers, view-mode rendering (Canvas/Board/Timeline/Orbit),
+//     all the handlers that mutate nodes/connections, the toolbar strip.
+//
+// NOT YET EXTRACTED (hook-extraction territory, paused):
+//   - hooks/useCanvasState — nodes/connections/selection/undo/redo
+//   - hooks/useCanvasKeyboard — keyboard shortcuts
+//   - hooks/useCanvasPersistence — DB save/BroadcastChannel
+//   - components/canvas/CanvasToolbar — view-mode switcher
+//   - components/canvas/CanvasModals — delete-confirm, project-switcher
 
 export const dynamic = "force-dynamic";
 
@@ -1153,10 +1176,25 @@ export default function CanvasPage() {
   }, []);
 
   // ── Global pointer events ─────────────────────────────────────────────────
-  // TODO: EDGE-18 — Pointer/drag callbacks capture stale React state in closures.
-  // Currently mitigated by using refs (zoomRef, panXRef, panYRef, nodesRef, snapToGridRef)
-  // instead of state directly. If adding new state to these handlers, always use refs.
-
+  //
+  // INVARIANT (was EDGE-18, resolved 2026-04-18):
+  // The `move` and `up` handlers below are attached **once** via
+  // `useEffect(() => ..., [])` with empty deps. This is deliberate — attaching
+  // global `pointermove`/`pointerup` listeners on every render would leak
+  // handlers and fire race conditions during drag.
+  //
+  // Because the effect runs once, the handlers close over the **initial**
+  // render's values. Every piece of mutable state they need at event time
+  // therefore has to come from a ref, not from a React state variable or
+  // a closure-captured prop. Current live refs used here:
+  //   draggingRef, resizingRef, panningRef, portDragRef, portDropCanvasPosRef,
+  //   zoomRef, panXRef, panYRef, snapToGridRef, viewportRef, nodesRef.
+  // State *setters* (setNodes, setPanX, …) are React-stable and safe to call
+  // directly; `pushHistory` is a `useCallback([])` so its reference is also
+  // stable. If you add a new piece of state that these handlers need to read
+  // live, add a ref alongside the useState and update it in a mirror useEffect
+  // — do NOT add the value to the deps array, that will re-attach the handlers
+  // on every change and break drag continuity.
   useEffect(() => {
     const move = (e: PointerEvent) => {
       if (draggingRef.current) {
