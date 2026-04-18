@@ -21,6 +21,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { connectors } from "@/connectors";
 import { SOURCE_REGISTRY } from "@/lib/trend-sources";
 import { PLANNED_CONNECTORS } from "@/lib/planned-connectors";
@@ -187,6 +188,9 @@ interface UnifiedRow {
 }
 
 export default function QuellenTable({ de }: QuellenTableProps) {
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const [statusMap, setStatusMap] = useState<Record<string, { lastRunAt?: string; status?: string }>>({});
   const [activeMacro, setActiveMacro] = useState<SteepVKey | "all">("all");
   const [activeFilter, setActiveFilter] = useState<CategoryKey>("all");
@@ -416,7 +420,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
           margin: "0 0 6px",
         }}
       >
-        {de ? "Datenquellen" : "Data Sources"}
+        {tl("sources.heading")}
       </h2>
 
       {/* Stats line — live-first, planned as transparent roadmap */}
@@ -430,7 +434,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
       >
         {showResearch ? (
           <>
-            {researchSources.length} {de ? "kuratierte Forschungs- und Beratungsquellen" : "curated research and consulting sources"}
+            {researchSources.length} {tl("sources.researchSubtitleSuffix")}
           </>
         ) : (
           <>
@@ -439,13 +443,13 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                  ob sie in den letzten Tagen Signale geliefert haben.
                  Jetzt klar getrennt: "Registriert" (installiert) vs.
                  "aktiv" (hat frische Signale) vs. "geplant" (Backlog). */}
-            {liveCount} {de ? "registriert" : "registered"} ·{" "}
+            {liveCount} {tl("sources.registeredLabel")} ·{" "}
             <span style={{ color: activeCount > 0 ? "var(--signal-positive, #1A9E5A)" : "var(--signal-negative, #C0341D)", fontWeight: 600 }}>
-              {activeCount} {de ? "aktiv" : "active"}
+              {activeCount} {tl("sources.activeLabel")}
             </span>
             {" · "}
             <span style={{ color: "var(--pastel-butter-text, #7A5C00)", fontWeight: 600 }}>
-              {plannedCount} {de ? "geplant" : "planned"}
+              {plannedCount} {tl("sources.plannedLabel")}
             </span>
           </>
         )}
@@ -470,7 +474,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
               setActiveMacro("all");
               if (activeFilter !== "all" && activeFilter !== "forschung") setActiveFilter("all");
             }}
-            label={de ? "Alle" : "All"}
+            label={tl("sources.all")}
             count={allRows.length}
           />
           {[...STEEP_V_ORDER].sort((a, b) => {
@@ -519,7 +523,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             marginRight: 2,
             flexShrink: 0,
           }}>
-            {de ? "Kategorie" : "Category"}
+            {tl("sources.category")}
           </span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: 1 }}>
             {(Object.keys(CATEGORIES) as CategoryKey[]).sort((a, b) => {
@@ -564,15 +568,15 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                   color: "var(--volt-text-faint, #999)",
                   marginRight: 4,
                 }}>
-                  {de ? "Status" : "Status"}
+                  {tl("sources.status")}
                 </span>
                 {(["all", "aktiv", "geplant"] as const).map((k) => {
                   const active = statusFilter === k;
                   const label = k === "all"
-                    ? (de ? "Alle" : "All")
+                    ? tl("sources.all")
                     : k === "aktiv"
-                      ? (de ? "Live (aktiv)" : "Live (active)")
-                      : (de ? "Geplant (Roadmap)" : "Planned (roadmap)");
+                      ? tl("sources.statusLive")
+                      : tl("sources.statusPlanned");
                   const count = k === "all"
                     ? allRows.length
                     : k === "aktiv"
@@ -642,11 +646,11 @@ export default function QuellenTable({ de }: QuellenTableProps) {
               }}
             >
               {([
-                { col: "name" as const, labelDe: "Quelle", labelEn: "Source" },
-                { col: "category" as const, labelDe: "Kategorie", labelEn: "Category" },
-                { col: "type" as const, labelDe: "Typ", labelEn: "Type" },
-                { col: "status" as const, labelDe: "Status", labelEn: "Status" },
-              ]).map(({ col, labelDe, labelEn }) => (
+                { col: "name" as const, key: "sources.colSource" as TranslationKey },
+                { col: "category" as const, key: "sources.colCategory" as TranslationKey },
+                { col: "type" as const, key: "sources.colType" as TranslationKey },
+                { col: "status" as const, key: "sources.colStatus" as TranslationKey },
+              ]).map(({ col, key }) => (
                 <div
                   key={col}
                   role="button"
@@ -661,7 +665,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                     gap: 4,
                   }}
                 >
-                  {de ? labelDe : labelEn}
+                  {tl(key)}
                   {sortCol === col && (
                     <span style={{ fontSize: 8, lineHeight: 1 }}>
                       {sortDir === "asc" ? "\u25B2" : "\u25BC"}
@@ -735,7 +739,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                             </span>
                             {isPlanned && r.priority === "high" && (
                               <span
-                                title={de ? "Hohe Priorit\u00e4t" : "High priority"}
+                                title={tl("sources.highPriority")}
                                 style={{ fontSize: 7, color: "var(--signal-negative, #C8102E)", fontWeight: 700, flexShrink: 0 }}
                               >&#9679;</span>
                             )}
@@ -831,7 +835,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
                 fontSize: 13,
                 fontFamily: "var(--font-ui)",
               }}>
-                {de ? "Keine Quellen gefunden" : "No sources found"}
+                {tl("sources.noneFound")}
               </div>
             )}
           </div>
@@ -882,7 +886,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
             ))}
           {filteredResearch.length === 0 && (
             <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--muted-foreground)", fontSize: 13 }}>
-              {de ? "Keine Forschungsquellen gefunden" : "No research sources found"}
+              {tl("sources.noResearchFound")}
             </div>
           )}
         </div>
@@ -894,6 +898,8 @@ export default function QuellenTable({ de }: QuellenTableProps) {
 // ─── Sub-components ─────────────────────────────────────────────────
 
 function SearchBox({ value, onChange, de }: { value: string; onChange: (v: string) => void; de: boolean }) {
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
   const [local, setLocal] = useState(value);
   const debounceTimer = useRef<NodeJS.Timeout>(undefined);
 
@@ -929,7 +935,7 @@ function SearchBox({ value, onChange, de }: { value: string; onChange: (v: strin
         type="text"
         value={local}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder={de ? "Suchen..." : "Search..."}
+        placeholder={tl("sources.searchPlaceholder")}
         style={{
           border: "none",
           outline: "none",

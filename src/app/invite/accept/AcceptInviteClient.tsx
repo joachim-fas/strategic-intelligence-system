@@ -1,8 +1,21 @@
 "use client";
 
+/**
+ * Landing page for /invite/accept?token=…
+ *
+ * Verifies the invite token via GET /api/v1/invites/accept, shows
+ * tenant/role summary, and posts the same endpoint to consume it.
+ * Hard-reloads on success so the session picks up the new membership.
+ *
+ * 2026-04-18 audit A5-H9: migrated from `de ? ... : ...` ternaries to
+ * `useT()` + the `invite.*` namespace. The role label lookup reuses
+ * `admin.roleOwner` / `admin.roleAdmin` / … from the admin migration.
+ */
+
 import { useCallback, useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { t as translate, localeTag, type Locale, type TranslationKey } from "@/lib/i18n";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface InviteInfo {
@@ -17,14 +30,19 @@ type LoadState =
   | { status: "ok"; invite: InviteInfo }
   | { status: "error"; code: string; message: string };
 
-function roleLabel(role: string, de: boolean): string {
-  if (de) return role === "owner" ? "Inhaber" : role === "admin" ? "Admin" : role === "member" ? "Mitglied" : "Leser";
-  return role === "owner" ? "Owner" : role === "admin" ? "Admin" : role === "member" ? "Member" : "Viewer";
+const ROLE_KEY: Record<InviteInfo["role"], TranslationKey> = {
+  owner: "admin.roleOwner",
+  admin: "admin.roleAdmin",
+  member: "admin.roleMember",
+  viewer: "admin.roleViewer",
+};
+
+function roleLabel(role: InviteInfo["role"], locale: Locale): string {
+  return translate(locale, ROLE_KEY[role]);
 }
 
 export function AcceptInviteClient({ token }: { token: string | null }) {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale } = useT();
 
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [accepting, setAccepting] = useState(false);
@@ -32,7 +50,7 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
 
   const load = useCallback(async () => {
     if (!token) {
-      setState({ status: "error", code: "NO_TOKEN", message: de ? "Kein Token in der URL." : "No token in URL." });
+      setState({ status: "error", code: "NO_TOKEN", message: t("invite.noTokenError") });
       return;
     }
     setState({ status: "loading" });
@@ -49,7 +67,7 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
     } catch (e) {
       setState({ status: "error", code: "NETWORK", message: e instanceof Error ? e.message : String(e) });
     }
-  }, [token, de]);
+  }, [token, t]);
   useEffect(() => { load(); }, [load]);
 
   // Audit A4-H2 (18.04.2026): error state for the POST-accept call.
@@ -73,7 +91,7 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         const code = json?.error?.code ?? (res.status === 401 ? "UNAUTHORIZED" : "UNKNOWN");
-        const message = json?.error?.message ?? (de ? "Annahme fehlgeschlagen." : "Accept failed.");
+        const message = json?.error?.message ?? t("invite.acceptFailedGeneric");
         // 401 → redirect straight to sign-in so the user can come back.
         if (code === "UNAUTHORIZED" || res.status === 401) {
           const callback = encodeURIComponent(window.location.href);
@@ -110,30 +128,24 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
             letterSpacing: "0.10em", textTransform: "uppercase" as const,
             color: "var(--volt-text-faint, #BBB)", marginBottom: 8,
           }}>
-            {de ? "Einladung" : "Invitation"}
+            {t("invite.caption")}
           </div>
 
           {state.status === "loading" && (
             <div style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
-              {de ? "Pruefe Einladung…" : "Checking invitation…"}
+              {t("invite.checking")}
             </div>
           )}
 
           {state.status === "error" && (
             <>
               <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px", color: "var(--volt-text, #0A0A0A)" }}>
-                {de ? "Einladung nicht gueltig" : "Invitation not valid"}
+                {t("invite.invalidHeading")}
               </h1>
               <p style={{ fontSize: 14, color: "var(--color-text-muted)", lineHeight: 1.55, margin: "0 0 16px" }}>
-                {state.code === "NOT_FOUND" ? (de
-                  ? "Diese Einladung existiert nicht oder wurde widerrufen."
-                  : "This invitation does not exist or was revoked.")
-                : state.code === "EXPIRED" ? (de
-                  ? "Diese Einladung ist abgelaufen (14 Tage ab Versand). Bitte eine neue Einladung anfordern."
-                  : "This invitation has expired (14 days since issue). Please request a new one.")
-                : state.code === "ALREADY_ACCEPTED" ? (de
-                  ? "Diese Einladung wurde bereits angenommen."
-                  : "This invitation has already been accepted.")
+                {state.code === "NOT_FOUND" ? t("invite.notFoundBody")
+                : state.code === "EXPIRED" ? t("invite.expiredBody")
+                : state.code === "ALREADY_ACCEPTED" ? t("invite.alreadyAcceptedBody")
                 : state.message}
               </p>
               <a href="/" style={{
@@ -145,7 +157,7 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
                 color: "var(--volt-text, #0A0A0A)",
                 background: "transparent",
               }}>
-                ← {de ? "Zur Startseite" : "Go home"}
+                ← {t("invite.goHomeLink")}
               </a>
             </>
           )}
@@ -153,12 +165,12 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
           {state.status === "ok" && !accepted && (
             <>
               <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 12px", color: "var(--volt-text, #0A0A0A)", letterSpacing: "-0.01em" }}>
-                {de ? "Du wurdest eingeladen" : "You've been invited"}
+                {t("invite.invitedHeading")}
               </h1>
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
-                {de
-                  ? <>Der Mandant <strong>{state.invite.tenant.name}</strong> laedt <strong>{state.invite.email}</strong> als <strong>{roleLabel(state.invite.role, true)}</strong> ein.</>
-                  : <>Tenant <strong>{state.invite.tenant.name}</strong> invites <strong>{state.invite.email}</strong> to join as <strong>{roleLabel(state.invite.role, false)}</strong>.</>}
+                {t("invite.invitedBodyPrefix")} <strong>{state.invite.tenant.name}</strong>{" "}
+                {t("invite.invitedBodyInvites")} <strong>{state.invite.email}</strong>{" "}
+                {t("invite.invitedBodyAsJoin")} <strong>{roleLabel(state.invite.role, locale)}</strong>.
               </p>
               <div style={{
                 display: "flex", flexDirection: "column", gap: 6,
@@ -166,12 +178,12 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
                 background: "var(--color-surface-2, #F5F5F5)",
                 marginBottom: 20,
               }}>
-                <Row label={de ? "Mandant" : "Tenant"} value={state.invite.tenant.name} />
-                <Row label={de ? "Email" : "Email"} value={state.invite.email} />
-                <Row label={de ? "Rolle" : "Role"} value={roleLabel(state.invite.role, de)} />
+                <Row label={t("invite.rowTenant")} value={state.invite.tenant.name} />
+                <Row label={t("invite.rowEmail")} value={state.invite.email} />
+                <Row label={t("invite.rowRole")} value={roleLabel(state.invite.role, locale)} />
                 <Row
-                  label={de ? "Gueltig bis" : "Valid until"}
-                  value={new Date(state.invite.expiresAt).toLocaleDateString(de ? "de-DE" : "en-US", {
+                  label={t("invite.rowValidUntil")}
+                  value={new Date(state.invite.expiresAt).toLocaleDateString(localeTag(locale), {
                     year: "numeric", month: "short", day: "numeric",
                   })}
                 />
@@ -196,20 +208,19 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
                 >
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>
                     {acceptError.code === "EMAIL_MISMATCH"
-                      ? (de ? "Falsches Konto" : "Wrong account")
-                      : (de ? "Annahme fehlgeschlagen" : "Accept failed")}
+                      ? t("invite.wrongAccountHeading")
+                      : t("invite.acceptFailedHeading")}
                   </div>
                   <div style={{ marginBottom: 6 }}>{acceptError.message}</div>
                   {acceptError.code === "EMAIL_MISMATCH" && (
                     <div style={{ fontSize: 12, opacity: 0.9 }}>
-                      {de
-                        ? <>Bitte mit <strong>{state.invite.email}</strong> anmelden und erneut versuchen. </>
-                        : <>Please sign in as <strong>{state.invite.email}</strong> and try again. </>}
+                      {t("invite.emailMismatchPrefix")} <strong>{state.invite.email}</strong>{" "}
+                      {t("invite.emailMismatchSuffix")}{" "}
                       <a
                         href={`/auth/signin?callbackUrl=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`}
                         style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}
                       >
-                        {de ? "Zur Anmeldung →" : "Sign in →"}
+                        {t("invite.emailMismatchSignInCta")}
                       </a>
                     </div>
                   )}
@@ -230,14 +241,10 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
                   cursor: accepting ? "wait" : "pointer",
                 }}
               >
-                {accepting
-                  ? (de ? "Einen Moment…" : "One moment…")
-                  : (de ? "Einladung annehmen →" : "Accept invitation →")}
+                {accepting ? t("invite.acceptingCta") : t("invite.acceptInviteCta")}
               </button>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 12, lineHeight: 1.5 }}>
-                {de
-                  ? "Du musst unter dieser Email eingeloggt sein. Ist das nicht der Fall, wirst du zum Login weitergeleitet."
-                  : "You must be signed in with this email. If you aren't, you'll be redirected to sign-in."}
+                {t("invite.acceptHint")}
               </p>
             </>
           )}
@@ -245,10 +252,10 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
           {accepted && (
             <>
               <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px", color: "var(--volt-text, #0A0A0A)" }}>
-                {de ? "Willkommen an Bord" : "Welcome aboard"}
+                {t("invite.acceptedHeading")}
               </h1>
               <p style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
-                {de ? "Du wirst weitergeleitet…" : "Redirecting you…"}
+                {t("invite.acceptedBody")}
               </p>
             </>
           )}
