@@ -6,9 +6,15 @@
  * Visuelles Kodiersystem:
  *   Position X   → Zeithorizont (kurzfristig ↔ langfristig)
  *   Position Y   → Reifegrad / Priorität (beobachten ↔ übernehmen)
- *   Blasengröße  → Einfluss (influence)
- *   Deckkraft    → Vertrauen (confidence)
+ *   Blasengröße  → Impact (Auswirkungsstärke des Trends)
+ *   Deckkraft    → Konfidenz (Vertrauen in die Einschätzung)
  *   Farbe        → Zeithorizont-Kategorie oder benutzerdefiniert
+ *
+ * Hinweis zur Terminologie (Welle A, Vokabular-Konsolidierung):
+ *   Die Prop-Namen `influence` / `confidence` bleiben in der
+ *   RadarBubble-API aus Gründen der Rückwärts-Kompatibilität erhalten.
+ *   Alle UI-Labels sprechen das kanonische SIS-Vokabular
+ *   ("Impact", "Konfidenz") — siehe src/lib/i18n.ts Glossar.
  *
  * Architektur:
  *   D3 wird NUR für Skalenberechnung verwendet (scaleLinear).
@@ -51,9 +57,10 @@ export interface RadarBubble {
   x: number;
   /** Y-Achse: Reifegrad (0–1, 0 = beobachten, 1 = übernehmen) */
   y: number;
-  /** Blasengröße: Einfluss (1–100) */
+  /** Blasengröße: Impact (1–100). Prop-Name `influence` bleibt zur
+   *  API-Kompatibilität; UI-Label ist "Impact" (siehe Glossar in i18n.ts). */
   influence: number;
-  /** Deckkraft: Vertrauen (0–1) */
+  /** Deckkraft: Konfidenz (0–1). Never render this as "Vertrauen". */
   confidence: number;
   /** Kategorie für Farbzuweisung */
   category?: string;
@@ -300,7 +307,7 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
               <circle cx="6" cy="8" r="4" fill={isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.15)"} />
               <circle cx="20" cy="8" r="7" fill={isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.15)"} />
             </svg>
-            <span>Größe = Einfluss</span>
+            <span>Größe = Impact</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="flex gap-0.5">
@@ -313,7 +320,7 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
           <div className="flex items-center gap-1.5">
             <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(0,0,0,0.15)", display: "inline-block", opacity: 0.4 }} />
             <span style={{ width: 14, height: 14, borderRadius: "50%", background: "rgba(0,0,0,0.15)", display: "inline-block", opacity: 1 }} />
-            <span>Deckkraft = Vertrauen</span>
+            <span>Deckkraft = Konfidenz</span>
           </div>
         </div>
       </div>
@@ -551,8 +558,8 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
 
               {/* Metriken */}
               {[
-                { label: "Einfluss",  value: tooltip.bubble.influence,                    color: tooltip.color },
-                { label: "Vertrauen", value: Math.round(tooltip.bubble.confidence * 100), color: "#6DDBA0" },
+                { label: "Impact",    value: tooltip.bubble.influence,                    color: tooltip.color },
+                { label: "Konfidenz", value: Math.round(tooltip.bubble.confidence * 100), color: "#6DDBA0" },
                 { label: "Relevanz",  value: tooltip.bubble.meta?.relevance ?? Math.round(tooltip.bubble.confidence * 100), color: "#7AB8F5" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center gap-2 mb-1.5">
@@ -609,8 +616,8 @@ export const VoltRadarChart: React.FC<VoltRadarChartProps> = ({
           style={{ borderTop: `1px solid ${borderColor}` }}
         >
           {[
-            { label: "Hohes Vertrauen",  value: highConf, color: isDark ? LIME : "#3A7A00" },
-            { label: "Mittleres Vertr.", value: midConf,  color: isDark ? "#F5C87A" : "#8A6000" },
+            { label: "Hohe Konfidenz",   value: highConf, color: isDark ? LIME : "#3A7A00" },
+            { label: "Mittlere Konf.",   value: midConf,  color: isDark ? "#F5C87A" : "#8A6000" },
             { label: "Beobachtung",      value: lowConf,  color: statsMuted },
           ].map(s => (
             <div key={s.label} className="flex items-center gap-2">

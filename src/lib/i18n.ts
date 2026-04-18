@@ -85,6 +85,95 @@
  *   - app/frameworks/* (45, 37, 25, 24, 24, 20, …)
  *   - app/cockpit/* + how-to/*, auth/signin/*, ~40 other files
  * Use the recipe above; keep commits ≤ 3 files each for reviewability.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Canonical vocabulary (2026-04-18, Welle A Item 1)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * After the 4-app Deep-Dive (Theia/Delphi, Manifold, Perigon,
+ * Worldmonitor) finding #4 — *all four benchmark apps have a
+ * coherent product vocabulary, SIS still mixes terms* — we fix our
+ * terminology here as the single source of truth. When in doubt,
+ * use these words. Do NOT translate around them.
+ *
+ * Core nouns
+ * ──────────
+ *   EN              DE                  Meaning (short)
+ *   ----            ----                -------------------------------
+ *   Signal          Signal              Single raw observation from a
+ *                                       connector (news, RSS, API item).
+ *                                       Never "news item", "article",
+ *                                       "event" in user-facing copy.
+ *   Trend           Trend               Distilled persistent pattern
+ *                                       across many signals over time.
+ *                                       "Macro-Trend" / "Mega-Trend" may
+ *                                       appear as qualifiers but the
+ *                                       base noun is always Trend.
+ *   Query           Abfrage             The user's strategic question
+ *                                       (also OK: "Frage" in casual UX
+ *                                       copy where "IHRE FRAGE" reads
+ *                                       better than "IHRE ABFRAGE").
+ *   Synthesis       Synthese            LLM-generated analytical text
+ *                                       for ONE query → one card.
+ *                                       Data-layer / card-level noun.
+ *   Briefing        Briefing            Project-level aggregate memo
+ *                                       built from many syntheses +
+ *                                       evidence. User-facing output
+ *                                       noun. (DE keeps the English
+ *                                       loanword — "Briefing" reads
+ *                                       as a term of art in strategy
+ *                                       teams; don't translate to
+ *                                       "Bericht" or "Memo".)
+ *   Scenario        Szenario            Structured what-if future
+ *                                       state with drivers + impact.
+ *   Project         Projekt             Container for queries, notes,
+ *                                       the canvas, the briefing.
+ *   Canvas          Canvas              The spatial workspace (node
+ *                                       graph). Never "Board" or
+ *                                       "Whiteboard".
+ *   Foresight       Foresight           The discipline / product
+ *                                       category. SIS is a "Foresight
+ *                                       platform", not an "Analytics
+ *                                       platform". (DE: keep the
+ *                                       English loanword — "Vorausschau"
+ *                                       reads academic, "Foresight"
+ *                                       reads industry-standard.)
+ *
+ * Core metrics
+ * ────────────
+ *   EN              DE                  Meaning
+ *   ----            ----                -------------------------------
+ *   Confidence      Konfidenz           How certain the assessment is
+ *                                       (0..1 or 0..100 %). Always
+ *                                       "Konfidenz" in DE, never
+ *                                       "Vertrauen" or "Sicherheit".
+ *   Impact          Impact              Magnitude of a trend's potential
+ *                                       effect (0..100). Loanword in DE
+ *                                       — never "Einfluss" (that's
+ *                                       reserved for stakeholder-style
+ *                                       social influence) and never
+ *                                       "Auswirkung" (that's an effect
+ *                                       description, not a metric).
+ *   Relevance       Relevanz            How relevant a trend is to the
+ *                                       user's query.
+ *   Velocity        Velocity            Rate-of-change of signal volume.
+ *                                       DE keeps the loanword.
+ *   Momentum        Momentum            Sustained velocity over time.
+ *   Horizon         Horizont            Time horizon: short/mid/long.
+ *
+ * Positioning phrases (from the Deep-Dive, to use consistently)
+ * ─────────────────────────────────────────────────────────────
+ *   "Strategic Signal" / "Strategisches Signal" — any canvas card
+ *     output, not "news card" or "analysis card".
+ *   "Strategic Briefing" / "Strategisches Briefing" — the project
+ *     output. Theia framing.
+ *   "Foresight-first" / "Foresight-zentriert" — SIS's differentiator
+ *     against retrospective tools (Perigon, Worldmonitor).
+ *
+ * When adding a new key, pick the noun/metric from the table above
+ * and align both EN + DE. If the concept doesn't fit any row here,
+ * add it to the table in the same commit — don't let new terms
+ * sneak in without a canonical entry.
  */
 
 export type Locale = "de" | "en";
@@ -1094,9 +1183,9 @@ const de: Dictionary = {
     impactGte: "Impact ≥",
     trendsCount: "Trends",
     withLiveSignals72h: "mit Live-Signalen (72h)",
-    sizeImpact: "Größe = Einfluss",
+    sizeImpact: "Größe = Impact",
     colorHorizon: "Farbe = Horizont",
-    opacityConfidence: "Deckkraft = Vertrauen",
+    opacityConfidence: "Deckkraft = Konfidenz",
     rings: "Ringe",
     rising: "steigt",
     falling: "fällt",
@@ -1118,7 +1207,7 @@ const de: Dictionary = {
     longTerm: "Langfristig",
     allRings: "Alle Ringe",
     allCategories: "Alle Kategorien",
-    minConfidence: "Min. Vertrauen:",
+    minConfidence: "Min. Konfidenz:",
     ringAdopt: "Übernehmen",
     ringTrial: "Testen",
     ringAssess: "Bewerten",
@@ -1127,8 +1216,8 @@ const de: Dictionary = {
     short: "Kurz",
     mid: "Mittel",
     long: "Lang",
-    sizeIsImpact: "Größe = Einfluss",
-    opacityIsConfidence: "Deckkraft = Vertrauen",
+    sizeIsImpact: "Größe = Impact",
+    opacityIsConfidence: "Deckkraft = Konfidenz",
     horizonShort: "0-12 Monate",
     horizonMid: "1-3 Jahre",
     horizonLong: "3+ Jahre",
@@ -1136,8 +1225,8 @@ const de: Dictionary = {
     velocityFalling: "Fallend",
     stable: "Stabil",
     relevance: "Relevanz",
-    confidence: "Vertrauen",
-    impact: "Einfluss",
+    confidence: "Konfidenz",
+    impact: "Impact",
     timeHorizon: "Zeithorizont",
     override: "Überschreiben",
     scoreHistory: "Score-Verlauf (90 Tage)",
