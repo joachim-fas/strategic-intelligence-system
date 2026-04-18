@@ -170,7 +170,8 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
                 {t("invite.invitedBodyPrefix")} <strong>{state.invite.tenant.name}</strong>{" "}
                 {t("invite.invitedBodyInvites")} <strong>{state.invite.email}</strong>{" "}
-                {t("invite.invitedBodyAsJoin")} <strong>{roleLabel(state.invite.role, locale)}</strong>.
+                {t("invite.invitedBodyAsJoin")} <strong>{roleLabel(state.invite.role, locale)}</strong>
+                {t("invite.invitedBodySuffix")}
               </p>
               <div style={{
                 display: "flex", flexDirection: "column", gap: 6,

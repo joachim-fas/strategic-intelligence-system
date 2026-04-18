@@ -456,6 +456,10 @@ const en = {
     invitedBodyPrefix: "Tenant",
     invitedBodyInvites: "invites",
     invitedBodyAsJoin: "to join as",
+    // Trailing fragment so the German sentence closes with the
+    // separable verb "ein" after the role, instead of "ein als Z"
+    // before it. EN just gets the period.
+    invitedBodySuffix: ".",
     rowTenant: "Tenant",
     rowEmail: "Email",
     rowRole: "Role",
@@ -1351,7 +1355,8 @@ const de: Dictionary = {
     invitedHeading: "Du wurdest eingeladen",
     invitedBodyPrefix: "Der Mandant",
     invitedBodyInvites: "lädt",
-    invitedBodyAsJoin: "ein als",
+    invitedBodyAsJoin: "als",
+    invitedBodySuffix: " ein.",
     rowTenant: "Mandant",
     rowEmail: "E-Mail",
     rowRole: "Rolle",
@@ -1957,9 +1962,12 @@ export function formatRelativeTime(
 ): string {
   const d = value instanceof Date ? value : new Date(value);
   const diffMs = Date.now() - d.getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  const hrs = Math.floor(mins / 60);
-  const days = Math.floor(hrs / 24);
+  // Math.round (not floor) so "59 min 40 s" rounds up to "1 h" at the
+  // boundary — matches the original `SessionList.formatRelative`
+  // behaviour. Floor would hold the reader at "59 Min" for ~30 s longer.
+  const mins = Math.round(diffMs / 60_000);
+  const hrs = Math.round(mins / 60);
+  const days = Math.round(hrs / 24);
 
   if (mins < 1) return t(locale, "common.justNow");
   if (mins < 60) return t(locale, "common.minutesAgo", { n: mins });
