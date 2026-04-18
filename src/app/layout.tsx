@@ -5,6 +5,7 @@ import { LocaleProvider } from "@/lib/locale-context";
 import { TenantProvider, type TenantMembership } from "@/lib/tenant-context";
 import SignalTicker from "@/components/SignalTicker";
 import { ActivityPanel } from "@/components/ActivityPanel";
+import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { Footer } from "@/components/Footer";
 import { auth } from "@/lib/auth";
 import { getSqliteHandle } from "@/db";
@@ -32,8 +33,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 
-// TODO: UX-04 — No responsive/mobile layout. No breakpoints, no touch support.
-// FIX: Add responsive breakpoints or show "Desktop only" notice on mobile.
+// Former TODO UX-04 — "Desktop only" notice on mobile is now handled
+// by <DesktopOnlyGate/>. A proper responsive layout is still open as
+// a follow-up ticket (Audit A5-H4).
 
 export const metadata: Metadata = {
   title: { default: "SIS — Strategic Intelligence System", template: "%s | SIS" },
@@ -124,6 +126,9 @@ export default async function RootLayout({
             </div>
             <SignalTicker />
             <ActivityPanel />
+            {/* Honest-state overlay for < 768 px viewports until the
+                 responsive-layout ticket lands (Audit A5-H4). */}
+            <DesktopOnlyGate />
           </TenantProvider>
         </LocaleProvider>
       </body>
