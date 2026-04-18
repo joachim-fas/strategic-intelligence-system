@@ -28,6 +28,7 @@ import { groupSignalsByTopic, scoreTrend } from "@/lib/scoring";
 import { megaTrends } from "@/lib/mega-trends";
 import { sanitizeConnectorResponse } from "@/lib/api-utils";
 import { storeSignals, pruneOldSignals } from "@/lib/signals";
+import { updateBaseline, baselineKeyForDate } from "@/lib/baseline";
 import { eq, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -253,6 +254,34 @@ export async function runPipeline(): Promise<PipelineResult> {
         source: "database",
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+
+    // Phase 2c (Welle B Item 3 — Welford baselines):
+    // Update streaming-variance state for per-source signal volume.
+    // One sample per connector per pipeline run, keyed by weekday x
+    // month so Tuesday-vs-Sunday patterns don't wash each other out.
+    // Wrapped per-connector so one bad write doesn't short-circuit
+    // the rest — this is a side-channel metric, not on the hot path.
+    try {
+      const now = new Date();
+      for (const [connectorName, connSignals] of signalsByConnector) {
+        try {
+          updateBaseline(
+            baselineKeyForDate("signal_count", connectorName, now),
+            connSignals.length,
+          );
+        } catch (innerErr) {
+          console.error(
+            `[pipeline] baseline update failed for ${connectorName}:`,
+            innerErr,
+          );
+          // Not added to errors[] — baseline is a nice-to-have, not
+          // a pipeline-health signal. A missing baseline just means
+          // the anomaly UI will stay in "warming up" state longer.
+        }
+      }
+    } catch (err) {
+      console.error("[pipeline] baseline phase failed:", err);
     }
 
     const durationMs = Date.now() - start;

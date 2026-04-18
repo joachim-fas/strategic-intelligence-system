@@ -278,6 +278,21 @@ const statements = [
     expires_at TEXT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS og_image_cache_expires ON og_image_cache(expires_at)`,
+
+  // ─── Baseline stats (Welle B Item 3 — Welford) ───────────────────────────
+  // Per-key streaming-variance state for anomaly detection. One row per
+  // (metric, source, weekday, month) tuple; key shape is built by
+  // `baselineKey()` in src/lib/baseline.ts. Welford state is (n, mean, m2)
+  // — stddev is derived on read. The table is tiny by design: one row per
+  // source × 7 weekdays × 12 months = ~1k rows even with 100 connectors,
+  // so no partitioning / retention is needed.
+  `CREATE TABLE IF NOT EXISTS baseline_stats (
+    key TEXT PRIMARY KEY,
+    n INTEGER NOT NULL,
+    mean REAL NOT NULL,
+    m2 REAL NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);

@@ -128,6 +128,18 @@ export function ensureMultiTenantSchema(db: Database.Database): void {
   // legacy constraint cleanly.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS bsc_ratings_tenant_unique
     ON bsc_ratings(tenant_id, query_hash, perspective_id)`);
+
+  // ── Baseline stats (Welle B Item 3 — Welford streaming variance) ──
+  // Keyed per (metric:source:weekday:month); helpers in src/lib/baseline.ts.
+  // Lives here so the auto-migration on first boot (db/index.ts) picks it
+  // up alongside the tenant schema — no separate manual migrate step.
+  db.exec(`CREATE TABLE IF NOT EXISTS baseline_stats (
+    key TEXT PRIMARY KEY,
+    n INTEGER NOT NULL,
+    mean REAL NOT NULL,
+    m2 REAL NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
 }
 
 /**
