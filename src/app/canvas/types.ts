@@ -198,3 +198,31 @@ export interface CanvasProject {
   hasState: boolean;
   updated_at: string;
 }
+
+// ── Shared card-renderer props ─────────────────────────────────────
+
+/**
+ * Props common to every canvas node-card renderer. Decomposition
+ * slice 4 (18.04.2026 audit A5-H7) pulls card renderers into
+ * `src/app/canvas/nodes/` — this type keeps their signatures from
+ * drifting. Each card type extends this with its own mutation
+ * callbacks (onUpdate for note/idea/list, onAnalyze for file, etc.).
+ */
+export interface CardBaseProps {
+  selected: boolean;
+  onSelect: (id: string) => void;
+  onDragStart: (e: React.PointerEvent, id: string) => void;
+  onDelete: (id: string) => void;
+  onResizeStart: (
+    e: React.PointerEvent,
+    id: string,
+    currentW: number,
+    currentH: number,
+    dir?: "h" | "v" | "both",
+  ) => void;
+  onIterate: (nodeId: string, prefill: string) => void;
+  onPortDragStart: (e: React.PointerEvent, nodeId: string) => void;
+  nodeW: number;
+  dimmed?: boolean;
+  zoom?: number;
+}
