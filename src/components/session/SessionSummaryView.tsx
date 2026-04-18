@@ -21,7 +21,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { t as translate, localeTag, type Locale, type TranslationKey } from "@/lib/i18n";
 import { VoltInfoBlock } from "@/components/verstehen/VoltPrimitives";
 import {
   ArrowLeft,
@@ -80,8 +81,7 @@ interface SessionSummaryViewProps {
 // ── Presentation ────────────────────────────────────────────────────────────
 
 export default function SessionSummaryView({ projectId }: SessionSummaryViewProps) {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale, de } = useT();
 
   const [briefings, setBriefings] = useState<Briefing[]>([]);
   const [projectName, setProjectName] = useState<string>("");
@@ -108,7 +108,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
           setProjectName((json.data ?? json).canvas?.name || "");
         }
         if (!summaryRes.ok) {
-          setError(de ? "Projekt nicht gefunden." : "Project not found.");
+          setError(t("summary.projectNotFound"));
           setLoading(false);
           return;
         }
@@ -126,30 +126,30 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
 
   const exportMarkdown = useCallback(() => {
     const lines: string[] = [];
-    lines.push(`# ${projectName || (de ? "Projekt" : "Project")}`);
+    lines.push(`# ${projectName || t("summary.projectFallback")}`);
     lines.push("");
-    lines.push(`> ${briefings.length} ${de ? "Analysen" : "analyses"} · ${new Date().toLocaleString(de ? "de-DE" : "en-US")}`);
+    lines.push(`> ${briefings.length} ${t("summary.analysisPlural")} · ${new Date().toLocaleString(localeTag(locale))}`);
     lines.push("");
     briefings.forEach((b, i) => {
       lines.push(`## ${String(i + 1).padStart(2, "0")}. ${b.query}`);
       if (b.createdAt) {
-        lines.push(`_${new Date(b.createdAt).toLocaleString(de ? "de-DE" : "en-US")}_`);
+        lines.push(`_${new Date(b.createdAt).toLocaleString(localeTag(locale))}_`);
       }
       lines.push("");
       if (b.synthesis) {
-        lines.push(`### ${de ? "Synthese" : "Synthesis"}`);
+        lines.push(`### ${t("summary.sectionSynthesis")}`);
         lines.push("");
         lines.push(b.synthesis);
         lines.push("");
       }
       if (b.keyInsights.length > 0) {
-        lines.push(`### ${de ? "Erkenntnisse" : "Key Insights"}`);
+        lines.push(`### ${t("summary.sectionKeyInsights")}`);
         lines.push("");
         b.keyInsights.forEach((k) => lines.push(`- ${k}`));
         lines.push("");
       }
       if (b.scenarios.length > 0) {
-        lines.push(`### ${de ? "Szenarien" : "Scenarios"}`);
+        lines.push(`### ${t("summary.sectionScenarios")}`);
         lines.push("");
         b.scenarios.forEach((s) => {
           const pct = s.probability != null ? ` (${Math.round(s.probability * 100)}%)` : "";
@@ -158,19 +158,19 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         });
       }
       if (b.interpretation) {
-        lines.push(`### ${de ? "Interpretation" : "Interpretation"}`);
+        lines.push(`### ${t("summary.sectionInterpretation")}`);
         lines.push("");
         lines.push(b.interpretation);
         lines.push("");
       }
       if (b.decisionFramework) {
-        lines.push(`### ${de ? "Entscheidungsrahmen" : "Decision Framework"}`);
+        lines.push(`### ${t("summary.sectionDecisionFramework")}`);
         lines.push("");
         lines.push(b.decisionFramework);
         lines.push("");
       }
       if (b.regulatoryContext.length > 0) {
-        lines.push(`### ${de ? "Regulatorischer Kontext" : "Regulatory Context"}`);
+        lines.push(`### ${t("summary.sectionRegulatoryContext")}`);
         lines.push("");
         b.regulatoryContext.forEach((r) => {
           if (typeof r === "string") lines.push(`- ${r}`);
@@ -179,13 +179,13 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         lines.push("");
       }
       if (b.followUpQuestions.length > 0) {
-        lines.push(`### ${de ? "Folgefragen" : "Follow-up Questions"}`);
+        lines.push(`### ${t("summary.sectionFollowUps")}`);
         lines.push("");
         b.followUpQuestions.forEach((q) => lines.push(`- ${q}`));
         lines.push("");
       }
       if (b.references.length > 0) {
-        lines.push(`### ${de ? "Quellen" : "References"}`);
+        lines.push(`### ${t("summary.sectionReferences")}`);
         lines.push("");
         b.references.forEach((r) => {
           if (r.url) lines.push(`- [${r.title ?? r.url}](${r.url})${r.source ? ` — _${r.source}_` : ""}`);
@@ -215,17 +215,17 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         <>
           <button
             onClick={() => window.print()}
-            title={de ? "Drucken (Cmd+P)" : "Print (Cmd+P)"}
+            title={t("summary.printTip")}
             style={headerBtnStyle}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.5)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <Printer size={13} strokeWidth={2} />
-            <span>{de ? "Drucken" : "Print"}</span>
+            <span>{t("summary.printAction")}</span>
           </button>
           <button
             onClick={exportMarkdown}
-            title={de ? "Als Markdown exportieren" : "Export as Markdown"}
+            title={t("summary.exportMdTip")}
             style={headerBtnStyle}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(228,255,151,0.5)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
@@ -277,7 +277,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                 marginBottom: 8,
               }}>
                 <FileText size={11} strokeWidth={2} />
-                {de ? "Zusammenfassung" : "Summary"}
+                {t("summary.caption")}
               </div>
               <h1 style={{
                 margin: 0,
@@ -286,7 +286,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                 color: "var(--color-text-heading, #0A0A0A)",
                 lineHeight: 1.15,
               }}>
-                {projectName || (de ? "Projekt" : "Project")}
+                {projectName || t("summary.projectFallback")}
               </h1>
               <p style={{
                 margin: "6px 0 0", fontSize: 13,
@@ -294,12 +294,10 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
               }}>
                 {loading
-                  ? (de ? "Lade Analysen …" : "Loading analyses…")
+                  ? t("summary.loadingAnalyses")
                   : briefings.length === 0
-                    ? (de ? "Keine Analysen in diesem Projekt." : "No analyses in this project yet.")
-                    : (de
-                        ? `${briefings.length} ${briefings.length === 1 ? "Analyse" : "Analysen"} · chronologisch`
-                        : `${briefings.length} ${briefings.length === 1 ? "analysis" : "analyses"} · chronological`)}
+                    ? t("summary.noneInProject")
+                    : `${briefings.length} ${briefings.length === 1 ? t("summary.analysisSingular") : t("summary.analysisPlural")} · ${t("summary.chronological")}`}
               </p>
             </div>
             {headerActions}
@@ -308,7 +306,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
 
         {/* ─── Error state ─── */}
         {error && !loading && (
-          <VoltInfoBlock variant="error" label={de ? "Fehler" : "Error"}>
+          <VoltInfoBlock variant="error" label={t("summary.errorLabel")}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <span style={{ flex: 1 }}>{error}</span>
               <button
@@ -320,17 +318,15 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
                   color: "inherit", cursor: "pointer",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}
-              >{de ? "Erneut laden" : "Retry"}</button>
+              >{t("summary.retry")}</button>
             </div>
           </VoltInfoBlock>
         )}
 
         {/* ─── Empty state ─── */}
         {!loading && !error && briefings.length === 0 && (
-          <VoltInfoBlock variant="info" label={de ? "Noch keine Analysen" : "No analyses yet"}>
-            {de
-              ? "In diesem Projekt ist noch keine Analyse gespeichert. Starte eine Abfrage auf der Startseite oder im Node-Canvas — sobald ein Briefing erstellt wird, erscheint es hier."
-              : "No analyses saved to this project yet. Run a query on the home page or in the node canvas — as soon as a briefing lands, it shows up here."}
+          <VoltInfoBlock variant="info" label={t("summary.emptyLabel")}>
+            {t("summary.emptyBody")}
           </VoltInfoBlock>
         )}
 
@@ -350,6 +346,8 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
 // ── Briefing section ───────────────────────────────────────────────────────
 
 function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: number; de: boolean }) {
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
   const b = briefing;
   const confPct = b.confidence != null ? Math.round(b.confidence * 100) : null;
 
@@ -373,7 +371,7 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
         }}>
           <span>{String(index + 1).padStart(2, "0")}</span>
           <span style={{ opacity: 0.4 }}>·</span>
-          <span>{de ? "Abfrage" : "Query"}</span>
+          <span>{tl("summary.queryLabel")}</span>
           {confPct != null && (
             <>
               <span style={{ opacity: 0.4 }}>·</span>
@@ -382,14 +380,14 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
                 padding: "1px 6px", borderRadius: 3,
                 background: "#E4FF97", color: "#0A0A0A",
               }}>
-                {confPct}% {de ? "Konfidenz" : "Confidence"}
+                {confPct}% {tl("summary.confidenceLabel")}
               </span>
             </>
           )}
           {b.createdAt && (
             <>
               <span style={{ opacity: 0.4 }}>·</span>
-              <span>{new Date(b.createdAt).toLocaleDateString(de ? "de-DE" : "en-US", { day: "2-digit", month: "short", year: "numeric" })}</span>
+              <span>{new Date(b.createdAt).toLocaleDateString(localeTag(locale), { day: "2-digit", month: "short", year: "numeric" })}</span>
             </>
           )}
         </div>
@@ -406,14 +404,14 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
 
       {/* Synthesis */}
       {b.synthesis && (
-        <Block icon={<Target size={13} strokeWidth={2.25} />} label={de ? "Synthese" : "Synthesis"}>
+        <Block icon={<Target size={13} strokeWidth={2.25} />} label={tl("summary.sectionSynthesis")}>
           <p style={bodyTextStyle}>{b.synthesis}</p>
         </Block>
       )}
 
       {/* Key Insights */}
       {b.keyInsights.length > 0 && (
-        <Block icon={<Compass size={13} strokeWidth={2.25} />} label={de ? "Erkenntnisse" : "Key Insights"}>
+        <Block icon={<Compass size={13} strokeWidth={2.25} />} label={tl("summary.sectionKeyInsights")}>
           <ul style={bulletListStyle}>
             {b.keyInsights.map((k, i) => (
               <li key={i} style={bulletItemStyle}>{k}</li>
@@ -424,7 +422,7 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
 
       {/* Scenarios */}
       {b.scenarios.length > 0 && (
-        <Block icon={<Layers size={13} strokeWidth={2.25} />} label={de ? "Szenarien" : "Scenarios"}>
+        <Block icon={<Layers size={13} strokeWidth={2.25} />} label={tl("summary.sectionScenarios")}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
             {b.scenarios.map((s, i) => (
               <div key={i} style={{
@@ -437,7 +435,7 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
                     fontSize: 13, fontWeight: 700,
                     color: "var(--color-text-heading)",
                     fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
-                  }}>{s.name || (de ? "Szenario" : "Scenario")}</span>
+                  }}>{s.name || tl("summary.scenarioFallback")}</span>
                   {s.probability != null && (
                     <span style={{
                       fontSize: 11, fontWeight: 700,
@@ -459,21 +457,21 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
 
       {/* Interpretation */}
       {b.interpretation && (
-        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={de ? "Interpretation" : "Interpretation"}>
+        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={tl("summary.sectionInterpretation")}>
           <p style={bodyTextStyle}>{b.interpretation}</p>
         </Block>
       )}
 
       {/* Decision Framework */}
       {b.decisionFramework && (
-        <Block icon={<CircleDot size={13} strokeWidth={2.25} />} label={de ? "Entscheidungsrahmen" : "Decision Framework"}>
+        <Block icon={<CircleDot size={13} strokeWidth={2.25} />} label={tl("summary.sectionDecisionFramework")}>
           <p style={bodyTextStyle}>{b.decisionFramework}</p>
         </Block>
       )}
 
       {/* Regulatory Context */}
       {b.regulatoryContext.length > 0 && (
-        <Block icon={<AlertTriangle size={13} strokeWidth={2.25} />} label={de ? "Regulatorischer Kontext" : "Regulatory Context"}>
+        <Block icon={<AlertTriangle size={13} strokeWidth={2.25} />} label={tl("summary.sectionRegulatoryContext")}>
           <ul style={bulletListStyle}>
             {b.regulatoryContext.map((r, i) => {
               if (typeof r === "string") return <li key={i} style={bulletItemStyle}>{r}</li>;
@@ -495,7 +493,7 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
            the home page with the question pre-filled so the reader
            can launch the follow-up analysis with one click. */}
       {b.followUpQuestions.length > 0 && (
-        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={de ? "Folgefragen" : "Follow-up Questions"}>
+        <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={tl("summary.sectionFollowUps")}>
           <ul style={{ ...bulletListStyle, gap: 6 }}>
             {b.followUpQuestions.map((q, i) => (
               <li key={i} style={bulletItemStyle}>
@@ -519,7 +517,7 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
 
       {/* References */}
       {b.references.length > 0 && (
-        <Block icon={<BookOpen size={13} strokeWidth={2.25} />} label={de ? "Quellen" : "References"}>
+        <Block icon={<BookOpen size={13} strokeWidth={2.25} />} label={tl("summary.sectionReferences")}>
           <ul style={{ ...bulletListStyle, gap: 6 }}>
             {b.references.map((r, i) => (
               <li key={i} style={{ ...bulletItemStyle, display: "flex", alignItems: "baseline", gap: 6 }}>
