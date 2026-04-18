@@ -4457,7 +4457,7 @@ function DetailPanel({
             )}
             {qNode.status === "error" && (
               <Tooltip content={de ? "Fehlgeschlagene Analyse erneut versuchen" : "Retry failed analysis"} placement="top">
-                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}><RotateCcw size={12} /> Retry</button>
+                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}><RotateCcw size={12} /> {de ? "Erneut versuchen" : "Retry"}</button>
               </Tooltip>
             )}
             {qNode.synthesis && (
@@ -4486,7 +4486,7 @@ function DetailPanel({
               >{de ? "Als Abfrage" : "As Query"}</button>
             </Tooltip>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, noteDraft)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
+              <button onClick={() => onIterate(node.id, noteDraft)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4510,7 +4510,7 @@ function DetailPanel({
               >{de ? "Als Abfrage" : "As Query"}</button>
             </Tooltip>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, ideaText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
+              <button onClick={() => onIterate(node.id, ideaText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4529,7 +4529,7 @@ function DetailPanel({
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
             <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, listText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
+              <button onClick={() => onIterate(node.id, listText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
             </Tooltip>
             <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
@@ -4676,7 +4676,7 @@ function DetailPanel({
             >{btnLabel}</button>
           </Tooltip>
           <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-            <button onClick={() => onIterate(node.id, dNode.queryText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 4 }}><RotateCcw size={11} /> rethink</button>
+            <button onClick={() => onIterate(node.id, dNode.queryText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
           </Tooltip>
           <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
             <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
