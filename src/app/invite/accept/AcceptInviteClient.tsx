@@ -52,9 +52,18 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
   }, [token, de]);
   useEffect(() => { load(); }, [load]);
 
+  // Audit A4-H2 (18.04.2026): error state for the POST-accept call.
+  // Previously we rendered `alert(json?.error?.message)` which left the
+  // user on a modal dialog with no recovery — especially bad for the
+  // 401 UNAUTHORIZED case (user not signed in) and the 403
+  // EMAIL_MISMATCH case (logged in under the wrong email). Now both
+  // get inline copy + an actionable link.
+  const [acceptError, setAcceptError] = useState<{ code: string; message: string } | null>(null);
+
   const accept = async () => {
     if (!token) return;
     setAccepting(true);
+    setAcceptError(null);
     try {
       const res = await fetchWithTimeout("/api/v1/invites/accept", {
         method: "POST",
@@ -63,7 +72,15 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
-        alert(json?.error?.message ?? (de ? "Annahme fehlgeschlagen." : "Accept failed."));
+        const code = json?.error?.code ?? (res.status === 401 ? "UNAUTHORIZED" : "UNKNOWN");
+        const message = json?.error?.message ?? (de ? "Annahme fehlgeschlagen." : "Accept failed.");
+        // 401 → redirect straight to sign-in so the user can come back.
+        if (code === "UNAUTHORIZED" || res.status === 401) {
+          const callback = encodeURIComponent(window.location.href);
+          window.location.href = `/auth/signin?callbackUrl=${callback}`;
+          return;
+        }
+        setAcceptError({ code, message });
         return;
       }
       setAccepted(true);
@@ -159,6 +176,45 @@ export function AcceptInviteClient({ token }: { token: string | null }) {
                   })}
                 />
               </div>
+              {/* Inline error banner — audit A4-H2. EMAIL_MISMATCH is
+                   the common 403 where a logged-in user has the wrong
+                   email for this token. We tell them which email was
+                   invited (from state.invite.email) and link to sign
+                   out so they can sign back in under the right one. */}
+              {acceptError && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: 12,
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: "1px solid var(--signal-negative, #C0341D)",
+                    background: "var(--signal-negative-light, #FDEDEA)",
+                    color: "var(--signal-negative, #C0341D)",
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    {acceptError.code === "EMAIL_MISMATCH"
+                      ? (de ? "Falsches Konto" : "Wrong account")
+                      : (de ? "Annahme fehlgeschlagen" : "Accept failed")}
+                  </div>
+                  <div style={{ marginBottom: 6 }}>{acceptError.message}</div>
+                  {acceptError.code === "EMAIL_MISMATCH" && (
+                    <div style={{ fontSize: 12, opacity: 0.9 }}>
+                      {de
+                        ? <>Bitte mit <strong>{state.invite.email}</strong> anmelden und erneut versuchen. </>
+                        : <>Please sign in as <strong>{state.invite.email}</strong> and try again. </>}
+                      <a
+                        href={`/auth/signin?callbackUrl=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`}
+                        style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}
+                      >
+                        {de ? "Zur Anmeldung →" : "Sign in →"}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
               <button
                 onClick={accept}
                 disabled={accepting}

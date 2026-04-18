@@ -148,9 +148,12 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       );
       if (!res.ok) {
         const j = await res.json().catch(() => null);
-        alert(j?.error?.message ?? (de ? "Rolle konnte nicht geaendert werden." : "Could not change role."));
+        // Audit A4-H1 (18.04.2026): surface inline instead of alert().
+        setError(j?.error?.message ?? (de ? "Rolle konnte nicht geaendert werden." : "Could not change role."));
+        setTimeout(() => setError(null), 6000);
         return;
       }
+      setError(null);
       await load();
     } finally {
       setBusyId(null);
@@ -176,9 +179,12 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       );
       if (!res.ok) {
         const j = await res.json().catch(() => null);
-        alert(j?.error?.message ?? (de ? "Entfernen fehlgeschlagen." : "Remove failed."));
+        // Audit A4-H1 (18.04.2026): surface inline instead of alert().
+        setError(j?.error?.message ?? (de ? "Entfernen fehlgeschlagen." : "Remove failed."));
+        setTimeout(() => setError(null), 6000);
         return;
       }
+      setError(null);
       await load();
     } finally {
       setBusyId(null);
@@ -203,7 +209,9 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
         { method: "DELETE" },
       );
       if (!res.ok) {
-        alert(de ? "Aktion fehlgeschlagen." : "Action failed.");
+        // Audit A4-H1 (18.04.2026): inline error instead of alert().
+        setError(de ? "Aktion fehlgeschlagen." : "Action failed.");
+        setTimeout(() => setError(null), 6000);
         return;
       }
       await load();
@@ -228,6 +236,36 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
 
         {loading && !tenant && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Lade…" : "Loading…"}</div>}
         {error && !tenant && <div style={{ color: "var(--signal-negative, #C0341D)", fontSize: 13 }}>{error}</div>}
+        {/* Audit A4-H1 (18.04.2026): action errors (role change, member
+             remove, invite revoke) now surface as a sticky banner here
+             instead of as a native alert(). The banner auto-clears after
+             6s or when the next action succeeds. */}
+        {error && tenant && (
+          <div
+            role="alert"
+            style={{
+              margin: "8px 0 14px",
+              padding: "9px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--signal-negative, #C0341D)",
+              background: "var(--signal-negative-light, #FDEDEA)",
+              color: "var(--signal-negative, #C0341D)",
+              fontSize: 13,
+              display: "flex", alignItems: "center", gap: 10,
+            }}
+          >
+            <span style={{ flex: 1 }}>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              aria-label={de ? "Schließen" : "Close"}
+              style={{
+                border: "none", background: "transparent",
+                color: "inherit", cursor: "pointer",
+                padding: "0 4px", lineHeight: 1,
+              }}
+            >✕</button>
+          </div>
+        )}
 
         {tenant && (
           <>

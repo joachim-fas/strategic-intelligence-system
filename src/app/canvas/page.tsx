@@ -4716,6 +4716,9 @@ function DetailPanel({
   return (
     <div
       onPointerDown={e => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-label={de ? "Kartendetails" : "Card details"}
       style={{
         position: "fixed",
         left: "50%", top: 72,
@@ -8720,10 +8723,15 @@ export default function CanvasPage() {
           <>
             {/* Backdrop */}
             <div style={{ position: "absolute", inset: 0, zIndex: 49 }} onPointerDown={() => { setNodePickerVisible(false); setIterateCtx(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; }} />
-            <div style={nodePickerPos
-              ? { position: "absolute", left: nodePickerPos.x, top: nodePickerPos.y, transform: "translate(-50%, -100%) translateY(-16px)", zIndex: 50 }
-              : { position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }
-            }>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={de ? "Neuen Knoten hinzufügen" : "Add new node"}
+              style={nodePickerPos
+                ? { position: "absolute", left: nodePickerPos.x, top: nodePickerPos.y, transform: "translate(-50%, -100%) translateY(-16px)", zIndex: 50 }
+                : { position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }
+              }
+            >
               <NodePicker onSelect={handleNodeTypeSelect} onClose={() => { setNodePickerVisible(false); setIterateCtx(null); setNodePickerPos(null); portDropCanvasPosRef.current = null; }} hasContext={!!iterateCtx} />
             </div>
           </>
@@ -8918,15 +8926,21 @@ export default function CanvasPage() {
           : "diese Karte"
           : "diese Karte";
         return (
-          <div style={{
-            position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
-            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-            border: "1.5px solid var(--signal-negative-border, #F4A090)",
-            borderRadius: 14,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
-            padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
-            zIndex: 9999, minWidth: 340,
-          }}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="sis-delete-confirm-title"
+            aria-describedby="sis-delete-confirm-desc"
+            style={{
+              position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+              background: "rgba(255,255,255,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+              border: "1.5px solid var(--signal-negative-border, #F4A090)",
+              borderRadius: 14,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)",
+              padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
+              zIndex: 9999, minWidth: 340,
+            }}
+          >
             <div style={{
               width: 30, height: 30, borderRadius: 8, flexShrink: 0,
               background: "var(--signal-negative-light, #FDEEE9)",
@@ -8934,8 +8948,8 @@ export default function CanvasPage() {
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
             }}>🗑</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>{de ? "Karte löschen?" : "Delete card?"}</p>
-              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <p id="sis-delete-confirm-title" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>{de ? "Karte löschen?" : "Delete card?"}</p>
+              <p id="sis-delete-confirm-desc" style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {label} · {de ? "nicht rückgängig machbar · Enter zum Bestätigen" : "cannot be undone · press Enter to confirm"}
               </p>
             </div>
@@ -8957,7 +8971,11 @@ export default function CanvasPage() {
       {briefingOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 250 }} onClick={() => setBriefingOpen(false)} />
-          <div style={{
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={de ? "Briefing" : "Briefing"}
+            style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
             width: "min(680px, 92vw)", maxHeight: "80vh",
             background: "rgba(255,255,255,0.95)",
