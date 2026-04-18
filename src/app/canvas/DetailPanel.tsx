@@ -54,22 +54,27 @@ import type {
   MatchedTrend,
   UsedSignal,
 } from "@/types";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 // ── ConfidenceBadge ───────────────────────────────────────────────────────
 
 function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const safe = Number.isNaN(value) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value));
   const pct = Math.round(safe * 100);
   const cls = safe > 0.7 ? "signal-positive-badge" : safe > 0.4 ? "signal-neutral-badge" : "signal-negative-badge";
   return (
     <span className={cls} style={{ fontSize: 10 }}>
-      {pct}% {de ? "Konfidenz" : "confidence"}
+      {pct}% {tl("detail.confidence")}
     </span>
   );
 }
 // ── SourceChips ───────────────────────────────────────────────────────────
 
 function SourceChips({ sources, de }: { sources: UsedSignal[]; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!sources.length) return null;
   return (
     <div
@@ -77,7 +82,7 @@ function SourceChips({ sources, de }: { sources: UsedSignal[]; de: boolean }) {
       style={{ display: "flex", gap: 3, flexWrap: "wrap", alignItems: "center" }}
     >
       <span style={{ fontSize: 8, color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 2 }}>
-        {de ? "Basis" : "Via"}
+        {tl("detail.basis")}
       </span>
       {sources.map((s, i) => {
         const tipContent = (
@@ -143,16 +148,18 @@ function CollapsibleSection({ title, children, defaultOpen = true, accent }: {
 // ── Radar Chart (pure SVG, no D3) ────────────────────────────────────────
 
 function RadarChart({ trends, de }: { trends: MatchedTrend[]; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!trends || trends.length === 0) return null;
 
   const SIZE = 160;
   const cx = SIZE / 2, cy = SIZE / 2, r = 58;
   const axes = [
-    { key: "relevance", label: de ? "Relevanz" : "Relevance" },
-    { key: "confidence", label: de ? "Konfidenz" : "Confidence" },
-    { key: "impact", label: de ? "Impact" : "Impact" },
-    { key: "momentum", label: de ? "Momentum" : "Momentum" },
-    { key: "density", label: de ? "Signaldichte" : "Signal Density" },
+    { key: "relevance", label: tl("detail.relevance") },
+    { key: "confidence", label: tl("detail.confidenceCap") },
+    { key: "impact", label: tl("detail.impact") },
+    { key: "momentum", label: tl("detail.momentum") },
+    { key: "density", label: tl("detail.signalDensity") },
   ];
   const n = axes.length;
 
@@ -207,7 +214,7 @@ function RadarChart({ trends, de }: { trends: MatchedTrend[]; de: boolean }) {
       </svg>
       {/* Legend: matched trend count */}
       <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 2 }}>
-        {trends.length} {de ? "Trends analysiert" : "trends analyzed"} · Ø {Math.round(vals[0] * 100)}% {de ? "Relevanz" : "relevance"}
+        {trends.length} {tl("detail.trendsAnalyzed")} · Ø {Math.round(vals[0] * 100)}% {tl("detail.relevanceShort")}
       </div>
     </div>
   );
@@ -319,15 +326,17 @@ export function DimensionRadar({ dimData, size = 200, mini = false }: {
 function CausalEdgeList({ edges, trendNames, de }: {
   edges: MatchedEdge[]; trendNames: Map<string, string>; de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!edges || edges.length === 0) return null;
   const typeColor: Record<string, string> = {
     drives: "#1A9E5A", amplifies: "#2563EB", dampens: "#E8402A", correlates: "#8B5CF6",
   };
   const typeLabel: Record<string, string> = {
-    drives: de ? "treibt" : "drives",
-    amplifies: de ? "verstärkt" : "amplifies",
-    dampens: de ? "dämpft" : "dampens",
-    correlates: de ? "korreliert" : "correlates",
+    drives: tl("detail.drives"),
+    amplifies: tl("detail.amplifies"),
+    dampens: tl("detail.dampens"),
+    correlates: tl("detail.correlates"),
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -724,12 +733,14 @@ function DimensionRadarInteractive({ dimData, size, onHover }: {
 function ScenarioComparisonChart({ scenarios, currentId, de }: {
   scenarios: DerivedNode[]; currentId: string; de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (scenarios.length < 2) return null;
   const sorted = [...scenarios].sort((a, b) => (b.probability ?? 0) - (a.probability ?? 0));
   return (
     <div style={{ marginBottom: 24, padding: "16px 18px 18px", background: "rgba(0,0,0,0.025)", borderRadius: 12, border: "1px solid rgba(0,0,0,0.07)" }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 14 }}>
-        {de ? "Szenario-Vergleich" : "Scenario Comparison"}
+        {tl("detail.scenarioComparison")}
       </div>
       {sorted.map(s => {
         // FIXED: EDGE-15 — Clamp probability to [0,1]
@@ -786,6 +797,8 @@ export function DetailPanel({
   onUpdateNote, onUpdateIdea, onUpdateList, onPromoteNote, onPromoteIdea,
   onAnalyzeFile, onIterate, onSetStatus, onUpdateTags, siblingScenarios,
 }: DetailPanelProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const [noteDraft, setNoteDraft] = useState(() =>
     node.nodeType === "note" ? (node as NoteNode).content || "" : ""
   );
@@ -874,7 +887,7 @@ export function DetailPanel({
       return (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#0A0A0A", background: "#E4FF97", padding: "1px 6px", borderRadius: 4, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{de ? "IHRE FRAGE" : "YOUR QUERY"}</span>
+            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#0A0A0A", background: "#E4FF97", padding: "1px 6px", borderRadius: 4, fontFamily: "var(--font-code, 'JetBrains Mono'), monospace" }}>{tl("detail.yourQuery")}</span>
           </div>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, fontFamily: "var(--font-heading, 'Bricolage Grotesque'), sans-serif", color: "var(--color-text-heading)", lineHeight: 1.3, letterSpacing: "-0.025em" }}>{qNode.query}</h2>
         </div>
@@ -889,7 +902,7 @@ export function DetailPanel({
         <input
           value={ideaTitle}
           onChange={e => handleIdeaTitleChange(e.target.value)}
-          placeholder={de ? "Idee oder Hypothese…" : "Idea or hypothesis…"}
+          placeholder={tl("detail.ideaPlaceholder")}
           style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
         />
       </div>
@@ -900,7 +913,7 @@ export function DetailPanel({
         <input
           value={listTitle}
           onChange={e => handleListTitleChange(e.target.value)}
-          placeholder={de ? "Listen-Titel…" : "List title…"}
+          placeholder={tl("detail.listPlaceholder")}
           style={{ width: "100%", background: "transparent", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: "var(--color-text-heading)", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
         />
       </div>
@@ -934,9 +947,9 @@ export function DetailPanel({
         </div>
       );
     }
-    const badge = type === "insight" ? (de ? "ERKENNTNIS" : "INSIGHT")
-      : type === "decision" ? (de ? "EMPFEHLUNG" : "DECISION")
-      : type === "followup" ? (de ? "FOLGEFRAGE" : "FOLLOW-UP")
+    const badge = type === "insight" ? tl("detail.badgeInsight")
+      : type === "decision" ? tl("detail.badgeDecision")
+      : type === "followup" ? tl("detail.badgeFollowup")
       : (() => { const s = SCEN[dNode.colorKey ?? "baseline"] ?? SCEN.baseline; return de ? s.label.toUpperCase() : s.labelEn.toUpperCase(); })();
     const accentColor = type === "insight" ? "#6B7A00"
       : type === "decision" ? "#1A9E5A"
@@ -1031,7 +1044,7 @@ export function DetailPanel({
 
           {/* ── Aktueller Kontext ─────────────────────────────────── */}
           {(r?.newsContext || (r?.usedSignals && r.usedSignals.length > 0)) && (
-            <CollapsibleSection title={`${de ? "Live-Signale & Kontext" : "Live Signals & Context"}${r?.usedSignals?.length ? ` (${r.usedSignals.length})` : ""}`} accent="#2563EB">
+            <CollapsibleSection title={`${tl("detail.liveSignalsContext")}${r?.usedSignals?.length ? ` (${r.usedSignals.length})` : ""}`} accent="#2563EB">
               {r?.newsContext && (
                 <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--color-text-secondary)", margin: "0 0 12px", padding: "8px 12px", background: "#EFF6FF", borderRadius: 7 }}>
                   {r.newsContext}
@@ -1052,7 +1065,7 @@ export function DetailPanel({
                         border: "1px solid var(--color-border)", transition: "background 0.12s",
                       }}>
                         {/* Age badge */}
-                        <Tooltip content={signalDate ? signalDate.toLocaleString("de-DE") : (de ? "Unbekannt" : "Unknown")} placement="top">
+                        <Tooltip content={signalDate ? signalDate.toLocaleString("de-DE") : tl("detail.unknown")} placement="top">
                           <span style={{
                             fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
                             background: `${ageBg}18`, color: ageBg, border: `1px solid ${ageBg}33`,
@@ -1092,7 +1105,7 @@ export function DetailPanel({
 
           {/* ── Synthese ──────────────────────────────────────────── */}
           {(qNode.synthesis || isLoading) && (
-            <CollapsibleSection title={de ? "Synthese — KI-Analyse" : "Synthesis — AI Analysis"}>
+            <CollapsibleSection title={tl("detail.synthesisHeading")}>
               {r?.confidence != null && r.confidence > 0 && (
                 <div style={{ marginBottom: 8 }}><ConfidenceBadge value={r.confidence} de={de} /></div>
               )}
@@ -1101,14 +1114,14 @@ export function DetailPanel({
                 {qNode.status === "streaming" && (
                   <span style={{ display: "inline-block", width: 2, height: "0.9em", background: "#0A0A0A", marginLeft: 2, animation: "cur-blink 0.8s steps(1) infinite", verticalAlign: "text-bottom" }} />
                 )}
-                {qNode.status === "loading" && <span style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Analysiere…" : "Analyzing…"}</span>}
+                {qNode.status === "loading" && <span style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{tl("detail.analyzing")}</span>}
               </div>
             </CollapsibleSection>
           )}
 
           {/* ── Radar ─────────────────────────────────────────────── */}
           {r?.matchedTrends && r.matchedTrends.length > 0 && (
-            <CollapsibleSection title={de ? "Radar — Analyseprofil" : "Radar — Analysis Profile"} defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.radarHeading")} defaultOpen={false}>
               <RadarChart trends={r.matchedTrends} de={de} />
               {/* Category distribution */}
               <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -1125,9 +1138,9 @@ export function DetailPanel({
 
           {/* ── Kohärenzen ────────────────────────────────────────── */}
           {coherences.length > 0 && (
-            <CollapsibleSection title={de ? "Kohärenzen" : "Coherences"} accent="#8B5CF6" defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.coherences")} accent="#8B5CF6" defaultOpen={false}>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 8px" }}>
-                {de ? "Geteilte Trends mit anderen Analysen auf diesem Canvas:" : "Shared trends with other analyses on this canvas:"}
+                {tl("detail.coherencesBody")}
               </p>
               {coherences.map(c => (
                 <div key={c.nodeId} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 10px", background: "#F5F3FF", borderRadius: 7, border: "1px solid #E5E0FF" }}>
@@ -1140,7 +1153,7 @@ export function DetailPanel({
 
           {/* ── Kausalnetz ────────────────────────────────────────── */}
           {r?.matchedEdges && r.matchedEdges.length > 0 && (
-            <CollapsibleSection title={de ? "Kausalnetz" : "Causal Network"} accent="#1A9E5A" defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.causalNetworkHeading")} accent="#1A9E5A" defaultOpen={false}>
               <CausalEdgeList edges={r.matchedEdges} trendNames={trendNames} de={de} />
               {r?.causalAnalysis && r.causalAnalysis.length > 0 && (
                 <div style={{ marginTop: 10 }}>
@@ -1156,7 +1169,7 @@ export function DetailPanel({
 
           {/* ── Kernerkenntnisse ──────────────────────────────────── */}
           {r?.keyInsights && r.keyInsights.length > 0 && (
-            <CollapsibleSection title={de ? "Kernerkenntnisse" : "Key Insights"}>
+            <CollapsibleSection title={tl("detail.keyInsightsHeading")}>
               {r.keyInsights.map((ins, i) => (
                 <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: "#0F6038", marginTop: 3 }}>◉</span>
@@ -1168,7 +1181,7 @@ export function DetailPanel({
 
           {/* ── Szenarien ─────────────────────────────────────────── */}
           {r?.scenarios && r.scenarios.length > 0 && (
-            <CollapsibleSection title={de ? "Szenarien" : "Scenarios"}>
+            <CollapsibleSection title={tl("detail.scenariosHeading")}>
               {r.scenarios.map((s, i) => {
                 const sc = SCEN[s.type ?? "baseline"] ?? SCEN.baseline;
                 return (
@@ -1202,9 +1215,9 @@ export function DetailPanel({
 
           {/* ── Demographics ──────────────────────────────────────── */}
           {demographicTrends.length > 0 && (
-            <CollapsibleSection title={de ? "Demografischer Kontext" : "Demographic Context"} accent="#0369A1" defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.demoContextHeading")} accent="#0369A1" defaultOpen={false}>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 8px" }}>
-                {de ? "Demographisch relevante Trends dieser Analyse:" : "Demographically relevant trends in this analysis:"}
+                {tl("detail.demoContextBody")}
               </p>
               {demographicTrends.map(t => (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, padding: "6px 10px", background: "#F0F9FF", borderRadius: 7, border: "1px solid #BAE6FD" }}>
@@ -1217,7 +1230,7 @@ export function DetailPanel({
                       {/* FIXED: EDGE-15 — Clamp relevance to [0,1] */}
                       <div style={{ height: "100%", width: `${Math.max(0, Math.min(1, t.relevance)) * 100}%`, background: "#0369A1", borderRadius: 1 }} />
                     </div>
-                    <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{Math.round(Math.max(0, Math.min(1, t.relevance)) * 100)}% {de ? "Rel." : "rel."}</span>
+                    <span style={{ fontSize: 9, color: "var(--color-text-muted)" }}>{Math.round(Math.max(0, Math.min(1, t.relevance)) * 100)}% {tl("detail.relShort")}</span>
                   </div>
                 </div>
               ))}
@@ -1226,7 +1239,7 @@ export function DetailPanel({
 
           {/* ── Strategische Interpretation ───────────────────────── */}
           {r?.interpretation && (
-            <CollapsibleSection title={de ? "Strategische Interpretation" : "Strategic Interpretation"} accent="#0A3A20">
+            <CollapsibleSection title={tl("detail.strategicInterpretation")} accent="#0A3A20">
               <div style={{ padding: "10px 14px", background: "#F4FBF7", borderRadius: 8 }}>
                 <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--color-text-secondary)", margin: 0 }}>{r.interpretation}</p>
               </div>
@@ -1235,7 +1248,7 @@ export function DetailPanel({
 
           {/* ── Entscheidungshilfe ────────────────────────────────── */}
           {r?.decisionFramework && (
-            <CollapsibleSection title={de ? "Entscheidungshilfe" : "Decision Framework"} accent="#1D4ED8">
+            <CollapsibleSection title={tl("detail.decisionFramework")} accent="#1D4ED8">
               <div style={{ padding: "10px 14px", background: "#EFF6FF", borderRadius: 8 }}>
                 {r.decisionFramework.replace(/\.\s+(?=\d+\.)/g, ".\n").split("\n").filter(Boolean).map((step, i, arr) => (
                   <div key={i} style={{ display: "flex", gap: 8, marginBottom: i < arr.length - 1 ? 8 : 0 }}>
@@ -1249,7 +1262,7 @@ export function DetailPanel({
 
           {/* ── Regulierung ───────────────────────────────────────── */}
           {r?.regulatoryContext && r.regulatoryContext.length > 0 && (
-            <CollapsibleSection title={de ? "Regulierung" : "Regulatory Context"} defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.regulatoryContext")} defaultOpen={false}>
               {r.regulatoryContext.map((reg, i) => (
                 <div key={i} style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", marginBottom: 5, paddingLeft: 8 }}>{reg}</div>
               ))}
@@ -1258,7 +1271,7 @@ export function DetailPanel({
 
           {/* ── Folgefragen ───────────────────────────────────────── */}
           {r?.followUpQuestions && r.followUpQuestions.length > 0 && (
-            <CollapsibleSection title={de ? "Folgefragen" : "Follow-up Questions"} defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.followUpHeading")} defaultOpen={false}>
               {r.followUpQuestions.map((q, i) => (
                 <button key={i} onClick={() => onFollowUp(node.id, q)}
                   style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 4, fontSize: 12, fontStyle: "italic", padding: "7px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", lineHeight: 1.4, transition: "all 0.1s" }}
@@ -1271,7 +1284,7 @@ export function DetailPanel({
 
           {/* ── Quellen ───────────────────────────────────────────── */}
           {r?.references && r.references.length > 0 && (
-            <CollapsibleSection title={de ? "Quellen" : "References"} defaultOpen={false}>
+            <CollapsibleSection title={tl("detail.referencesHeading")} defaultOpen={false}>
               {r.references.map((ref, i) => (
                 <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--color-brand)", textDecoration: "none", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}
@@ -1291,7 +1304,7 @@ export function DetailPanel({
                left as a comment so the history is clear. */}
 
           {/* ── System-Prompt (read-only) ─────────────────────────── */}
-          <CollapsibleSection title={de ? "Analyse-Parameter" : "Analysis Parameters"} accent="#6B7280" defaultOpen={false}>
+          <CollapsibleSection title={tl("detail.analysisParameters")} accent="#6B7280" defaultOpen={false}>
             <div style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Query</span>
@@ -1308,13 +1321,13 @@ export function DetailPanel({
               {r?.matchedTrends && (
                 <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Trends</span>
-                  <span>{r.matchedTrends.length} {de ? "abgeglichen" : "matched"}</span>
+                  <span>{r.matchedTrends.length} {tl("detail.matched")}</span>
                 </div>
               )}
               {r?.usedSignals && (
                 <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", width: 60 }}>Signale</span>
-                  <span>{r.usedSignals.length} {de ? "verarbeitet" : "processed"}</span>
+                  <span>{r.usedSignals.length} {tl("detail.processed")}</span>
                 </div>
               )}
               {r?.confidence != null && (
@@ -1329,7 +1342,7 @@ export function DetailPanel({
           {/* Timestamp */}
           <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginTop: 4 }}>
             {formatNodeTime(qNode.createdAt)}
-            {age !== "fresh" && <span style={{ marginLeft: 8, color: age === "stale" ? "#F5A623" : "rgba(245,166,35,0.6)" }}>{age === "stale" ? (de ? "· Veraltet" : "· Stale") : (de ? "· Altert" : "· Aging")}</span>}
+            {age !== "fresh" && <span style={{ marginLeft: 8, color: age === "stale" ? "#F5A623" : "rgba(245,166,35,0.6)" }}>{age === "stale" ? tl("detail.staleMark") : tl("detail.agingMark")}</span>}
           </div>
         </div>
       );
@@ -1340,7 +1353,7 @@ export function DetailPanel({
         <textarea
           value={noteDraft}
           onChange={e => handleNoteChange(e.target.value)}
-          placeholder={de ? "Notiz hinzufügen…" : "Add note…"}
+          placeholder={tl("detail.notePlaceholder")}
           style={{ flex: 1, minHeight: 200, background: "var(--pastel-butter)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.65, color: "#3E2723", fontFamily: "inherit", resize: "none", outline: "none" }}
         />
         <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 8 }}>{formatNodeTime(node.createdAt)}</div>
@@ -1352,7 +1365,7 @@ export function DetailPanel({
         <textarea
           value={ideaContent}
           onChange={e => handleIdeaContentChange(e.target.value)}
-          placeholder={de ? "Beschreibung, Begründung oder nächste Schritte…" : "Description, rationale or next steps…"}
+          placeholder={tl("detail.descriptionPlaceholder")}
           style={{ flex: 1, minHeight: 200, background: "var(--pastel-peach)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.65, color: "#0A0A0A", fontFamily: "inherit", resize: "none", outline: "none" }}
         />
         <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 8 }}>{formatNodeTime(node.createdAt)}</div>
@@ -1380,7 +1393,7 @@ export function DetailPanel({
               <span
                 onClick={() => { setEditingListIdx(i); setListDraftItem(item); setTimeout(() => listItemRefs.current[i]?.focus(), 0); }}
                 style={{ flex: 1, fontSize: 14, lineHeight: 1.5, color: item ? "#0A0A0A" : "rgba(0,0,0,0.3)", cursor: "text", minHeight: 22 }}
-              >{item || (de ? "Eintrag…" : "Item…")}</span>
+              >{item || tl("detail.listItemPlaceholder")}</span>
             )}
             {listItems.length > 1 && (
               <button onClick={() => removeListItem(i)}
@@ -1395,7 +1408,7 @@ export function DetailPanel({
           style={{ marginTop: 6, fontSize: 12, color: "#2E7D32", background: "none", border: "none", cursor: "pointer", padding: "2px 0", display: "flex", alignItems: "center", gap: 4, opacity: 0.7 }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0.7"}
-        >+ {de ? "Eintrag" : "Item"}</button>
+        >+ {tl("detail.listItemAdd")}</button>
         <div style={{ fontSize: 10, color: "rgba(0,0,0,0.35)", marginTop: 12 }}>{formatNodeTime(node.createdAt)}</div>
       </div>
     );
@@ -1441,7 +1454,7 @@ export function DetailPanel({
         <div style={{ padding: "8px 40px 28px", flex: 1, overflowY: "auto" }}>
           {edges.length > 0 && (
             <div style={{ marginBottom: 20, padding: "12px 0" }}>
-              <GraphLightbox title={de ? "Kausalnetz — Vollbild" : "Causal Graph — Fullscreen"} style={{ borderRadius: 8, overflow: "hidden" }}>
+              <GraphLightbox title={tl("detail.causalFullscreenTitle")} style={{ borderRadius: 8, overflow: "hidden" }}>
                 <CausalGraphSVG edges={edges} nameMap={nameMapObj} width={760} height={380} />
               </GraphLightbox>
             </div>
@@ -1467,7 +1480,7 @@ export function DetailPanel({
             <div style={{ height: 4, borderRadius: 2, background: "rgba(0,0,0,0.08)", overflow: "hidden", marginBottom: 5 }}>
               <div style={{ height: 4, width: `${dNode.probability * 100}%`, borderRadius: 2, background: scenCfg?.color ?? "#1D4ED8" }} />
             </div>
-            <span style={{ fontSize: 11, color: scenCfg?.color ?? "#1D4ED8", fontWeight: 600 }}>{Math.round(dNode.probability * 100)}% {de ? "Wahrscheinlichkeit" : "probability"}</span>
+            <span style={{ fontSize: 11, color: scenCfg?.color ?? "#1D4ED8", fontWeight: 600 }}>{Math.round(dNode.probability * 100)}% {tl("detail.probabilityShort")}</span>
           </div>
         )}
         <div style={{ marginBottom: 14, fontStyle: type === "followup" ? "italic" : "normal" }}>
@@ -1502,7 +1515,7 @@ export function DetailPanel({
     return (
       <div
         role="radiogroup"
-        aria-label={de ? "Status" : "Status"}
+        aria-label={tl("detail.statusLabel")}
         style={{
           display: "inline-flex",
           margin: "0 40px 10px",
@@ -1560,33 +1573,33 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <Tooltip content={de ? "Folgefrage generieren und Analyse vertiefen" : "Generate follow-up question to deepen analysis"} placement="top">
-              <button onClick={() => onFollowUp(node.id)} style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A" }}>{de ? "Weiterdenken" : "Follow up"}</button>
+            <Tooltip content={tl("detail.followUpTip")} placement="top">
+              <button onClick={() => onFollowUp(node.id)} style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.12)", background: "#E4FF97", color: "#0A0A0A" }}>{tl("detail.followUpCta")}</button>
             </Tooltip>
             {qNode.status === "done" && (
-              <Tooltip content={de ? "Analyse mit aktuellen Daten neu berechnen" : "Re-run analysis with latest data"} placement="top">
+              <Tooltip content={tl("detail.refreshTip")} placement="top">
                 <button onClick={() => onRefresh(node.id)}
                   style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: `1px solid ${age === "stale" ? "rgba(245,166,35,0.4)" : "var(--color-border)"}`, background: "transparent", color: age === "stale" ? "#F5A623" : "var(--color-text-muted)" }}
                   onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(245,166,35,0.1)"; el.style.color = "#F5A623"; }}
                   onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = age === "stale" ? "#F5A623" : "var(--color-text-muted)"; }}
-                ><RefreshCw size={12} /> {de ? "Aktualisieren" : "Refresh"}</button>
+                ><RefreshCw size={12} /> {tl("detail.refreshCta")}</button>
               </Tooltip>
             )}
             {qNode.status === "error" && (
-              <Tooltip content={de ? "Fehlgeschlagene Analyse erneut versuchen" : "Retry failed analysis"} placement="top">
-                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}><RotateCcw size={12} /> {de ? "Erneut versuchen" : "Retry"}</button>
+              <Tooltip content={tl("detail.retryTip")} placement="top">
+                <button onClick={() => onRefresh(node.id)} style={{ ...btnBase, display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#E8402A" }}><RotateCcw size={12} /> {tl("detail.retryCta")}</button>
               </Tooltip>
             )}
             {qNode.synthesis && (
-              <Tooltip content={de ? "Synthese in Zwischenablage kopieren" : "Copy synthesis to clipboard"} placement="top">
+              <Tooltip content={tl("detail.copySynthesisTip")} placement="top">
                 <button onClick={() => copyText(qNode.synthesis)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
               </Tooltip>
             )}
-            <Tooltip content={de ? "Karte und alle Ableitungen entfernen" : "Remove card and all derived nodes"} placement="top">
+            <Tooltip content={tl("detail.deleteCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1597,19 +1610,19 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "Notiz als strategische Abfrage weiterverarbeiten" : "Convert note into strategic query"} placement="top">
+            <Tooltip content={tl("detail.noteToQueryTip")} placement="top">
               <button onClick={() => onPromoteNote(noteDraft)} disabled={!noteDraft.trim()}
                 style={{ ...btnBase, border: "1px solid rgba(249,168,37,0.3)", background: "rgba(249,168,37,0.1)", color: "#B45309", opacity: noteDraft.trim() ? 1 : 0.4 }}
-              >{de ? "Als Abfrage" : "As Query"}</button>
+              >{tl("detail.asQueryCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, noteDraft)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
+            <Tooltip content={tl("detail.reworkTip")} placement="top">
+              <button onClick={() => onIterate(node.id, noteDraft)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {tl("detail.reworkCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1621,19 +1634,19 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "Idee als strategische Abfrage weiterverarbeiten" : "Convert idea into strategic query"} placement="top">
+            <Tooltip content={tl("detail.ideaToQueryTip")} placement="top">
               <button onClick={() => onPromoteIdea(ideaText)} disabled={!ideaText.trim()}
                 style={{ ...btnBase, border: "1px solid rgba(255,152,0,0.3)", background: "rgba(255,152,0,0.08)", color: "#E65100", opacity: ideaText.trim() ? 1 : 0.4 }}
-              >{de ? "Als Abfrage" : "As Query"}</button>
+              >{tl("detail.asQueryCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, ideaText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
+            <Tooltip content={tl("detail.reworkTip")} placement="top">
+              <button onClick={() => onIterate(node.id, ideaText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {tl("detail.reworkCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1645,14 +1658,14 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-              <button onClick={() => onIterate(node.id, listText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
+            <Tooltip content={tl("detail.reworkTip")} placement="top">
+              <button onClick={() => onIterate(node.id, listText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {tl("detail.reworkCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1669,26 +1682,26 @@ export function DetailPanel({
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
             {fNode.fileUrl && (
-              <Tooltip content={de ? "Datei in neuem Tab öffnen" : "Open file in new tab"} placement="top">
+              <Tooltip content={tl("detail.openFileTip")} placement="top">
                 <a href={fNode.fileUrl} target="_blank" rel="noopener noreferrer"
                   style={{ fontSize: 12, padding: "6px 12px", borderRadius: 20, border: "1px solid rgba(74,108,247,0.25)", background: "transparent", color: "rgba(74,108,247,0.8)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5 }}
-                ><ExternalLink size={12} /> {de ? "Öffnen" : "Open"}</a>
+                ><ExternalLink size={12} /> {tl("detail.openFileCta")}</a>
               </Tooltip>
             )}
             {(fNode.textContent || isImage) && (
-              <Tooltip content={de ? "Dateiinhalt mit KI analysieren" : "Analyze file content with AI"} placement="top">
+              <Tooltip content={tl("detail.analyzeFileTip")} placement="top">
                 <button onClick={() => onAnalyzeFile(analyzeText, node.id)}
                   style={{ ...btnBase, border: "1px solid rgba(74,108,247,0.3)", background: "rgba(74,108,247,0.08)", color: "#4A6CF7" }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.18)"}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,108,247,0.08)"}
-                >{de ? "Analysieren" : "Analyze"}</button>
+                >{tl("detail.analyzeFileCta")}</button>
               </Tooltip>
             )}
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1703,10 +1716,10 @@ export function DetailPanel({
       const scenName = dNode.label || dNode.content.slice(0, 60);
       const firstDriver = dNode.keyDrivers?.[0] ?? scenName;
       const actionButtons = [
-        { label: de ? "VERTIEFEN" : "DEEPEN", icon: <Search size={12} />, tip: de ? "Tiefenanalyse: Treiber und Implikationen dieses Szenarios genauer untersuchen" : "Deep-dive: Analyze drivers and implications of this scenario", prefill: `Vertiefen: ${scenName} — detaillierte Analyse der Treiber und Implikationen`, color: "#1A9E5A" },
-        { label: de ? "WAS WENN" : "WHAT IF", icon: <GitBranch size={12} />, tip: de ? "Sensitivitätstest: Was passiert wenn ein Schlüsseltreiber wegfällt?" : "Sensitivity test: What happens if a key driver disappears?",       prefill: `Was wenn: ${firstDriver} wegfällt — wie verändert sich das Szenario?`,       color: "#2563EB" },
-        { label: de ? "ANGREIFEN" : "CHALLENGE", icon: <ShieldAlert size={12} />, tip: de ? "Kritische Prüfung: Welche Annahmen könnten falsch sein?" : "Critical review: Which assumptions could be wrong?",             prefill: `Kritisch: Welche Annahmen in '${scenName}' könnten falsch sein?`,             color: "#E8402A" },
-        { label: de ? "STRATEGIE" : "STRATEGY", icon: <Compass size={12} />, tip: de ? "Handlungsoptionen: Konkrete Maßnahmen für dieses Szenario ableiten" : "Strategy: Derive concrete actions for this scenario",               prefill: `Spielplan: Gegeben '${scenName}' — konkrete Handlungsoptionen`,               color: "#8B5CF6" },
+        { label: tl("detail.deepenLabel"), icon: <Search size={12} />, tip: tl("detail.deepenTip"), prefill: `Vertiefen: ${scenName} — detaillierte Analyse der Treiber und Implikationen`, color: "#1A9E5A" },
+        { label: tl("detail.whatIfLabel"), icon: <GitBranch size={12} />, tip: tl("detail.whatIfTip"),       prefill: `Was wenn: ${firstDriver} wegfällt — wie verändert sich das Szenario?`,       color: "#2563EB" },
+        { label: tl("detail.challengeLabel"), icon: <ShieldAlert size={12} />, tip: tl("detail.challengeTip"),             prefill: `Kritisch: Welche Annahmen in '${scenName}' könnten falsch sein?`,             color: "#E8402A" },
+        { label: tl("detail.strategyLabel"), icon: <Compass size={12} />, tip: tl("detail.strategyTip"),               prefill: `Spielplan: Gegeben '${scenName}' — konkrete Handlungsoptionen`,               color: "#8B5CF6" },
       ];
       return (
         <>
@@ -1722,11 +1735,11 @@ export function DetailPanel({
                 >{label} {icon}</button>
               </Tooltip>
             ))}
-            <Tooltip content={de ? "Szenario-Karte entfernen" : "Remove scenario card"} placement="top">
+            <Tooltip content={tl("detail.removeScenarioTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1739,16 +1752,16 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "STEEP+V-Dimensionen weiter analysieren" : "Further analyze STEEP+V dimensions"} placement="top">
+            <Tooltip content={tl("detail.deepenDimensionsTip")} placement="top">
               <button onClick={() => onIterate(node.id, dNode.queryText)}
                 style={{ ...btnBase, border: "1px solid rgba(59,130,246,0.3)", background: "rgba(59,130,246,0.08)", color: "#3b82f6" }}
-              >{de ? "Dimensionen vertiefen" : "Deepen dimensions"}</button>
+              >{tl("detail.deepenDimensionsCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
@@ -1761,28 +1774,28 @@ export function DetailPanel({
         <>
           {renderStatusSelector()}
           <div style={{ padding: "12px 40px", borderTop: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "Kausale Zusammenhänge und Treiber tiefer untersuchen" : "Deep-dive into causal relationships and drivers"} placement="top">
+            <Tooltip content={tl("detail.exploreCausalTip")} placement="top">
               <button onClick={() => onIterate(node.id, dNode.queryText)}
                 style={{ ...btnBase, border: "1px solid rgba(26,158,90,0.3)", background: "rgba(26,158,90,0.08)", color: "#1A9E5A" }}
-              >{de ? "Kausaltreiber vertiefen" : "Explore causal drivers"}</button>
+              >{tl("detail.exploreCausalCta")}</button>
             </Tooltip>
-            <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+            <Tooltip content={tl("detail.removeCardTip")} placement="top">
               <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-              >{de ? "Löschen" : "Delete"}</button>
+              >{tl("detail.deleteCta")}</button>
             </Tooltip>
           </div>
         </>
       );
     }
 
-    const btnLabel = type === "followup" ? (de ? "Vertiefen" : "Explore")
-      : type === "decision" ? (de ? "Umsetzen" : "Implement")
-      : (de ? "Analysieren" : "Analyze");
-    const btnTip = type === "followup" ? (de ? "Erkenntnis als neue Abfrage weiterverfolgen" : "Follow up on this insight with a new query")
-      : type === "decision" ? (de ? "Handlungsempfehlung als Abfrage konkretisieren" : "Concretize recommendation as query")
-      : (de ? "Inhalt als neue Analyse weiterverarbeiten" : "Process content as new analysis");
+    const btnLabel = type === "followup" ? tl("detail.followupBtnLabel")
+      : type === "decision" ? tl("detail.decisionBtnLabel")
+      : tl("detail.defaultBtnLabel");
+    const btnTip = type === "followup" ? tl("detail.followupBtnTip")
+      : type === "decision" ? tl("detail.decisionBtnTip")
+      : tl("detail.defaultBtnTip");
     return (
       <>
         {renderStatusSelector()}
@@ -1792,14 +1805,14 @@ export function DetailPanel({
               style={{ ...btnBase, border: "1px solid rgba(0,0,0,0.1)", background: "#E4FF97", color: "#0A0A0A" }}
             >{btnLabel}</button>
           </Tooltip>
-          <Tooltip content={de ? "Inhalt überarbeiten und neu formulieren" : "Rework and reformulate content"} placement="top">
-            <button onClick={() => onIterate(node.id, dNode.queryText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {de ? "Überarbeiten" : "Rework"}</button>
+          <Tooltip content={tl("detail.reworkTip")} placement="top">
+            <button onClick={() => onIterate(node.id, dNode.queryText)} style={{ ...btnMuted, display: "inline-flex", alignItems: "center", gap: 5 }}><RotateCcw size={11} /> {tl("detail.reworkCta")}</button>
           </Tooltip>
-          <Tooltip content={de ? "Karte entfernen" : "Remove card"} placement="top">
+          <Tooltip content={tl("detail.removeCardTip")} placement="top">
             <button onClick={() => { onDelete(node.id); onClose(); }} style={btnDelete}
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "#E8402A"; el.style.borderColor = "#FCA5A5"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            >{tl("detail.deleteCta")}</button>
           </Tooltip>
         </div>
       </>
@@ -1811,7 +1824,7 @@ export function DetailPanel({
       onPointerDown={e => e.stopPropagation()}
       role="dialog"
       aria-modal="true"
-      aria-label={de ? "Kartendetails" : "Card details"}
+      aria-label={tl("detail.panelAria")}
       style={{
         position: "fixed",
         left: "50%", top: 72,
@@ -1840,7 +1853,7 @@ export function DetailPanel({
       <div style={{ padding: "18px 32px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>{renderHeader()}</div>
         <button onClick={onClose}
-          title={de ? "Schließen (Esc)" : "Close (Esc)"}
+          title={tl("detail.closeTip")}
           style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, border: "1px solid var(--color-border, #E8E8E8)", cursor: "pointer", padding: 0, color: "var(--color-text-muted)", borderRadius: 8, background: "var(--color-page-bg, #F5F5F5)", transition: "all 0.15s" }}
           onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-primary)"; el.style.background = "var(--color-border, #E8E8E8)"; el.style.borderColor = "rgba(0,0,0,0.2)"; }}
           onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = "var(--color-text-muted)"; el.style.background = "var(--color-page-bg, #F5F5F5)"; el.style.borderColor = "var(--color-border, #E8E8E8)"; }}
