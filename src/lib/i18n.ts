@@ -7,17 +7,84 @@
  *
  * New contract
  * ────────────
- * 1. Dictionary is nested by namespace: `common`, `canvas`, `cockpit`,
- *    `admin`, `tenant`, `home`, `projects`, `monitor`, `invite`,
- *    `sessions`, `errors`. Add new namespaces here — do NOT sprinkle
- *    inline strings in components.
- * 2. Lookup is dot-path: `t('common.cancel')`, `t('admin.tenants.title')`.
+ * 1. Dictionary is nested by namespace: `common`, `nav`, `cockpit`,
+ *    `admin`, `tenant`, `sessions`, `invite`, `monitor`, `errors`,
+ *    `audit`. Add new namespaces here — do NOT sprinkle inline strings
+ *    in components.
+ * 2. Lookup is dot-path: `t('common.cancel')`, `t('admin.archiveTenantQ')`.
  * 3. Interpolation is `{{var}}`: `t('sessions.minutesAgo', { n: 5 })`.
  * 4. Missing keys fall back to EN, then to the key string — never crash.
  * 5. The React hook `useT()` (see `locale-context`) returns a bound
  *    `t()` so components don't thread `locale` manually.
  * 6. Date/number formatting helpers use `localeTag(locale)` so we
  *    stop peppering `de ? "de-DE" : "en-US"` everywhere.
+ *
+ * Migration recipe (for remaining files with `de ? ... : ...` ternaries)
+ * ─────────────────────────────────────────────────────────────────────
+ * 1. At the top of the component, swap
+ *
+ *      const { locale } = useLocale();
+ *      const de = locale === "de";
+ *
+ *    for
+ *
+ *      const { t, locale } = useT();
+ *
+ *    If the component already takes `de: boolean` as a prop (some
+ *    shared components do), keep the prop and derive a local translator
+ *    like `SessionList.tsx`:
+ *
+ *      const locale: Locale = de ? "de" : "en";
+ *      const tl = (k, vars) => translate(locale, k, vars);
+ *
+ * 2. Move each bilingual string pair into the dictionary under the
+ *    right namespace. Group per file/page; prefer keys that describe
+ *    the UI role (`tipRename`, `archiveTenantQ`) over the copy itself
+ *    (`"Rename"`, `"Archive tenant?"`). Add the key to BOTH `en` and
+ *    `de` (TypeScript enforces shape parity).
+ *
+ * 3. Replace inline ternaries:
+ *      `de ? "Speichern" : "Save"`     →  `t("common.save")`
+ *      `de ? "„X" löschen?" : "Delete "X"?"`
+ *                                        →  `t("ns.key", { name: x })`
+ *      `de.toLocaleDateString("de-DE") : "en-US"`
+ *                                        →  `localeTag(locale)`
+ *      `de ? "vor 5 Min" : "5 min ago"`  →  `formatRelativeTime(d, locale)`
+ *
+ * 4. For JSX-embedded interpolation where styling matters
+ *    (`<strong>{name}</strong>`), split the sentence into translated
+ *    fragments (`prefix`, `suffix`, etc.) — see `audit.*` keys and how
+ *    `renderAuditDetail` uses them. Do NOT try to embed JSX in the
+ *    dictionary — the dictionary holds strings, JSX composition stays
+ *    in code.
+ *
+ * 5. Sub-components that receive `locale` as a prop (because they
+ *    render outside React context, e.g. inside modals mounted from
+ *    `voltConfirm`) should build a local `tl` via `translate()` — see
+ *    `InviteModal` in `TenantDetailClient.tsx`.
+ *
+ * 6. Verify with `npx tsc --noEmit`. TypeScript enforces that every
+ *    dot-path you pass to `t()` exists in the dictionary, and that the
+ *    DE/EN shapes stay in sync.
+ *
+ * Status (at commit time)
+ * ───────────────────────
+ * Migrated (0 UI ternaries remaining):
+ *   - components/radar/RadarChart.tsx
+ *   - components/radar/TrendDetailPanel.tsx
+ *   - components/sessions/SessionList.tsx (52 → 4 structural)
+ *   - app/admin/tenants/TenantsClient.tsx (41 → 0)
+ *   - app/admin/tenants/[id]/TenantDetailClient.tsx (70 → 0)
+ *   - app/admin/audit/AuditClient.tsx (23 → 0)
+ *   - app/settings/tenant/TenantSettingsClient.tsx (25 → 0)
+ *
+ * Remaining hotspots (highest ternary counts):
+ *   - app/dokumentation/page.tsx (184), app/komponenten/page.tsx (141)
+ *   - app/canvas/page.tsx (127), app/canvas/DetailPanel.tsx (108)
+ *   - app/canvas/OrbitDerivationView.tsx (48), OrbitGraphView.tsx (24)
+ *   - app/frameworks/* (45, 37, 25, 24, 24, 20, …)
+ *   - app/cockpit/* + how-to/*, auth/signin/*, ~40 other files
+ * Use the recipe above; keep commits ≤ 3 files each for reviewability.
  */
 
 export type Locale = "de" | "en";
