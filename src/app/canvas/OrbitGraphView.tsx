@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Tooltip } from "@/components/ui/Tooltip";
 import { ChevronLeft, ChevronRight, X, Filter, ArrowDownToLine } from "lucide-react";
 import type { MatchedEdge } from "@/types";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 interface OrbitNode {
   id: string;
@@ -64,6 +65,8 @@ export function OrbitGraphView({
   de,
   onSelectQuery,
 }: OrbitGraphViewProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 900, h: 600 });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -301,8 +304,8 @@ export function OrbitGraphView({
       <div ref={containerRef} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: 14 }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.3 }}>⬡</div>
-          <div>{de ? "Noch keine Kausalnetze vorhanden" : "No causal networks yet"}</div>
-          <div style={{ fontSize: 12, marginTop: 6, opacity: 0.6 }}>{de ? "Starte eine Analyse im Canvas, um das Orbit zu füllen" : "Run an analysis in Canvas to populate the Orbit"}</div>
+          <div>{tl("orbitGraph.emptyHeading")}</div>
+          <div style={{ fontSize: 12, marginTop: 6, opacity: 0.6 }}>{tl("orbitGraph.emptyBody")}</div>
         </div>
       </div>
     );
@@ -476,12 +479,12 @@ export function OrbitGraphView({
             }}
               title={queryLabels?.[queryFilter] ?? queryFilter}
             >
-              {de ? "Gefiltert: " : "Filtered: "}
+              {tl("orbitGraph.filteredPrefix")}
               {(queryLabels?.[queryFilter] ?? queryFilter).slice(0, 40)}
               {((queryLabels?.[queryFilter] ?? queryFilter).length > 40) ? "…" : ""}
             </span>
             <button onClick={() => setQueryFilter(null)}
-              title={de ? "Filter aufheben" : "Clear filter"}
+              title={tl("orbitGraph.clearFilterTip")}
               style={{
                 background: "rgba(37,99,235,0.12)", border: "none", borderRadius: "50%",
                 width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -497,7 +500,7 @@ export function OrbitGraphView({
         <div style={{ position: "absolute", bottom: 12, right: 16, fontSize: 10, color: "var(--color-text-muted)", display: "flex", gap: 6, alignItems: "center" }}>
           <span>{Math.round(zoom * 100)}%</span>
           <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-            title={de ? "Zoom & Ansicht zurücksetzen" : "Reset zoom & view"}
+            title={tl("orbitGraph.resetViewTip")}
             style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, border: "1px solid var(--color-border)", background: "rgba(255,255,255,0.9)", color: "var(--color-text-muted)", cursor: "pointer" }}
           >⊙</button>
         </div>
@@ -506,7 +509,7 @@ export function OrbitGraphView({
         {sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(false)}
-            title={de ? "Seitenleiste einklappen" : "Collapse sidebar"}
+            title={tl("orbitGraph.collapseSidebarTip")}
             style={{
               position: "absolute", top: 12, right: 12,
               display: "inline-flex", alignItems: "center", gap: 4,
@@ -524,7 +527,7 @@ export function OrbitGraphView({
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            title={de ? "Seitenleiste öffnen" : "Show sidebar"}
+            title={tl("orbitGraph.showSidebarTip")}
             style={{
               position: "absolute", top: 12, right: 12,
               display: "inline-flex", alignItems: "center", gap: 5,
@@ -535,7 +538,7 @@ export function OrbitGraphView({
             }}
           >
             <ChevronLeft size={12} strokeWidth={1.8} />
-            {de ? "Übersicht" : "Overview"}
+            {tl("orbitGraph.overview")}
           </button>
         )}
       </div>
@@ -563,7 +566,7 @@ export function OrbitGraphView({
               <>
                 <button
                   onClick={() => setSelectedId(null)}
-                  title={de ? "Zurück zur Übersicht" : "Back to overview"}
+                  title={tl("orbitGraph.backToOverviewTip")}
                   style={{
                     background: "none", border: "none", padding: 0,
                     color: "var(--color-text-muted)", cursor: "pointer",
@@ -572,10 +575,10 @@ export function OrbitGraphView({
                 >
                   <ChevronLeft size={14} strokeWidth={1.8} />
                 </button>
-                <span>{de ? "Detail" : "Detail"}</span>
+                <span>{tl("orbitGraph.detail")}</span>
               </>
             ) : (
-              <span>{de ? "Übersicht" : "Overview"}</span>
+              <span>{tl("orbitGraph.overview")}</span>
             )}
             <span style={{ flex: 1 }} />
             <span style={{ fontWeight: 500, fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
@@ -630,6 +633,8 @@ function OverviewPanel({
   setQueryFilter: (id: string | null) => void;
   onSelectNode: (id: string) => void;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   return (
     <>
       {/* Stat tiles */}
@@ -652,11 +657,11 @@ function OverviewPanel({
       </div>
 
       {/* Top trends */}
-      <SectionLabel>{de ? "Zentrale Trends" : "Central trends"}</SectionLabel>
+      <SectionLabel>{tl("orbitGraph.centralTrends")}</SectionLabel>
       <div style={{ marginBottom: 18 }}>
         {topTrends.length === 0 && (
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-            {de ? "Keine Trends im aktuellen Filter." : "No trends in current filter."}
+            {tl("orbitGraph.noTrendsInFilter")}
           </div>
         )}
         {topTrends.map((t, i) => (
@@ -689,11 +694,11 @@ function OverviewPanel({
       </div>
 
       {/* Top edges */}
-      <SectionLabel>{de ? "Stärkste Beziehungen" : "Strongest relations"}</SectionLabel>
+      <SectionLabel>{tl("orbitGraph.strongestRelations")}</SectionLabel>
       <div style={{ marginBottom: 18 }}>
         {topEdges.length === 0 && (
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-            {de ? "Keine Kanten im aktuellen Filter." : "No edges in current filter."}
+            {tl("orbitGraph.noEdgesInFilter")}
           </div>
         )}
         {topEdges.map((e, i) => {
@@ -741,7 +746,7 @@ function OverviewPanel({
       {/* Query filter */}
       {queryList.length > 1 && (
         <>
-          <SectionLabel>{de ? "Nach Analyse filtern" : "Filter by query"}</SectionLabel>
+          <SectionLabel>{tl("orbitGraph.filterByQuery")}</SectionLabel>
           <div>
             <button
               onClick={() => setQueryFilter(null)}
@@ -756,7 +761,7 @@ function OverviewPanel({
                 fontWeight: queryFilter === null ? 600 : 500,
               }}
             >
-              <span style={{ flex: 1 }}>{de ? "Alle Analysen" : "All queries"}</span>
+              <span style={{ flex: 1 }}>{tl("orbitGraph.allQueries")}</span>
               <span style={{ fontSize: 9, color: "var(--color-text-muted)", fontFamily: "var(--font-mono, monospace)" }}>
                 {queryList.length}
               </span>
@@ -809,6 +814,8 @@ function DetailPanel({
   onSelectQuery?: (id: string) => void;
   onSelectNode: (id: string) => void;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   // Trends stage color (matches STAGE_META.trends.color in OrbitDerivationView)
   const typeColor = "#1A9E5A";
 
@@ -834,7 +841,7 @@ function DetailPanel({
           color: typeColor, background: `${typeColor}14`, border: `1px solid ${typeColor}30`,
           borderRadius: 6, padding: "4px 10px",
         }}>
-          {de ? "Trend" : "Trend"}
+          {tl("orbitGraph.trend")}
         </span>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 10, color: "var(--color-text-muted)", fontVariantNumeric: "tabular-nums" }}>
@@ -859,12 +866,12 @@ function DetailPanel({
         }}>
           <span>
             <strong style={{ color: typeColor, fontWeight: 700 }}>{node.edgeCount}</strong>{" "}
-            {de ? "Verbindungen" : "connections"}
+            {tl("orbitGraph.connections")}
           </span>
           <span style={{ color: "var(--color-border)" }}>·</span>
           <span>
             <strong style={{ color: "var(--color-text-secondary)", fontWeight: 700 }}>{node.queryIds.length}</strong>{" "}
-            {de ? "Analysen" : "queries"}
+            {tl("orbitGraph.queries")}
           </span>
         </div>
       </div>
@@ -874,7 +881,7 @@ function DetailPanel({
         {/* Connected edges */}
         {edges.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <SectionLabel>{de ? "Kausale Verbindungen" : "Causal connections"}</SectionLabel>
+            <SectionLabel>{tl("orbitGraph.causalConnections")}</SectionLabel>
             {edges.map((e, i) => {
               const isFrom = e.from === node.id;
               const otherId = isFrom ? e.to : e.from;
@@ -911,7 +918,7 @@ function DetailPanel({
         {/* Query references */}
         {node.queryIds.length > 0 && (
           <div style={{ marginBottom: 4 }}>
-            <SectionLabel>{de ? "Referenziert in" : "Referenced in"}</SectionLabel>
+            <SectionLabel>{tl("orbitGraph.referencedIn")}</SectionLabel>
             {node.queryIds.map(qId => {
               const label = queryLabels?.[qId];
               const display = label && label.length > 60 ? label.slice(0, 60) + "…" : label ?? `Query ${qId.slice(0, 8)}…`;
@@ -945,7 +952,7 @@ function DetailPanel({
         padding: "10px 12px", borderTop: "1px solid var(--color-border)",
         background: "rgba(0,0,0,0.02)",
       }}>
-        <Tooltip content={de ? "Neue Analyse mit diesem Trend als Fokus starten" : "Start new analysis focused on this trend"} placement="left">
+        <Tooltip content={tl("orbitGraph.deepenTrendTip")} placement="left">
           <button
             onClick={() => onSelectQuery?.(`__orbit_deepen__${node.label}`)}
             style={{
@@ -959,7 +966,7 @@ function DetailPanel({
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${typeColor}12`; }}
           >
             <ArrowDownToLine size={12} strokeWidth={2} />
-            {de ? "Trend vertiefen" : "Deepen trend"}
+            {tl("orbitGraph.deepenTrendCta")}
           </button>
         </Tooltip>
       </div>

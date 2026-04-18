@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -151,8 +151,7 @@ interface SourcesStatusPayload {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MonitorPage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, de } = useT();
   const [data, setData] = useState<MonitorData | null>(null);
   const [sources, setSources] = useState<SourcesStatusPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -246,16 +245,16 @@ export default function MonitorPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, fontFamily: "var(--volt-font-display)", color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.02em" }}>
-              {de ? "Aktivitaetsmonitor" : "Activity Monitor"}
+              {t("monitor.pageTitle")}
             </h1>
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-              {de ? "Echtzeit-Systemstatus, Pipeline-Aktivitaet und Datenqualitaet" : "Real-time system status, pipeline activity and data quality"}
+              {t("monitor.pageSubtitle")}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {lastRefresh && (
               <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                {de ? "Aktualisiert" : "Updated"}: {lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                {t("monitor.updated")}: {lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
             )}
             <button
@@ -267,7 +266,7 @@ export default function MonitorPage() {
                 color: autoRefresh ? "#0A0A0A" : "var(--color-text-muted)",
               }}
             >
-              {autoRefresh ? (de ? "Auto-Refresh AN" : "Auto-refresh ON") : (de ? "Auto-Refresh AUS" : "Auto-refresh OFF")}
+              {autoRefresh ? t("monitor.autoRefreshOn") : t("monitor.autoRefreshOff")}
             </button>
             <button
               onClick={runPipeline}
@@ -279,14 +278,14 @@ export default function MonitorPage() {
                 opacity: pipelineRunning ? 0.5 : 1,
               }}
             >
-              {pipelineRunning ? (de ? "Pipeline laeuft..." : "Pipeline running...") : (de ? "Pipeline starten" : "Run Pipeline")}
+              {pipelineRunning ? t("monitor.pipelineRunning") : t("monitor.runPipeline")}
             </button>
           </div>
         </div>
 
         {loading && !data && (
           <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>
-            {de ? "Lade Systemdaten..." : "Loading system data..."}
+            {t("monitor.loadingSystem")}
           </div>
         )}
 
@@ -301,35 +300,35 @@ export default function MonitorPage() {
             {/* ── KPI Cards ─────────────────────────────────────── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
               <StatCard
-                label={de ? "Live-Signale" : "Live Signals"}
+                label={t("monitor.liveSignals")}
                 value={data.signals.total}
-                sub={data.signals.newestHours < 999 ? `${de ? "Neueste" : "Newest"}: ${formatHoursAgo(data.signals.newestHours)}` : de ? "Keine Signale" : "No signals"}
+                sub={data.signals.newestHours < 999 ? `${t("monitor.newest")}: ${formatHoursAgo(data.signals.newestHours)}` : t("monitor.noSignalsStat")}
                 color={data.signals.total > 0 ? "#1A9E5A" : "#E8402A"}
               />
               <StatCard
-                label={de ? "Trends" : "Trends"}
+                label={t("monitor.trends")}
                 value={data.trends.total}
                 sub={`${data.knowledgeBase.megaTrends} Mega-/Makro-Trends`}
               />
               <StatCard
-                label={de ? "Connectors" : "Connectors"}
+                label={t("monitor.connectors")}
                 value={data.knowledgeBase.connectors}
-                sub={data.pipeline ? `${data.pipeline.sources?.length || 0} ${de ? "aktiv" : "active"}` : de ? "Noch nicht gelaufen" : "Not run yet"}
+                sub={data.pipeline ? `${data.pipeline.sources?.length || 0} ${t("monitor.activeShort")}` : t("monitor.notRunYet")}
               />
               <StatCard
-                label={de ? "Kausale Kanten" : "Causal Edges"}
+                label={t("monitor.causalEdges")}
                 value={data.knowledgeBase.causalEdges}
-                sub={`${data.knowledgeBase.regulations} ${de ? "Regulierungen" : "Regulations"}`}
+                sub={`${data.knowledgeBase.regulations} ${t("monitor.regulations")}`}
               />
               <StatCard
-                label={de ? "Datenbank" : "Database"}
+                label={t("monitor.database")}
                 value={`${(data.system.dbSizeKB / 1024).toFixed(1)} MB`}
                 sub={`Node ${data.system.nodeVersion}`}
               />
               <StatCard
                 label="Uptime"
                 value={formatDuration(data.system.uptime)}
-                sub={de ? "Server-Laufzeit" : "Server uptime"}
+                sub={t("monitor.serverUptime")}
               />
             </div>
 
@@ -340,30 +339,30 @@ export default function MonitorPage() {
                 borderRadius: 12, padding: 20, marginBottom: 20,
               }}>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-                  {de ? "Letzte Pipeline-Ausfuehrung" : "Last Pipeline Run"}
+                  {t("monitor.lastPipelineRun")}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, fontSize: 13 }}>
                   <div>
-                    <span style={{ color: "var(--color-text-muted)" }}>{de ? "Zeitpunkt: " : "Time: "}</span>
+                    <span style={{ color: "var(--color-text-muted)" }}>{t("monitor.timeLabel")}</span>
                     <strong>{new Date(data.pipeline.fetchedAt).toLocaleString()}</strong>
                   </div>
                   <div>
-                    <span style={{ color: "var(--color-text-muted)" }}>{de ? "Dauer: " : "Duration: "}</span>
+                    <span style={{ color: "var(--color-text-muted)" }}>{t("monitor.durationLabel")}</span>
                     <strong>{data.pipeline.duration}ms</strong>
                   </div>
                   <div>
-                    <span style={{ color: "var(--color-text-muted)" }}>{de ? "Signale: " : "Signals: "}</span>
+                    <span style={{ color: "var(--color-text-muted)" }}>{t("monitor.signalsLabel")}</span>
                     <strong>{data.pipeline.signalCount}</strong>
                   </div>
                   <div>
-                    <span style={{ color: "var(--color-text-muted)" }}>{de ? "Quellen: " : "Sources: "}</span>
+                    <span style={{ color: "var(--color-text-muted)" }}>{t("monitor.sourcesLabel")}</span>
                     <strong>{data.pipeline.sources?.length || 0}</strong>
                   </div>
                 </div>
                 {data.pipeline.errors?.length > 0 && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "#E8402A", marginBottom: 4 }}>
-                      {data.pipeline.errors.length} {de ? "Fehler" : "Errors"}:
+                      {data.pipeline.errors.length} {t("monitor.errorsLabel")}:
                     </div>
                     <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--volt-font-mono)", maxHeight: 120, overflow: "auto" }}>
                       {data.pipeline.errors.map((e: string, i: number) => (
@@ -383,12 +382,12 @@ export default function MonitorPage() {
                 borderRadius: 12, padding: 20,
               }}>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-                  {de ? "Signale nach Quelle" : "Signals by Source"}
+                  {t("monitor.signalsBySource")}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {data.signals.bySource.length === 0 && (
                     <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                      {de ? "Keine Signale vorhanden — Pipeline ausfuehren" : "No signals — run the pipeline"}
+                      {t("monitor.noSignalsRunPipeline")}
                     </div>
                   )}
                   {data.signals.bySource.map((s) => (
@@ -403,12 +402,12 @@ export default function MonitorPage() {
                 borderRadius: 12, padding: 20,
               }}>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-                  {de ? "Letzte Abfragen" : "Recent Queries"}
+                  {t("monitor.recentQueries")}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {data.recentQueries.length === 0 && (
                     <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                      {de ? "Noch keine Abfragen" : "No queries yet"}
+                      {t("monitor.noQueriesYet")}
                     </div>
                   )}
                   {data.recentQueries.map((q, i) => (
@@ -446,7 +445,7 @@ export default function MonitorPage() {
               }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)" }}>
-                    {de ? "Datenquellen-Gesundheit" : "Data Source Health"}
+                    {t("monitor.sourcesHealthHeading")}
                   </div>
                   <div style={{
                     fontFamily: "var(--volt-font-mono)", fontSize: 11,
@@ -456,7 +455,7 @@ export default function MonitorPage() {
                     {" · "}<span style={{ color: "#F5A623", fontWeight: 600 }}>{sources.stale}</span> stale
                     {" · "}<span style={{ color: "#9B9B9B", fontWeight: 600 }}>{sources.inactive}</span> inaktiv
                     {sources.needsKey > 0 && (
-                      <>{" · "}<span style={{ color: "#E8402A", fontWeight: 700 }}>{sources.needsKey}</span> {de ? "ohne Key" : "missing key"}</>
+                      <>{" · "}<span style={{ color: "#E8402A", fontWeight: 700 }}>{sources.needsKey}</span> {t("monitor.missingKeyShort")}</>
                     )}
                   </div>
                 </div>
@@ -469,7 +468,7 @@ export default function MonitorPage() {
                       letterSpacing: "0.10em", textTransform: "uppercase",
                       color: "#E8402A", marginBottom: 8,
                     }}>
-                      {de ? "❌ Aktivierung erforderlich — API-Key fehlt" : "❌ Activation required — API key missing"}
+                      {t("monitor.activationRequired")}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {sources.connectors.filter(c => c.config.status === "missing-required").map(c => (
@@ -494,7 +493,7 @@ export default function MonitorPage() {
                               background: "#0A0A0A", color: "#fff",
                               textDecoration: "none", flexShrink: 0,
                             }}>
-                              {de ? "Key holen →" : "Get key →"}
+                              {t("monitor.getKey")}
                             </a>
                           )}
                         </div>
@@ -511,7 +510,7 @@ export default function MonitorPage() {
                       letterSpacing: "0.10em", textTransform: "uppercase",
                       color: "#F5A623", marginBottom: 8,
                     }}>
-                      {de ? "⚠ Rate-Limit — optionaler Key empfohlen" : "⚠ Rate limit — optional key recommended"}
+                      {t("monitor.rateLimitWarn")}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {sources.connectors.filter(c => c.config.status === "missing-optional").map(c => (
@@ -537,7 +536,7 @@ export default function MonitorPage() {
                               border: "1px solid var(--color-border)",
                               textDecoration: "none", flexShrink: 0,
                             }}>
-                              {de ? "Key holen →" : "Get key →"}
+                              {t("monitor.getKey")}
                             </a>
                           )}
                         </div>
@@ -554,7 +553,7 @@ export default function MonitorPage() {
                       letterSpacing: "0.10em", textTransform: "uppercase",
                       color: "var(--color-text-muted)", marginBottom: 8,
                     }}>
-                      {de ? "○ Ohne Config-Problem, aber stumm (Pipeline pruefen)" : "○ No config issue, still silent (check pipeline)"}
+                      {t("monitor.silentSourceWarn")}
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {sources.connectors.filter(c => c.status === "inactive" && c.config.status === "ok").map(c => (
@@ -579,7 +578,7 @@ export default function MonitorPage() {
                     padding: "10px 12px", background: "var(--pastel-mint)",
                     borderRadius: 6,
                   }}>
-                    {de ? "✓ Alle konfigurierten Quellen liefern aktiv Signale." : "✓ All configured sources are actively delivering signals."}
+                    {t("monitor.allHealthyMark")}
                   </div>
                 )}
               </div>
@@ -591,7 +590,7 @@ export default function MonitorPage() {
               borderRadius: 12, padding: 20, marginBottom: 20,
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-                {de ? `Connector-Registry (${data.connectors.length})` : `Connector Registry (${data.connectors.length})`}
+                {`${t("monitor.connectorRegistry")} (${data.connectors.length})`}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {data.connectors.map((c) => {
@@ -619,12 +618,12 @@ export default function MonitorPage() {
               borderRadius: 12, padding: 20,
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-                {de ? "Aktivitaetsprotokoll" : "Activity Log"}
+                {t("monitor.activityLog")}
               </div>
               <div style={{ maxHeight: 300, overflow: "auto" }}>
                 {activityLog.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                    {de ? "Warte auf Aktivitaet..." : "Waiting for activity..."}
+                    {t("monitor.waitingForActivity")}
                   </div>
                 )}
                 {activityLog.map((entry, i) => (
