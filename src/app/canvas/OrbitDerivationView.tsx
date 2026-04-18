@@ -7,6 +7,7 @@ import {
   Link as LinkIcon, Target, ArrowUpRight, Info,
 } from "lucide-react";
 import type { UsedSignal, MatchedTrend, MatchedEdge, QueryResult } from "@/types";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    OrbitDerivationView — 7-stage left-to-right derivation chain.
@@ -357,6 +358,8 @@ interface FocusPickerProps {
 }
 
 function FocusPicker({ nodes, onPick, de }: FocusPickerProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const groups: Array<{ stage: Stage; types: string[] }> = [
     { stage: "decisions",  types: ["decision", "followup"] },
     { stage: "scenarios",  types: ["scenario"] },
@@ -378,10 +381,10 @@ function FocusPicker({ nodes, onPick, de }: FocusPickerProps) {
             marginBottom: 10,
           }}>
             <GitBranch size={14} strokeWidth={1.5} />
-            {de ? "Ableitungs-Ansicht" : "Derivation view"}
+            {tl("orbit.viewTitle")}
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-text-heading)", marginBottom: 6 }}>
-            {de ? "Woher kommt das Ergebnis?" : "Where does this come from?"}
+            {tl("orbit.viewSubtitle")}
           </div>
           <div style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.55 }}>
             {de
@@ -433,7 +436,7 @@ function FocusPicker({ nodes, onPick, de }: FocusPickerProps) {
                 ))}
                 {items.length > 20 && (
                   <div style={{ fontSize: 11, color: "var(--color-text-muted)", padding: "4px 12px" }}>
-                    +{items.length - 20} {de ? "weitere" : "more"}
+                    +{items.length - 20} {tl("orbit.moreSuffix")}
                   </div>
                 )}
               </div>
@@ -467,6 +470,8 @@ export function OrbitDerivationView({
   de,
   onNavigateToNode,
 }: OrbitDerivationViewProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   // Default focus: passed-in selection if eligible, else first decision, else first query
   const initialFocus = useMemo(() => {
     if (selectedNodeId) {
@@ -526,10 +531,9 @@ export function OrbitDerivationView({
       }}>
         <div style={{ textAlign: "center", maxWidth: 360 }}>
           <GitBranch size={32} strokeWidth={1} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
-          <div>{de ? "Noch keine Ableitungen vorhanden" : "No derivations yet"}</div>
+          <div>{tl("orbit.emptyHeading")}</div>
           <div style={{ fontSize: 12, marginTop: 6, opacity: 0.7, lineHeight: 1.5 }}>
-            {de ? "Starte eine Analyse im Canvas — die Ableitungs-Ansicht zeigt dann, aus welchen Signalen und Trends deine Erkenntnisse entstanden sind."
-                : "Run an analysis in Canvas — this view shows which signals and trends led to your insights."}
+            {tl("orbit.emptyBody")}
           </div>
         </div>
       </div>
@@ -985,6 +989,8 @@ function TopBar({
   panelOpen: boolean;
   onTogglePanel: () => void;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const focusStage = focusNode ? nodeTypeToStage(focusNode.nodeType) : null;
   const focusLabel = focusNode
     ? (focusNode.nodeType === "query"
@@ -1008,7 +1014,7 @@ function TopBar({
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, minWidth: 0 }}>
         <button
           onClick={onClearFocus}
-          title={de ? "Anderen Knoten als Fokus wählen" : "Pick another focus node"}
+          title={tl("orbit.pickFocusTitle")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             fontSize: 11, padding: "4px 8px",
@@ -1018,7 +1024,7 @@ function TopBar({
           }}
         >
           <X size={11} strokeWidth={1.8} />
-          {de ? "Fokus wechseln" : "Change focus"}
+          {tl("orbit.changeFocus")}
         </button>
         {focusNode && focusStage && (
           <div
@@ -1057,7 +1063,7 @@ function TopBar({
           fontSize: 11, color: "var(--color-text-muted)",
           fontFamily: "var(--font-mono, monospace)",
         }}
-          title={de ? "Sichtbare / gesamte Knoten auf der Ableitungsspur" : "Visible / total nodes on the derivation spine"}
+          title={tl("orbit.visibleVsTotalTip")}
         >
           {visible}/{total}
         </div>
@@ -1067,8 +1073,8 @@ function TopBar({
             fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
             color: "var(--color-text-muted)", textTransform: "uppercase",
           }}
-            title={de ? "Kettenrelevanz-Schwelle — Knoten unterhalb werden ausgeblendet" : "Chain-relevance threshold — nodes below are hidden"}
-          >{de ? "Schw." : "Thr."}</span>
+            title={tl("orbit.thresholdTip")}
+          >{tl("orbit.thresholdAbbrev")}</span>
           <input
             type="range" min={0} max={1} step={0.05}
             value={threshold}
@@ -1083,7 +1089,7 @@ function TopBar({
 
         <button
           onClick={onTogglePanel}
-          title={panelOpen ? (de ? "Kontext schließen" : "Hide context") : (de ? "Kontext anzeigen" : "Show context")}
+          title={panelOpen ? tl("orbit.hideContext") : tl("orbit.showContext")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             fontSize: 11, padding: "4px 9px",
@@ -1096,13 +1102,13 @@ function TopBar({
           }}
         >
           <Info size={11} strokeWidth={1.8} />
-          {de ? "Kontext" : "Context"}
+          {tl("orbit.contextHeading")}
         </button>
 
         {onOpenInCanvas && (
           <button
             onClick={onOpenInCanvas}
-            title={de ? "Fokus-Knoten im Canvas öffnen" : "Open focus node in canvas"}
+            title={tl("orbit.openInCanvasTip")}
             style={{
               display: "inline-flex", alignItems: "center", gap: 5,
               fontSize: 11, padding: "4px 9px",
@@ -1113,7 +1119,7 @@ function TopBar({
             }}
           >
             <ArrowUpRight size={11} strokeWidth={2} />
-            {de ? "Im Canvas" : "In canvas"}
+            {tl("orbit.openInCanvas")}
           </button>
         )}
       </div>
@@ -1249,6 +1255,8 @@ function ContextPanel({
   onNavigateToNode?: (canvasId: string) => void;
   onFocusNode: (canvasId: string) => void;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   // Resolve upstream chain: walk back through anchors to the focus
   const upstream = useMemo(() => {
     const chain: SpineNode[] = [];
@@ -1320,12 +1328,12 @@ function ContextPanel({
               borderRadius: 4, background: "#6B7A00", color: "#fff",
               letterSpacing: "0.08em", textTransform: "uppercase",
             }}>
-              {de ? "Fokus" : "Focus"}
+              {tl("orbit.focusLabel")}
             </span>
           )}
           <div style={{ flex: 1 }} />
           <button onClick={onClose}
-            title={de ? "Kontext schließen" : "Close context"}
+            title={tl("orbit.closeContextTip")}
             style={{
               background: "none", border: "none", cursor: "pointer",
               color: "var(--color-text-muted)", padding: 2, lineHeight: 0,
@@ -1358,7 +1366,7 @@ function ContextPanel({
             fontSize: 10, color: "var(--color-text-muted)",
           }}>
             <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              {de ? "Kettenbezug" : "Chain rel."}
+              {tl("orbit.chainRelLabel")}
             </span>
             <div style={{
               flex: 1, height: 4, background: "var(--color-border)",
@@ -1380,7 +1388,7 @@ function ContextPanel({
         <div style={{ flex: 1, overflow: "auto", padding: "12px 14px 14px", minHeight: 0 }}>
           {/* Upstream chain */}
           {upstream.length > 0 && (
-            <ContextSection title={de ? "Ableitung aus" : "Derived from"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
+            <ContextSection title={tl("orbit.derivedFrom")} icon={<GitBranch size={12} strokeWidth={1.8} />}>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {upstream.slice(0, 8).map(u => {
                   const meta = STAGE_META[u.stage];
@@ -1410,7 +1418,7 @@ function ContextPanel({
                 })}
                 {upstream.length > 8 && (
                   <div style={{ fontSize: 10, color: "var(--color-text-muted)", padding: "2px 4px" }}>
-                    +{upstream.length - 8} {de ? "weitere" : "more"}
+                    +{upstream.length - 8} {tl("orbit.moreSuffix")}
                   </div>
                 )}
               </div>
@@ -1447,7 +1455,7 @@ function ContextPanel({
             {canRefocus && detailNode.canvasId && (
               <button
                 onClick={() => onFocusNode(detailNode.canvasId!)}
-                title={de ? "Ableitungskette auf diesen Knoten fokussieren" : "Focus spine on this node"}
+                title={tl("orbit.focusSpineTip")}
                 style={{
                   flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
                   borderRadius: 6, border: `1px solid ${stageColor}66`,
@@ -1459,13 +1467,13 @@ function ContextPanel({
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${stageColor}12`; }}
               >
                 <Target size={11} strokeWidth={2} />
-                {de ? "Fokussieren" : "Focus"}
+                {tl("orbit.focusSpine")}
               </button>
             )}
             {detailNode.canvasId && onNavigateToNode && (
               <button
                 onClick={() => onNavigateToNode(detailNode.canvasId!)}
-                title={de ? "Diesen Knoten im Canvas öffnen" : "Open this node in canvas"}
+                title={tl("orbit.openNodeTip")}
                 style={{
                   flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 10px",
                   borderRadius: 6, border: "1px solid var(--color-border)",
@@ -1478,7 +1486,7 @@ function ContextPanel({
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
               >
                 <ArrowUpRight size={11} strokeWidth={2} />
-                {de ? "Im Canvas" : "In canvas"}
+                {tl("orbit.openInCanvas")}
               </button>
             )}
           </div>
@@ -1512,11 +1520,13 @@ function ContextSection({
 }
 
 function QuestionContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const r = node.result;
   return (
     <>
       {node.query && (
-        <ContextSection title={de ? "Frage" : "Question"} icon={<HelpCircle size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.questionLabel")} icon={<HelpCircle size={12} strokeWidth={1.8} />}>
           <div style={{
             fontSize: 12, lineHeight: 1.5, color: "var(--color-text-heading)",
             padding: "8px 10px", background: "var(--color-surface, #F5F5F5)",
@@ -1527,21 +1537,21 @@ function QuestionContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
         </ContextSection>
       )}
       {r?.synthesis && (
-        <ContextSection title={de ? "Synthese" : "Synthesis"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.synthesisLabel")} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
           <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)", whiteSpace: "pre-wrap" }}>
             {r.synthesis}
           </div>
         </ContextSection>
       )}
       {r?.keyInsights && r.keyInsights.length > 0 && (
-        <ContextSection title={de ? "Kernerkenntnisse" : "Key insights"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.keyInsightsLabel")} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11.5, lineHeight: 1.5 }}>
             {r.keyInsights.slice(0, 6).map((k, i) => <li key={i}>{k}</li>)}
           </ul>
         </ContextSection>
       )}
       {r?.matchedTrends && r.matchedTrends.length > 0 && (
-        <ContextSection title={de ? "Bezogene Trends" : "Matched trends"} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.matchedTrendsLabel")} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             {r.matchedTrends.slice(0, 8).map(t => {
               const rel = typeof t.queryRelevance === "number" ? t.queryRelevance : t.relevance * t.confidence;
@@ -1568,7 +1578,7 @@ function QuestionContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
         </ContextSection>
       )}
       {r?.references && r.references.length > 0 && (
-        <ContextSection title={de ? "Quellen" : "References"} icon={<LinkIcon size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.referencesLabel")} icon={<LinkIcon size={12} strokeWidth={1.8} />}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {r.references.slice(0, 10).map((ref, i) => (
               <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
@@ -1593,8 +1603,10 @@ function QuestionContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
 }
 
 function SignalContent({ signal, de }: { signal: UsedSignal; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   return (
-    <ContextSection title={de ? "Signal" : "Signal"} icon={<Radio size={12} strokeWidth={1.8} />}>
+    <ContextSection title={tl("orbit.signalLabel")} icon={<Radio size={12} strokeWidth={1.8} />}>
       <div style={{
         padding: "10px 12px", borderRadius: 8,
         border: "1px solid var(--color-border)",
@@ -1611,7 +1623,7 @@ function SignalContent({ signal, de }: { signal: UsedSignal; de: boolean }) {
             {signal.source}
           </span>
           {signal.date && <><span>·</span><span>{signal.date}</span></>}
-          {typeof signal.strength === "number" && <><span>·</span><span>{de ? "Stärke" : "Strength"} {Math.round(signal.strength * 100)}%</span></>}
+          {typeof signal.strength === "number" && <><span>·</span><span>{tl("orbit.strengthLabel")} {Math.round(signal.strength * 100)}%</span></>}
         </div>
         {signal.url && (
           <a href={signal.url} target="_blank" rel="noopener noreferrer"
@@ -1631,9 +1643,11 @@ function SignalContent({ signal, de }: { signal: UsedSignal; de: boolean }) {
 }
 
 function TrendContent({ trend, de }: { trend: MatchedTrend; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const qr = typeof trend.queryRelevance === "number" ? trend.queryRelevance : null;
   return (
-    <ContextSection title={de ? "Trend" : "Trend"} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
+    <ContextSection title={tl("orbit.trendLabel")} icon={<TrendingUp size={12} strokeWidth={1.8} />}>
       <div style={{
         padding: "10px 12px", borderRadius: 8,
         border: "1px solid var(--color-border)",
@@ -1646,13 +1660,13 @@ function TrendContent({ trend, de }: { trend: MatchedTrend; de: boolean }) {
           {trend.category}
         </div>
         <MetricGrid items={[
-          ...(qr !== null ? [{ label: de ? "Bezug (Frage)" : "Query rel.", value: `${Math.round(qr * 100)}%`, emphasis: qr >= 0.6 }] : []),
-          { label: de ? "Relevanz" : "Relevance", value: `${Math.round(trend.relevance * 100)}%` },
-          { label: de ? "Konfidenz" : "Confidence", value: `${Math.round(trend.confidence * 100)}%` },
-          { label: de ? "Impact" : "Impact", value: `${Math.round(trend.impact * 100)}%` },
-          { label: de ? "Ring" : "Ring", value: trend.ring },
-          { label: de ? "Signale" : "Signals", value: String(trend.signalCount) },
-          { label: de ? "Velocity" : "Velocity", value: trend.velocity },
+          ...(qr !== null ? [{ label: tl("orbit.queryRelLabel"), value: `${Math.round(qr * 100)}%`, emphasis: qr >= 0.6 }] : []),
+          { label: tl("orbit.relevanceLabel"), value: `${Math.round(trend.relevance * 100)}%` },
+          { label: tl("orbit.confidenceLabel"), value: `${Math.round(trend.confidence * 100)}%` },
+          { label: tl("orbit.impactLabel"), value: `${Math.round(trend.impact * 100)}%` },
+          { label: tl("orbit.ringLabel"), value: trend.ring },
+          { label: tl("orbit.signalsLabel"), value: String(trend.signalCount) },
+          { label: tl("orbit.velocityLabel"), value: trend.velocity },
         ]} />
       </div>
     </ContextSection>
@@ -1660,6 +1674,8 @@ function TrendContent({ trend, de }: { trend: MatchedTrend; de: boolean }) {
 }
 
 function EdgeContent({ edge, spine, de }: { edge: MatchedEdge; spine: Spine; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const fromName = spine.columns.trends.find(t => t.trend?.id === edge.from)?.label ?? edge.from;
   const toName = spine.columns.trends.find(t => t.trend?.id === edge.to)?.label ?? edge.to;
   const typeColor: Record<string, string> = {
@@ -1674,7 +1690,7 @@ function EdgeContent({ edge, spine, de }: { edge: MatchedEdge; spine: Spine; de:
   };
   const tlabel = typeLabel[edge.type] ?? { de: edge.type, en: edge.type };
   return (
-    <ContextSection title={de ? "Kausale Beziehung" : "Causal edge"} icon={<GitBranch size={12} strokeWidth={1.8} />}>
+    <ContextSection title={tl("orbit.causalEdgeLabel")} icon={<GitBranch size={12} strokeWidth={1.8} />}>
       <div style={{
         padding: "10px 12px", borderRadius: 8,
         border: `1px solid ${c}44`, background: `${c}08`,
@@ -1692,9 +1708,9 @@ function EdgeContent({ edge, spine, de }: { edge: MatchedEdge; spine: Spine; de:
           {toName}
         </div>
         <MetricGrid items={[
-          { label: de ? "Stärke" : "Strength", value: `${Math.round(edge.strength * 100)}%` },
+          { label: tl("orbit.strengthLabel"), value: `${Math.round(edge.strength * 100)}%` },
           ...(typeof edge.queryRelevance === "number"
-            ? [{ label: de ? "Bezug (Frage)" : "Query rel.", value: `${Math.round(edge.queryRelevance * 100)}%`, emphasis: edge.queryRelevance >= 0.6 }]
+            ? [{ label: tl("orbit.queryRelLabel"), value: `${Math.round(edge.queryRelevance * 100)}%`, emphasis: edge.queryRelevance >= 0.6 }]
             : []),
         ]} />
         {edge.description && (
@@ -1708,10 +1724,12 @@ function EdgeContent({ edge, spine, de }: { edge: MatchedEdge; spine: Spine; de:
 }
 
 function DerivedContent({ node, de }: { node: DerivCanvasNode; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   return (
     <>
       {node.content && (
-        <ContextSection title={de ? "Inhalt" : "Content"} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
+        <ContextSection title={tl("orbit.contentLabel")} icon={<Lightbulb size={12} strokeWidth={1.8} />}>
           <div style={{
             fontSize: 12, lineHeight: 1.55, color: "var(--color-text-secondary)",
             whiteSpace: "pre-wrap",
