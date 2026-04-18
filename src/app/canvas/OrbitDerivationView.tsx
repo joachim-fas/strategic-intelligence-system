@@ -806,21 +806,29 @@ export function OrbitDerivationView({
                     isSelected={detailSpineId === n.id}
                     onHover={setHoveredId}
                     onClick={() => {
-                      // Click always selects for the context panel (stays in Orbit).
-                      // Canvas navigation is now an explicit action via the panel button.
+                      // Always open the in-Orbit context panel — that's
+                      // the nachgelagerte Trend-/Stammdaten-Schicht.
                       setDetailSpineId(n.id);
                       setPanelPinned(true);
-                      // If the clicked node is canvas-linked AND a valid spine terminal
-                      // (query/insight/scenario/decision), re-focus the spine onto it.
+
+                      // For canvas-linked "result" nodes (the Frage /
+                      // Erkenntnis / Szenario / Empfehlung rails) ALSO
+                      // open the full DetailPanel that the Canvas view
+                      // uses. Previously Orbit showed only the trend-
+                      // shaped sidebar and never surfaced the briefing
+                      // content — user report: "bei Ergebnissen nicht
+                      // wie in der Canvas-Ansicht". Trends / causal
+                      // edges have no canvas node, so they stay
+                      // sidebar-only.
                       if (
                         n.canvasId &&
-                        n.canvasId !== focusId &&
                         (n.stage === "question" ||
                           n.stage === "insights" ||
                           n.stage === "scenarios" ||
                           n.stage === "decisions")
                       ) {
-                        setFocusId(n.canvasId);
+                        if (n.canvasId !== focusId) setFocusId(n.canvasId);
+                        onNavigateToNode?.(n.canvasId);
                       }
                     }}
                     isFocus={n.canvasId === focusId}
