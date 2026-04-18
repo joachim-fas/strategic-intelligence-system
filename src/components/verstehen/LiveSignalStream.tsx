@@ -30,6 +30,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { TrendDot } from "@/types";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import {
   VoltAccordion,
   VoltAccordionItem,
@@ -80,10 +81,11 @@ function sourceColor(source: string): string {
 }
 
 function ageLabel(h: number, de: boolean): string {
-  if (h < 1) return de ? "<1 Std" : "<1h";
-  if (h < 24) return de ? `vor ${Math.round(h)} Std` : `${Math.round(h)}h ago`;
+  const locale: Locale = de ? "de" : "en";
+  if (h < 1) return translate(locale, "liveStream.hoursShort");
+  if (h < 24) return translate(locale, "liveStream.hoursAgo", { n: Math.round(h) });
   const days = Math.round(h / 24);
-  return de ? `vor ${days} Tg` : `${days}d ago`;
+  return translate(locale, "liveStream.daysAgo", { n: days });
 }
 
 // "mixed" is the default — preserves the server-side round-robin interleave
@@ -108,6 +110,8 @@ type OgCacheState = "pending" | "ok" | "fail";
 interface OgCacheEntry { state: OgCacheState; imageUrl: string | null }
 
 export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const [signals, setSignals] = useState<RawSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -321,20 +325,20 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           color: "var(--volt-text-muted, #6B6B6B)",
         }}>
           {loading
-            ? (de ? "Lade Signale…" : "Loading signals…")
+            ? tl("liveStream.loadingSignals")
             : error
               ? error
               : (
                 <>
                   <strong>{displaySignals.length}</strong>{" "}
-                  {de ? "Signale" : "signals"}
+                  {tl("liveStream.signals")}
                   {displaySignals.length !== signals.length && (
                     <span style={{ color: "var(--volt-text-faint, #737373)" }}>
-                      {" "}({de ? `von ${signals.length}` : `of ${signals.length}`})
+                      {" "}({tl("liveStream.ofCount", { n: signals.length })})
                     </span>
                   )}
                   <span style={{ color: "var(--volt-text-faint, #737373)", marginLeft: 8 }}>
-                    · {de ? "aktualisiert alle 2 Min" : "refreshes every 2 min"}
+                    · {tl("liveStream.refreshEvery2Min")}
                   </span>
                 </>
               )}
@@ -355,7 +359,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           onChange={(e) => setSourceFilter(e.target.value)}
           style={selectStyle}
         >
-          <option value="all">{de ? "Alle Quellen" : "All sources"} ({signals.length})</option>
+          <option value="all">{tl("liveStream.allSources")} ({signals.length})</option>
           {sourceCounts.map(([src, count]) => (
             <option key={src} value={src}>{src} ({count})</option>
           ))}
@@ -367,7 +371,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           onChange={(e) => setTopicFilter(e.target.value)}
           style={selectStyle}
         >
-          <option value="all">{de ? "Alle Themen" : "All topics"}</option>
+          <option value="all">{tl("liveStream.allTopics")}</option>
           {topicCounts.map(([topic, count]) => (
             <option key={topic} value={topic}>{topic} ({count})</option>
           ))}
@@ -397,16 +401,16 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           {(["mixed", "newest", "strongest"] as SortKey[]).map((key) => {
             const active = sortKey === key;
             const label =
-              key === "mixed"     ? (de ? "Gemischt"  : "Mixed")
-              : key === "newest"  ? (de ? "Neueste"   : "Newest")
-              :                     (de ? "Stärkste"  : "Strongest");
+              key === "mixed"     ? tl("liveStream.sortMixed")
+              : key === "newest"  ? tl("liveStream.sortNewest")
+              :                     tl("liveStream.sortStrongest");
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => setSortKey(key)}
                 title={key === "mixed"
-                  ? (de ? "Quellen-ausgewogener Mix (Round-Robin)" : "Source-balanced mix (round-robin)")
+                  ? tl("liveStream.sortMixedTip")
                   : undefined}
                 style={{
                   fontSize: 11, fontWeight: 600,
@@ -437,8 +441,8 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           {(["evidenz", "feed"] as ViewMode[]).map((key) => {
             const active = viewMode === key;
             const label = key === "evidenz"
-              ? (de ? "Evidenz" : "Evidence")
-              : (de ? "Feed" : "Feed");
+              ? tl("liveStream.viewEvidence")
+              : tl("liveStream.viewFeed");
             return (
               <button
                 key={key}
@@ -474,7 +478,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
           fontSize: 13,
           display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
         }}>
-          <span>{de ? "Keine Signale für diese Filter-Kombination." : "No signals for this filter combination."}</span>
+          <span>{tl("liveStream.noSignalsInFilter")}</span>
           {timeWindow !== "168" && (
             <button
               type="button"
@@ -490,7 +494,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
                 fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
               }}
             >
-              {de ? "Zeitfenster auf 7 Tage erweitern →" : "Expand to 7 days →"}
+              {tl("liveStream.expandTo7Days")}
             </button>
           )}
           {timeWindow === "168" && signals.length === 0 && (
@@ -556,7 +560,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
                         }}
                       >
                         {isUnmatched
-                          ? (de ? "Unzugeordnete Signale" : "Unmatched Signals")
+                          ? tl("liveStream.unmatchedSignals")
                           : (trend?.name ?? key)}
                       </button>
                       {trend && trend.velocity !== "stable" && (
@@ -574,7 +578,7 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
                         marginLeft: "auto",
                         whiteSpace: "nowrap",
                       }}>
-                        {groupSignals.length} {de ? "Signale" : "signals"}
+                        {groupSignals.length} {tl("liveStream.signals")}
                       </span>
                     </div>
 
@@ -693,6 +697,8 @@ function SignalCard({
   topicHasTrend,
   de,
 }: SignalCardProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   // IntersectionObserver → only fetch the OG image once this card
@@ -905,8 +911,8 @@ function SignalCard({
             }}
             disabled={!topicHasTrend}
             title={topicHasTrend
-              ? (de ? "Im Radar anzeigen" : "Show in Radar")
-              : (de ? "Kein passender Trend im Radar" : "No matching trend in Radar")}
+              ? tl("liveStream.showInRadar")
+              : tl("liveStream.noMatchingTrend")}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -944,6 +950,8 @@ function SignalCard({
 
 // ─── Evidence Signal Row (compact, inside accordion) ───────────────────
 function EvidenceSignalRow({ signal: s, de }: { signal: RawSignal; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const color = sourceColor(s.source);
   return (
     <a

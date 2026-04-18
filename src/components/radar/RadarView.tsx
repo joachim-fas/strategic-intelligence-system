@@ -15,7 +15,7 @@ import { useRef, useState, useMemo, useEffect } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import RadarChart from "./RadarChart";
 import { TrendDot, TimeHorizon } from "@/types";
-import { Locale } from "@/lib/i18n";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import {
   applySteepVQuadrants,
   QUADRANT_LABELS_DE,
@@ -45,6 +45,7 @@ interface LiveFeedTrend {
 export default function RadarView({ trends, onTrendClick, locale, filteredTrendIds }: RadarViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const de = locale === "de";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(locale, key, vars);
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -198,7 +199,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
                 setSearch("");
               }
             }}
-            placeholder={de ? "Trend suchen…" : "Search trends…"}
+            placeholder={tl("radarView.searchPlaceholder")}
             style={{
               flex: 1, minWidth: 0,
               border: "none", outline: "none", background: "transparent",
@@ -239,7 +240,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
                   color: "var(--volt-text-muted, #6B6B6B)",
                   fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
                 }}>
-                  {de ? `Keine Treffer für „${search}"` : `No matches for "${search}"`}
+                  {`${tl("radarView.noMatchesPrefix")} „${search}"`}
                 </div>
               ) : (
                 searchMatches.map((t, i) => (
@@ -304,7 +305,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
             letterSpacing: "0.1em", textTransform: "uppercase",
             color: "var(--volt-text-faint, #999)", marginRight: 4,
           }}>
-            {de ? "Tempo" : "Velocity"}
+            {tl("radarView.velocity")}
           </span>
           {(["all", "rising", "stable", "falling"] as VelocityFilter[]).map((v) => (
             <FilterPill
@@ -312,10 +313,10 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
               active={velocityFilter === v}
               onClick={() => setVelocityFilter(v)}
               label={
-                v === "all" ? (de ? "Alle" : "All")
-                : v === "rising" ? (de ? "↗ steigt" : "↗ rising")
-                : v === "stable" ? (de ? "→ stabil" : "→ stable")
-                : (de ? "↘ fällt" : "↘ falling")
+                v === "all" ? tl("radarView.velocityAll")
+                : v === "rising" ? tl("radarView.velocityRising")
+                : v === "stable" ? tl("radarView.velocityStable")
+                : tl("radarView.velocityFalling")
               }
             />
           ))}
@@ -330,7 +331,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
             letterSpacing: "0.1em", textTransform: "uppercase",
             color: "var(--volt-text-faint, #999)", marginRight: 4,
           }}>
-            {de ? "Horizont" : "Horizon"}
+            {tl("radarView.horizonLabel")}
           </span>
           {(["short", "mid", "long"] as TimeHorizon[]).map((h) => (
             <FilterPill
@@ -343,7 +344,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
                 if (next.size === 0) next.add(h); // never empty
                 setHorizonFilter(next);
               }}
-              label={de ? (h === "short" ? "kurz" : h === "mid" ? "mittel" : "lang") : h}
+              label={h === "short" ? tl("radarView.horizonShort") : h === "mid" ? tl("radarView.horizonMid") : tl("radarView.horizonLong")}
             />
           ))}
         </div>
@@ -352,12 +353,12 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
 
         {/* Confidence + Impact sliders */}
         <SliderControl
-          label={de ? "Konfidenz ≥" : "Confidence ≥"}
+          label={tl("radarView.confidenceGte")}
           value={minConfidence}
           onChange={setMinConfidence}
         />
         <SliderControl
-          label={de ? "Impact ≥" : "Impact ≥"}
+          label={tl("radarView.impactGte")}
           value={minImpact}
           onChange={setMinImpact}
         />
@@ -372,7 +373,7 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
         color: "var(--volt-text-muted, #6B6B6B)",
       }}>
         <span style={{ fontWeight: 700, color: "var(--volt-text-faint, #999)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          {filteredCount}/{totalCount} {de ? "Trends" : "Trends"}
+          {filteredCount}/{totalCount} {tl("radarView.trendsCount")}
         </span>
         <span style={{ opacity: 0.4 }}>·</span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -381,12 +382,12 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
             background: liveActiveCount > 0 ? "#1A9E5A" : "#9CA3AF",
             boxShadow: liveActiveCount > 0 ? "0 0 6px rgba(26,158,90,0.6)" : "none",
           }} />
-          {liveActiveCount} {de ? "mit Live-Signalen (72h)" : "with live signals (72h)"}
+          {liveActiveCount} {tl("radarView.withLiveSignals72h")}
         </span>
         <span style={{ opacity: 0.4 }}>·</span>
-        <LegendItem marker="dot-big" label={de ? "Größe = Einfluss" : "Size = Impact"} />
-        <LegendItem marker="color" label={de ? "Farbe = Horizont" : "Color = Horizon"} />
-        <LegendItem marker="opacity" label={de ? "Deckkraft = Vertrauen" : "Opacity = Confidence"} />
+        <LegendItem marker="dot-big" label={tl("radarView.sizeImpact")} />
+        <LegendItem marker="color" label={tl("radarView.colorHorizon")} />
+        <LegendItem marker="opacity" label={tl("radarView.opacityConfidence")} />
       </div>
 
       {/* ── Quadrant legend strip ─────────────────────────────────────────── */}
@@ -468,22 +469,22 @@ export default function RadarView({ trends, onTrendClick, locale, filteredTrendI
       }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {de ? "Ringe" : "Rings"}
+            {tl("radarView.rings")}
           </span>
           <span style={{ opacity: 0.8 }}>Adopt → Trial → Assess → Hold</span>
         </span>
         <span style={{ width: 1, height: 10, background: "var(--volt-border, #E8E8E8)" }} />
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1.25px dashed #1A9E5A", display: "inline-block" }} />
-          {de ? "steigt" : "rising"}
+          {tl("radarView.rising")}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 11, height: 11, borderRadius: "50%", border: "1.25px solid #E8402A", display: "inline-block" }} />
-          {de ? "fällt" : "falling"}
+          {tl("radarView.falling")}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 11, height: 11, borderRadius: "50%", background: "rgba(122,184,245,0.35)", display: "inline-block" }} />
-          {de ? "Live-Halo" : "Live halo"}
+          {tl("radarView.liveHalo")}
         </span>
         <span
           style={{ marginLeft: "auto", position: "relative", cursor: "help" }}

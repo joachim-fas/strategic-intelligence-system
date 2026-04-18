@@ -21,6 +21,7 @@
 
 import { Database, Network, TrendingUp, Filter, Eye, GitBranch, AlertCircle, Layers, Cpu, BarChart3, Map as MapIcon } from "lucide-react";
 import { connectors } from "@/connectors";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 // Audit A3-M4 (18.04.2026): "48+ offene Quellen" in the pipeline
 // diagram was hardcoded. Post-RSS-merge the real count is ~100, so
@@ -32,6 +33,8 @@ interface Props {
 }
 
 export function MethodikContent({ de }: Props) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   return (
     <div>
       {/* Hero */}
@@ -42,14 +45,14 @@ export function MethodikContent({ de }: Props) {
           textTransform: "uppercase", color: "var(--volt-text-faint, #AAA)",
           marginBottom: 14,
         }}>
-          {de ? "So funktioniert das SIS" : "How the SIS works"}
+          {tl("methodology.heading")}
         </div>
         <h1 style={{
           fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
           fontSize: 40, fontWeight: 700, letterSpacing: "-0.02em",
           color: "var(--volt-text, #0A0A0A)", margin: "0 0 16px", lineHeight: 1.1,
         }}>
-          {de ? "Methodik" : "Methodology"}
+          {tl("methodology.caption")}
         </h1>
         <p style={{
           fontSize: 16, lineHeight: 1.65,
@@ -67,7 +70,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="01"
         icon={<Eye size={18} />}
-        title={de ? "Was ist das SIS?" : "What is the SIS?"}
+        title={tl("methodology.whatIsSis")}
       >
         <p style={paragraphStyle}>
           {de
@@ -86,7 +89,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="02"
         icon={<Database size={18} />}
-        title={de ? "Die Daten-Pipeline" : "The Data Pipeline"}
+        title={tl("methodology.dataPipeline")}
       >
         <p style={paragraphStyle}>
           {de
@@ -105,7 +108,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="03"
         icon={<Filter size={18} />}
-        title={de ? "STEEP+V — die sechs Dimensionen" : "STEEP+V — the six dimensions"}
+        title={tl("methodology.steepV")}
       >
         <p style={paragraphStyle}>
           {de
@@ -119,7 +122,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="04"
         icon={<TrendingUp size={18} />}
-        title={de ? "Trend-Klassifikation: Adopt · Trial · Assess · Hold" : "Trend Classification: Adopt · Trial · Assess · Hold"}
+        title={tl("methodology.trendClassification")}
       >
         <p style={paragraphStyle}>
           {de
@@ -133,7 +136,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="05"
         icon={<Network size={18} />}
-        title={de ? "Konfidenz-Score: Wie sicher ist die Einschätzung?" : "Confidence Score: How certain is the assessment?"}
+        title={tl("methodology.confidenceScore")}
       >
         <p style={paragraphStyle}>
           {de
@@ -147,7 +150,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="06"
         icon={<GitBranch size={18} />}
-        title={de ? "Kausal-Edges: Wie Trends einander beeinflussen" : "Causal Edges: How trends influence each other"}
+        title={tl("methodology.causalEdges")}
       >
         <p style={paragraphStyle}>
           {de
@@ -161,7 +164,7 @@ export function MethodikContent({ de }: Props) {
       <Section
         number="07"
         icon={<AlertCircle size={18} />}
-        title={de ? "Was das SIS NICHT tut" : "What the SIS does NOT do"}
+        title={tl("methodology.whatSisIsNot")}
         accent="warning"
       >
         <p style={paragraphStyle}>
@@ -241,6 +244,8 @@ function Section({
 // ── Abgrenzungs-Box (Section 1) ──────────────────────────────────────────────
 
 function AbgrenzungBox({ de }: { de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const rows: Array<{ label: string; ja: string; nein: string }> = de ? [
     { label: "Zweck", ja: "Strategische Fragestellungen beantworten", nein: "Nachrichten lesen" },
     { label: "Nutzer", ja: "Entscheider, Strategen, Analysten", nein: "Massen-Publikum" },
@@ -271,8 +276,8 @@ function AbgrenzungBox({ de }: { de: boolean }) {
         color: "var(--volt-text-faint, #999)",
       }}>
         <div></div>
-        <div style={{ color: "var(--signal-positive, #1A9E5A)" }}>{de ? "Das ist SIS" : "This is SIS"}</div>
-        <div>{de ? "Das ist NICHT SIS" : "This is NOT SIS"}</div>
+        <div style={{ color: "var(--signal-positive, #1A9E5A)" }}>{tl("methodology.thisIsSis")}</div>
+        <div>{tl("methodology.thisIsNotSis")}</div>
       </div>
       {rows.map((r, i) => (
         <div
@@ -611,6 +616,8 @@ function RingExplainer({ de }: { de: boolean }) {
 // ── Confidence Breakdown (Section 5) ─────────────────────────────────────────
 
 function ConfidenceBreakdown({ de }: { de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const factors = de ? [
     {
       name: "Quellen-Breite",
@@ -716,7 +723,7 @@ function ConfidenceBreakdown({ de }: { de: boolean }) {
         color: "var(--volt-text, #0A0A0A)",
         fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
       }}>
-        <strong>{de ? "Beispiel: " : "Example: "}</strong>
+        <strong>{tl("methodology.exampleLabel")}</strong>
         {de
           ? "Ein Trend mit 7 Quellen (voll), 60 % Übereinstimmung (mittel) und Signalen aus der letzten Woche (voll) ergibt ca. 33 + 20 + 34 = 87 % Konfidenz → Adopt-Ring."
           : "A trend with 7 sources (full), 60% agreement (medium), and signals from the last week (full) yields ≈ 33 + 20 + 34 = 87% confidence → Adopt ring."}
@@ -728,6 +735,8 @@ function ConfidenceBreakdown({ de }: { de: boolean }) {
 // ── Edge Types Grid (Section 6) ──────────────────────────────────────────────
 
 function EdgeTypesGrid({ de }: { de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const edges = de ? [
     { type: "treibt",      color: "#1A9E5A", solid: true,  desc: "A treibt B direkt an. Wenn A stärker wird, wird B wahrscheinlicher.", example: "Agentic AI → Automatisierungs-Druck" },
     { type: "ermöglicht",  color: "#7AB8F5", solid: true,  desc: "A ist Voraussetzung für B. B kann ohne A nicht existieren.", example: "5G-Netze → Autonomes Fahren" },
@@ -793,7 +802,7 @@ function EdgeTypesGrid({ de }: { de: boolean }) {
             fontStyle: "italic",
             fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
           }}>
-            {de ? "Beispiel: " : "Example: "}{e.example}
+            {tl("methodology.exampleLabel")}{e.example}
           </div>
         </div>
       ))}

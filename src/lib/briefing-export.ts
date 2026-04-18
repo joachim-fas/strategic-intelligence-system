@@ -4,14 +4,14 @@
  */
 
 import type { HistoryEntry } from "@/components/briefing/BriefingResult";
-import type { Locale } from "@/lib/i18n";
+import { t as translate, localeTag, type Locale } from "@/lib/i18n";
 
 // ── Single briefing → Markdown ────────────────────────────────────────────────
 export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string {
   const b = entry.briefing as any;
-  const de = locale === "de";
-  const ts = entry.timestamp.toLocaleString(de ? "de-DE" : "en-US");
-  const conf = b.confidence > 0 ? ` · ${(b.confidence * 100).toFixed(0)}% ${de ? "Konfidenz" : "confidence"}` : "";
+  const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
+  const ts = entry.timestamp.toLocaleString(localeTag(locale));
+  const conf = b.confidence > 0 ? ` · ${(b.confidence * 100).toFixed(0)}% ${t("summary.confidenceLabel")}` : "";
   const lines: string[] = [];
 
   // Header
@@ -21,14 +21,14 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // Synthesis
   if (b.synthesis && b.synthesis !== "Analysiere..." && b.synthesis !== "Analyzing...") {
-    lines.push(`## ${de ? "Synthese" : "Synthesis"}`);
+    lines.push(`## ${t("summary.sectionSynthesis")}`);
     lines.push(b.synthesis);
     lines.push("");
   }
 
   // Scenarios
   if (b.scenarios?.length > 0) {
-    lines.push(`## ${de ? "Szenarien" : "Scenarios"}`);
+    lines.push(`## ${t("summary.sectionScenarios")}`);
     lines.push("");
     for (const s of b.scenarios) {
       const pct = (s.probability * 100).toFixed(0);
@@ -40,7 +40,7 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // Key Insights
   if (b.keyInsights?.length > 0) {
-    lines.push(`## ${de ? "Erkenntnisse" : "Key Insights"}`);
+    lines.push(`## ${t("summary.sectionKeyInsights")}`);
     for (const insight of b.keyInsights) {
       lines.push(`- ${insight}`);
     }
@@ -50,7 +50,7 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
   // Causal chains
   const causalChains = b.causalAnalysis ?? b.causalChain;
   if (causalChains?.length > 0) {
-    lines.push(`## ${de ? "Kausalketten" : "Causal Chains"}`);
+    lines.push(`## ${t("summary.sectionCausalChains")}`);
     for (const chain of causalChains) {
       lines.push(`- ${chain}`);
     }
@@ -59,21 +59,21 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // Strategic interpretation
   if (b.interpretation) {
-    lines.push(`## ${de ? "Strategische Interpretation" : "Strategic Interpretation"}`);
+    lines.push(`## ${t("summary.sectionInterpretation")}`);
     lines.push(b.interpretation);
     lines.push("");
   }
 
   // Decision framework
   if (b.decisionFramework) {
-    lines.push(`## ${de ? "Entscheidungshilfe" : "Decision Framework"}`);
+    lines.push(`## ${t("summary.sectionDecisionFramework")}`);
     lines.push(b.decisionFramework);
     lines.push("");
   }
 
   // Follow-up questions
   if (b.followUpQuestions?.length > 0) {
-    lines.push(`## ${de ? "Weiterführende Fragen" : "Follow-up Questions"}`);
+    lines.push(`## ${t("summary.sectionFollowUps")}`);
     for (const q of b.followUpQuestions) {
       lines.push(`- ${q}`);
     }
@@ -82,14 +82,14 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // News context
   if (b.newsContext) {
-    lines.push(`## ${de ? "Aktueller Kontext" : "Current Context"}`);
+    lines.push(`## ${t("summary.sectionCurrentContext")}`);
     lines.push(b.newsContext);
     lines.push("");
   }
 
   // Regulatory context
   if (b.regulatoryContext?.length > 0) {
-    lines.push(`## ${de ? "Regulierung" : "Regulation"}`);
+    lines.push(`## ${t("summary.sectionRegulation")}`);
     for (const r of b.regulatoryContext) {
       lines.push(`- ${r}`);
     }
@@ -98,7 +98,7 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // References
   if (b.references?.length > 0) {
-    lines.push(`## ${de ? "Quellen" : "Sources"}`);
+    lines.push(`## ${t("summary.sectionReferences")}`);
     for (const ref of b.references) {
       lines.push(`- [${ref.title}](${ref.url})`);
     }
@@ -107,7 +107,7 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // Balanced Scorecard
   if (b.balancedScorecard?.perspectives?.length > 0) {
-    lines.push(`## ${de ? "Balanced Scorecard" : "Balanced Scorecard"}`);
+    lines.push(`## ${t("summary.sectionBalancedScorecard")}`);
     if (b.balancedScorecard.criticalTension) {
       lines.push(`> ${b.balancedScorecard.criticalTension}`);
       lines.push("");
@@ -125,7 +125,7 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
 
   // Live signals
   if (b.usedSignals?.length > 0) {
-    lines.push(`## ${de ? "Live-Signale" : "Live Signals"}`);
+    lines.push(`## ${t("summary.sectionLiveSignals")}`);
     for (const s of b.usedSignals) {
       const link = s.url ? `[${s.title}](${s.url})` : s.title;
       lines.push(`- **${s.source}** — ${link} _(${s.date})_`);
@@ -134,15 +134,14 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
   }
 
   lines.push("---");
-  lines.push(`_${de ? "Exportiert von" : "Exported from"} SIS — Strategic Intelligence System_`);
+  lines.push(`_${t("summary.exportedFrom")} SIS — Strategic Intelligence System_`);
 
   return lines.join("\n");
 }
 
 // ── Session export (all entries) ─────────────────────────────────────────────
 export function sessionToMarkdown(history: HistoryEntry[], locale: Locale): string {
-  const de = locale === "de";
-  const now = new Date().toLocaleString(de ? "de-DE" : "en-US");
+  const now = new Date().toLocaleString(localeTag(locale));
   const completed = history.filter(
     (e) => !e.isLoading
       && e.briefing.synthesis !== "Analysiere..." && e.briefing.synthesis !== "Analyzing..."
@@ -151,7 +150,7 @@ export function sessionToMarkdown(history: HistoryEntry[], locale: Locale): stri
 
   const header = [
     `# SIS Session Export`,
-    `_${now} · ${completed.length} ${de ? "Analysen" : "analyses"}_`,
+    `_${now} · ${completed.length} ${translate(locale, "summary.analysisPlural")}_`,
     "",
     "---",
     "",
