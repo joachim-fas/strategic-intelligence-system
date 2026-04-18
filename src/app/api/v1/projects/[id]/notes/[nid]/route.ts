@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { getSqliteHandle } from "@/db";
-import { requireTenantContext } from "@/lib/api-helpers";
+import { apiSuccess, apiError, requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string; nid: string }> };
 
@@ -22,16 +21,16 @@ export async function DELETE(req: Request, context: Params) {
     const ctx = await requireTenantContext(req);
     if (ctx.errorResponse) return ctx.errorResponse;
     if (ctx.role === "viewer") {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return apiError("Viewers cannot delete notes", 403, "INSUFFICIENT_TENANT_ROLE");
     }
     if (!assertNoteInTenant(id, nid, ctx.tenantId)) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return apiError("Note not found", 404, "NOT_FOUND");
     }
     const d = getSqliteHandle();
     d.prepare("DELETE FROM project_notes WHERE id = ?").run(nid);
-    return NextResponse.json({ deleted: true });
+    return apiSuccess({ deleted: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : String(err), 500, "INTERNAL_ERROR");
   }
 }
 
@@ -42,22 +41,22 @@ export async function PATCH(req: Request, context: Params) {
     const ctx = await requireTenantContext(req);
     if (ctx.errorResponse) return ctx.errorResponse;
     if (ctx.role === "viewer") {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return apiError("Viewers cannot modify notes", 403, "INSUFFICIENT_TENANT_ROLE");
     }
     if (!assertNoteInTenant(id, nid, ctx.tenantId)) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return apiError("Note not found", 404, "NOT_FOUND");
     }
     const body = await req.json().catch(() => null as null | { content?: string });
-    if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+    if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
     const { content } = body;
-    if (!content?.trim()) return NextResponse.json({ error: "content required" }, { status: 400 });
+    if (!content?.trim()) return apiError("Content required", 400, "VALIDATION_ERROR");
     const d = getSqliteHandle();
     d.prepare("UPDATE project_notes SET content = ?, updated_at = datetime('now') WHERE id = ?")
       .run(content.trim(), nid);
     const updated = d.prepare("SELECT * FROM project_notes WHERE id = ?").get(nid);
-    if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
-    return NextResponse.json({ note: updated });
+    if (!updated) return apiError("Note not found", 404, "NOT_FOUND");
+    return apiSuccess({ note: updated });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : String(err), 500, "INTERNAL_ERROR");
   }
 }

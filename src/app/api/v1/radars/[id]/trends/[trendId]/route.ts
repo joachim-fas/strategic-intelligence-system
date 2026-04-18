@@ -5,10 +5,9 @@
  * Sets userOverride = true so the UI knows this was manually adjusted.
  */
 
-import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { parseBody, requireTenantContext } from "@/lib/api-helpers";
+import { apiSuccess, apiError, parseBody, requireTenantContext } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 const updateRadarTrendSchema = z.object({
@@ -29,7 +28,7 @@ export async function PATCH(request: Request, context: Params) {
   const ctx = await requireTenantContext(request);
   if (ctx.errorResponse) return ctx.errorResponse;
   if (ctx.role === "viewer") {
-    return NextResponse.json({ error: "Viewers cannot modify radar trends" }, { status: 403 });
+    return apiError("Viewers cannot modify radar trends", 403, "INSUFFICIENT_TENANT_ROLE");
   }
 
   const { data, error } = await parseBody(request, updateRadarTrendSchema);
@@ -49,7 +48,7 @@ export async function PATCH(request: Request, context: Params) {
       .limit(1);
 
     if (radar.length === 0) {
-      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
+      return apiError("Radar not found", 404, "NOT_FOUND");
     }
 
     // Find the radar-trend entry
@@ -65,10 +64,7 @@ export async function PATCH(request: Request, context: Params) {
       .limit(1);
 
     if (existing.length === 0) {
-      return NextResponse.json(
-        { error: "Trend not found in this radar" },
-        { status: 404 }
-      );
+      return apiError("Trend not found in this radar", 404, "NOT_FOUND");
     }
 
     const updateData: Record<string, unknown> = {
@@ -95,7 +91,7 @@ export async function PATCH(request: Request, context: Params) {
       )
       .returning();
 
-    return NextResponse.json({ data: result[0] });
+    return apiSuccess({ radarTrend: result[0] });
   } else {
     const schema = await import("@/db/schema-sqlite");
 
@@ -106,7 +102,7 @@ export async function PATCH(request: Request, context: Params) {
       .get();
 
     if (!radar) {
-      return NextResponse.json({ error: "Radar not found" }, { status: 404 });
+      return apiError("Radar not found", 404, "NOT_FOUND");
     }
 
     const existing = db
@@ -121,10 +117,7 @@ export async function PATCH(request: Request, context: Params) {
       .get();
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Trend not found in this radar" },
-        { status: 404 }
-      );
+      return apiError("Trend not found in this radar", 404, "NOT_FOUND");
     }
 
     const updateData: Record<string, unknown> = {
@@ -161,6 +154,6 @@ export async function PATCH(request: Request, context: Params) {
       )
       .get();
 
-    return NextResponse.json({ data: updated });
+    return apiSuccess({ radarTrend: updated });
   }
 }

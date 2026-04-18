@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { getSqliteHandle } from "@/db";
-import { requireTenantContext } from "@/lib/api-helpers";
+import { apiSuccess, apiError, requireTenantContext } from "@/lib/api-helpers";
 
 type Params = { params: Promise<{ id: string; qid: string }> };
 
@@ -26,22 +25,22 @@ export async function PATCH(req: Request, context: Params) {
     const ctx = await requireTenantContext(req);
     if (ctx.errorResponse) return ctx.errorResponse;
     if (ctx.role === "viewer") {
-      return NextResponse.json({ ok: false, error: { message: "Viewers cannot modify queries", code: "INSUFFICIENT_TENANT_ROLE" } }, { status: 403 });
+      return apiError("Viewers cannot modify queries", 403, "INSUFFICIENT_TENANT_ROLE");
     }
     if (!assertQueryInTenant(id, qid, ctx.tenantId)) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return apiError("Query not found", 404, "NOT_FOUND");
     }
 
     const body = await req.json().catch(() => null as null | { pinned?: boolean });
-    if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+    if (!body) return apiError("Invalid or empty JSON body", 400, "VALIDATION_ERROR");
     const d = getSqliteHandle();
     if (typeof body.pinned === "boolean") {
       d.prepare("UPDATE project_queries SET pinned = ? WHERE id = ?").run(body.pinned ? 1 : 0, qid);
     }
     const updated = d.prepare("SELECT * FROM project_queries WHERE id = ?").get(qid);
-    return NextResponse.json({ query: updated });
+    return apiSuccess({ query: updated });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : String(err), 500, "INTERNAL_ERROR");
   }
 }
 
@@ -52,17 +51,17 @@ export async function DELETE(req: Request, context: Params) {
     const ctx = await requireTenantContext(req);
     if (ctx.errorResponse) return ctx.errorResponse;
     if (ctx.role === "viewer") {
-      return NextResponse.json({ ok: false, error: { message: "Viewers cannot delete queries", code: "INSUFFICIENT_TENANT_ROLE" } }, { status: 403 });
+      return apiError("Viewers cannot delete queries", 403, "INSUFFICIENT_TENANT_ROLE");
     }
     if (!assertQueryInTenant(id, qid, ctx.tenantId)) {
-      return NextResponse.json({ error: "not found" }, { status: 404 });
+      return apiError("Query not found", 404, "NOT_FOUND");
     }
     const d = getSqliteHandle();
     // Also delete associated notes
     d.prepare("DELETE FROM project_notes WHERE query_id = ?").run(qid);
     d.prepare("DELETE FROM project_queries WHERE id = ?").run(qid);
-    return NextResponse.json({ deleted: true });
+    return apiSuccess({ deleted: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return apiError(err instanceof Error ? err.message : String(err), 500, "INTERNAL_ERROR");
   }
 }

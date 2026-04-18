@@ -5,7 +5,7 @@
 
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { parseBody, apiSuccess, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
+import { parseBody, apiSuccess, apiError, CACHE_HEADERS, requireTenantContext } from "@/lib/api-helpers";
 import { getDb, getDialectName } from "@/db";
 
 // ---------------------------------------------------------------------------
@@ -59,10 +59,12 @@ export async function POST(request: Request) {
   const ctx = await requireTenantContext(request);
   if (ctx.errorResponse) return ctx.errorResponse;
   if (ctx.role === "viewer") {
-    return apiSuccess(
-      { ok: false, error: { message: "Viewers cannot create radars", code: "INSUFFICIENT_TENANT_ROLE" } },
-      403,
-    );
+    // Audit A5-H6 (18.04.2026): was apiSuccess({ok:false,error:…}, 403)
+    // which produced the double-envelope {ok:true,data:{ok:false,error}}
+    // with HTTP 403 — client error handling couldn't distinguish the
+    // viewer rejection from a successful response. apiError emits the
+    // canonical {ok:false,error:{message,code}} shape.
+    return apiError("Viewers cannot create radars", 403, "INSUFFICIENT_TENANT_ROLE");
   }
 
   const { data, error } = await parseBody(request, createRadarSchema);
