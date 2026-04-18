@@ -312,21 +312,121 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                      GET-Link triggert direkten Download (Content-
                      Disposition: attachment). Server schreibt
                      'tenant.exported' als Audit-Entry. */}
-                <a
-                  href={`/api/v1/admin/tenants/${tenantId}/export`}
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: 12, fontWeight: 600,
-                    padding: "4px 12px", borderRadius: 6,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--volt-surface-raised, #fff)",
-                    color: "var(--color-text-primary)",
-                    textDecoration: "none",
-                  }}
-                  title={de ? "Kompletter JSON-Export (DSGVO)" : "Full JSON export (GDPR)"}
-                >
-                  ↓ {de ? "Export (JSON)" : "Export (JSON)"}
-                </a>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Audit A4-M3 (18.04.2026): archive / restore /
+                       delete controls were only reachable from the
+                       list view; admins landing on the detail via
+                       audit-log link had no path. */}
+                  {!tenant.archived_at && (
+                    <button
+                      onClick={async () => {
+                        const ok = await voltConfirm({
+                          title: de ? `"${tenant.name}" archivieren?` : `Archive "${tenant.name}"?`,
+                          message: de
+                            ? "Archivierte Mandanten sind schreibgeschützt und erscheinen nicht mehr im Switcher der Mitglieder. Kann jederzeit wiederhergestellt werden."
+                            : "Archived tenants become read-only and disappear from member switchers. Can be restored any time.",
+                          confirmLabel: de ? "Archivieren" : "Archive",
+                          cancelLabel: de ? "Abbrechen" : "Cancel",
+                          variant: "destructive",
+                        });
+                        if (!ok) return;
+                        const res = await fetchWithTimeout(
+                          `/api/v1/admin/tenants/${tenantId}/archive`,
+                          { method: "POST" },
+                        );
+                        if (!res.ok) {
+                          const j = await res.json().catch(() => null);
+                          setError(j?.error?.message ?? (de ? "Archivieren fehlgeschlagen." : "Archive failed."));
+                          setTimeout(() => setError(null), 6000);
+                          return;
+                        }
+                        await load();
+                      }}
+                      style={{
+                        fontSize: 12, fontWeight: 600,
+                        padding: "5px 12px", borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--volt-surface-raised, #fff)",
+                        color: "var(--color-text-primary)",
+                        cursor: "pointer",
+                      }}
+                    >{de ? "Archivieren" : "Archive"}</button>
+                  )}
+                  {tenant.archived_at && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          const res = await fetchWithTimeout(
+                            `/api/v1/admin/tenants/${tenantId}/archive`,
+                            { method: "DELETE" },
+                          );
+                          if (!res.ok) {
+                            const j = await res.json().catch(() => null);
+                            setError(j?.error?.message ?? (de ? "Wiederherstellung fehlgeschlagen." : "Restore failed."));
+                            setTimeout(() => setError(null), 6000);
+                            return;
+                          }
+                          await load();
+                        }}
+                        style={{
+                          fontSize: 12, fontWeight: 600,
+                          padding: "5px 12px", borderRadius: 6,
+                          border: "1px solid var(--color-border)",
+                          background: "var(--volt-surface-raised, #fff)",
+                          color: "var(--color-text-primary)",
+                          cursor: "pointer",
+                        }}
+                      >{de ? "Wiederherstellen" : "Restore"}</button>
+                      <button
+                        onClick={async () => {
+                          const ok = await voltConfirm({
+                            title: de ? `"${tenant.name}" endgültig löschen?` : `Permanently delete "${tenant.name}"?`,
+                            message: de
+                              ? "Alle Daten des Mandanten werden unwiderruflich entfernt. Lade vorher den JSON-Export herunter."
+                              : "All tenant data is permanently removed. Download the JSON export first.",
+                            confirmLabel: de ? "Endgültig löschen" : "Delete permanently",
+                            cancelLabel: de ? "Abbrechen" : "Cancel",
+                            variant: "destructive",
+                          });
+                          if (!ok) return;
+                          const res = await fetchWithTimeout(
+                            `/api/v1/admin/tenants/${tenantId}`,
+                            { method: "DELETE" },
+                          );
+                          if (!res.ok) {
+                            const j = await res.json().catch(() => null);
+                            setError(j?.error?.message ?? (de ? "Löschen fehlgeschlagen." : "Delete failed."));
+                            setTimeout(() => setError(null), 6000);
+                            return;
+                          }
+                          window.location.href = "/admin/tenants";
+                        }}
+                        style={{
+                          fontSize: 12, fontWeight: 600,
+                          padding: "5px 12px", borderRadius: 6,
+                          border: "1px solid var(--signal-negative, #C0341D)",
+                          background: "var(--signal-negative-light, #FDEDEA)",
+                          color: "var(--signal-negative, #C0341D)",
+                          cursor: "pointer",
+                        }}
+                      >{de ? "Endgültig löschen" : "Delete"}</button>
+                    </>
+                  )}
+                  <a
+                    href={`/api/v1/admin/tenants/${tenantId}/export`}
+                    style={{
+                      fontSize: 12, fontWeight: 600,
+                      padding: "5px 12px", borderRadius: 6,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--volt-surface-raised, #fff)",
+                      color: "var(--color-text-primary)",
+                      textDecoration: "none",
+                    }}
+                    title={de ? "Kompletter JSON-Export (DSGVO)" : "Full JSON export (GDPR)"}
+                  >
+                    ↓ {de ? "Export (JSON)" : "Export (JSON)"}
+                  </a>
+                </div>
               </div>
             </div>
 
@@ -454,7 +554,46 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                       <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                         {new Date(inv.expires_at).toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "short", day: "numeric" })}
                       </span>
-                      <span style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <span style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                        {/* Audit A4-M4 (18.04.2026): Resend action.
+                             Previously admins had to revoke + re-invite
+                             to nudge an unresponsive invitee. Now we
+                             POST a fresh invite with the same email /
+                             role; the old invite row gets replaced. */}
+                        <button
+                          onClick={async () => {
+                            setBusyId(inv.id);
+                            try {
+                              const res = await fetchWithTimeout(
+                                `/api/v1/admin/tenants/${tenantId}/invites`,
+                                {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ email: inv.email, role: inv.role }),
+                                },
+                              );
+                              if (!res.ok) {
+                                const j = await res.json().catch(() => null);
+                                setError(j?.error?.message ?? (de ? "Erneut senden fehlgeschlagen." : "Resend failed."));
+                                setTimeout(() => setError(null), 6000);
+                                return;
+                              }
+                              await load();
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                          disabled={busyId === inv.id}
+                          style={{
+                            fontSize: 11, padding: "4px 10px", borderRadius: 6,
+                            border: "1px solid var(--color-border)",
+                            background: "transparent",
+                            cursor: busyId === inv.id ? "wait" : "pointer",
+                            fontFamily: "var(--volt-font-ui)",
+                          }}
+                        >
+                          {de ? "Erneut senden" : "Resend"}
+                        </button>
                         <button
                           onClick={() => revokeInvite(inv)}
                           disabled={busyId === inv.id}

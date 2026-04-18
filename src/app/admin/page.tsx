@@ -44,7 +44,15 @@ function loadStats(): AdminStats {
     const d = getSqliteHandle();
     const tenantTotal = d.prepare("SELECT COUNT(*) AS n FROM tenants").get() as { n: number };
     const tenantActive = d.prepare("SELECT COUNT(*) AS n FROM tenants WHERE archived_at IS NULL").get() as { n: number };
-    const memberships = d.prepare("SELECT COUNT(*) AS n FROM tenant_memberships").get() as { n: number };
+    // Audit A4-M10 (18.04.2026): was `COUNT(*) FROM tenant_memberships`
+    // without filtering archived tenants, inflating the count with
+    // memberships in tenants nobody can use anymore.
+    const memberships = d.prepare(`
+      SELECT COUNT(*) AS n
+      FROM tenant_memberships m
+      JOIN tenants t ON t.id = m.tenant_id
+      WHERE t.archived_at IS NULL
+    `).get() as { n: number };
     const invites = d.prepare(
       "SELECT COUNT(*) AS n FROM tenant_invites WHERE accepted_at IS NULL AND expires_at > datetime('now')",
     ).get() as { n: number };

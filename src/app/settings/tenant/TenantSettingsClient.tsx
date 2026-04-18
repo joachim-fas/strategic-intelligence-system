@@ -418,10 +418,14 @@ function LogoUploadField({
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/v1/tenant/settings/logo", {
-        method: "POST",
-        body: form,
-      });
+      // Audit A4-M7 (18.04.2026): was bare `fetch(…)` — a slow or
+      // stalled upload would hang indefinitely. 60 s is generous
+      // for a 512 KB file cap but finite.
+      const res = await fetchWithTimeout(
+        "/api/v1/tenant/settings/logo",
+        { method: "POST", body: form },
+        60_000,
+      );
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
