@@ -1,12 +1,19 @@
 /**
  * VoltTrendCard – Kompakte Trend-Karte
  * Zeigt: Titel (truncated), Richtungspfeil, Status-Badge, Kategorie-Label, Signale + Konfidenz
+ *
+ * Konfidenz wird als farbiges Tier-Badge (High/Medium/Low) gerendert —
+ * siehe src/components/ui/ConfidenceBadge.tsx. Der frühere Plain-Text
+ * "72 %" gab keine visuelle Hierarchie; die Delphi-inspirierte Tier-
+ * Darstellung (Welle A Item 2) macht Niedrig-Konfidenz-Trends sofort
+ * erkennbar.
  */
 
 import React from "react";
 import { ArrowUp, ArrowDown, ArrowRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VoltBadge } from "./VoltBadge";
+import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
 
 export type TrendDirection = "up" | "down" | "stable";
 export type TrendStatus = "trial" | "assess" | "hold" | "adopt" | "mega";
@@ -128,9 +135,7 @@ export const VoltTrendCard: React.FC<VoltTrendCardProps> = ({
           </span>
         )}
         {confidence !== undefined && (
-          <span className="text-[10px] font-mono text-muted-foreground">
-            {confidence}%
-          </span>
+          <ConfidenceBadge value={confidence} size="xs" showLabel={false} />
         )}
       </div>
     </button>

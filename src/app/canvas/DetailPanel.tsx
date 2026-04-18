@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
+import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
 import { StatusIcon } from "./StatusIcon";
 import { FormattedText } from "./FormattedText";
 import { TagInlineInput } from "./TagInlineInput";
@@ -57,19 +58,11 @@ import type {
 import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 // ── ConfidenceBadge ───────────────────────────────────────────────────────
+// Moved to src/components/ui/ConfidenceBadge.tsx (Welle A Item 2 —
+// reusable across DetailPanel, VoltTrendCard, BriefingResult). Imports
+// the shared component; the tier thresholds + CSS classes are
+// unchanged, so there's no visual regression.
 
-function ConfidenceBadge({ value, de }: { value: number; de: boolean }) {
-  const tlocale: Locale = de ? "de" : "en";
-  const tl = (key: TranslationKey) => translate(tlocale, key);
-  const safe = Number.isNaN(value) || !Number.isFinite(value) ? 0 : Math.min(1, Math.max(0, value));
-  const pct = Math.round(safe * 100);
-  const cls = safe > 0.7 ? "signal-positive-badge" : safe > 0.4 ? "signal-neutral-badge" : "signal-negative-badge";
-  return (
-    <span className={cls} style={{ fontSize: 10 }}>
-      {pct}% {tl("detail.confidence")}
-    </span>
-  );
-}
 // ── SourceChips ───────────────────────────────────────────────────────────
 
 function SourceChips({ sources, de }: { sources: UsedSignal[]; de: boolean }) {
@@ -1107,7 +1100,7 @@ export function DetailPanel({
           {(qNode.synthesis || isLoading) && (
             <CollapsibleSection title={tl("detail.synthesisHeading")}>
               {r?.confidence != null && r.confidence > 0 && (
-                <div style={{ marginBottom: 8 }}><ConfidenceBadge value={r.confidence} de={de} /></div>
+                <div style={{ marginBottom: 8 }}><ConfidenceBadge value={r.confidence} /></div>
               )}
               <div style={{ marginBottom: 4 }}>
                 <FormattedText text={qNode.synthesis ?? ""} fontSize={14} lineHeight={1.78} color="var(--color-text-primary)" />

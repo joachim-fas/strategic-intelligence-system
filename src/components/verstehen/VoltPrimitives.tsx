@@ -18,6 +18,7 @@
 
 import React from "react";
 import { Key as KeyIcon } from "lucide-react";
+import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
 
 // ─── StatusRing: adopt / trial / assess / hold ─────────────────────────
 // Color mapping is SEMANTIC — matches Volt UI pastel spec exactly.
@@ -469,7 +470,10 @@ export function VoltTrendCard({
         <VoltStatusPill ring={ring} size="sm" />
       </div>
 
-      {/* Footer: signal count + score */}
+      {/* Footer: signal count + score.
+          The score renders as a tiered ConfidenceBadge (Welle A Item 2)
+          so low-confidence trends are immediately readable. `score` is
+          a 0..1 value; ConfidenceBadge auto-detects the range. */}
       <div
         style={{
           display: "flex",
@@ -484,7 +488,7 @@ export function VoltTrendCard({
         }}
       >
         <span>{signalCount} {de ? "sig." : "sig."}</span>
-        <span style={{ fontWeight: 700, color: s.textStrong }}>{Math.round(score * 100)}%</span>
+        <ConfidenceBadge value={score} size="xs" showLabel={false} />
       </div>
     </button>
   );
