@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { useT } from "@/lib/locale-context";
+import { provenanceCoverage } from "@/lib/causal-graph";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -318,7 +319,19 @@ export default function MonitorPage() {
               <StatCard
                 label={t("monitor.causalEdges")}
                 value={data.knowledgeBase.causalEdges}
-                sub={`${data.knowledgeBase.regulations} ${t("monitor.regulations")}`}
+                // Welle B Item 1: surface edge-provenance coverage so
+                // analysts can see at a glance how much of the causal
+                // graph carries citations. The goal is 100 % over time
+                // — this tile makes progress visible without blocking
+                // any single PR on full coverage.
+                sub={(() => {
+                  const cov = provenanceCoverage();
+                  if (cov.partialPct === 0) {
+                    return `${data.knowledgeBase.regulations} ${t("monitor.regulations")} · ${de ? "0 % mit Quelle" : "0 % w/ source"}`;
+                  }
+                  const label = de ? "mit Quelle" : "w/ source";
+                  return `${cov.fullPct} % ${label} (${cov.full}/${cov.total})`;
+                })()}
               />
               <StatCard
                 label={t("monitor.database")}

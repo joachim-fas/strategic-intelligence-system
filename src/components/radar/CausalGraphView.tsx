@@ -889,14 +889,55 @@ export default function CausalGraphView({ trends, onTrendClick, locale, highligh
         )}
       </div>
 
-      {/* Edge tooltip */}
+      {/* Edge tooltip.
+          Provenance fields (source / timestamp / confidence) render in a
+          small second line when present — Welle B Item 1 (Delphi-style
+          per-edge attribution). Edges without provenance fall back to
+          the original single-line display so we don't regress the
+          density of existing rendering. */}
       {hoveredEdge && (
         <div className="mb-2 px-3 py-1.5 rounded text-xs font-sans shadow-sm" style={{ background: "var(--volt-surface, white)", border: "1px solid var(--volt-border, #E8E8E8)" }}>
-          <span style={{ color: EDGE_COLORS[hoveredEdge.type], fontWeight: 600 }}>{EDGE_LABELS[hoveredEdge.type]?.[locale]}</span>
-          {hoveredEdge.description && (
-            <span className="ml-2" style={{ color: "var(--volt-text-muted, #6B6B6B)" }}>{hoveredEdge.description}</span>
+          <div>
+            <span style={{ color: EDGE_COLORS[hoveredEdge.type], fontWeight: 600 }}>{EDGE_LABELS[hoveredEdge.type]?.[locale]}</span>
+            {hoveredEdge.description && (
+              <span className="ml-2" style={{ color: "var(--volt-text-muted, #6B6B6B)" }}>{hoveredEdge.description}</span>
+            )}
+            <span className="ml-2" style={{ color: "var(--volt-text-faint, #737373)" }}>({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
+          </div>
+          {(hoveredEdge.source || hoveredEdge.timestamp || hoveredEdge.confidence != null) && (
+            <div style={{
+              marginTop: 3,
+              fontSize: 10,
+              color: "var(--volt-text-faint, #737373)",
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              display: "flex", flexWrap: "wrap", gap: 8,
+            }}>
+              {hoveredEdge.source && (
+                <span>
+                  <span style={{ fontWeight: 700, letterSpacing: "0.04em" }}>
+                    {locale === "de" ? "QUELLE" : "SOURCE"}
+                  </span>
+                  {": "}{hoveredEdge.source}
+                </span>
+              )}
+              {hoveredEdge.timestamp && (
+                <span>
+                  <span style={{ fontWeight: 700, letterSpacing: "0.04em" }}>
+                    {locale === "de" ? "STAND" : "AS OF"}
+                  </span>
+                  {": "}{hoveredEdge.timestamp}
+                </span>
+              )}
+              {hoveredEdge.confidence != null && (
+                <span>
+                  <span style={{ fontWeight: 700, letterSpacing: "0.04em" }}>
+                    {locale === "de" ? "KONFIDENZ" : "CONFIDENCE"}
+                  </span>
+                  {": "}{Math.round(hoveredEdge.confidence * 100)}%
+                </span>
+              )}
+            </div>
           )}
-          <span className="ml-2" style={{ color: "var(--volt-text-faint, #737373)" }}>({(hoveredEdge.strength * 100).toFixed(0)}%)</span>
         </div>
       )}
 

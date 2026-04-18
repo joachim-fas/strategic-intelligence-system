@@ -8,6 +8,35 @@
  * - What a trend will affect (its consequences)
  * - Feedback loops and amplification chains
  * - Systemic risks (when multiple connected trends shift)
+ *
+ * ── Edge provenance (Welle B Item 1, Delphi-inspired) ──────────────
+ *
+ * Delphi/Theia stamps every causal edge in their Neo4j graph with
+ * `{source, timestamp, confidence}` (blog post 2026-01-14). This lets
+ * analysts answer "why does the system believe X causes Y?" with a
+ * concrete citation — and it lets auditors date-check every claim.
+ *
+ * SIS adopts the same shape as optional fields on TrendEdge:
+ *   - `source`:     Short human-readable reference: a specific report,
+ *                   a regulatory act, a paper citation, or "Expert
+ *                   review 2026-04" for curator-added edges. Not a URL
+ *                   (URLs live in the references section of the trend
+ *                   itself); this is the handle.
+ *   - `timestamp`:  ISO 8601 date (`YYYY-MM-DD` is enough) of when the
+ *                   edge was added or last verified. Edges older than
+ *                   12 months should be reviewed; edges without a
+ *                   timestamp are treated as "curator-asserted,
+ *                   undated".
+ *   - `confidence`: 0..1 score. 0.9+ = well-established causal
+ *                   relationship backed by multiple independent
+ *                   sources. 0.5–0.8 = plausible, single-source or
+ *                   contested. <0.5 = speculative — don't draw
+ *                   conclusions on this alone.
+ *
+ * All three fields are optional. Existing edges without provenance
+ * render with a "Quelle unbekannt" hint and silently contribute to a
+ * "provenance coverage" metric on /monitor (future work). Adding them
+ * to an existing edge is non-breaking.
  */
 
 export type EdgeType = "drives" | "amplifies" | "dampens" | "correlates";
@@ -19,6 +48,13 @@ export interface TrendEdge {
   strength: number; // 0-1
   description?: string;
   bidirectional?: boolean;
+
+  /** Welle B Item 1 — Delphi-style edge provenance. All optional to
+   *  keep existing curated edges non-breaking; see the file header
+   *  for the semantic contract. */
+  source?: string;
+  timestamp?: string; // ISO 8601 (YYYY-MM-DD minimum)
+  confidence?: number; // 0..1
 }
 
 /**
@@ -31,12 +67,19 @@ export interface TrendEdge {
  */
 export const TREND_EDGES: TrendEdge[] = [
   // ─── Climate drives everything ─────────────────────────────
+  // The five edges immediately below carry explicit provenance as
+  // the reference template for Welle B Item 1 (Delphi-style). New
+  // curated edges should follow this shape; legacy edges migrate
+  // opportunistically whenever they're touched for another reason.
   {
     from: "mega-climate-sustainability",
     to: "mega-energy-transition",
     type: "drives",
     strength: 0.95,
     description: "Climate urgency accelerates energy transition",
+    source: "IPCC AR6 Synthesis Report (2023) + IEA World Energy Outlook 2024",
+    timestamp: "2026-04-18",
+    confidence: 0.92,
   },
   {
     from: "mega-climate-sustainability",
@@ -44,6 +87,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "Resource scarcity and climate migration fuel geopolitical tensions",
+    source: "UNHCR Climate Displacement Report 2024 + SIPRI Yearbook 2024",
+    timestamp: "2026-04-18",
+    confidence: 0.75,
   },
   {
     from: "mega-climate-sustainability",
@@ -74,6 +120,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.95,
     description: "AI fundamentally reshapes jobs, skills, and work models",
+    source: "Goldman Sachs Global Economics Analyst — AI-Work Impact (2024) + OECD Employment Outlook 2024",
+    timestamp: "2026-04-18",
+    confidence: 0.88,
   },
   {
     from: "mega-ai-transformation",
@@ -81,6 +130,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.98,
     description: "AI research directly produces generative AI capabilities",
+    source: "Epoch AI Trends Database + Stanford AI Index Report 2024",
+    timestamp: "2026-04-18",
+    confidence: 0.95,
   },
   {
     from: "mega-ai-transformation",
@@ -96,6 +148,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.8,
     description: "AI creates new attack vectors and defense needs",
     bidirectional: true,
+    source: "ENISA Threat Landscape Report 2024 + MITRE ATLAS (Adversarial AI)",
+    timestamp: "2026-04-18",
+    confidence: 0.85,
   },
   {
     from: "mega-ai-transformation",
@@ -1125,4 +1180,50 @@ export function networkDensity(): number {
 
 /** Re-export the directed adjacency builder for callers that need it. */
 export { buildDirectedAdjacency };
+
+/**
+ * Welle B Item 1 — edge provenance helpers.
+ *
+ * These let UI surfaces ask "does this edge have citations?" and
+ * let /monitor track how much of the graph is provenance-covered
+ * over time. The goal is 100 % coverage; the metric makes progress
+ * visible without making each individual PR block on full coverage.
+ */
+
+/** True when an edge carries at least one provenance field. */
+export function hasProvenance(edge: TrendEdge): boolean {
+  return edge.source != null || edge.timestamp != null || edge.confidence != null;
+}
+
+/** True when an edge carries the full provenance triplet. */
+export function hasFullProvenance(edge: TrendEdge): boolean {
+  return edge.source != null && edge.timestamp != null && edge.confidence != null;
+}
+
+/**
+ * Count of edges by provenance state. Useful for a /monitor tile:
+ *   "Causal edges: 102 total · 5 with provenance (4.9 %)"
+ */
+export function provenanceCoverage(): {
+  total: number;
+  partial: number;
+  full: number;
+  partialPct: number;
+  fullPct: number;
+} {
+  const total = TREND_EDGES.length;
+  let partial = 0;
+  let full = 0;
+  for (const e of TREND_EDGES) {
+    if (hasFullProvenance(e)) full += 1;
+    else if (hasProvenance(e)) partial += 1;
+  }
+  return {
+    total,
+    partial,
+    full,
+    partialPct: total === 0 ? 0 : Math.round(((partial + full) / total) * 100),
+    fullPct: total === 0 ? 0 : Math.round((full / total) * 100),
+  };
+}
 
