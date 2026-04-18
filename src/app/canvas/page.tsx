@@ -4696,7 +4696,15 @@ function DetailPanel({
         position: "fixed",
         left: "50%", top: 72,
         transform: "translateX(-50%)",
-        width: "min(880px, calc(100vw - 48px))",
+        // Was 880 px. The user asked for noticeably wider panels
+        // (especially visible in Orbit view where the right-hand
+        // ContextPanel eats viewport width and the centered
+        // DetailPanel was getting squeezed to ~440 px). 1200 px gives
+        // the briefing content (synthesis paragraphs, scenarios,
+        // insights) room to breathe on typical laptop + desktop
+        // viewports; the calc(100vw - 48px) clamp keeps the panel
+        // inside the viewport on smaller screens.
+        width: "min(1200px, calc(100vw - 48px))",
         maxHeight: "calc(100vh - 96px)",
         background: "rgba(255,255,255,0.98)",
         backdropFilter: "blur(24px) saturate(180%)",
