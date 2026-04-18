@@ -105,20 +105,13 @@ import {
   getNodeWidth,
 } from "./utils";
 
-// StatusIcon stays in this file for now — it renders JSX and only
-// has this one call-site. Extracting it would add an import edge
-// without a corresponding reuse benefit. A future decomposition
-// slice can pull it out when a second consumer appears.
-function StatusIcon({ status, size = 12 }: { status: NodeStatus; size?: number }) {
-  const color = NODE_STATUS_META[status].color;
-  const s: React.CSSProperties = { color, flexShrink: 0 };
-  switch (status) {
-    case "open":    return <Circle size={size} style={s} />;
-    case "active":  return <Zap size={size} style={s} />;
-    case "decided": return <CheckCircle2 size={size} style={s} />;
-    case "pinned":  return <Pin size={size} style={s} />;
-  }
-}
+// Slice 2 extraction: StatusIcon, CardActionsMenu, FormattedText
+// and TagInlineInput now live in their own sibling files. Re-imported
+// here so the rest of page.tsx stays unchanged.
+import { StatusIcon } from "./StatusIcon";
+import { CardActionsMenu } from "./CardActionsMenu";
+import { FormattedText } from "./FormattedText";
+import { TagInlineInput } from "./TagInlineInput";
 
 // ── Persistence (localStorage) ────────────────────────────────────────────
 
@@ -1517,239 +1510,15 @@ function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: selId, 
 
 // ── TagInlineInput (reusable inline tag adder for detail panels) ─────────
 
-function TagInlineInput({ nodeId, de, onAddTag }: { nodeId: string; de: boolean; onAddTag: (id: string, tag: string) => void }) {
-  const [value, setValue] = useState("");
-  return (
-    <div style={{ display: "flex", gap: 4 }}>
-      <input
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === "Enter" && value.trim()) {
-            onAddTag(nodeId, value);
-            setValue("");
-          }
-        }}
-        placeholder={de ? "Neuen Tag eingeben…" : "Add new tag…"}
-        style={{
-          flex: 1, fontSize: 12, padding: "4px 10px",
-          border: "1px solid var(--color-border)", borderRadius: 8,
-          background: "var(--color-surface)", color: "var(--color-text-primary)",
-          outline: "none",
-        }}
-      />
-      <button
-        onClick={() => { if (value.trim()) { onAddTag(nodeId, value); setValue(""); } }}
-        disabled={!value.trim()}
-        style={{
-          fontSize: 11, padding: "4px 10px", borderRadius: 8,
-          border: "1px solid var(--color-border)", background: value.trim() ? "#E4FF97" : "transparent",
-          color: value.trim() ? "#0A0A0A" : "var(--color-text-muted)", cursor: value.trim() ? "pointer" : "default",
-          fontWeight: 600,
-        }}
-      >{de ? "Hinzufügen" : "Add"}</button>
-    </div>
-  );
-}
+// TagInlineInput moved to ./TagInlineInput (slice 2).
 
 // ── CardActionsMenu (shared action dropdown for all node cards) ──────────
 
-function CardActionsMenu({ nodeId, nodeType: _nodeType, de, onDelete, onSetStatus, onAddTag, onFollowUp, onCopy, currentStatus }: {
-  nodeId: string;
-  nodeType: string;
-  de: boolean;
-  onDelete: (id: string) => void;
-  onSetStatus: (id: string, status: NodeStatus) => void;
-  onAddTag: (id: string, tag: string) => void;
-  onFollowUp?: (id: string, prefill?: string) => void;
-  /** When provided, adds a "Copy" entry next to "Follow-up". Used on
-   *  query cards so the three-dot menu matches the DetailPanel footer. */
-  onCopy?: (id: string) => void;
-  currentStatus?: NodeStatus;
-}) {
-  const [tagInput, setTagInput] = useState("");
-  const [showTagInput, setShowTagInput] = useState(false);
-
-  return (
-    <VoltDropdownMenu>
-      <VoltDropdownMenuTrigger asChild>
-        <button
-          onPointerDown={e => e.stopPropagation()}
-          onClick={e => e.stopPropagation()}
-          style={{
-            width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
-            borderRadius: 4, border: "none", background: "transparent", cursor: "pointer",
-            color: "var(--color-text-muted)", flexShrink: 0,
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-        >
-          <MoreHorizontal size={14} />
-        </button>
-      </VoltDropdownMenuTrigger>
-      <VoltDropdownMenuContent align="end" side="bottom" className="min-w-[180px]">
-        <VoltDropdownMenuLabel>{de ? "Aktionen" : "Actions"}</VoltDropdownMenuLabel>
-        {onFollowUp && (
-          <VoltDropdownMenuItem onClick={() => onFollowUp(nodeId)}>
-            <MessageSquarePlus size={14} />
-            {de ? "Folgefrage stellen" : "Ask follow-up"}
-          </VoltDropdownMenuItem>
-        )}
-        {onCopy && (
-          <VoltDropdownMenuItem onClick={() => onCopy(nodeId)}>
-            <Copy size={14} />
-            {de ? "Synthese kopieren" : "Copy synthesis"}
-          </VoltDropdownMenuItem>
-        )}
-        <VoltDropdownMenuSeparator />
-        <VoltDropdownMenuLabel>{de ? "Status" : "Status"}</VoltDropdownMenuLabel>
-        {(["open", "active", "decided", "pinned"] as NodeStatus[]).map(s => (
-          <VoltDropdownMenuItem key={s} onClick={() => onSetStatus(nodeId, s)}>
-            <StatusIcon status={s} size={14} />
-            <span style={{ flex: 1 }}>{NODE_STATUS_META[s].label}</span>
-            {currentStatus === s && <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>●</span>}
-          </VoltDropdownMenuItem>
-        ))}
-        <VoltDropdownMenuSeparator />
-        {!showTagInput ? (
-          <VoltDropdownMenuItem onClick={(e) => { e.preventDefault(); setShowTagInput(true); }}>
-            <TagIcon size={14} />
-            {de ? "Tag hinzufügen" : "Add tag"}
-          </VoltDropdownMenuItem>
-        ) : (
-          <div style={{ padding: "4px 8px" }} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
-            <input
-              autoFocus
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && tagInput.trim()) {
-                  onAddTag(nodeId, tagInput);
-                  setTagInput("");
-                  setShowTagInput(false);
-                }
-                if (e.key === "Escape") setShowTagInput(false);
-              }}
-              placeholder={de ? "Tag eingeben…" : "Enter tag…"}
-              style={{
-                width: "100%", fontSize: 12, padding: "4px 8px",
-                border: "1px solid var(--color-border)", borderRadius: 6,
-                background: "var(--color-surface)", color: "var(--color-text-primary)",
-                outline: "none",
-              }}
-            />
-          </div>
-        )}
-        <VoltDropdownMenuSeparator />
-        <VoltDropdownMenuItem variant="destructive" onClick={() => onDelete(nodeId)}>
-          <Trash2 size={14} />
-          {de ? "Löschen" : "Delete"}
-        </VoltDropdownMenuItem>
-      </VoltDropdownMenuContent>
-    </VoltDropdownMenu>
-  );
-}
+// CardActionsMenu moved to ./CardActionsMenu (slice 2).
 
 // ── FormattedText — structured text rendering with paragraphs & provenance ──
 
-function FormattedText({ text, fontSize = 13, lineHeight = 1.65, color = "var(--color-text-secondary)", maxLines, compact }: {
-  text: string; fontSize?: number; lineHeight?: number; color?: string; maxLines?: number; compact?: boolean;
-}) {
-  if (!text) return null;
-
-  // Smart paragraph splitting: if text has no \n\n but is long, insert breaks at sentence boundaries
-  const ensureParagraphs = (raw: string): string => {
-    // Already has paragraph breaks → use as-is
-    if (raw.includes("\n\n")) return raw;
-    // Short text → no splitting needed
-    if (raw.length < 300) return raw;
-    // Split at sentence boundaries (period/! /? followed by space + uppercase)
-    const sentences = raw.split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ])/);
-    if (sentences.length <= 3) return raw;
-    // Group into paragraphs of ~3 sentences each
-    const paras: string[] = [];
-    let current: string[] = [];
-    for (const s of sentences) {
-      current.push(s);
-      if (current.length >= 3 || current.join(" ").length > 400) {
-        paras.push(current.join(" "));
-        current = [];
-      }
-    }
-    if (current.length > 0) paras.push(current.join(" "));
-    return paras.join("\n\n");
-  };
-  const processedText = ensureParagraphs(text);
-
-  // Parse inline provenance tags and bold markers into React elements
-  const renderInline = (line: string, keyPrefix: string) => {
-    const parts: React.ReactNode[] = [];
-    // Match [SIGNAL: ...], [TREND: ...], [LLM-Einschätzung], [Source, Date], and **bold**
-    const regex = /(\[SIGNAL:\s*[^\]]+\]|\[TREND:\s*[^\]]+\]|\[LLM-Einschätzung\]|\[[A-Za-zÄÖÜäöüß][^\]]{1,40},\s*\d{2,4}[^\]]*\]|\*\*[^*]+\*\*)/g;
-    let lastIdx = 0;
-    let match: RegExpExecArray | null;
-    let i = 0;
-    while ((match = regex.exec(line)) !== null) {
-      if (match.index > lastIdx) {
-        parts.push(line.slice(lastIdx, match.index));
-      }
-      const m = match[0];
-      if (m.startsWith("[SIGNAL:")) {
-        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#2563EB10", color: "#2563EB", border: "1px solid #2563EB20", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
-      } else if (m.startsWith("[TREND:")) {
-        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#1A9E5A10", color: "#1A9E5A", border: "1px solid #1A9E5A20", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
-      } else if (m === "[LLM-Einschätzung]") {
-        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 600, padding: "0px 4px", borderRadius: 4, background: "#F5A62310", color: "#F5A623", border: "1px solid #F5A62320", fontFamily: "var(--font-code, monospace)", whiteSpace: "nowrap" }}>LLM</span>);
-      } else if (m.startsWith("[") && m.endsWith("]")) {
-        // Citation: [Source, Date]
-        parts.push(<span key={`${keyPrefix}-${i}`} style={{ fontSize: compact ? 7 : 9, fontWeight: 500, padding: "0px 3px", borderRadius: 3, background: "var(--color-page-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", whiteSpace: "nowrap" }}>{m.slice(1, -1)}</span>);
-      } else if (m.startsWith("**") && m.endsWith("**")) {
-        parts.push(<strong key={`${keyPrefix}-${i}`} style={{ fontWeight: 700, color: "var(--color-text-heading)" }}>{m.slice(2, -2)}</strong>);
-      }
-      lastIdx = match.index + m.length;
-      i++;
-    }
-    if (lastIdx < line.length) parts.push(line.slice(lastIdx));
-    return parts;
-  };
-
-  // Split into paragraphs by double newline
-  const paragraphs = processedText.split(/\n\n+/).filter(p => p.trim());
-
-  // For compact mode (card previews), render as single clamped block
-  if (compact && maxLines) {
-    return (
-      <p style={{ fontSize, lineHeight, color, margin: 0, overflow: "hidden", wordBreak: "break-word", display: "-webkit-box", WebkitLineClamp: maxLines, WebkitBoxOrient: "vertical" as const }}>
-        {renderInline(processedText.replace(/\n\n+/g, " — ").replace(/\n/g, " "), "c")}
-      </p>
-    );
-  }
-
-  return (
-    <div style={{ fontSize, lineHeight, color }}>
-      {paragraphs.map((para, pi) => {
-        const trimmed = para.trim();
-        // Check for heading-like lines (short, no period, possibly bold)
-        const isHeading = trimmed.length < 80 && !trimmed.endsWith(".") && !trimmed.endsWith(":") && !trimmed.includes("[") && pi > 0;
-        if (isHeading && !compact) {
-          return <div key={pi} style={{ fontWeight: 700, fontSize: fontSize + 1, color: "var(--color-text-heading)", marginTop: pi > 0 ? 14 : 0, marginBottom: 4 }}>{renderInline(trimmed, `h${pi}`)}</div>;
-        }
-        // Split by single newlines within paragraph for soft line breaks
-        const lines = trimmed.split(/\n/);
-        return (
-          <p key={pi} style={{ margin: pi > 0 ? "10px 0 0" : 0 }}>
-            {lines.map((line, li) => (
-              <React.Fragment key={li}>
-                {li > 0 && <br />}
-                {renderInline(line, `p${pi}l${li}`)}
-              </React.Fragment>
-            ))}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
+// FormattedText moved to ./FormattedText (slice 2).
 
 // ── DerivedNodeCard (compact) ─────────────────────────────────────────────
 
