@@ -6,6 +6,7 @@ import { TenantProvider, type TenantMembership } from "@/lib/tenant-context";
 import SignalTicker from "@/components/SignalTicker";
 import { ActivityPanel } from "@/components/ActivityPanel";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { Footer } from "@/components/Footer";
 import { auth } from "@/lib/auth";
 import { getSqliteHandle } from "@/db";
@@ -126,6 +127,11 @@ export default async function RootLayout({
             </div>
             <SignalTicker />
             <ActivityPanel />
+            {/* Cmd+K / Ctrl+K command palette — mounts the global
+                 keyboard listener and renders on demand. Sits inside
+                 TenantProvider so it can check isSystemAdmin for the
+                 admin-scoped commands. */}
+            <CommandPalette />
             {/* Honest-state overlay for < 768 px viewports until the
                  responsive-layout ticket lands (Audit A5-H4). */}
             <DesktopOnlyGate />
