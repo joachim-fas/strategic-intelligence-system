@@ -6,6 +6,7 @@ import { getFrameworkMeta } from "@/types/frameworks";
 import { useFrameworkAnalysis, StepResult } from "@/lib/use-framework-analysis";
 import { StepCard } from "@/components/frameworks/StepCard";
 import { ScenarioCards } from "@/components/frameworks/ScenarioCards";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 const ACCENT = "#7C1A9E";
 const BORDER = "#D8A8F0";
@@ -23,6 +24,8 @@ export default function TrendDeepDivePage() {
 /* ── Content ─────────────────────────────────────────────── */
 
 function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const { steps, runStep } = useFrameworkAnalysis("trend-deep-dive");
 
   const previousData = (ids: string[]) => {
@@ -37,8 +40,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
       {/* Step 1 */}
       <StepCard
         stepId="definition"
-        title={de ? "Definition & Status" : "Definition & Status"}
-        description={de ? "Trenddefinition, aktueller Stand, S-Kurven-Position" : "Trend definition, current state, S-curve position"}
+        title={tl("trendDeepDive.step1Title")}
+        description={tl("trendDeepDive.step1Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.definition}
@@ -51,8 +54,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
       {/* Step 2 */}
       <StepCard
         stepId="evidence"
-        title={de ? "Evidenz & Daten" : "Evidence & Data"}
-        description={de ? "Signalaggregation, quantitative Evidenz" : "Signal aggregation, quantitative evidence"}
+        title={tl("trendDeepDive.step2Title")}
+        description={tl("trendDeepDive.step2Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.evidence}
@@ -66,8 +69,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
       {/* Step 3 */}
       <StepCard
         stepId="drivers"
-        title={de ? "Treiber & Bremser" : "Drivers & Brakers"}
-        description={de ? "Treiber- und Bremser-Analyse" : "Drivers and brakers analysis"}
+        title={tl("trendDeepDive.step3Title")}
+        description={tl("trendDeepDive.step3Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.drivers}
@@ -81,8 +84,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
       {/* Step 4 */}
       <StepCard
         stepId="impact"
-        title={de ? "Impact-Analyse" : "Impact Analysis"}
-        description={de ? "Cross-Domain Impact + Szenarien" : "Cross-domain impact + scenarios"}
+        title={tl("trendDeepDive.step4Title")}
+        description={tl("trendDeepDive.step4Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.impact}
@@ -96,8 +99,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
       {/* Step 5 */}
       <StepCard
         stepId="actions"
-        title={de ? "Handlungsoptionen" : "Action Recommendations"}
-        description={de ? "Empfehlungen mit Ring-Klassifikation" : "Recommendations with ring classification"}
+        title={tl("trendDeepDive.step5Title")}
+        description={tl("trendDeepDive.step5Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.actions}
@@ -115,6 +118,8 @@ function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: st
 /* ── Step 1: Definition & Status ─────────────────────────── */
 
 function DefinitionViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const definition: string = data.definition || data.synthesis || "";
@@ -179,7 +184,7 @@ function DefinitionViz({ data, de }: { data: any; de: boolean }) {
       {sCurvePosition >= 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "S-Kurven-Position" : "S-Curve Position"}
+            {tl("trendDeepDive.sCurvePosition")}
           </div>
           <div style={{ position: "relative", height: 32, background: "#F3E8FF", borderRadius: 8, overflow: "hidden" }}>
             {/* Track gradient */}
@@ -229,7 +234,7 @@ function DefinitionViz({ data, de }: { data: any; de: boolean }) {
       {keyActors.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Schlüsselakteure" : "Key Actors"}
+            {tl("trendDeepDive.keyActors")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
             {keyActors.map((a, i) => {
@@ -264,6 +269,8 @@ function DefinitionViz({ data, de }: { data: any; de: boolean }) {
 /* ── Step 2: Evidence & Data ─────────────────────────────── */
 
 function EvidenceViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const signals: { text: string; strength?: string; source?: string }[] = Array.isArray(data.signals) ? data.signals : [];
@@ -315,7 +322,7 @@ function EvidenceViz({ data, de }: { data: any; de: boolean }) {
       {signals.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Signale" : "Signals"}
+            {tl("trendDeepDive.signals")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {signals.map((s, i) => (
@@ -344,7 +351,7 @@ function EvidenceViz({ data, de }: { data: any; de: boolean }) {
       {quantitative.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Quantitative Daten" : "Quantitative Data"}
+            {tl("trendDeepDive.quantitativeData")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
             {quantitative.map((q, i) => (
@@ -379,7 +386,7 @@ function EvidenceViz({ data, de }: { data: any; de: boolean }) {
           <span style={{ fontSize: 16, flexShrink: 0 }}>&#9888;</span>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)", marginBottom: 4 }}>
-              {de ? "Gegenargumente" : "Counter-Evidence"}
+              {tl("trendDeepDive.counterEvidence")}
             </div>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: "#78350F", margin: 0 }}>
               {counterEvidence}
@@ -399,7 +406,7 @@ function EvidenceViz({ data, de }: { data: any; de: boolean }) {
           <span style={{ fontSize: 14, color: "var(--muted-foreground)", flexShrink: 0 }}>&#9432;</span>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)", marginBottom: 4 }}>
-              {de ? "Datenlücken" : "Data Gaps"}
+              {tl("trendDeepDive.dataGaps")}
             </div>
             <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--muted-foreground)", margin: 0 }}>
               {dataGaps}
@@ -414,6 +421,8 @@ function EvidenceViz({ data, de }: { data: any; de: boolean }) {
 /* ── Step 3: Drivers & Brakers ───────────────────────────── */
 
 function DriversViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const drivers: { name: string; strength: number; category?: string }[] = Array.isArray(data.drivers) ? data.drivers : [];
@@ -474,28 +483,28 @@ function DriversViz({ data, de }: { data: any; de: boolean }) {
           {/* Drivers column */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "#16a34a", marginBottom: 10 }}>
-              {de ? "Treiber" : "Drivers"}
+              {tl("trendDeepDive.drivers")}
             </div>
             {drivers.map((d, i) => (
               <React.Fragment key={i}>{barRow(d, "#16a34a")}</React.Fragment>
             ))}
             {drivers.length === 0 && (
               <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                {de ? "Keine Treiber identifiziert" : "No drivers identified"}
+                {tl("trendDeepDive.noDrivers")}
               </span>
             )}
           </div>
           {/* Brakers column */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "#ef4444", marginBottom: 10 }}>
-              {de ? "Bremser" : "Brakers"}
+              {tl("trendDeepDive.brakers")}
             </div>
             {brakers.map((b, i) => (
               <React.Fragment key={i}>{barRow(b, "#ef4444")}</React.Fragment>
             ))}
             {brakers.length === 0 && (
               <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                {de ? "Keine Bremser identifiziert" : "No brakers identified"}
+                {tl("trendDeepDive.noBrakers")}
               </span>
             )}
           </div>
@@ -506,7 +515,7 @@ function DriversViz({ data, de }: { data: any; de: boolean }) {
       {connectedTrends.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Verbundene Trends" : "Connected Trends"}
+            {tl("trendDeepDive.connectedTrends")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
             {connectedTrends.map((t, i) => {
@@ -545,7 +554,7 @@ function DriversViz({ data, de }: { data: any; de: boolean }) {
       {tippingPoints.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Kipppunkte" : "Tipping Points"}
+            {tl("trendDeepDive.tippingPoints")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {tippingPoints.map((tp, i) => (
@@ -563,12 +572,12 @@ function DriversViz({ data, de }: { data: any; de: boolean }) {
                   <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                     {tp.probability && (
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#DC2626", fontFamily: "var(--font-mono)" }}>
-                        {de ? "Wahrsch." : "Prob."}: {tp.probability}
+                        {tl("trendDeepDive.probShort")}: {tp.probability}
                       </span>
                     )}
                     {tp.timeframe && (
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#991B1B", fontFamily: "var(--font-mono)" }}>
-                        {de ? "Zeitrahmen" : "Timeframe"}: {tp.timeframe}
+                        {tl("trendDeepDive.timeframe")}: {tp.timeframe}
                       </span>
                     )}
                   </div>
@@ -585,6 +594,8 @@ function DriversViz({ data, de }: { data: any; de: boolean }) {
 /* ── Step 4: Impact Analysis ─────────────────────────────── */
 
 function ImpactViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const economicImpacts: { sector: string; type?: string; magnitude?: string; timeframe?: string }[] = Array.isArray(data.economicImpacts) ? data.economicImpacts : (Array.isArray(data.economic_impacts) ? data.economic_impacts : []);
@@ -626,7 +637,7 @@ function ImpactViz({ data, de }: { data: any; de: boolean }) {
       {economicImpacts.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Wirtschaftliche Auswirkungen" : "Economic Impacts"}
+            {tl("trendDeepDive.economicImpacts")}
           </div>
           <div style={{
             border: `1px solid ${BORDER}`,
@@ -640,10 +651,10 @@ function ImpactViz({ data, de }: { data: any; de: boolean }) {
               letterSpacing: "0.06em", fontFamily: "var(--font-mono)",
               color: ACCENT, borderBottom: `1px solid ${BORDER}`,
             }}>
-              <span>{de ? "Sektor" : "Sector"}</span>
-              <span>{de ? "Typ" : "Type"}</span>
-              <span>{de ? "Ausmaß" : "Magnitude"}</span>
-              <span>{de ? "Zeitrahmen" : "Timeframe"}</span>
+              <span>{tl("trendDeepDive.sector")}</span>
+              <span>{tl("trendDeepDive.typeCol")}</span>
+              <span>{tl("trendDeepDive.magnitude")}</span>
+              <span>{tl("trendDeepDive.timeframe")}</span>
             </div>
             {/* Rows */}
             {economicImpacts.map((e, i) => (
@@ -667,13 +678,13 @@ function ImpactViz({ data, de }: { data: any; de: boolean }) {
       {(winners.length > 0 || losers.length > 0) && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 8 }}>
-            {de ? "Soziale Auswirkungen" : "Social Impact"}
+            {tl("trendDeepDive.socialImpact")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {/* Winners */}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", marginBottom: 6, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                {de ? "Gewinner" : "Winners"}
+                {tl("trendDeepDive.winners")}
               </div>
               {winners.length > 0 ? winners.map((w, i) => (
                 <div key={i} style={{
@@ -689,7 +700,7 @@ function ImpactViz({ data, de }: { data: any; de: boolean }) {
             {/* Losers */}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", marginBottom: 6, fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                {de ? "Verlierer" : "Losers"}
+                {tl("trendDeepDive.losers")}
               </div>
               {losers.length > 0 ? losers.map((l, i) => (
                 <div key={i} style={{
@@ -730,6 +741,8 @@ const PRIORITY_SECTIONS = [
 ] as const;
 
 function ActionsViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const ringClassification: string = data.ringClassification || data.ring_classification || "";
@@ -776,7 +789,7 @@ function ActionsViz({ data, de }: { data: any; de: boolean }) {
       {ringClassification && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            {de ? "Ring-Klassifikation" : "Ring Classification"}:
+            {tl("trendDeepDive.ringClassification")}:
           </span>
           {ringBadge(ringClassification)}
         </div>
@@ -787,7 +800,7 @@ function ActionsViz({ data, de }: { data: any; de: boolean }) {
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              {de ? "Konfidenz" : "Confidence"}
+              {tl("trendDeepDive.confidence")}
             </span>
             <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, fontFamily: "var(--font-mono)" }}>
               {Math.round(confidence * (confidence > 1 ? 1 : 100))}%
@@ -840,7 +853,7 @@ function ActionsViz({ data, de }: { data: any; de: boolean }) {
                     {action.target && (
                       <span>
                         <span style={{ fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
-                          {de ? "Ziel" : "Target"}:
+                          {tl("trendDeepDive.target")}:
                         </span>{" "}
                         {action.target}
                       </span>
@@ -848,7 +861,7 @@ function ActionsViz({ data, de }: { data: any; de: boolean }) {
                     {action.effort && (
                       <span>
                         <span style={{ fontWeight: 600, color: "var(--foreground)", fontFamily: "var(--font-mono)", fontSize: 10 }}>
-                          {de ? "Aufwand" : "Effort"}:
+                          {tl("trendDeepDive.effort")}:
                         </span>{" "}
                         {action.effort}
                       </span>

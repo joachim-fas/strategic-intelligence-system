@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { FrameworkShell } from "@/components/frameworks/FrameworkShell";
 import { getFrameworkMeta } from "@/types/frameworks";
 import { useFrameworkAnalysis } from "@/lib/use-framework-analysis";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { StepCard } from "@/components/frameworks/StepCard";
 import { MatrixChart } from "@/components/frameworks/MatrixChart";
 
@@ -56,6 +57,8 @@ function PreMortemContent({
   locale: string;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const { steps, runStep } = useFrameworkAnalysis("pre-mortem");
 
   /* ── Helpers to gather previous‑step data for context ── */
@@ -74,7 +77,7 @@ function PreMortemContent({
       {/* ───── Step 1: Risiko-Inventar ───── */}
       <StepCard
         stepId="risks"
-        title={de ? "Risiko-Inventar" : "Risk Inventory"}
+        title={tl("preMortem.step1Title")}
         description={
           de
             ? "Alle Risiken identifizieren und kategorisieren"
@@ -92,7 +95,7 @@ function PreMortemContent({
       {/* ───── Step 2: Risiko-Bewertung ───── */}
       <StepCard
         stepId="assessment"
-        title={de ? "Risiko-Bewertung" : "Risk Assessment"}
+        title={tl("preMortem.step2Title")}
         description={
           de
             ? "Wahrscheinlichkeit x Impact Matrix"
@@ -111,7 +114,7 @@ function PreMortemContent({
       {/* ───── Step 3: Risiko-Mitigation ───── */}
       <StepCard
         stepId="mitigation"
-        title={de ? "Risiko-Mitigation" : "Risk Mitigation"}
+        title={tl("preMortem.step3Title")}
         description={
           de
             ? "Mitigationsplaene + Fruehwarnsystem"
@@ -147,6 +150,8 @@ function RiskInventoryViz({
   data: any;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const risks: any[] = Array.isArray(data.risks) ? data.risks : [];
@@ -269,7 +274,7 @@ function RiskInventoryViz({
                     letterSpacing: "0.04em",
                   }}
                 >
-                  {de ? "Wahrscheinl." : "Probability"}{" "}
+                  {tl("preMortem.probabilityShort")}{" "}
                   <span style={{ color: ACCENT }}>
                     {probability.toFixed(1)}/5
                   </span>
@@ -382,7 +387,7 @@ function RiskInventoryViz({
               fontFamily: "var(--font-display)",
             }}
           >
-            {de ? "Blinde Flecken" : "Blind Spots"}
+            {tl("preMortem.blindSpots")}
           </div>
           <ul
             style={{
@@ -422,6 +427,8 @@ function RiskAssessmentViz({
   data: any;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const risks: any[] = Array.isArray(data.risks) ? data.risks : [];
@@ -458,12 +465,12 @@ function RiskAssessmentViz({
         <div style={{ overflowX: "auto" }}>
           <MatrixChart
             points={points}
-            xLabel={de ? "Wahrscheinlichkeit" : "Probability"}
+            xLabel={tl("preMortem.probabilityLabel")}
             yLabel="Impact"
-            xLow={de ? "Niedrig" : "Low"}
-            xHigh={de ? "Hoch" : "High"}
-            yLow={de ? "Niedrig" : "Low"}
-            yHigh={de ? "Hoch" : "High"}
+            xLow={tl("preMortem.low")}
+            xHigh={tl("preMortem.high")}
+            yLow={tl("preMortem.low")}
+            yHigh={tl("preMortem.high")}
             accentColor={ACCENT}
             quadrantLabels={
               de
@@ -491,7 +498,7 @@ function RiskAssessmentViz({
               marginBottom: 10,
             }}
           >
-            {de ? "Kritische Risiken" : "Critical Risks"}
+            {tl("preMortem.criticalRisks")}
           </div>
           <div
             style={{
@@ -552,6 +559,8 @@ function MitigationViz({
   data: any;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
 
   const mitigations: any[] = Array.isArray(data.mitigations)
@@ -593,7 +602,7 @@ function MitigationViz({
               marginBottom: 10,
             }}
           >
-            {de ? "Fruehwarnsystem" : "Early Warning System"}
+            {tl("preMortem.earlyWarningSystem")}
           </div>
           <div
             style={{
@@ -629,7 +638,7 @@ function MitigationViz({
                       letterSpacing: "0.04em",
                     }}
                   >
-                    {de ? "Signal" : "Signal"}
+                    {tl("preMortem.signalLabel")}
                   </th>
                   <th
                     style={{
@@ -643,7 +652,7 @@ function MitigationViz({
                       letterSpacing: "0.04em",
                     }}
                   >
-                    {de ? "Quelle" : "Source"}
+                    {tl("preMortem.sourceLabel")}
                   </th>
                   <th
                     style={{
@@ -657,7 +666,7 @@ function MitigationViz({
                       letterSpacing: "0.04em",
                     }}
                   >
-                    {de ? "Schwelle" : "Threshold"}
+                    {tl("preMortem.thresholdLabel")}
                   </th>
                   <th
                     style={{
@@ -671,7 +680,7 @@ function MitigationViz({
                       letterSpacing: "0.04em",
                     }}
                   >
-                    {de ? "Aktion" : "Action"}
+                    {tl("preMortem.actionLabel")}
                   </th>
                 </tr>
               </thead>
@@ -740,6 +749,8 @@ function MitigationCard({
   index: number;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const [expanded, setExpanded] = useState(true);
   const m = mitigation;
 
@@ -780,7 +791,7 @@ function MitigationCard({
             color: "var(--foreground)",
           }}
         >
-          {m.riskName || m.name || `${de ? "Risiko" : "Risk"} ${index + 1}`}
+          {m.riskName || m.name || `${tl("preMortem.riskFallback")} ${index + 1}`}
         </span>
         <span
           style={{
@@ -808,18 +819,18 @@ function MitigationCard({
         >
           {/* Prevention */}
           <MitigationSection
-            label={de ? "Praevention" : "Prevention"}
+            label={tl("preMortem.preventionLabel")}
             color="#22c55e"
           >
             {prevention.action && (
               <MitigationRow
-                label={de ? "Massnahme" : "Action"}
+                label={tl("preMortem.measureLabel")}
                 value={prevention.action}
               />
             )}
             {prevention.cost && (
               <MitigationRow
-                label={de ? "Kosten" : "Cost"}
+                label={tl("preMortem.costLabel")}
                 value={prevention.cost}
               />
             )}
@@ -830,12 +841,12 @@ function MitigationCard({
 
           {/* Contingency */}
           <MitigationSection
-            label={de ? "Notfallplan" : "Contingency"}
+            label={tl("preMortem.contingencyLabel")}
             color="#f97316"
           >
             {contingency.action && (
               <MitigationRow
-                label={de ? "Massnahme" : "Action"}
+                label={tl("preMortem.measureLabel")}
                 value={contingency.action}
               />
             )}
@@ -848,19 +859,19 @@ function MitigationCard({
           <MitigationSection label="Monitoring" color="#3b82f6">
             {monitoring.indicator && (
               <MitigationRow
-                label={de ? "Indikator" : "Indicator"}
+                label={tl("preMortem.indicatorLabel")}
                 value={monitoring.indicator}
               />
             )}
             {monitoring.threshold && (
               <MitigationRow
-                label={de ? "Schwelle" : "Threshold"}
+                label={tl("preMortem.thresholdLabel")}
                 value={monitoring.threshold}
               />
             )}
             {monitoring.frequency && (
               <MitigationRow
-                label={de ? "Frequenz" : "Frequency"}
+                label={tl("preMortem.frequencyLabel")}
                 value={monitoring.frequency}
               />
             )}

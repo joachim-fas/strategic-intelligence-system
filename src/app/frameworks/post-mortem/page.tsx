@@ -4,6 +4,7 @@ import React from "react";
 import { FrameworkShell } from "@/components/frameworks/FrameworkShell";
 import { getFrameworkMeta } from "@/types/frameworks";
 import { useFrameworkAnalysis } from "@/lib/use-framework-analysis";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { StepCard } from "@/components/frameworks/StepCard";
 
 const ACCENT = "#0F6038";
@@ -40,6 +41,8 @@ export default function PostMortemPage() {
 }
 
 function PostMortemContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const { steps, runStep } = useFrameworkAnalysis("post-mortem");
 
   const previousResults = (ids: string[]) => {
@@ -56,8 +59,8 @@ function PostMortemContent({ topic, locale, de }: { topic: string; locale: strin
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <StepCard
         stepId="timeline"
-        title={de ? "Chronologie & Fakten" : "Chronology & Facts"}
-        description={de ? "Rekonstruktion des Ereignisverlaufs mit Zeitstrahl" : "Event reconstruction with timeline"}
+        title={tl("postMortem.step1Title")}
+        description={tl("postMortem.step1Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.timeline}
@@ -69,8 +72,8 @@ function PostMortemContent({ topic, locale, de }: { topic: string; locale: strin
 
       <StepCard
         stepId="causes"
-        title={de ? "Ursachen auf 3 Ebenen" : "Causes on 3 Levels"}
-        description={de ? "Strukturell, zyklisch, situativ + 5-Whys" : "Structural, cyclical, situational + 5-Whys"}
+        title={tl("postMortem.step2Title")}
+        description={tl("postMortem.step2Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.causes}
@@ -83,8 +86,8 @@ function PostMortemContent({ topic, locale, de }: { topic: string; locale: strin
 
       <StepCard
         stepId="lessons"
-        title={de ? "Lessons Learned" : "Lessons Learned"}
-        description={de ? "Erkenntnisse, Musterabgleich & Modell-Updates" : "Insights, pattern matching & model updates"}
+        title={tl("postMortem.step3Title")}
+        description={tl("postMortem.step3Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps.lessons}
@@ -100,6 +103,8 @@ function PostMortemContent({ topic, locale, de }: { topic: string; locale: strin
 
 /* ─────────────────────── Step 1 — Timeline ──────────────────────── */
 function TimelineViz({ data, de }: { data?: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
   const events: any[] = Array.isArray(data.timeline) ? data.timeline : (Array.isArray(data.events) ? data.events : []);
   const turningPoints: any[] = Array.isArray(data.keyTurningPoints) ? data.keyTurningPoints : [];
@@ -168,7 +173,7 @@ function TimelineViz({ data, de }: { data?: any; de: boolean }) {
                         fontFamily: "var(--font-mono)",
                         textTransform: "uppercase", letterSpacing: "0.06em",
                       }}>
-                        ★ {de ? "Wendepunkt" : "Turning Point"}
+                        ★ {tl("postMortem.turningPoint")}
                       </span>
                     )}
                   </div>
@@ -198,7 +203,7 @@ function TimelineViz({ data, de }: { data?: any; de: boolean }) {
                         textTransform: "uppercase", letterSpacing: "0.06em",
                         marginBottom: 3,
                       }}>
-                        {de ? "Was wäre wenn..." : "What if..."}
+                        {tl("postMortem.whatIf")}
                       </div>
                       <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--muted-foreground)" }}>
                         {tp.whatIfAlternative}
@@ -226,6 +231,8 @@ function TimelineViz({ data, de }: { data?: any; de: boolean }) {
 
 /* ─────────────────────── Step 2 — Causes ──────────────────────── */
 function CausesViz({ data, de }: { data?: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   if (!data) return null;
   const structural: any[] = Array.isArray(data.structural) ? data.structural : [];
   const cyclical: any[] = Array.isArray(data.cyclical) ? data.cyclical : [];
@@ -250,14 +257,14 @@ function CausesViz({ data, de }: { data?: any; de: boolean }) {
         display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
         gap: 12,
       }}>
-        <CauseColumn label={de ? "Strukturell" : "Structural"} color="#7C3AED" causes={structural} de={de} />
-        <CauseColumn label={de ? "Zyklisch" : "Cyclical"} color="#2563EB" causes={cyclical} de={de} />
-        <CauseColumn label={de ? "Situativ" : "Situational"} color="#EA580C" causes={situational} de={de} />
+        <CauseColumn label={tl("postMortem.structural")} color="#7C3AED" causes={structural} de={de} />
+        <CauseColumn label={tl("postMortem.cyclical")} color="#2563EB" causes={cyclical} de={de} />
+        <CauseColumn label={tl("postMortem.situational")} color="#EA580C" causes={situational} de={de} />
       </div>
 
       {causalChains.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Kausalketten" : "Causal Chains"} />
+          <SectionLabel text={tl("postMortem.causalChains")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {causalChains.map((chain, i) => <CausalChainViz key={i} chain={chain} />)}
           </div>
@@ -266,7 +273,7 @@ function CausesViz({ data, de }: { data?: any; de: boolean }) {
 
       {fiveWhys.length > 0 && (
         <div>
-          <SectionLabel text={de ? "5-Whys-Analyse" : "5-Whys Analysis"} />
+          <SectionLabel text={tl("postMortem.fiveWhys")} />
           <div style={{ position: "relative" }}>
             {fiveWhys.map((lv, i) => (
               <div key={i} style={{ marginLeft: i * 18, position: "relative", marginBottom: 8 }}>
@@ -288,7 +295,7 @@ function CausesViz({ data, de }: { data?: any; de: boolean }) {
                     fontSize: 10, fontWeight: 700, color: ACCENT,
                     fontFamily: "var(--font-mono)", marginBottom: 2,
                   }}>
-                    {de ? `Warum #${lv.level || i + 1}` : `Why #${lv.level || i + 1}`}
+                    {`${tl("postMortem.whyPrefix")}${lv.level || i + 1}`}
                   </div>
                   {lv.question && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)", marginBottom: 2 }}>
@@ -309,6 +316,8 @@ function CausesViz({ data, de }: { data?: any; de: boolean }) {
 }
 
 function CauseColumn({ label, color, causes, de }: { label: string; color: string; causes: any[]; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (causes.length === 0) return null;
   return (
     <div>
@@ -336,13 +345,13 @@ function CauseColumn({ label, color, causes, de }: { label: string; color: strin
             )}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
               {c.fixability && (
-                <Badge label={de ? `Behebbar: ${c.fixability}` : `Fixable: ${c.fixability}`} color={FIXABILITY_COLORS[c.fixability] || "#9CA3AF"} />
+                <Badge label={`${tl("postMortem.fixablePrefix")} ${c.fixability}`} color={FIXABILITY_COLORS[c.fixability] || "#9CA3AF"} />
               )}
               {c.predictable != null && (
-                <Badge label={de ? (c.predictable ? "Vorhersehbar" : "Unvorhersehbar") : (c.predictable ? "Predictable" : "Unpredictable")} color={c.predictable ? "#16A34A" : "#9CA3AF"} />
+                <Badge label={c.predictable ? tl("postMortem.predictable") : tl("postMortem.unpredictable")} color={c.predictable ? "#16A34A" : "#9CA3AF"} />
               )}
               {c.avoidable != null && (
-                <Badge label={de ? (c.avoidable ? "Vermeidbar" : "Unvermeidbar") : (c.avoidable ? "Avoidable" : "Unavoidable")} color={c.avoidable ? "#16A34A" : "#9CA3AF"} />
+                <Badge label={c.avoidable ? tl("postMortem.avoidable") : tl("postMortem.unavoidable")} color={c.avoidable ? "#16A34A" : "#9CA3AF"} />
               )}
             </div>
           </div>
@@ -394,6 +403,8 @@ function CausalChainViz({ chain }: { chain: any }) {
 
 /* ─────────────────────── Step 3 — Lessons ──────────────────────── */
 function LessonsViz({ data, de }: { data?: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   if (!data) return null;
   const couldHaveKnown: any[] = Array.isArray(data.couldHaveKnown) ? data.couldHaveKnown : [];
   const couldHaveDone: any[] = Array.isArray(data.couldHaveDone) ? data.couldHaveDone : (Array.isArray(data.couldHaveDoneDifferently) ? data.couldHaveDoneDifferently : []);
@@ -416,21 +427,21 @@ function LessonsViz({ data, de }: { data?: any; de: boolean }) {
 
       {couldHaveKnown.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Hätte man wissen können" : "Could Have Known"} />
+          <SectionLabel text={tl("postMortem.couldHaveKnown")} />
           <ItemList items={couldHaveKnown} />
         </div>
       )}
 
       {couldHaveDone.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Hätte man anders machen können" : "Could Have Done Differently"} />
+          <SectionLabel text={tl("postMortem.couldHaveDone")} />
           <ItemList items={couldHaveDone} />
         </div>
       )}
 
       {systemicChanges.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Systemische Veränderungen" : "Systemic Changes"} />
+          <SectionLabel text={tl("postMortem.systemicChanges")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {systemicChanges.map((sc, i) => {
               const title: string = sc.change || sc.title || "";
@@ -470,7 +481,7 @@ function LessonsViz({ data, de }: { data?: any; de: boolean }) {
 
       {patternMatches.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Musterabgleich" : "Pattern Matches"} />
+          <SectionLabel text={tl("postMortem.patternMatches")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {patternMatches.map((pm, i) => {
               const sim: any = pm.similarity;
@@ -507,7 +518,7 @@ function LessonsViz({ data, de }: { data?: any; de: boolean }) {
                   )}
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
                     <span style={{ fontWeight: 600, color: "var(--foreground)", marginRight: 4 }}>
-                      {de ? "Erkenntnis:" : "Lesson:"}
+                      {tl("postMortem.lesson")}
                     </span>
                     {pm.lesson}
                   </div>
@@ -520,7 +531,7 @@ function LessonsViz({ data, de }: { data?: any; de: boolean }) {
 
       {modelUpdates.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Modell-Updates" : "Model Updates"} />
+          <SectionLabel text={tl("postMortem.modelUpdates")} />
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {modelUpdates.map((mu, i) => (
               <li key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "var(--foreground)", marginBottom: 4 }}>

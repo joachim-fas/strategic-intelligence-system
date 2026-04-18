@@ -8,6 +8,7 @@ import { StepCard } from "@/components/frameworks/StepCard";
 import { MatrixChart } from "@/components/frameworks/MatrixChart";
 import { ScenarioCards } from "@/components/frameworks/ScenarioCards";
 import { VoltTable } from "@/components/volt";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 /* ---------- constants ---------- */
 
@@ -68,6 +69,8 @@ interface ContentProps {
 }
 
 function MarktanalyseContent({ topic, locale, de }: ContentProps) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const { steps, runStep } = useFrameworkAnalysis("marktanalyse");
 
   /* convenience accessors */
@@ -106,8 +109,8 @@ function MarktanalyseContent({ topic, locale, de }: ContentProps) {
       {/* ---- Step 1: Marktstruktur ---- */}
       <StepCard
         stepId="market-structure"
-        title={de ? "Marktstruktur" : "Market Structure"}
-        description={de ? "TAM / SAM / SOM, Segmente, Akteure" : "TAM / SAM / SOM, Segments, Key Players"}
+        title={tl("marktanalyse.step1Title")}
+        description={tl("marktanalyse.step1Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={s1}
@@ -122,8 +125,8 @@ function MarktanalyseContent({ topic, locale, de }: ContentProps) {
       {/* ---- Step 2: Wettbewerber-Radar ---- */}
       <StepCard
         stepId="competitor-radar"
-        title={de ? "Wettbewerber-Radar" : "Competitor Radar"}
-        description={de ? "Identifikation & Positionierungsmatrix" : "Identification & Positioning Matrix"}
+        title={tl("marktanalyse.step2Title")}
+        description={tl("marktanalyse.step2Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={s2}
@@ -139,8 +142,8 @@ function MarktanalyseContent({ topic, locale, de }: ContentProps) {
       {/* ---- Step 3: Trends & Regulierung ---- */}
       <StepCard
         stepId="trends-regulation"
-        title={de ? "Trends & Regulierung" : "Trends & Regulation"}
-        description={de ? "Megatrends, regulatorischer Kontext, 3 Szenarien" : "Megatrends, Regulatory Context, 3 Scenarios"}
+        title={tl("marktanalyse.step3Title")}
+        description={tl("marktanalyse.step3Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={s3}
@@ -157,7 +160,7 @@ function MarktanalyseContent({ topic, locale, de }: ContentProps) {
       <StepCard
         stepId="benchmarking"
         title="Benchmarking"
-        description={de ? "Vergleichskennzahlen der Marktteilnehmer" : "Comparative Metrics across Players"}
+        description={tl("marktanalyse.step4Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={s4}
@@ -191,6 +194,8 @@ interface MarketStructureData {
 }
 
 function MarketStructureViz({ data, de }: { data: MarketStructureData; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const d = data ?? {};
   const segments = safeArr<{ name: string; share: number; color?: string }>(d.segments);
   const players = safeArr<{ name: string; marketShare?: number | string; strength?: string }>(d.keyPlayers);
@@ -280,7 +285,7 @@ function MarketStructureViz({ data, de }: { data: MarketStructureData; de: boole
             textTransform: "uppercase", color: "var(--muted-foreground)",
             fontFamily: "var(--font-mono)", marginBottom: 6,
           }}>
-            {de ? "Segmente" : "Segments"}
+            {tl("marktanalyse.segments")}
           </div>
           <div style={{
             display: "flex", borderRadius: 8, overflow: "hidden",
@@ -333,7 +338,7 @@ function MarketStructureViz({ data, de }: { data: MarketStructureData; de: boole
             textTransform: "uppercase", color: "var(--muted-foreground)",
             fontFamily: "var(--font-mono)", marginBottom: 6,
           }}>
-            {de ? "Akteure" : "Key Players"}
+            {tl("marktanalyse.keyPlayers")}
           </div>
           <table style={{
             width: "100%", borderCollapse: "collapse",
@@ -342,13 +347,13 @@ function MarketStructureViz({ data, de }: { data: MarketStructureData; de: boole
             <thead>
               <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
                 <th style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {de ? "Name" : "Name"}
+                  {tl("marktanalyse.nameCol")}
                 </th>
                 <th style={{ textAlign: "right", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {de ? "Marktanteil" : "Market Share"}
+                  {tl("marktanalyse.marketShare")}
                 </th>
                 <th style={{ textAlign: "left", padding: "6px 10px", fontSize: 10, fontWeight: 700, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {de ? "Staerke" : "Strength"}
+                  {tl("marktanalyse.strengthCol")}
                 </th>
               </tr>
             </thead>
@@ -402,6 +407,8 @@ const THREAT_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 function CompetitorRadarViz({ data, de }: { data: CompetitorRadarData; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const d = data ?? {};
   const positioning = safeArr<{ name: string; x: number; y: number; color?: string; size?: number }>(d.positioning);
   const competitors = safeArr<{ name: string; threatLevel?: string; description?: string; strengths?: string[]; weaknesses?: string[] }>(d.competitors);
@@ -420,8 +427,8 @@ function CompetitorRadarViz({ data, de }: { data: CompetitorRadarData; de: boole
         <div style={{ overflowX: "auto" }}>
           <MatrixChart
             points={positioning}
-            xLabel={d.xLabel || (de ? "Marktstaerke" : "Market Strength")}
-            yLabel={d.yLabel || (de ? "Innovationskraft" : "Innovation Power")}
+            xLabel={d.xLabel || tl("marktanalyse.marketStrength")}
+            yLabel={d.yLabel || tl("marktanalyse.innovationPower")}
             xLow={d.xLow}
             xHigh={d.xHigh}
             yLow={d.yLow}
@@ -440,7 +447,7 @@ function CompetitorRadarViz({ data, de }: { data: CompetitorRadarData; de: boole
             textTransform: "uppercase", color: "var(--muted-foreground)",
             fontFamily: "var(--font-mono)", marginBottom: 8,
           }}>
-            {de ? "Wettbewerber-Profile" : "Competitor Profiles"}
+            {tl("marktanalyse.competitorProfiles")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
             {competitors.map((c, i) => {
@@ -523,6 +530,8 @@ interface TrendsRegulationData {
 }
 
 function TrendsRegulationViz({ data, de }: { data: TrendsRegulationData; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const d = data ?? {};
   const megatrends = safeArr<{ name: string; category?: string; description?: string }>(d.megatrends);
   const regulations = safeArr<{ name: string; status?: string; description?: string; jurisdiction?: string }>(d.regulations);
@@ -545,7 +554,7 @@ function TrendsRegulationViz({ data, de }: { data: TrendsRegulationData; de: boo
             textTransform: "uppercase", color: "var(--muted-foreground)",
             fontFamily: "var(--font-mono)", marginBottom: 6,
           }}>
-            {de ? "Megatrends (STEEP)" : "Megatrends (STEEP)"}
+            {tl("marktanalyse.megatrendsSteep")}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {megatrends.map((t, i) => {
@@ -592,7 +601,7 @@ function TrendsRegulationViz({ data, de }: { data: TrendsRegulationData; de: boo
             textTransform: "uppercase", color: "var(--muted-foreground)",
             fontFamily: "var(--font-mono)", marginBottom: 6,
           }}>
-            {de ? "Regulierung" : "Regulation"}
+            {tl("marktanalyse.regulation")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {regulations.map((r, i) => {
@@ -661,6 +670,8 @@ interface BenchmarkingData {
 }
 
 function BenchmarkingViz({ data, de }: { data: BenchmarkingData; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const d = data ?? {};
   const players = safeArr<Record<string, unknown>>(d.players);
   const metrics = safeArr<string>(d.metrics);
@@ -677,7 +688,7 @@ function BenchmarkingViz({ data, de }: { data: BenchmarkingData; de: boolean }) 
     }
 
     const cols: { key: string; header: string; align: "left" | "right" }[] = [
-      { key: "name", header: de ? "Akteur" : "Player", align: "left" },
+      { key: "name", header: tl("marktanalyse.playerCol"), align: "left" },
     ];
     for (const m of metrics) {
       cols.push({ key: m, header: m, align: "right" });
@@ -702,8 +713,8 @@ function BenchmarkingViz({ data, de }: { data: BenchmarkingData; de: boolean }) 
         striped
         compact
         hoverable
-        caption={d.caption || (de ? "Benchmarking-Vergleich" : "Benchmarking Comparison")}
-        emptyMessage={de ? "Keine Daten vorhanden" : "No data available"}
+        caption={d.caption || tl("marktanalyse.benchmarkingCaption")}
+        emptyMessage={tl("marktanalyse.noData")}
       />
     </div>
   );

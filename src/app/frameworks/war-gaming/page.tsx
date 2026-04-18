@@ -4,6 +4,7 @@ import React from "react";
 import { FrameworkShell } from "@/components/frameworks/FrameworkShell";
 import { getFrameworkMeta } from "@/types/frameworks";
 import { useFrameworkAnalysis } from "@/lib/use-framework-analysis";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { StepCard } from "@/components/frameworks/StepCard";
 
 const ACCENT = "#A0244A";
@@ -105,6 +106,8 @@ function WarGamingContent({
   locale: string;
   de: boolean;
 }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const { steps, runStep } = useFrameworkAnalysis("war-gaming");
 
   const prev = (ids: string[]): Record<string, any> => {
@@ -120,7 +123,7 @@ function WarGamingContent({
       {/* Step 1 -- Akteurs-Modellierung */}
       <StepCard
         stepId="actors"
-        title={de ? "Akteurs-Modellierung" : "Actor Modeling"}
+        title={tl("warGaming.step1Title")}
         description={
           de
             ? "Akteurprofile: Wettbewerber, Regulierer, Partner, Disruptoren"
@@ -138,7 +141,7 @@ function WarGamingContent({
       {/* Step 2 -- Spielzug-Simulation */}
       <StepCard
         stepId="moves"
-        title={de ? "Spielzug-Simulation" : "Move Simulation"}
+        title={tl("warGaming.step2Title")}
         description={
           de
             ? "Simulation: Was Akteure als Nächstes tun könnten"
@@ -157,7 +160,7 @@ function WarGamingContent({
       {/* Step 3 -- Reaktionsmatrix */}
       <StepCard
         stepId="responses"
-        title={de ? "Reaktionsmatrix" : "Response Matrix"}
+        title={tl("warGaming.step3Title")}
         description={
           de
             ? "Reaktionsmatrix & Gegenstrategien"
@@ -180,7 +183,7 @@ function WarGamingContent({
       {/* Step 4 -- Red-Team-Modus */}
       <StepCard
         stepId="red-team"
-        title={de ? "Red-Team-Modus" : "Red Team Mode"}
+        title={tl("warGaming.step4Title")}
         description={
           de
             ? "Schwachstellen & Verwundbarkeitsanalyse"
@@ -213,6 +216,8 @@ function WarGamingContent({
    ================================================================ */
 
 function ActorsViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const actors: Actor[] = Array.isArray(data?.actors)
     ? data.actors
     : Array.isArray(data?.items)
@@ -256,7 +261,7 @@ function ActorsViz({ data, de }: { data: any; de: boolean }) {
                     color: "var(--foreground)",
                   }}
                 >
-                  {actor.name || `${de ? "Akteur" : "Actor"} ${i + 1}`}
+                  {actor.name || `${tl("warGaming.actorFallback")} ${i + 1}`}
                 </span>
                 {actor.type && (
                   <span
@@ -281,7 +286,7 @@ function ActorsViz({ data, de }: { data: any; de: boolean }) {
               {Array.isArray(actor.resources) && actor.resources.length > 0 && (
                 <div style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
-                    {de ? "Ressourcen" : "Resources"}
+                    {tl("warGaming.resources")}
                   </span>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
                     {actor.resources.map((r, j) => (
@@ -306,7 +311,7 @@ function ActorsViz({ data, de }: { data: any; de: boolean }) {
               {Array.isArray(actor.goals) && actor.goals.length > 0 && (
                 <div style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
-                    {de ? "Ziele" : "Goals"}
+                    {tl("warGaming.goals")}
                   </span>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
                     {actor.goals.map((g, j) => (
@@ -341,7 +346,7 @@ function ActorsViz({ data, de }: { data: any; de: boolean }) {
                     }}
                   />
                   <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>
-                    {de ? "Bedrohungslevel" : "Threat level"}: {actor.threatLevel}
+                    {tl("warGaming.threatLevel")}: {actor.threatLevel}
                   </span>
                 </div>
               )}
@@ -358,6 +363,8 @@ function ActorsViz({ data, de }: { data: any; de: boolean }) {
    ================================================================ */
 
 function MovesViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const moves: Move[] = Array.isArray(data?.moves)
     ? data.moves
     : Array.isArray(data?.items)
@@ -425,7 +432,7 @@ function MovesViz({ data, de }: { data: any; de: boolean }) {
                     fontFamily: "var(--font-mono)",
                   }}
                 >
-                  {de ? "Auswirkung" : "Impact"}: {m.impact}
+                  {tl("warGaming.impact")}: {m.impact}
                 </span>
               )}
             </div>
@@ -449,7 +456,7 @@ function MovesViz({ data, de }: { data: any; de: boolean }) {
                   }}
                 >
                   <span style={{ fontSize: 10, color: "var(--muted-foreground)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {de ? "Wahrscheinlichkeit" : "Probability"}
+                    {tl("warGaming.probability")}
                   </span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT, fontFamily: "var(--font-mono)" }}>
                     {Math.round(prob * 100)}%
@@ -480,7 +487,7 @@ function MovesViz({ data, de }: { data: any; de: boolean }) {
             {Array.isArray(m.cascadeEffects) && m.cascadeEffects.length > 0 && (
               <div>
                 <span style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
-                  {de ? "Kaskadeneffekte" : "Cascade Effects"}
+                  {tl("warGaming.cascadeEffects")}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                   {m.cascadeEffects.map((c, j) => (
@@ -513,6 +520,8 @@ function MovesViz({ data, de }: { data: any; de: boolean }) {
    ================================================================ */
 
 function ResponsesViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const rows: ResponseRow[] = Array.isArray(data?.responses)
     ? data.responses
     : Array.isArray(data?.matrix)
@@ -559,11 +568,11 @@ function ResponsesViz({ data, de }: { data: any; de: boolean }) {
             <thead>
               <tr>
                 {[
-                  de ? "Gegenzug" : "Opponent Move",
-                  de ? "Beste Antwort" : "Best Response",
-                  de ? "Alternative" : "Alternative",
-                  de ? "Risiko bei Passivität" : "Risk of Inaction",
-                  de ? "Priorität" : "Priority",
+                  tl("warGaming.opponentMove"),
+                  tl("warGaming.bestResponse"),
+                  tl("warGaming.alternative"),
+                  tl("warGaming.riskOfInaction"),
+                  tl("warGaming.priority"),
                 ].map((h, i) => (
                   <th
                     key={i}
@@ -653,7 +662,7 @@ function ResponsesViz({ data, de }: { data: any; de: boolean }) {
               marginBottom: 8,
             }}
           >
-            {de ? "Gegenstrategien" : "Counter-Strategies"}
+            {tl("warGaming.counterStrategies")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
             {counterStrategies.map((cs, i) => (
@@ -667,7 +676,7 @@ function ResponsesViz({ data, de }: { data: any; de: boolean }) {
                 }}
               >
                 <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", marginBottom: 4, fontFamily: "var(--font-display)" }}>
-                  {cs.name || `${de ? "Strategie" : "Strategy"} ${i + 1}`}
+                  {cs.name || `${tl("warGaming.strategyFallback")} ${i + 1}`}
                 </div>
                 {cs.targetActor && (
                   <span
@@ -683,7 +692,7 @@ function ResponsesViz({ data, de }: { data: any; de: boolean }) {
                       display: "inline-block",
                     }}
                   >
-                    {de ? "Ziel" : "Target"}: {cs.targetActor}
+                    {tl("warGaming.target")}: {cs.targetActor}
                   </span>
                 )}
                 {cs.description && (
@@ -705,6 +714,8 @@ function ResponsesViz({ data, de }: { data: any; de: boolean }) {
    ================================================================ */
 
 function RedTeamViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const vulns: Vulnerability[] = Array.isArray(data?.vulnerabilities)
     ? data.vulnerabilities
     : Array.isArray(data?.items)
@@ -750,7 +761,7 @@ function RedTeamViz({ data, de }: { data: any; de: boolean }) {
                   color: "var(--foreground)",
                 }}
               >
-                {v.name || `${de ? "Schwachstelle" : "Vulnerability"} ${i + 1}`}
+                {v.name || `${tl("warGaming.vulnerabilityFallback")} ${i + 1}`}
               </span>
               {v.severity && (
                 <span
@@ -775,7 +786,7 @@ function RedTeamViz({ data, de }: { data: any; de: boolean }) {
             {v.exploitScenario && (
               <div style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
-                  {de ? "Angriffsszenario" : "Exploit Scenario"}
+                  {tl("warGaming.exploitScenario")}
                 </span>
                 <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--foreground)", margin: "3px 0 0" }}>
                   {v.exploitScenario}
@@ -787,7 +798,7 @@ function RedTeamViz({ data, de }: { data: any; de: boolean }) {
             {v.currentDefense && (
               <div style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 10, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)" }}>
-                  {de ? "Aktuelle Verteidigung" : "Current Defense"}
+                  {tl("warGaming.currentDefense")}
                 </span>
                 <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--foreground)", margin: "3px 0 0" }}>
                   {v.currentDefense}
@@ -806,7 +817,7 @@ function RedTeamViz({ data, de }: { data: any; de: boolean }) {
                 }}
               >
                 <span style={{ fontSize: 10, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
-                  {de ? "Empfehlung" : "Recommendation"}
+                  {tl("warGaming.recommendation")}
                 </span>
                 <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--foreground)", margin: "3px 0 0" }}>
                   {v.recommendation}
@@ -862,7 +873,7 @@ function RedTeamViz({ data, de }: { data: any; de: boolean }) {
                 fontFamily: "var(--font-mono)",
               }}
             >
-              {de ? "Worst-Case-Szenario" : "Worst Case Scenario"}
+              {tl("warGaming.worstCase")}
             </span>
           </div>
           <p style={{ fontSize: 13, lineHeight: 1.7, color: "#7F1D1D", margin: 0 }}>
