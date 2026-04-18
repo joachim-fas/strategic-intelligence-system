@@ -12,12 +12,17 @@
  * Rollen-Change laeuft ueber PATCH memberships/[id], Remove ueber DELETE.
  * Einladungen: POST /invites (mit Auto-Membership wenn User existiert),
  * DELETE /invites?inviteId=... revoked pending.
+ *
+ * 2026-04-18 audit A5-H9: migrated from `de ? ... : ...` ternaries to
+ * the new namespaced dictionary via `useT()`. Audit detail lines keep
+ * their JSX shape but use translated fragments.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { t as translate, localeTag, type Locale, type TranslationKey } from "@/lib/i18n";
 import { VoltModal, voltConfirm } from "@/components/volt";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
@@ -31,9 +36,15 @@ const ROLE_COLOR: Record<Role, string> = {
   viewer: "#9B9B9B",
 };
 
-function roleLabel(role: Role, de: boolean): string {
-  if (de) return role === "owner" ? "Inhaber" : role === "admin" ? "Admin" : role === "member" ? "Mitglied" : "Leser";
-  return role === "owner" ? "Owner" : role === "admin" ? "Admin" : role === "member" ? "Member" : "Viewer";
+const ROLE_KEY: Record<Role, TranslationKey> = {
+  owner: "admin.roleOwner",
+  admin: "admin.roleAdmin",
+  member: "admin.roleMember",
+  viewer: "admin.roleViewer",
+};
+
+function roleLabel(role: Role, locale: Locale): string {
+  return translate(locale, ROLE_KEY[role]);
 }
 
 interface TenantDetail {
@@ -80,8 +91,7 @@ interface AuditEntry {
 }
 
 export function TenantDetailClient({ tenantId }: { tenantId: string }) {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale } = useT();
 
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -149,7 +159,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       if (!res.ok) {
         const j = await res.json().catch(() => null);
         // Audit A4-H1 (18.04.2026): surface inline instead of alert().
-        setError(j?.error?.message ?? (de ? "Rolle konnte nicht geaendert werden." : "Could not change role."));
+        setError(j?.error?.message ?? t("admin.roleChangeFailed"));
         setTimeout(() => setError(null), 6000);
         return;
       }
@@ -162,12 +172,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
 
   const removeMember = async (m: Member) => {
     const ok = await voltConfirm({
-      title: de ? `„${m.email}" entfernen?` : `Remove "${m.email}"?`,
-      message: de
-        ? "Der Nutzer verliert den Zugriff auf diesen Mandanten. Seine erstellten Projekte bleiben erhalten."
-        : "The user will lose access to this tenant. Projects they created remain.",
-      confirmLabel: de ? "Entfernen" : "Remove",
-      cancelLabel: de ? "Abbrechen" : "Cancel",
+      title: t("admin.removeMemberQ", { email: m.email }),
+      message: t("admin.removeMemberBody"),
+      confirmLabel: t("common.remove"),
+      cancelLabel: t("common.cancel"),
       variant: "destructive",
     });
     if (!ok) return;
@@ -180,7 +188,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       if (!res.ok) {
         const j = await res.json().catch(() => null);
         // Audit A4-H1 (18.04.2026): surface inline instead of alert().
-        setError(j?.error?.message ?? (de ? "Entfernen fehlgeschlagen." : "Remove failed."));
+        setError(j?.error?.message ?? t("admin.removeFailed"));
         setTimeout(() => setError(null), 6000);
         return;
       }
@@ -193,12 +201,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
 
   const revokeInvite = async (inv: Invite) => {
     const ok = await voltConfirm({
-      title: de ? `Einladung fuer „${inv.email}" zurueckziehen?` : `Revoke invite for "${inv.email}"?`,
-      message: de
-        ? "Der Einladungs-Link wird ungueltig. Du kannst sie jederzeit neu versenden."
-        : "The invite link becomes invalid. You can re-send a fresh invite any time.",
-      confirmLabel: de ? "Zurueckziehen" : "Revoke",
-      cancelLabel: de ? "Abbrechen" : "Cancel",
+      title: t("admin.revokeInviteQ", { email: inv.email }),
+      message: t("admin.revokeInviteBody"),
+      confirmLabel: t("admin.revokeInvite"),
+      cancelLabel: t("common.cancel"),
       variant: "destructive",
     });
     if (!ok) return;
@@ -210,7 +216,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
       );
       if (!res.ok) {
         // Audit A4-H1 (18.04.2026): inline error instead of alert().
-        setError(de ? "Aktion fehlgeschlagen." : "Action failed.");
+        setError(t("common.actionFailed"));
         setTimeout(() => setError(null), 6000);
         return;
       }
@@ -231,10 +237,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
           textDecoration: "none",
           marginBottom: 14,
         }}>
-          ← {de ? "Alle Mandanten" : "All tenants"}
+          ← {t("audit.allTenantsLink")}
         </Link>
 
-        {loading && !tenant && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Lade…" : "Loading…"}</div>}
+        {loading && !tenant && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{t("common.loading")}</div>}
         {error && !tenant && <div style={{ color: "var(--signal-negative, #C0341D)", fontSize: 13 }}>{error}</div>}
         {/* Audit A4-H1 (18.04.2026): action errors (role change, member
              remove, invite revoke) now surface as a sticky banner here
@@ -257,7 +263,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
             <span style={{ flex: 1 }}>{error}</span>
             <button
               onClick={() => setError(null)}
-              aria-label={de ? "Schließen" : "Close"}
+              aria-label={t("common.close")}
               style={{
                 border: "none", background: "transparent",
                 color: "inherit", cursor: "pointer",
@@ -278,7 +284,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                 color: "var(--volt-text-faint, #BBB)",
                 marginBottom: 6,
               }}>
-                {de ? "Mandant" : "Tenant"}
+                {t("admin.tenantLabel")}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <h1 style={{
@@ -304,7 +310,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                     background: "var(--pastel-butter, #FFF5BA)",
                     color: "var(--pastel-butter-text, #7A5C00)",
                   }}>
-                    {de ? "Archiviert" : "Archived"}
+                    {t("common.archived")}
                   </span>
                 )}
                 {/* Data-Export: DSGVO-kompatibler JSON-Dump eines
@@ -321,12 +327,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                     <button
                       onClick={async () => {
                         const ok = await voltConfirm({
-                          title: de ? `"${tenant.name}" archivieren?` : `Archive "${tenant.name}"?`,
-                          message: de
-                            ? "Archivierte Mandanten sind schreibgeschützt und erscheinen nicht mehr im Switcher der Mitglieder. Kann jederzeit wiederhergestellt werden."
-                            : "Archived tenants become read-only and disappear from member switchers. Can be restored any time.",
-                          confirmLabel: de ? "Archivieren" : "Archive",
-                          cancelLabel: de ? "Abbrechen" : "Cancel",
+                          title: t("admin.archiveHereQ", { name: tenant.name }),
+                          message: t("admin.archiveHereBody"),
+                          confirmLabel: t("common.archive"),
+                          cancelLabel: t("common.cancel"),
                           variant: "destructive",
                         });
                         if (!ok) return;
@@ -336,7 +340,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                         );
                         if (!res.ok) {
                           const j = await res.json().catch(() => null);
-                          setError(j?.error?.message ?? (de ? "Archivieren fehlgeschlagen." : "Archive failed."));
+                          setError(j?.error?.message ?? t("admin.archiveFailed"));
                           setTimeout(() => setError(null), 6000);
                           return;
                         }
@@ -350,7 +354,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                         color: "var(--color-text-primary)",
                         cursor: "pointer",
                       }}
-                    >{de ? "Archivieren" : "Archive"}</button>
+                    >{t("common.archive")}</button>
                   )}
                   {tenant.archived_at && (
                     <>
@@ -362,7 +366,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                           );
                           if (!res.ok) {
                             const j = await res.json().catch(() => null);
-                            setError(j?.error?.message ?? (de ? "Wiederherstellung fehlgeschlagen." : "Restore failed."));
+                            setError(j?.error?.message ?? t("admin.restoreTenantFailed"));
                             setTimeout(() => setError(null), 6000);
                             return;
                           }
@@ -376,16 +380,14 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                           color: "var(--color-text-primary)",
                           cursor: "pointer",
                         }}
-                      >{de ? "Wiederherstellen" : "Restore"}</button>
+                      >{t("admin.restoreTenant")}</button>
                       <button
                         onClick={async () => {
                           const ok = await voltConfirm({
-                            title: de ? `"${tenant.name}" endgültig löschen?` : `Permanently delete "${tenant.name}"?`,
-                            message: de
-                              ? "Alle Daten des Mandanten werden unwiderruflich entfernt. Lade vorher den JSON-Export herunter."
-                              : "All tenant data is permanently removed. Download the JSON export first.",
-                            confirmLabel: de ? "Endgültig löschen" : "Delete permanently",
-                            cancelLabel: de ? "Abbrechen" : "Cancel",
+                            title: t("admin.deleteHereQ", { name: tenant.name }),
+                            message: t("admin.deleteHereBody"),
+                            confirmLabel: t("admin.deletePermanent"),
+                            cancelLabel: t("common.cancel"),
                             variant: "destructive",
                           });
                           if (!ok) return;
@@ -395,7 +397,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                           );
                           if (!res.ok) {
                             const j = await res.json().catch(() => null);
-                            setError(j?.error?.message ?? (de ? "Löschen fehlgeschlagen." : "Delete failed."));
+                            setError(j?.error?.message ?? t("admin.deleteFailed"));
                             setTimeout(() => setError(null), 6000);
                             return;
                           }
@@ -409,7 +411,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                           color: "var(--signal-negative, #C0341D)",
                           cursor: "pointer",
                         }}
-                      >{de ? "Endgültig löschen" : "Delete"}</button>
+                      >{t("common.delete")}</button>
                     </>
                   )}
                   <a
@@ -422,9 +424,9 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                       color: "var(--color-text-primary)",
                       textDecoration: "none",
                     }}
-                    title={de ? "Kompletter JSON-Export (DSGVO)" : "Full JSON export (GDPR)"}
+                    title={t("admin.exportJsonTip")}
                   >
-                    ↓ {de ? "Export (JSON)" : "Export (JSON)"}
+                    ↓ {t("admin.exportJson")}
                   </a>
                 </div>
               </div>
@@ -433,10 +435,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
             {/* Stats */}
             {stats && (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 26 }}>
-                <Stat label={de ? "Mitglieder" : "Members"} value={stats.memberCount} />
-                <Stat label={de ? "Projekte" : "Projects"} value={stats.radarCount} />
-                <Stat label={de ? "Szenarien" : "Scenarios"} value={stats.scenarioCount} />
-                <Stat label={de ? "Ratings" : "Ratings"} value={stats.ratingCount} />
+                <Stat label={t("admin.memberCount")} value={stats.memberCount} />
+                <Stat label={t("admin.projects")} value={stats.radarCount} />
+                <Stat label={t("admin.scenarios")} value={stats.scenarioCount} />
+                <Stat label={t("admin.ratings")} value={stats.ratingCount} />
               </div>
             )}
 
@@ -444,7 +446,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
             <section style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 12 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-heading)", margin: 0 }}>
-                  {de ? "Mitglieder" : "Members"}
+                  {t("admin.membersSection")}
                 </h2>
                 <button
                   onClick={() => setInviteOpen(true)}
@@ -458,7 +460,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                     fontFamily: "var(--volt-font-ui)",
                   }}
                 >
-                  + {de ? "Mitglied einladen" : "Invite member"}
+                  + {t("admin.inviteMember")}
                 </button>
               </div>
               <div style={{
@@ -467,10 +469,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                 background: "var(--volt-surface-raised, #fff)",
               }}>
                 <TableHeader cols={[
-                  de ? "Name / Email" : "Name / Email",
-                  de ? "Rolle" : "Role",
-                  de ? "Mitglied seit" : "Member since",
-                  de ? "Aktionen" : "Actions",
+                  t("admin.memberNameEmail"),
+                  t("admin.roleColumn"),
+                  t("admin.memberSince"),
+                  t("common.actions"),
                 ]} />
                 {members.map(m => (
                   <div key={m.id} style={rowStyle(false)}>
@@ -497,10 +499,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                         width: 120,
                       }}
                     >
-                      {ROLES.map(r => <option key={r} value={r}>{roleLabel(r, de)}</option>)}
+                      {ROLES.map(r => <option key={r} value={r}>{roleLabel(r, locale)}</option>)}
                     </select>
                     <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                      {new Date(m.joined_at).toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "short", day: "numeric" })}
+                      {new Date(m.joined_at).toLocaleDateString(localeTag(locale), { year: "numeric", month: "short", day: "numeric" })}
                     </span>
                     <span style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button
@@ -515,14 +517,14 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                           fontFamily: "var(--volt-font-ui)",
                         }}
                       >
-                        {de ? "Entfernen" : "Remove"}
+                        {t("common.remove")}
                       </button>
                     </span>
                   </div>
                 ))}
                 {members.length === 0 && (
                   <div style={{ padding: "18px 16px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
-                    {de ? "Noch keine Mitglieder." : "No members yet."}
+                    {t("admin.noMembers")}
                   </div>
                 )}
               </div>
@@ -532,7 +534,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
             {invites.length > 0 && (
               <section>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)", margin: "0 0 10px" }}>
-                  {de ? "Ausstehende Einladungen" : "Pending invitations"}
+                  {t("admin.pendingInvites")}
                 </h2>
                 <div style={{
                   border: "1px solid var(--color-border)",
@@ -540,19 +542,19 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                   background: "var(--volt-surface-raised, #fff)",
                 }}>
                   <TableHeader cols={[
-                    de ? "Email" : "Email",
-                    de ? "Rolle" : "Role",
-                    de ? "Laeuft ab" : "Expires",
-                    de ? "Aktionen" : "Actions",
+                    t("common.email"),
+                    t("admin.roleColumn"),
+                    t("admin.expiresColumn"),
+                    t("common.actions"),
                   ]} />
                   {invites.map(inv => (
                     <div key={inv.id} style={rowStyle(true)}>
                       <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>{inv.email}</span>
                       <span style={{ fontSize: 12, color: ROLE_COLOR[inv.role], fontWeight: 600 }}>
-                        {roleLabel(inv.role, de)}
+                        {roleLabel(inv.role, locale)}
                       </span>
                       <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                        {new Date(inv.expires_at).toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "short", day: "numeric" })}
+                        {new Date(inv.expires_at).toLocaleDateString(localeTag(locale), { year: "numeric", month: "short", day: "numeric" })}
                       </span>
                       <span style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
                         {/* Audit A4-M4 (18.04.2026): Resend action.
@@ -574,7 +576,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                               );
                               if (!res.ok) {
                                 const j = await res.json().catch(() => null);
-                                setError(j?.error?.message ?? (de ? "Erneut senden fehlgeschlagen." : "Resend failed."));
+                                setError(j?.error?.message ?? t("admin.resendFailed"));
                                 setTimeout(() => setError(null), 6000);
                                 return;
                               }
@@ -592,7 +594,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                             fontFamily: "var(--volt-font-ui)",
                           }}
                         >
-                          {de ? "Erneut senden" : "Resend"}
+                          {t("admin.resendAction")}
                         </button>
                         <button
                           onClick={() => revokeInvite(inv)}
@@ -605,7 +607,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                             fontFamily: "var(--volt-font-ui)",
                           }}
                         >
-                          {de ? "Zurueckziehen" : "Revoke"}
+                          {t("admin.revokeInvite")}
                         </button>
                       </span>
                     </div>
@@ -623,7 +625,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
             {auditEntries.length > 0 && (
               <section style={{ marginTop: 28 }}>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)", margin: "0 0 10px" }}>
-                  {de ? "Aktivitaet" : "Activity"}
+                  {t("admin.activitySection")}
                 </h2>
                 <div style={{
                   border: "1px solid var(--color-border)",
@@ -652,10 +654,10 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                         {entry.action}
                       </span>
                       <span style={{ color: "var(--color-text-primary)", lineHeight: 1.5 }}>
-                        {renderAuditDetail(entry, de)}
+                        {renderAuditDetail(entry, locale)}
                       </span>
                       <span style={{ fontSize: 10, color: "var(--color-text-muted)", textAlign: "right" as const, fontFamily: "var(--volt-font-mono)" }}>
-                        {new Date(entry.createdAt).toLocaleString(de ? "de-DE" : "en-US", {
+                        {new Date(entry.createdAt).toLocaleString(localeTag(locale), {
                           month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                         })}
                         {entry.actor?.email && (
@@ -683,7 +685,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                 color: "var(--pastel-sky-text, #1A4A8A)",
               }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  {de ? "Einladung erstellt — Link an den Eingeladenen senden:" : "Invite created — share this link:"}
+                  {t("admin.inviteCreatedShareLink")}
                 </div>
                 <code style={{
                   display: "block", fontFamily: "var(--volt-font-mono)",
@@ -706,7 +708,7 @@ export function TenantDetailClient({ tenantId }: { tenantId: string }) {
                     cursor: "pointer",
                   }}
                 >
-                  {de ? "Kopieren" : "Copy"}
+                  {t("common.copy")}
                 </button>
               </div>
             )}
@@ -789,9 +791,10 @@ function InviteModal({ tenantId, onClose, onDone, locale }: {
   tenantId: string;
   onClose: () => void;
   onDone: (r: InviteResult) => void;
-  locale: "de" | "en";
+  locale: Locale;
 }) {
-  const de = locale === "de";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [saving, setSaving] = useState(false);
@@ -825,22 +828,22 @@ function InviteModal({ tenantId, onClose, onDone, locale }: {
     <VoltModal
       open
       onClose={onClose}
-      title={de ? "Mitglied einladen" : "Invite member"}
+      title={tl("admin.inviteMember")}
       size="md"
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} disabled={saving} style={btnSecondary}>
-            {de ? "Abbrechen" : "Cancel"}
+            {tl("common.cancel")}
           </button>
           <button onClick={submit} disabled={saving || !email.trim()} style={btnPrimary(saving, email.trim().length === 0)}>
-            {saving ? (de ? "Sende…" : "Sending…") : (de ? "Einladen" : "Invite")}
+            {saving ? tl("admin.inviteSending") : tl("admin.inviteSubmit")}
           </button>
         </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={fieldLabel}>{de ? "Email" : "Email"}</span>
+          <span style={fieldLabel}>{tl("common.email")}</span>
           <input
             type="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="name@example.com"
@@ -848,18 +851,16 @@ function InviteModal({ tenantId, onClose, onDone, locale }: {
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={fieldLabel}>{de ? "Rolle" : "Role"}</span>
+          <span style={fieldLabel}>{tl("admin.roleColumn")}</span>
           <select
             value={role}
             onChange={e => setRole(e.target.value as Role)}
             style={inputStyle}
           >
-            {ROLES.map(r => <option key={r} value={r}>{roleLabel(r, de)}</option>)}
+            {ROLES.map(r => <option key={r} value={r}>{roleLabel(r, locale)}</option>)}
           </select>
           <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            {de
-              ? "Wenn der User existiert, wird er sofort Mitglied. Sonst bekommst du einen Accept-Link zum Teilen."
-              : "If the user exists, they'll be added immediately. Otherwise you'll get a shareable accept link."}
+            {tl("admin.inviteModalHint")}
           </span>
         </label>
         {error && <div style={{ fontSize: 12, color: "var(--signal-negative, #C0341D)", padding: "6px 10px", borderRadius: 6, background: "var(--signal-negative-light)" }}>{error}</div>}
@@ -923,33 +924,38 @@ function actionColor(action: string): string {
  * Rendert die Audit-Zeile in lesbarem Deutsch/Englisch. Die `target`-
  * Payload variiert je nach action; wir formatieren die bekannten Felder
  * inline und fallen bei unbekannten Actions auf JSON-Preview zurueck.
+ *
+ * 2026-04-18: shares wording with `/admin/audit`'s renderer via the
+ * `audit.*` namespace so both views stay in sync automatically.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderAuditDetail(entry: { action: string; target: any; actor: { name: string | null; email: string | null } | null }, de: boolean): React.ReactNode {
-  const t = entry.target ?? {};
+function renderAuditDetail(entry: { action: string; target: any; actor: { name: string | null; email: string | null } | null }, locale: Locale): React.ReactNode {
+  const target = entry.target ?? {};
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   switch (entry.action) {
     case "tenant.created":
-      return de ? <>Mandant <strong>{t.name}</strong> angelegt ({t.slug})</> : <>Tenant <strong>{t.name}</strong> created ({t.slug})</>;
+      return <>{tl("audit.tenantCreatedPrefix")} <strong>{target.name}</strong> {tl("audit.tenantCreatedSuffix")} ({target.slug})</>;
     case "tenant.updated":
-      return de ? <>Stammdaten aktualisiert</> : <>Tenant data updated</>;
+      return <>{tl("audit.tenantUpdated")}</>;
     case "tenant.archived":
-      return de ? <>Mandant archiviert</> : <>Tenant archived</>;
+      return <>{tl("audit.tenantArchived")}</>;
     case "tenant.restored":
-      return de ? <>Mandant wiederhergestellt</> : <>Tenant restored</>;
+      return <>{tl("audit.tenantRestored")}</>;
     case "tenant.deleted":
-      return de ? <>Mandant endgueltig geloescht</> : <>Tenant permanently deleted</>;
+      return <>{tl("audit.tenantDeleted")}</>;
     case "member.added":
-      return de ? <><strong>{t.email ?? t.userId}</strong> als {t.role} hinzugefuegt</> : <><strong>{t.email ?? t.userId}</strong> added as {t.role}</>;
+      return <><strong>{target.email ?? target.userId}</strong> {tl("audit.memberAddedSuffix", { role: target.role })}</>;
     case "member.removed":
-      return de ? <>Mitglied entfernt (Rolle: {t.role})</> : <>Member removed (role: {t.role})</>;
+      return <>{tl("audit.memberRemovedRole", { role: target.role })}</>;
     case "role.changed":
-      return de ? <>Rolle geaendert: {t.from} → <strong>{t.to}</strong></> : <>Role changed: {t.from} → <strong>{t.to}</strong></>;
+      return <>{tl("audit.roleChangedPrefix")} {target.from} {tl("audit.roleChangedArrow")} <strong>{target.to}</strong></>;
     case "invite.sent":
-      return de ? <>Einladung an <strong>{t.email}</strong> gesendet ({t.role})</> : <>Invite sent to <strong>{t.email}</strong> ({t.role})</>;
+      return <>{tl("audit.inviteSentPrefix")} <strong>{target.email}</strong> {tl("audit.inviteSentRole", { role: target.role })}</>;
     case "invite.revoked":
-      return de ? <>Einladung fuer <strong>{t.email}</strong> zurueckgezogen</> : <>Invite for <strong>{t.email}</strong> revoked</>;
+      return <>{tl("audit.inviteRevokedPrefix")} <strong>{target.email}</strong> {tl("audit.inviteRevokedSuffix")}</>;
     case "invite.accepted":
-      return de ? <>Einladung angenommen ({t.role})</> : <>Invite accepted ({t.role})</>;
+      return <>{tl("audit.inviteAccepted", { role: target.role })}</>;
     default:
       // Unbekannte Action: knapp JSON-Preview, damit wenigstens die
       // rohe Info sichtbar ist statt eine leere Zeile.

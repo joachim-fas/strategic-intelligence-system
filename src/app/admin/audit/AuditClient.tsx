@@ -22,12 +22,17 @@
  * und eine ID-Resolution noetig waere — das spart auf dem Server
  * einen JOIN. Client-Side-Filter auf die geladene Seite reicht fuer
  * den typischen "ich suche meinen eigenen letzten Move"-Fall.
+ *
+ * 2026-04-18 audit A5-H9: migrated to `useT()` + `audit.*` namespace.
+ * Action detail lines build JSX with translated fragments so the
+ * <strong>-wrapped interpolations remain styled in both locales.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { t as translate, localeTag, type Locale, type TranslationKey } from "@/lib/i18n";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface AuditEntry {
@@ -49,8 +54,7 @@ interface Payload {
 }
 
 export function AuditClient() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale } = useT();
 
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [filters, setFilters] = useState<Payload["filters"]>({ actions: [], tenants: [] });
@@ -97,8 +101,8 @@ export function AuditClient() {
   // um 250ms so the user can tippen without triggering N requests.
   useEffect(() => {
     setNextBefore(null);
-    const t = window.setTimeout(() => { load(); }, actorQuery ? 250 : 0);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => { load(); }, actorQuery ? 250 : 0);
+    return () => window.clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantFilter, actionFilter, actorQuery]);
 
@@ -111,7 +115,7 @@ export function AuditClient() {
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px 64px" }}>
         {/* Header + Back */}
         <Link href="/admin/tenants" style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", marginBottom: 12, display: "inline-block" }}>
-          ← {de ? "Alle Mandanten" : "All tenants"}
+          ← {t("audit.allTenantsLink")}
         </Link>
         <div style={{ marginBottom: 16 }}>
           <div style={{
@@ -119,18 +123,16 @@ export function AuditClient() {
             letterSpacing: "0.10em", textTransform: "uppercase" as const,
             color: "var(--volt-text-faint, #BBB)", marginBottom: 6,
           }}>
-            {de ? "System-Admin" : "System admin"}
+            {t("nav.systemAdmin")}
           </div>
           <h1 style={{
             fontSize: 28, fontWeight: 700, fontFamily: "var(--volt-font-display)",
             color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.02em",
           }}>
-            {de ? "Aktivitaetsprotokoll" : "Audit log"}
+            {t("audit.pageTitle")}
           </h1>
           <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "6px 0 0", maxWidth: 640 }}>
-            {de
-              ? "Jede administrative Aktion ueber alle Mandanten hinweg. Filter nach Mandant, Aktion oder Akteur."
-              : "Every administrative action across all tenants. Filter by tenant, action, or actor."}
+            {t("audit.subtitle")}
           </p>
         </div>
 
@@ -146,9 +148,9 @@ export function AuditClient() {
             onChange={(e) => setTenantFilter(e.target.value)}
             style={filterStyle}
           >
-            <option value="">{de ? "Alle Mandanten" : "All tenants"}</option>
-            {filters.tenants.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            <option value="">{t("audit.filterAllTenants")}</option>
+            {filters.tenants.map((tn) => (
+              <option key={tn.id} value={tn.id}>{tn.name}</option>
             ))}
           </select>
           <select
@@ -156,7 +158,7 @@ export function AuditClient() {
             onChange={(e) => setActionFilter(e.target.value)}
             style={filterStyle}
           >
-            <option value="">{de ? "Alle Aktionen" : "All actions"}</option>
+            <option value="">{t("audit.filterAllActions")}</option>
             {filters.actions.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
@@ -165,7 +167,7 @@ export function AuditClient() {
             type="text"
             value={actorQuery}
             onChange={(e) => setActorQuery(e.target.value)}
-            placeholder={de ? "Akteur (Email/Name)…" : "Actor (email/name)…"}
+            placeholder={t("audit.actorPlaceholder")}
             style={{ ...filterStyle, flex: "1 1 200px", minWidth: 160 }}
           />
           {(tenantFilter || actionFilter || actorQuery) && (
@@ -173,13 +175,13 @@ export function AuditClient() {
               onClick={() => { setTenantFilter(""); setActionFilter(""); setActorQuery(""); }}
               style={{ ...filterStyle, cursor: "pointer", color: "var(--color-text-muted)" }}
             >
-              {de ? "Zuruecksetzen" : "Reset"}
+              {t("common.reset")}
             </button>
           )}
         </div>
 
         {loading && entries.length === 0 && (
-          <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{de ? "Lade…" : "Loading…"}</div>
+          <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("common.loading")}</div>
         )}
         {error && (
           <div style={{
@@ -195,7 +197,7 @@ export function AuditClient() {
             border: "1px dashed var(--color-border)",
             color: "var(--color-text-muted)", fontSize: 13, textAlign: "center" as const,
           }}>
-            {de ? "Keine Eintraege fuer diese Filter." : "No entries for these filters."}
+            {t("audit.emptyForFilters")}
           </div>
         )}
 
@@ -224,7 +226,7 @@ export function AuditClient() {
                   {e.action}
                 </span>
                 <span style={{ color: "var(--color-text-primary)", lineHeight: 1.5 }}>
-                  {renderAuditDetail(e, de)}
+                  {renderAuditDetail(e, locale)}
                 </span>
                 <Link
                   href={`/admin/tenants/${e.tenant.id}`}
@@ -236,7 +238,7 @@ export function AuditClient() {
                   </span>
                 </Link>
                 <span style={{ fontSize: 10, color: "var(--color-text-muted)", textAlign: "right" as const, fontFamily: "var(--volt-font-mono)" }}>
-                  {new Date(e.createdAt).toLocaleString(de ? "de-DE" : "en-US", {
+                  {new Date(e.createdAt).toLocaleString(localeTag(locale), {
                     year: "2-digit", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                   })}
                   {e.actor && (
@@ -267,9 +269,7 @@ export function AuditClient() {
                 fontFamily: "var(--volt-font-ui)",
               }}
             >
-              {loadingMore
-                ? (de ? "Lade…" : "Loading…")
-                : (de ? "Mehr laden" : "Load more")}
+              {loadingMore ? t("common.loading") : t("audit.loadMore")}
             </button>
           </div>
         )}
@@ -298,31 +298,33 @@ function actionColor(action: string): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function renderAuditDetail(entry: { action: string; target: any }, de: boolean): React.ReactNode {
-  const t = entry.target ?? {};
+function renderAuditDetail(entry: { action: string; target: any }, locale: Locale): React.ReactNode {
+  const target = entry.target ?? {};
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   switch (entry.action) {
     case "tenant.created":
-      return de ? <>Mandant <strong>{t.name}</strong> angelegt ({t.slug})</> : <>Tenant <strong>{t.name}</strong> created ({t.slug})</>;
+      return <>{tl("audit.tenantCreatedPrefix")} <strong>{target.name}</strong> {tl("audit.tenantCreatedSuffix")} ({target.slug})</>;
     case "tenant.updated":
-      return de ? <>Stammdaten aktualisiert</> : <>Tenant data updated</>;
+      return <>{tl("audit.tenantUpdated")}</>;
     case "tenant.archived":
-      return de ? <>Mandant archiviert</> : <>Tenant archived</>;
+      return <>{tl("audit.tenantArchived")}</>;
     case "tenant.restored":
-      return de ? <>Mandant wiederhergestellt</> : <>Tenant restored</>;
+      return <>{tl("audit.tenantRestored")}</>;
     case "tenant.deleted":
-      return de ? <>Mandant endgueltig geloescht</> : <>Tenant permanently deleted</>;
+      return <>{tl("audit.tenantDeleted")}</>;
     case "member.added":
-      return de ? <><strong>{t.email ?? t.userId}</strong> als {t.role} hinzugefuegt</> : <><strong>{t.email ?? t.userId}</strong> added as {t.role}</>;
+      return <><strong>{target.email ?? target.userId}</strong> {tl("audit.memberAddedSuffix", { role: target.role })}</>;
     case "member.removed":
-      return de ? <>Mitglied entfernt (Rolle: {t.role})</> : <>Member removed (role: {t.role})</>;
+      return <>{tl("audit.memberRemovedRole", { role: target.role })}</>;
     case "role.changed":
-      return de ? <>Rolle geaendert: {t.from} → <strong>{t.to}</strong></> : <>Role changed: {t.from} → <strong>{t.to}</strong></>;
+      return <>{tl("audit.roleChangedPrefix")} {target.from} {tl("audit.roleChangedArrow")} <strong>{target.to}</strong></>;
     case "invite.sent":
-      return de ? <>Einladung an <strong>{t.email}</strong> gesendet ({t.role})</> : <>Invite sent to <strong>{t.email}</strong> ({t.role})</>;
+      return <>{tl("audit.inviteSentPrefix")} <strong>{target.email}</strong> {tl("audit.inviteSentRole", { role: target.role })}</>;
     case "invite.revoked":
-      return de ? <>Einladung fuer <strong>{t.email}</strong> zurueckgezogen</> : <>Invite for <strong>{t.email}</strong> revoked</>;
+      return <>{tl("audit.inviteRevokedPrefix")} <strong>{target.email}</strong> {tl("audit.inviteRevokedSuffix")}</>;
     case "invite.accepted":
-      return de ? <>Einladung angenommen ({t.role})</> : <>Invite accepted ({t.role})</>;
+      return <>{tl("audit.inviteAccepted", { role: target.role })}</>;
     default:
       try {
         const preview = typeof entry.target === "object" && entry.target
