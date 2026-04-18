@@ -19,7 +19,8 @@
     "tenant:bootstrap": "tsx scripts/tenant-bootstrap.ts",
     "test:tenants": "tsx scripts/tenant-smoke-test.ts",
     "test:api": "tsx scripts/api-smoke-test.ts",
-    "test": "npm run test:tenants && npm run test:api"
+    "test:stream": "tsx scripts/stream-query-retry-test.ts",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",
