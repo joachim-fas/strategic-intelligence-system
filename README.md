@@ -123,11 +123,25 @@ Plain tsx smoke tests, zero framework install:
 
 ```bash
 npm run test:tenants    # 20 assertions — schema, isolation, guards
+npm run test:api        # 37 assertions — API envelope contract (needs dev server)
+npm run test            # runs both
 ```
 
-Covers: migration idempotency, default-tenant seeding, cross-tenant
-radar isolation, bsc_ratings tenant-unique, last-owner guard, invite
+**`test:tenants`** — offline, uses an in-memory SQLite. Covers
+migration idempotency, default-tenant seeding, cross-tenant radar
+isolation, bsc_ratings tenant-unique, last-owner guard, invite
 expiry/uniqueness, audit-log truncation window.
+
+**`test:api`** — online, expects `npm run dev` running on
+`localhost:3001` (override with `BASE_URL=...`). Holds the line on
+the canonical `apiSuccess({data}) / apiError(msg, code)` envelope
+after the 18.04.2026 audit migration: hits every route that was
+touched and asserts both HTTP status and response shape.
+
+**Deferred (open ticket):** Playwright E2E for canvas save-roundtrip,
+home-query-to-briefing, and invite-accept happy path. Needs an
+explicit `npx playwright install` step (browser downloads) so
+deliberately not bundled into `npm install`.
 
 ## Repository layout
 
@@ -174,7 +188,9 @@ scripts/
 | `npm run signals:pump` | Trigger the signals pipeline once |
 | `npm run signals:status` | Per-source freshness table |
 | `npm run tenant:bootstrap -- <email>` | Promote user to system admin |
-| `npm run test:tenants` | Tenant-layer smoke tests (20 assertions) |
+| `npm run test:tenants` | Tenant-layer smoke tests (20 assertions, offline) |
+| `npm run test:api` | API envelope smoke tests (37 assertions, needs dev server) |
+| `npm run test` | Both test suites in sequence |
 
 ## Deployment
 

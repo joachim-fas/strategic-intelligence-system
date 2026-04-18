@@ -17,7 +17,9 @@
     "signals:pump": "tsx scripts/signals-pump.ts",
     "signals:status": "sqlite3 local.db \"SELECT source, COUNT(*) as n, ROUND((julianday('now') - julianday(MAX(fetched_at))) * 24, 1) as hours_ago FROM live_signals GROUP BY source ORDER BY hours_ago ASC LIMIT 40;\"",
     "tenant:bootstrap": "tsx scripts/tenant-bootstrap.ts",
-    "test:tenants": "tsx scripts/tenant-smoke-test.ts"
+    "test:tenants": "tsx scripts/tenant-smoke-test.ts",
+    "test:api": "tsx scripts/api-smoke-test.ts",
+    "test": "npm run test:tenants && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",
