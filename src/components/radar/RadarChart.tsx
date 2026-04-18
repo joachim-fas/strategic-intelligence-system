@@ -697,9 +697,9 @@ export default function RadarChart({
 
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 8px", fontSize: 10 }}>
             {[
-              { label: t(locale, "relevance"), val: tooltip.trend.relevance, color: "var(--pastel-sky-text, #3b82f6)" },
-              { label: t(locale, "confidence"), val: tooltip.trend.confidence, color: "var(--signal-positive, #22c55e)" },
-              { label: t(locale, "impact"), val: tooltip.trend.impact, color: "var(--pastel-amber-text, #f59e0b)" },
+              { label: t(locale, "cockpit.relevance"), val: tooltip.trend.relevance, color: "var(--pastel-sky-text, #3b82f6)" },
+              { label: t(locale, "cockpit.confidence"), val: tooltip.trend.confidence, color: "var(--signal-positive, #22c55e)" },
+              { label: t(locale, "cockpit.impact"), val: tooltip.trend.impact, color: "var(--pastel-amber-text, #f59e0b)" },
             ].map(({ label, val, color }) => (
               <React.Fragment key={label}>
                 <span style={{ color: "var(--color-text-muted)" }}>{label}</span>
@@ -713,15 +713,15 @@ export default function RadarChart({
                 </div>
               </React.Fragment>
             ))}
-            <span style={{ color: "var(--color-text-muted)" }}>{t(locale, "timeHorizon")}</span>
+            <span style={{ color: "var(--color-text-muted)" }}>{t(locale, "cockpit.timeHorizon")}</span>
             <span style={{
               display: "inline-block", padding: "1px 6px", borderRadius: 8, fontSize: 9, fontWeight: 600,
               background: getDotColor(tooltip.trend.timeHorizon) + "18",
               color: getDotColor(tooltip.trend.timeHorizon),
             }}>
-              {tooltip.trend.timeHorizon === "short" ? t(locale, "horizonShort")
-                : tooltip.trend.timeHorizon === "mid" ? t(locale, "horizonMid")
-                : t(locale, "horizonLong")}
+              {tooltip.trend.timeHorizon === "short" ? t(locale, "cockpit.horizonShort")
+                : tooltip.trend.timeHorizon === "mid" ? t(locale, "cockpit.horizonMid")
+                : t(locale, "cockpit.horizonLong")}
             </span>
           </div>
 
@@ -780,7 +780,7 @@ export default function RadarChart({
             fontSize: 9, color: "var(--color-text-muted)",
             display: "flex", gap: 4, flexWrap: "wrap",
           }}>
-            <span>{tooltip.trend.signalCount} {t(locale, "signals")}</span>
+            <span>{tooltip.trend.signalCount} {t(locale, "cockpit.signals")}</span>
             <span>·</span>
             <span>{tooltip.trend.topSources.slice(0, 3).join(", ")}</span>
           </div>
@@ -793,11 +793,11 @@ export default function RadarChart({
         gap: 16, marginTop: 10, fontSize: 10, color: "var(--color-text-muted)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{t(locale, "horizon")}</span>
+          <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{t(locale, "cockpit.horizon")}</span>
           {(["short", "mid", "long"] as TimeHorizon[]).map((h) => (
             <span key={h} style={{ display: "flex", alignItems: "center", gap: 3 }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: TIME_HORIZON_COLORS[h], display: "inline-block" }} />
-              {t(locale, h)}
+              {t(locale, `cockpit.${h}` as const)}
             </span>
           ))}
         </div>

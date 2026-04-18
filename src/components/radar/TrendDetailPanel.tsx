@@ -422,7 +422,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             onClick={onClose}
             className="flex items-center gap-1.5 text-xs text-[var(--volt-text-muted,#6B6B6B)] hover:text-[var(--volt-text,#1A1A1A)] transition-colors"
           >
-            ← {t(locale, "back")}
+            ← {t(locale, "common.back")}
           </button>
           {/* "Bearbeiten" und "Anheften" entfernt — die beiden Buttons
                hatten keinen Handler und keinen Effekt, nur der Close-
@@ -431,7 +431,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
                gesteuert, nicht hier im Detail-Panel. */}
           <button
             onClick={onClose}
-            title={t(locale, "back")}
+            title={t(locale, "common.back")}
             className="w-7 h-7 flex items-center justify-center rounded-full border border-[var(--volt-border,#E0E0E0)] text-[var(--volt-text-muted,#6B6B6B)] hover:border-[var(--volt-text,#1A1A1A)] hover:text-[var(--volt-text,#1A1A1A)] hover:bg-[rgba(0,0,0,0.04)] transition-colors bg-white text-sm font-medium"
           >
             ✕
@@ -487,22 +487,22 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           {/* Velocity with tooltip */}
           {trend.velocity === "rising" && (
             <Tooltip content={locale === "de" ? "Steigend: Relevanz hat in den letzten 30 Tagen zugenommen" : "Rising: Relevance increased over the last 30 days"} placement="bottom">
-              <span className="text-xs font-medium cursor-help" style={{ color: "var(--pastel-mint-text, #0F6038)" }}>▲ {t(locale, "velocityRising")}</span>
+              <span className="text-xs font-medium cursor-help" style={{ color: "var(--pastel-mint-text, #0F6038)" }}>▲ {t(locale, "cockpit.velocityRising")}</span>
             </Tooltip>
           )}
           {trend.velocity === "falling" && (
             <Tooltip content={locale === "de" ? "Fallend: Relevanz hat in den letzten 30 Tagen abgenommen" : "Falling: Relevance decreased over the last 30 days"} placement="bottom">
-              <span className="text-xs font-medium cursor-help" style={{ color: "var(--signal-negative, #C0341D)" }}>▼ {t(locale, "velocityFalling")}</span>
+              <span className="text-xs font-medium cursor-help" style={{ color: "var(--signal-negative, #C0341D)" }}>▼ {t(locale, "cockpit.velocityFalling")}</span>
             </Tooltip>
           )}
           {trend.velocity === "stable" && (
             <Tooltip content={locale === "de" ? "Stabil: Keine wesentliche Veraenderung in 30 Tagen" : "Stable: No significant change in 30 days"} placement="bottom">
-              <span className="text-xs cursor-help text-[var(--volt-text-faint,#9B9B9B)]">— {t(locale, "stable")}</span>
+              <span className="text-xs cursor-help text-[var(--volt-text-faint,#9B9B9B)]">— {t(locale, "cockpit.stable")}</span>
             </Tooltip>
           )}
           {trend.userOverride && (
             <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "var(--pastel-butter, #FFF5BA)", color: "var(--pastel-butter-text, #7A5C00)" }}>
-              {t(locale, "manualOverride")}
+              {t(locale, "cockpit.manualOverride")}
             </span>
           )}
         </div>
@@ -518,18 +518,18 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
       {/* ── Scores ── */}
       <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
         <h3 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider mb-4">
-          {t(locale, "scores")}
+          {t(locale, "cockpit.scores")}
         </h3>
         <div className="space-y-3">
-          <ScoreBar label={t(locale, "relevance")} value={trend.relevance} fillColor="var(--pastel-sky-border, #80B8F0)" trackColor="var(--pastel-sky-light, #EBF3FF)"
+          <ScoreBar label={t(locale, "cockpit.relevance")} value={trend.relevance} fillColor="var(--pastel-sky-border, #80B8F0)" trackColor="var(--pastel-sky-light, #EBF3FF)"
             tooltip={locale === "de" ? "Relevanz: Wie wichtig ist dieser Trend fuer strategische Entscheidungen (0-100%)" : "Relevance: How important is this trend for strategic decisions (0-100%)"} />
-          <ScoreBar label={t(locale, "confidence")} value={trend.confidence} fillColor="var(--pastel-mint-border, #6FD99A)" trackColor="var(--pastel-mint-light, #E8FAF0)"
+          <ScoreBar label={t(locale, "cockpit.confidence")} value={trend.confidence} fillColor="var(--pastel-mint-border, #6FD99A)" trackColor="var(--pastel-mint-light, #E8FAF0)"
             tooltip={locale === "de" ? "Konfidenz: Wie sicher ist die Einschaetzung, basierend auf Quellenlage und Signalstaerke (0-100%)" : "Confidence: How certain is the assessment, based on source coverage and signal strength (0-100%)"} />
-          <ScoreBar label={t(locale, "impact")} value={trend.impact} fillColor="var(--pastel-butter-border, #E0C840)" trackColor="var(--pastel-butter-light, #FFFAE5)"
+          <ScoreBar label={t(locale, "cockpit.impact")} value={trend.impact} fillColor="var(--pastel-butter-border, #E0C840)" trackColor="var(--pastel-butter-light, #FFFAE5)"
             tooltip={locale === "de" ? "Impact: Potenzielle Auswirkung auf Wirtschaft, Gesellschaft oder Technologie (0-100%)" : "Impact: Potential effect on economy, society, or technology (0-100%)"} />
         </div>
         <div className="mt-4 flex items-center justify-between pt-3 border-t" style={{ borderColor: "var(--volt-border, #F0F0F0)" }}>
-          <span className="text-xs text-[var(--volt-text-muted,#6B6B6B)]">{t(locale, "timeHorizon")}</span>
+          <span className="text-xs text-[var(--volt-text-muted,#6B6B6B)]">{t(locale, "cockpit.timeHorizon")}</span>
           <span
             className="px-2 py-0.5 rounded-full text-xs font-medium"
             style={{
@@ -538,10 +538,10 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             }}
           >
             {trend.timeHorizon === "short"
-              ? t(locale, "horizonShort")
+              ? t(locale, "cockpit.horizonShort")
               : trend.timeHorizon === "mid"
-              ? t(locale, "horizonMid")
-              : t(locale, "horizonLong")}
+              ? t(locale, "cockpit.horizonMid")
+              : t(locale, "cockpit.horizonLong")}
           </span>
         </div>
       </div>
@@ -600,7 +600,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
           </h3>
           {trend.signalCount > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--volt-lime, #E4FF97)", color: "var(--volt-text, #0A0A0A)" }}>
-              {trend.signalCount.toLocaleString()} {t(locale, "signals")}
+              {trend.signalCount.toLocaleString()} {t(locale, "cockpit.signals")}
             </span>
           )}
         </div>
@@ -693,7 +693,7 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
       {/* ── Tags ── */}
       <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
         <h3 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider mb-3">
-          {t(locale, "tags")}
+          {t(locale, "cockpit.tags")}
         </h3>
         <div className="flex flex-wrap gap-1.5">
           {trend.tags
