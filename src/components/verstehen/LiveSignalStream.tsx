@@ -31,6 +31,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { TrendDot } from "@/types";
 import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import { DataGapHint } from "@/components/ui/DataGapHint";
 import {
   VoltAccordion,
   VoltAccordionItem,
@@ -498,11 +499,20 @@ export default function LiveSignalStream({ trends, de, onTrendClick }: Props) {
             </button>
           )}
           {timeWindow === "168" && signals.length === 0 && (
-            <span style={{ fontSize: 11, color: "var(--volt-text-faint, #737373)" }}>
-              {de
-                ? "Es wurden noch keine Konnektoren ausgeführt. Starte einen Connector-Lauf, um Live-Signale zu sehen."
-                : "No connectors have been run yet. Start a connector run to see live signals."}
-            </span>
+            <>
+              <span style={{ fontSize: 11, color: "var(--volt-text-faint, #737373)" }}>
+                {de
+                  ? "Es wurden noch keine Konnektoren ausgeführt. Starte einen Connector-Lauf, um Live-Signale zu sehen."
+                  : "No connectors have been run yet. Start a connector run to see live signals."}
+              </span>
+              {/* Welle B Item 4 — be explicit about *why* the feed is
+                   empty. If connectors are mis-configured or stale, the
+                   DataGapHint surfaces that right here with a deep-link
+                   to /monitor. Silent when everything is actually
+                   healthy (Worldmonitor's rule: only show the gap
+                   tracker when there's a gap). */}
+              <DataGapHint compact />
+            </>
           )}
         </div>
       )}
