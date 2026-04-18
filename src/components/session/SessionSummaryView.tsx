@@ -87,11 +87,16 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
   const [projectName, setProjectName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  // Audit A1-M4 (18.04.2026): load-phase needs a retry handle so the
+  // user can recover without reloading the whole page. `reloadKey`
+  // increments on every retry click and re-arms the useEffect.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setError("");
       try {
         const [canvasRes, summaryRes] = await Promise.all([
           fetchWithTimeout(`/api/v1/canvas/${projectId}`),
@@ -117,7 +122,7 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
       }
     })();
     return () => { cancelled = true; };
-  }, [projectId, de]);
+  }, [projectId, de, reloadKey]);
 
   const exportMarkdown = useCallback(() => {
     const lines: string[] = [];
@@ -246,10 +251,13 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--background)" }}>
       <AppHeader />
 
-      {/* Print-only overrides: hide the chrome so Cmd+P produces a clean doc. */}
+      {/* Print-only overrides: hide the chrome so Cmd+P produces a clean doc.
+           Audit A1-M9 (18.04.2026): the hero had className="no-print-actions"
+           but the rule matched only ".no-print", so Print + .md + Back
+           buttons leaked into the printed output. Match both class names. */}
       <style>{`
         @media print {
-          header, .sis-nav, .no-print { display: none !important; }
+          header, .sis-nav, .no-print, .no-print-actions button, .no-print-actions a { display: none !important; }
           body { background: white !important; background-image: none !important; }
           @page { margin: 2cm; }
           .sis-briefing-section { break-inside: avoid; }
@@ -301,7 +309,19 @@ export default function SessionSummaryView({ projectId }: SessionSummaryViewProp
         {/* ─── Error state ─── */}
         {error && !loading && (
           <VoltInfoBlock variant="error" label={de ? "Fehler" : "Error"}>
-            {error}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button
+                onClick={() => setReloadKey(k => k + 1)}
+                style={{
+                  fontSize: 12, fontWeight: 600,
+                  padding: "6px 12px", borderRadius: 8,
+                  border: "1px solid currentColor", background: "transparent",
+                  color: "inherit", cursor: "pointer",
+                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
+                }}
+              >{de ? "Erneut laden" : "Retry"}</button>
+            </div>
           </VoltInfoBlock>
         )}
 
@@ -470,12 +490,28 @@ function BriefingSection({ briefing, index, de }: { briefing: Briefing; index: n
         </Block>
       )}
 
-      {/* Follow-up Questions */}
+      {/* Follow-up Questions — audit A1-M10 (18.04.2026): previously
+           these were inert <li> bullets. Now each is a link back to
+           the home page with the question pre-filled so the reader
+           can launch the follow-up analysis with one click. */}
       {b.followUpQuestions.length > 0 && (
         <Block icon={<HelpCircle size={13} strokeWidth={2.25} />} label={de ? "Folgefragen" : "Follow-up Questions"}>
-          <ul style={bulletListStyle}>
+          <ul style={{ ...bulletListStyle, gap: 6 }}>
             {b.followUpQuestions.map((q, i) => (
-              <li key={i} style={bulletItemStyle}>{q}</li>
+              <li key={i} style={bulletItemStyle}>
+                <Link
+                  href={`/?q=${encodeURIComponent(q)}`}
+                  style={{
+                    color: "var(--color-text-primary, #1A1A1A)",
+                    textDecoration: "none",
+                    borderBottom: "1px dotted var(--color-border)",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderBottomStyle = "solid"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderBottomStyle = "dotted"; }}
+                >
+                  {q} <span style={{ opacity: 0.6, fontSize: "0.85em" }}>→</span>
+                </Link>
+              </li>
             ))}
           </ul>
         </Block>

@@ -398,6 +398,11 @@ export default function HomeClient() {
   const [frameworkModal, setFrameworkModal] = useState<{ icon: string; label: string; desc: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } } | null>(null);
   const [frameworkTopic, setFrameworkTopic] = useState("");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
+  // Audit A1-M3 (18.04.2026): framework-launch failures used to pop
+  // `window.alert()` which breaks the modal aesthetic and is blocked
+  // in some iframe contexts. Render an inline error banner at the
+  // bottom of the modal instead.
+  const [frameworkError, setFrameworkError] = useState<string | null>(null);
   const [frameworkTopicFocused, setFrameworkTopicFocused] = useState(false);
   // Phase 1 guidance: values of optional structured fields per framework.
   // Keys match FrameworkField.key in canvas-templates.ts. Cleared whenever
@@ -1130,7 +1135,7 @@ export default function HomeClient() {
       });
       if (!res.ok) {
         setFrameworkLoading(false);
-        alert(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project.");
+        setFrameworkError(locale === "de" ? "Projekt konnte nicht erstellt werden." : "Could not create project.");
         return;
       }
       const json = await res.json();
@@ -1154,7 +1159,7 @@ export default function HomeClient() {
     } catch (err) {
       setFrameworkLoading(false);
       console.error("[launchFrameworkAnalysis]", err);
-      alert(locale === "de" ? "Fehler beim Starten der Analyse." : "Error starting analysis.");
+      setFrameworkError(locale === "de" ? "Fehler beim Starten der Analyse." : "Error starting analysis.");
     }
   }, [frameworkModal, frameworkTopic, frameworkLoading, frameworkFieldValues, locale, handleSubmit]);
 
@@ -1478,6 +1483,30 @@ export default function HomeClient() {
                         </span>
                       </p>
 
+                      {/* Audit A1-M3 (18.04.2026): inline error banner
+                           replaces the old `alert()` on framework-
+                           launch failure. */}
+                      {frameworkError && (
+                        <div
+                          role="alert"
+                          style={{
+                            marginTop: 16,
+                            padding: "9px 12px",
+                            borderRadius: 8,
+                            background: "var(--signal-negative-light, #FDEDEA)",
+                            border: "1px solid var(--signal-negative, #C0341D)",
+                            color: "var(--signal-negative, #C0341D)",
+                            fontSize: 13, display: "flex", gap: 8, alignItems: "center",
+                          }}
+                        >
+                          <span style={{ flex: 1 }}>{frameworkError}</span>
+                          <button
+                            onClick={() => setFrameworkError(null)}
+                            aria-label={locale === "de" ? "Schließen" : "Close"}
+                            style={{ border: "none", background: "transparent", color: "inherit", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}
+                          >✕</button>
+                        </div>
+                      )}
                       {/* ── Absolute bottom: Submit button row ──────────
                            Divider + right-aligned Analyse button. Button is
                            disabled until the main question has text — optional
