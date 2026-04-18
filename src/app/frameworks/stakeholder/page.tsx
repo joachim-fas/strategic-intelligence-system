@@ -4,6 +4,7 @@ import React from "react";
 import { FrameworkShell } from "@/components/frameworks/FrameworkShell";
 import { getFrameworkMeta } from "@/types/frameworks";
 import { useFrameworkAnalysis } from "@/lib/use-framework-analysis";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { StepCard } from "@/components/frameworks/StepCard";
 import { MatrixChart } from "@/components/frameworks/MatrixChart";
 
@@ -118,6 +119,8 @@ export default function StakeholderPage() {
 /* ---------- content component ---------- */
 
 function StakeholderContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const { steps, runStep } = useFrameworkAnalysis("stakeholder");
 
   const previousData = (ids: string[]) => {
@@ -134,8 +137,8 @@ function StakeholderContent({ topic, locale, de }: { topic: string; locale: stri
       {/* Step 1 -- Stakeholder identifizieren */}
       <StepCard
         stepId="inventory"
-        title={de ? "Stakeholder identifizieren" : "Identify Stakeholders"}
-        description={de ? "Akteure, Rollen, Interessen und Haltungen" : "Actors, roles, interests and stances"}
+        title={tl("stakeholder.step1Title")}
+        description={tl("stakeholder.step1Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps["inventory"]}
@@ -150,8 +153,8 @@ function StakeholderContent({ topic, locale, de }: { topic: string; locale: stri
       {/* Step 2 -- Macht & Einfluss bewerten */}
       <StepCard
         stepId="power-matrix"
-        title={de ? "Macht & Einfluss bewerten" : "Assess Power & Influence"}
-        description={de ? "Power-Interest-Matrix und Quadrantenanalyse" : "Power-Interest matrix and quadrant analysis"}
+        title={tl("stakeholder.step2Title")}
+        description={tl("stakeholder.step2Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps["power-matrix"]}
@@ -167,8 +170,8 @@ function StakeholderContent({ topic, locale, de }: { topic: string; locale: stri
       {/* Step 3 -- Dynamiken & Koalitionen */}
       <StepCard
         stepId="coalitions"
-        title={de ? "Dynamiken & Koalitionen" : "Dynamics & Coalitions"}
-        description={de ? "Allianzen, Konflikte und Einflussketten" : "Alliances, conflicts and influence chains"}
+        title={tl("stakeholder.step3Title")}
+        description={tl("stakeholder.step3Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps["coalitions"]}
@@ -184,8 +187,8 @@ function StakeholderContent({ topic, locale, de }: { topic: string; locale: stri
       {/* Step 4 -- Engagement-Strategie */}
       <StepCard
         stepId="engagement"
-        title={de ? "Engagement-Strategie" : "Engagement Strategy"}
-        description={de ? "Kommunikationsplan und 4-Wochen-Fahrplan" : "Communication plan and 4-week roadmap"}
+        title={tl("stakeholder.step4Title")}
+        description={tl("stakeholder.step4Desc")}
         accentColor={ACCENT}
         borderColor={BORDER}
         result={steps["engagement"]}
@@ -206,6 +209,8 @@ function StakeholderContent({ topic, locale, de }: { topic: string; locale: stri
    ============================================================ */
 
 function InventoryViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const stakeholders: Stakeholder[] = Array.isArray(data?.stakeholders) ? data.stakeholders : [];
   if (stakeholders.length === 0) return <FallbackSynthesis text={data?.synthesis} />;
 
@@ -252,6 +257,8 @@ function InventoryViz({ data, de }: { data: any; de: boolean }) {
 }
 
 function StakeholderCard({ s, de }: { s: Stakeholder; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const typeMeta = TYPE_LABELS[s.type] || TYPE_LABELS.observer;
   const stanceIcon = s.stance === "supporter"
     ? { symbol: "\u2713", color: "#16a34a" }
@@ -290,14 +297,14 @@ function StakeholderCard({ s, de }: { s: Stakeholder; de: boolean }) {
       {/* Interests */}
       <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginBottom: 8, lineHeight: 1.5 }}>
         <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-          {de ? "Primaer" : "Primary"}:
+          {tl("stakeholder.primary")}:
         </span>{" "}
         {s.primaryInterest || "-"}
         {s.secondaryInterest && (
           <>
             <br />
             <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-              {de ? "Sekundaer" : "Secondary"}:
+              {tl("stakeholder.secondary")}:
             </span>{" "}
             {s.secondaryInterest}
           </>
@@ -306,8 +313,8 @@ function StakeholderCard({ s, de }: { s: Stakeholder; de: boolean }) {
 
       {/* Power / Interest bars */}
       <div style={{ display: "flex", gap: 12 }}>
-        <MiniBar label={de ? "Macht" : "Power"} value={s.power} max={5} color={ACCENT} />
-        <MiniBar label={de ? "Interesse" : "Interest"} value={s.interest} max={5} color={ACCENT} />
+        <MiniBar label={tl("stakeholder.power")} value={s.power} max={5} color={ACCENT} />
+        <MiniBar label={tl("stakeholder.interest")} value={s.interest} max={5} color={ACCENT} />
       </div>
     </div>
   );
@@ -333,6 +340,8 @@ function MiniBar({ label, value, max, color }: { label: string; value: number; m
    ============================================================ */
 
 function PowerMatrixViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const stakeholders: Stakeholder[] = Array.isArray(data?.stakeholders) ? data.stakeholders : [];
   const quadrantAssignments: QuadrantEntry[] = Array.isArray(data?.quadrantAssignments) ? data.quadrantAssignments : [];
 
@@ -370,12 +379,12 @@ function PowerMatrixViz({ data, de }: { data: any; de: boolean }) {
         <div style={{ overflowX: "auto" }}>
           <MatrixChart
             points={points}
-            xLabel={de ? "Interesse" : "Interest"}
-            yLabel={de ? "Macht" : "Power"}
-            xLow={de ? "Niedrig" : "Low"}
-            xHigh={de ? "Hoch" : "High"}
-            yLow={de ? "Niedrig" : "Low"}
-            yHigh={de ? "Hoch" : "High"}
+            xLabel={tl("stakeholder.interest")}
+            yLabel={tl("stakeholder.power")}
+            xLow={tl("stakeholder.low")}
+            xHigh={tl("stakeholder.high")}
+            yLow={tl("stakeholder.low")}
+            yHigh={tl("stakeholder.high")}
             accentColor={ACCENT}
             quadrantLabels={quadLabels}
           />
@@ -389,7 +398,7 @@ function PowerMatrixViz({ data, de }: { data: any; de: boolean }) {
             fontSize: 12, fontWeight: 700, color: ACCENT,
             marginBottom: 8, fontFamily: "var(--font-display)",
           }}>
-            {de ? "Quadranten-Zuordnung" : "Quadrant Assignments"}
+            {tl("stakeholder.quadrantAssignments")}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
             {quadLabels.map((label, qi) => {
@@ -433,6 +442,8 @@ function PowerMatrixViz({ data, de }: { data: any; de: boolean }) {
    ============================================================ */
 
 function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   const alliances: Alliance[] = Array.isArray(data?.alliances) ? data.alliances : [];
   const conflicts: Conflict[] = Array.isArray(data?.conflicts) ? data.conflicts : [];
   const influenceChains: InfluenceChain[] = Array.isArray(data?.influenceChains) ? data.influenceChains : [];
@@ -453,7 +464,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
       {/* Alliances */}
       {alliances.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Allianzen" : "Alliances"} />
+          <SectionLabel text={tl("stakeholder.alliances")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
             {alliances.map((a, i) => {
               const stab = STABILITY_LABELS[a.stability] || STABILITY_LABELS.forming;
@@ -465,7 +476,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
-                      {a.name || (de ? "Allianz" : "Alliance")}
+                      {a.name || tl("stakeholder.allianceFallback")}
                     </span>
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: "2px 6px",
@@ -477,13 +488,13 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
                     <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                      {de ? "Mitglieder" : "Members"}:
+                      {tl("stakeholder.members")}:
                     </span>{" "}
                     {a.members.join(", ")}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5, marginTop: 4 }}>
                     <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                      {de ? "Basis" : "Basis"}:
+                      {tl("stakeholder.basis")}:
                     </span>{" "}
                     {a.basis}
                   </div>
@@ -497,7 +508,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
       {/* Conflicts */}
       {conflicts.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Konflikte" : "Conflicts"} />
+          <SectionLabel text={tl("stakeholder.conflicts")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
             {conflicts.map((c, i) => {
               const sev = SEVERITY_LABELS[c.severity] || SEVERITY_LABELS.medium;
@@ -521,7 +532,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
                     <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                      {de ? "Thema" : "Issue"}:
+                      {tl("stakeholder.issue")}:
                     </span>{" "}
                     {c.issue}
                   </div>
@@ -535,7 +546,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
       {/* Influence Chains */}
       {influenceChains.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Einflussketten" : "Influence Chains"} />
+          <SectionLabel text={tl("stakeholder.influenceChains")} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {influenceChains.map((ic, i) => (
               <div key={i} style={{
@@ -579,7 +590,7 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
       {/* Possible Shifts */}
       {possibleShifts.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Moegliche Verschiebungen" : "Possible Shifts"} />
+          <SectionLabel text={tl("stakeholder.possibleShifts")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
             {possibleShifts.map((ps, i) => (
               <div key={i} style={{
@@ -592,18 +603,18 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
                 </div>
                 <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
                   <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                    {de ? "Aktuell" : "Current"}:
+                    {tl("stakeholder.current")}:
                   </span>{" "}
                   {ps.currentStance}
                   <span style={{ margin: "0 6px", color: ACCENT, fontWeight: 700 }}>{"\u2192"}</span>
                   <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                    {de ? "Moeglich" : "Possible"}:
+                    {tl("stakeholder.possible")}:
                   </span>{" "}
                   {ps.possibleStance}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.5, marginTop: 4 }}>
                   <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                    {de ? "Ausloeser" : "Trigger"}:
+                    {tl("stakeholder.trigger")}:
                   </span>{" "}
                   {ps.trigger}
                 </div>
@@ -621,6 +632,8 @@ function CoalitionsViz({ data, de }: { data: any; de: boolean }) {
    ============================================================ */
 
 function EngagementViz({ data, de }: { data: any; de: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
   const strategies: EngagementStrategy[] = Array.isArray(data?.strategies) ? data.strategies : [];
   const weekPlan: WeekPlan[] = Array.isArray(data?.weekPlan) ? data.weekPlan : [];
 
@@ -642,7 +655,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
       {/* Quick Wins */}
       {quickWins.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Quick Wins" : "Quick Wins"} />
+          <SectionLabel text={tl("stakeholder.quickWins")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {quickWins.map((s, i) => (
               <StrategyCard key={i} s={s} de={de} highlight />
@@ -654,7 +667,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
       {/* Strategy Cards */}
       {regular.length > 0 && (
         <div>
-          <SectionLabel text={de ? "Engagement pro Stakeholder" : "Engagement per Stakeholder"} />
+          <SectionLabel text={tl("stakeholder.engagementPerStakeholder")} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
             {regular.map((s, i) => (
               <StrategyCard key={i} s={s} de={de} />
@@ -666,7 +679,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
       {/* 4-Week Plan */}
       {weekPlan.length > 0 && (
         <div>
-          <SectionLabel text={de ? "4-Wochen-Fahrplan" : "4-Week Plan"} />
+          <SectionLabel text={tl("stakeholder.fourWeekPlan")} />
           <div style={{
             border: `1px solid ${BORDER}`,
             borderRadius: 10, overflow: "hidden",
@@ -685,7 +698,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
                     textTransform: "uppercase", letterSpacing: "0.05em",
                     width: 100,
                   }}>
-                    {de ? "Woche" : "Week"}
+                    {tl("stakeholder.weekLabel")}
                   </th>
                   <th style={{
                     padding: "8px 14px", textAlign: "left",
@@ -694,7 +707,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
                     fontFamily: "var(--font-mono)",
                     textTransform: "uppercase", letterSpacing: "0.05em",
                   }}>
-                    {de ? "Massnahmen" : "Actions"}
+                    {tl("stakeholder.actionsLabel")}
                   </th>
                 </tr>
               </thead>
@@ -709,7 +722,7 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
                       fontFamily: "var(--font-mono)",
                       whiteSpace: "nowrap",
                     }}>
-                      {de ? `Woche ${wp.week}` : `Week ${wp.week}`}
+                      {tl("stakeholder.weekRow", { n: wp.week })}
                     </td>
                     <td style={{ padding: "10px 14px", verticalAlign: "top", color: "var(--foreground)", lineHeight: 1.6 }}>
                       {Array.isArray(wp.actions) && wp.actions.length > 0 ? (
@@ -734,6 +747,8 @@ function EngagementViz({ data, de }: { data: any; de: boolean }) {
 }
 
 function StrategyCard({ s, de, highlight }: { s: EngagementStrategy; de: boolean; highlight?: boolean }) {
+  const tlocale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(tlocale, key);
   return (
     <div style={{
       border: `1px solid ${highlight ? "#16a34a" : BORDER}`,
@@ -758,7 +773,7 @@ function StrategyCard({ s, de, highlight }: { s: EngagementStrategy; de: boolean
       <div style={{ fontSize: 12, color: "var(--muted-foreground)", lineHeight: 1.6 }}>
         <div style={{ marginBottom: 4 }}>
           <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-            {de ? "Ansatz" : "Approach"}:
+            {tl("stakeholder.approach")}:
           </span>{" "}
           {s.approach}
         </div>
@@ -775,14 +790,14 @@ function StrategyCard({ s, de, highlight }: { s: EngagementStrategy; de: boolean
 
         <div style={{ marginBottom: 2 }}>
           <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-            {de ? "Timing" : "Timing"}:
+            {tl("stakeholder.timing")}:
           </span>{" "}
           {s.timing}
         </div>
 
         <div style={{ marginBottom: 2 }}>
           <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-            {de ? "Kanal" : "Channel"}:
+            {tl("stakeholder.channel")}:
           </span>{" "}
           {s.channel}
         </div>
@@ -790,7 +805,7 @@ function StrategyCard({ s, de, highlight }: { s: EngagementStrategy; de: boolean
         {s.risk && (
           <div>
             <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-              {de ? "Risiko" : "Risk"}:
+              {tl("stakeholder.risk")}:
             </span>{" "}
             {s.risk}
           </div>
