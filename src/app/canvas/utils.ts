@@ -124,6 +124,19 @@ export function estimateQueryHeight(n: QueryNode): number {
   return Math.max(220, Math.min(QUERY_NODE_H, h));
 }
 
+// ── File-size formatting ──────────────────────────────────────────
+
+/**
+ * Byte count → human-readable string. Used by FileNodeCard and by
+ * the DetailPanel's file branch. Extracted here because both live in
+ * different files now.
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function getNodeHeight(n: CanvasNode): number {
   if (n.customHeight) return n.customHeight;
   if (n.nodeType === "query") return estimateQueryHeight(n as QueryNode);
