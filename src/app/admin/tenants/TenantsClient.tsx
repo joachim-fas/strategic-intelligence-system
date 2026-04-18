@@ -12,12 +12,16 @@
  * (Tabellen mit duennen Borders, Stat-Pills im Header), damit sich
  * die System-Admin-Sektion wie eine natuerliche Erweiterung
  * anfuehlt und nicht wie ein separates Admin-Panel-Produkt.
+ *
+ * 2026-04-18 audit A5-H9: migrated from `de ? ... : ...` ternaries to
+ * `useT()` with the `admin.*` / `common.*` / `nav.*` namespaces.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { localeTag, t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { VoltModal, voltConfirm } from "@/components/volt";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
@@ -34,8 +38,7 @@ interface Tenant {
 }
 
 export function TenantsClient() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale } = useT();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,27 +65,22 @@ export function TenantsClient() {
     load();
   }, [load]);
 
-  const onArchive = async (t: Tenant) => {
-    const archive = !t.archived_at;
+  const onArchive = async (tenant: Tenant) => {
+    const archive = !tenant.archived_at;
+    const titleKey: TranslationKey = archive ? "admin.archiveTenantQ" : "admin.restoreTenantQ";
+    const bodyKey: TranslationKey = archive ? "admin.archiveTenantBody" : "admin.restoreTenantBody";
+    const confirmKey: TranslationKey = archive ? "common.archive" : "common.restore";
     const ok = await voltConfirm({
-      title: archive
-        ? (de ? `Mandant „${t.name}" archivieren?` : `Archive tenant "${t.name}"?`)
-        : (de ? `Mandant „${t.name}" wiederherstellen?` : `Restore tenant "${t.name}"?`),
-      message: archive
-        ? (de
-          ? "Archivierte Mandanten verschwinden aus dem Switcher, bleiben aber auslesbar. Kein Datenverlust."
-          : "Archived tenants disappear from the switcher but stay readable. No data loss.")
-        : (de
-          ? "Der Mandant wird wieder als aktiv markiert und ist im Switcher sichtbar."
-          : "The tenant becomes active again and reappears in the switcher."),
-      confirmLabel: archive ? (de ? "Archivieren" : "Archive") : (de ? "Wiederherstellen" : "Restore"),
-      cancelLabel: de ? "Abbrechen" : "Cancel",
+      title: t(titleKey, { name: tenant.name }),
+      message: t(bodyKey),
+      confirmLabel: t(confirmKey),
+      cancelLabel: t("common.cancel"),
       variant: archive ? "destructive" : "default",
     });
     if (!ok) return;
-    setBusyId(t.id);
+    setBusyId(tenant.id);
     try {
-      const res = await fetchWithTimeout(`/api/v1/admin/tenants/${t.id}/archive`, {
+      const res = await fetchWithTimeout(`/api/v1/admin/tenants/${tenant.id}/archive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: archive }),
@@ -90,45 +88,41 @@ export function TenantsClient() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load();
     } catch (e) {
-      alert(de ? "Aktion fehlgeschlagen." : "Action failed.");
+      alert(t("common.actionFailed"));
       console.error(e);
     } finally {
       setBusyId(null);
     }
   };
 
-  const onDelete = async (t: Tenant) => {
-    if (!t.archived_at) {
-      alert(de
-        ? "Mandant muss zuerst archiviert werden, bevor er dauerhaft geloescht werden kann."
-        : "Tenant must be archived before permanent deletion.");
+  const onDelete = async (tenant: Tenant) => {
+    if (!tenant.archived_at) {
+      alert(t("admin.archiveBeforeDelete"));
       return;
     }
     const ok = await voltConfirm({
-      title: de ? `„${t.name}" endgueltig loeschen?` : `Permanently delete "${t.name}"?`,
-      message: de
-        ? `Alle Projekte, Szenarien und Mitgliedschaften dieses Mandanten werden unwiderruflich entfernt.\nDiese Aktion kann nicht rueckgaengig gemacht werden.`
-        : `All projects, scenarios and memberships of this tenant will be deleted irreversibly.\nThis action cannot be undone.`,
-      confirmLabel: de ? "Endgueltig loeschen" : "Delete permanently",
-      cancelLabel: de ? "Abbrechen" : "Cancel",
+      title: t("admin.deleteTenantQ", { name: tenant.name }),
+      message: t("admin.deleteTenantBody"),
+      confirmLabel: t("admin.deletePermanent"),
+      cancelLabel: t("common.cancel"),
       variant: "destructive",
     });
     if (!ok) return;
-    setBusyId(t.id);
+    setBusyId(tenant.id);
     try {
-      const res = await fetchWithTimeout(`/api/v1/admin/tenants/${t.id}`, { method: "DELETE" });
+      const res = await fetchWithTimeout(`/api/v1/admin/tenants/${tenant.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load();
     } catch (e) {
-      alert(de ? "Loeschen fehlgeschlagen." : "Deletion failed.");
+      alert(t("admin.deleteFailed"));
       console.error(e);
     } finally {
       setBusyId(null);
     }
   };
 
-  const active = tenants.filter(t => !t.archived_at);
-  const archived = tenants.filter(t => t.archived_at);
+  const active = tenants.filter(tn => !tn.archived_at);
+  const archived = tenants.filter(tn => tn.archived_at);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--volt-surface, #fff)" }}>
@@ -138,15 +132,13 @@ export function TenantsClient() {
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)", fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--volt-text-faint, #BBB)", marginBottom: 6 }}>
-              {de ? "System-Admin" : "System admin"}
+              {t("nav.systemAdmin")}
             </div>
             <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--volt-font-display)", color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.02em" }}>
-              {de ? "Mandanten" : "Tenants"}
+              {t("admin.tenantsTitle")}
             </h1>
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "6px 0 0", maxWidth: 640 }}>
-              {de
-                ? "Alle Organisationen im System. Mitglieder, Rollen und Einladungen werden pro Mandant verwaltet — siehe Detail-Ansicht."
-                : "All organizations in the system. Members, roles, and invites are managed per-tenant — see detail view."}
+              {t("admin.tenantsSubtitle")}
             </p>
           </div>
           <button
@@ -162,18 +154,18 @@ export function TenantsClient() {
               cursor: "pointer",
             }}
           >
-            + {de ? "Neuer Mandant" : "New tenant"}
+            + {t("admin.newTenant")}
           </button>
         </div>
 
         {/* Stat-Pills */}
         <div style={{ display: "flex", gap: 10, marginBottom: 18, fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>
-          <StatPill label={de ? "Aktiv" : "Active"} value={active.length} color="#0F6038" />
-          <StatPill label={de ? "Archiviert" : "Archived"} value={archived.length} color="#9B9B9B" />
-          <StatPill label={de ? "Gesamt" : "Total"} value={tenants.length} color="#1A4A8A" />
+          <StatPill label={t("common.active")} value={active.length} color="#0F6038" />
+          <StatPill label={t("common.archived")} value={archived.length} color="#9B9B9B" />
+          <StatPill label={t("common.total")} value={tenants.length} color="#1A4A8A" />
         </div>
 
-        {loading && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Lade…" : "Loading…"}</div>}
+        {loading && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{t("common.loading")}</div>}
         {error && <div style={{ color: "var(--signal-negative, #C0341D)", fontSize: 13 }}>{error}</div>}
 
         {!loading && tenants.length === 0 && (
@@ -185,14 +177,14 @@ export function TenantsClient() {
             fontSize: 13,
             textAlign: "center",
           }}>
-            {de ? "Noch keine Mandanten angelegt." : "No tenants yet."}
+            {t("admin.noTenants")}
           </div>
         )}
 
         {/* Aktive Tenants */}
         {active.length > 0 && (
           <TenantsTable
-            title={de ? "Aktiv" : "Active"}
+            title={t("common.active")}
             rows={active}
             busyId={busyId}
             onEdit={setEditing}
@@ -206,7 +198,7 @@ export function TenantsClient() {
         {archived.length > 0 && (
           <div style={{ marginTop: 32 }}>
             <TenantsTable
-              title={de ? "Archiviert" : "Archived"}
+              title={t("common.archived")}
               rows={archived}
               busyId={busyId}
               onEdit={setEditing}
@@ -257,12 +249,16 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
   title: string;
   rows: Tenant[];
   busyId: string | null;
-  onEdit: (t: Tenant) => void;
-  onArchive: (t: Tenant) => void;
-  onDelete: (t: Tenant) => void;
-  locale: "de" | "en";
+  onEdit: (tn: Tenant) => void;
+  onArchive: (tn: Tenant) => void;
+  onDelete: (tn: Tenant) => void;
+  locale: Locale;
 }) {
-  const de = locale === "de";
+  // Sub-component doesn't use the hook (to keep it a pure render fn
+  // easy to reuse in Storybook later). It translates via the bare
+  // `translate()` with the forwarded locale instead.
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   return (
     <section>
       <div style={{
@@ -290,15 +286,15 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
           textTransform: "uppercase",
           color: "var(--volt-text-faint, #BBB)",
         }}>
-          <span>{de ? "Name" : "Name"}</span>
-          <span>Slug</span>
-          <span style={{ textAlign: "right" }}>{de ? "Mitgl." : "Members"}</span>
-          <span style={{ textAlign: "right" }}>{de ? "Projekte" : "Projects"}</span>
-          <span>{de ? "Erstellt" : "Created"}</span>
-          <span style={{ textAlign: "right" }}>{de ? "Aktionen" : "Actions"}</span>
+          <span>{tl("common.name")}</span>
+          <span>{tl("admin.tenantSlug")}</span>
+          <span style={{ textAlign: "right" }}>{tl("admin.membersShort")}</span>
+          <span style={{ textAlign: "right" }}>{tl("admin.projects")}</span>
+          <span>{tl("common.created")}</span>
+          <span style={{ textAlign: "right" }}>{tl("common.actions")}</span>
         </div>
-        {rows.map(t => (
-          <div key={t.id} style={{
+        {rows.map(tn => (
+          <div key={tn.id} style={{
             display: "grid",
             gridTemplateColumns: "minmax(180px, 2fr) 1fr 80px 80px 140px 180px",
             gap: 12,
@@ -307,10 +303,10 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
             alignItems: "center",
             fontSize: 13,
             color: "var(--color-text-primary)",
-            opacity: t.archived_at ? 0.6 : 1,
+            opacity: tn.archived_at ? 0.6 : 1,
           }}>
             <Link
-              href={`/admin/tenants/${t.id}`}
+              href={`/admin/tenants/${tn.id}`}
               style={{
                 fontWeight: 600,
                 color: "var(--color-text-primary)",
@@ -319,57 +315,55 @@ function TenantsTable({ title, rows, busyId, onEdit, onArchive, onDelete, locale
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--volt-lime-dark, #5A8B1F)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; }}
             >
-              {t.name}
+              {tn.name}
             </Link>
-            <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{t.slug}</span>
-            <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{t.member_count}</span>
-            <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{t.radar_count}</span>
+            <span style={{ fontFamily: "var(--volt-font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{tn.slug}</span>
+            <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{tn.member_count}</span>
+            <span style={{ textAlign: "right", fontFamily: "var(--volt-font-mono)", fontSize: 12 }}>{tn.radar_count}</span>
             <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-              {new Date(t.created_at).toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "short", day: "numeric" })}
+              {new Date(tn.created_at).toLocaleDateString(localeTag(locale), { year: "numeric", month: "short", day: "numeric" })}
             </span>
             <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
               <button
-                onClick={() => onEdit(t)}
-                disabled={busyId === t.id}
+                onClick={() => onEdit(tn)}
+                disabled={busyId === tn.id}
                 style={{
                   fontSize: 11, padding: "4px 10px", borderRadius: 6,
                   border: "1px solid var(--color-border)",
                   background: "transparent",
-                  cursor: busyId === t.id ? "wait" : "pointer",
+                  cursor: busyId === tn.id ? "wait" : "pointer",
                   fontFamily: "var(--volt-font-ui)",
                 }}
               >
-                {de ? "Bearbeiten" : "Edit"}
+                {tl("common.edit")}
               </button>
               <button
-                onClick={() => onArchive(t)}
-                disabled={busyId === t.id}
+                onClick={() => onArchive(tn)}
+                disabled={busyId === tn.id}
                 style={{
                   fontSize: 11, padding: "4px 10px", borderRadius: 6,
                   border: "1px solid var(--color-border)",
                   background: "transparent",
-                  cursor: busyId === t.id ? "wait" : "pointer",
+                  cursor: busyId === tn.id ? "wait" : "pointer",
                   fontFamily: "var(--volt-font-ui)",
                 }}
               >
-                {t.archived_at
-                  ? (de ? "Wiederherstellen" : "Restore")
-                  : (de ? "Archivieren" : "Archive")}
+                {tn.archived_at ? tl("common.restore") : tl("common.archive")}
               </button>
-              {t.archived_at && (
+              {tn.archived_at && (
                 <button
-                  onClick={() => onDelete(t)}
-                  disabled={busyId === t.id}
+                  onClick={() => onDelete(tn)}
+                  disabled={busyId === tn.id}
                   style={{
                     fontSize: 11, padding: "4px 10px", borderRadius: 6,
                     border: "1px solid var(--signal-negative-border, #F5BDB4)",
                     background: "var(--signal-negative-light, #FDEEE9)",
                     color: "var(--signal-negative-text, #C0341D)",
-                    cursor: busyId === t.id ? "wait" : "pointer",
+                    cursor: busyId === tn.id ? "wait" : "pointer",
                     fontFamily: "var(--volt-font-ui)",
                   }}
                 >
-                  {de ? "Loeschen" : "Delete"}
+                  {tl("common.delete")}
                 </button>
               )}
             </span>
@@ -388,8 +382,9 @@ function slugify(s: string): string {
     .slice(0, 64);
 }
 
-function CreateTenantModal({ onClose, onCreated, locale }: { onClose: () => void; onCreated: () => void; locale: "de" | "en" }) {
-  const de = locale === "de";
+function CreateTenantModal({ onClose, onCreated, locale }: { onClose: () => void; onCreated: () => void; locale: Locale }) {
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -428,28 +423,28 @@ function CreateTenantModal({ onClose, onCreated, locale }: { onClose: () => void
     <VoltModal
       open
       onClose={onClose}
-      title={de ? "Neuer Mandant" : "New tenant"}
+      title={tl("admin.newTenant")}
       size="md"
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} disabled={saving} style={{ fontSize: 13, fontWeight: 500, padding: "7px 16px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-primary)", cursor: "pointer" }}>
-            {de ? "Abbrechen" : "Cancel"}
+            {tl("common.cancel")}
           </button>
           <button onClick={onSubmit} disabled={saving || !name.trim()} style={{ fontSize: 13, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: "none", background: "#0A0A0A", color: "#fff", cursor: saving ? "wait" : "pointer", opacity: !name.trim() ? 0.4 : 1 }}>
-            {saving ? (de ? "Speichere…" : "Saving…") : (de ? "Erstellen" : "Create")}
+            {saving ? tl("admin.saving") : tl("common.create")}
           </button>
         </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label={de ? "Name" : "Name"}>
+        <Field label={tl("common.name")}>
           <input
             type="text" value={name} onChange={e => setName(e.target.value)}
-            placeholder={de ? "z.B. Mercedes Strategie" : "e.g. Mercedes Strategy"}
+            placeholder={tl("admin.tenantNamePlaceholder")}
             style={inputStyle} autoFocus
           />
         </Field>
-        <Field label="Slug">
+        <Field label={tl("admin.tenantSlug")}>
           <input
             type="text"
             value={slugEdited ? slug : effectiveSlug}
@@ -458,17 +453,17 @@ function CreateTenantModal({ onClose, onCreated, locale }: { onClose: () => void
             style={{ ...inputStyle, fontFamily: "var(--volt-font-mono)" }}
           />
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
-            {de ? "URL-sicherer Bezeichner. Auto-generiert aus Name, kann angepasst werden." : "URL-safe identifier. Auto-generated from name, editable."}
+            {tl("admin.tenantSlugHint")}
           </div>
         </Field>
-        <Field label={de ? "Owner-Email (optional)" : "Owner email (optional)"}>
+        <Field label={tl("admin.ownerEmailLabel")}>
           <input
             type="email" value={ownerEmail} onChange={e => setOwnerEmail(e.target.value)}
             placeholder="lead@example.com"
             style={inputStyle}
           />
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
-            {de ? "Wenn dieser User existiert, wird er Owner. Sonst bist nur du Owner (Einladen in Phase 3)." : "If this user exists, they'll be made owner. Otherwise only you will be owner (invites in Phase 3)."}
+            {tl("admin.ownerEmailHint")}
           </div>
         </Field>
         {error && <div style={{ fontSize: 12, color: "var(--signal-negative, #C0341D)", padding: "6px 10px", borderRadius: 6, background: "var(--signal-negative-light)" }}>{error}</div>}
@@ -477,8 +472,9 @@ function CreateTenantModal({ onClose, onCreated, locale }: { onClose: () => void
   );
 }
 
-function EditTenantModal({ tenant, onClose, onSaved, locale }: { tenant: Tenant; onClose: () => void; onSaved: () => void; locale: "de" | "en" }) {
-  const de = locale === "de";
+function EditTenantModal({ tenant, onClose, onSaved, locale }: { tenant: Tenant; onClose: () => void; onSaved: () => void; locale: Locale }) {
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const [name, setName] = useState(tenant.name);
   const [slug, setSlug] = useState(tenant.slug);
   const [saving, setSaving] = useState(false);
@@ -509,24 +505,24 @@ function EditTenantModal({ tenant, onClose, onSaved, locale }: { tenant: Tenant;
     <VoltModal
       open
       onClose={onClose}
-      title={de ? "Mandant bearbeiten" : "Edit tenant"}
+      title={tl("admin.editTenant")}
       size="md"
       footer={
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} disabled={saving} style={{ fontSize: 13, fontWeight: 500, padding: "7px 16px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-primary)", cursor: "pointer" }}>
-            {de ? "Abbrechen" : "Cancel"}
+            {tl("common.cancel")}
           </button>
           <button onClick={onSubmit} disabled={saving} style={{ fontSize: 13, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: "none", background: "#0A0A0A", color: "#fff", cursor: saving ? "wait" : "pointer" }}>
-            {saving ? (de ? "Speichere…" : "Saving…") : (de ? "Speichern" : "Save")}
+            {saving ? tl("admin.saving") : tl("common.save")}
           </button>
         </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label={de ? "Name" : "Name"}>
+        <Field label={tl("common.name")}>
           <input type="text" value={name} onChange={e => setName(e.target.value)} style={inputStyle} autoFocus />
         </Field>
-        <Field label="Slug">
+        <Field label={tl("admin.tenantSlug")}>
           <input type="text" value={slug} onChange={e => setSlug(e.target.value)} style={{ ...inputStyle, fontFamily: "var(--volt-font-mono)" }} />
         </Field>
         {error && <div style={{ fontSize: 12, color: "var(--signal-negative, #C0341D)", padding: "6px 10px", borderRadius: 6, background: "var(--signal-negative-light)" }}>{error}</div>}

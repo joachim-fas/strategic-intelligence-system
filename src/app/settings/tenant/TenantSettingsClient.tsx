@@ -22,11 +22,14 @@
  *     },
  *     logoUrl?: string | null,    // optional, noch kein Upload-Flow
  *   }
+ *
+ * 2026-04-18 audit A5-H9: migrated to `useT()` + `tenant.*` namespace.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import { useTenant } from "@/lib/tenant-context";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
@@ -53,8 +56,7 @@ interface TenantRow {
 }
 
 export function TenantSettingsClient() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, locale } = useT();
   const tenantCtx = useTenant();
 
   const [tenant, setTenant] = useState<TenantRow | null>(null);
@@ -84,13 +86,13 @@ export function TenantSettingsClient() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       const data = json?.data ?? json;
-      const t = data.tenant as TenantRow;
-      setTenant(t);
-      setName(t.name);
-      setSlug(t.slug);
-      const parsed: TenantSettings = typeof t.settings === "string"
-        ? (t.settings ? safeParse(t.settings) : {})
-        : (t.settings ?? {});
+      const row = data.tenant as TenantRow;
+      setTenant(row);
+      setName(row.name);
+      setSlug(row.slug);
+      const parsed: TenantSettings = typeof row.settings === "string"
+        ? (row.settings ? safeParse(row.settings) : {})
+        : (row.settings ?? {});
       setSettingsLocale((parsed.locale as "de" | "en") ?? "de");
       setTimezone(parsed.timezone ?? "Europe/Berlin");
       setRole(parsed.contextProfile?.role ?? "");
@@ -174,7 +176,7 @@ export function TenantSettingsClient() {
             color: "var(--volt-text-faint, #BBB)",
             marginBottom: 6,
           }}>
-            {de ? "Einstellungen" : "Settings"}
+            {t("tenant.settingsCaption")}
           </div>
           <h1 style={{
             fontSize: 26, fontWeight: 700,
@@ -182,16 +184,14 @@ export function TenantSettingsClient() {
             color: "var(--color-text-heading)",
             margin: 0, letterSpacing: "-0.02em",
           }}>
-            {de ? "Mandant" : "Tenant"}
+            {t("tenant.settingsHeading")}
           </h1>
           <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "6px 0 0", maxWidth: 600 }}>
-            {de
-              ? "Einstellungen fuer deinen aktiven Mandanten. Aenderungen gelten fuer alle Mitglieder. Mitglieder- und Rollen-Verwaltung liegt unter der Admin-Ansicht des Mandanten."
-              : "Settings for the currently active tenant. Changes apply to all members. Member + role management lives under the admin view of this tenant."}
+            {t("tenant.settingsSubtitle")}
           </p>
         </div>
 
-        {loading && <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{de ? "Lade…" : "Loading…"}</div>}
+        {loading && <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("common.loading")}</div>}
         {error && <div style={{
           fontSize: 12, color: "var(--signal-negative, #C0341D)",
           padding: "8px 12px", borderRadius: 8,
@@ -209,23 +209,22 @@ export function TenantSettingsClient() {
                 color: "var(--pastel-butter-text, #7A5C00)",
                 fontSize: 12, lineHeight: 1.5,
               }}>
-                {de
-                  ? "Nur Owner und Admins koennen Mandanten-Einstellungen aendern. Du kannst die Werte unten einsehen, aber nicht speichern."
-                  : "Only owners and admins can change tenant settings. You can inspect the values below but can't save."}
+                {t("tenant.nonAdminHint")}
               </div>
             )}
 
             {/* ── Stammdaten ────────────────────────────────────────── */}
-            <SectionCard title={de ? "Stammdaten" : "Basics"}>
-              <Field label={de ? "Name" : "Name"}>
+            <SectionCard title={t("tenant.basicsSection")}>
+              <Field label={t("common.name")}>
                 <input
                   type="text" value={name} onChange={e => setName(e.target.value)}
                   disabled={!canEditSettings} style={inputStyle(!canEditSettings)}
                 />
               </Field>
-              <Field label={de ? "Slug" : "Slug"} hint={canEditSlug
-                ? (de ? "URL-sicherer Bezeichner. Nur Owner koennen den Slug aendern." : "URL-safe identifier. Only owners can change the slug.")
-                : (de ? "Nur der Owner kann den Slug aendern." : "Only the owner can change the slug.")}>
+              <Field
+                label={t("admin.tenantSlug")}
+                hint={canEditSlug ? t("tenant.slugOwnerOnlyHint") : t("tenant.slugOwnerOnly")}
+              >
                 <input
                   type="text" value={slug} onChange={e => setSlug(e.target.value)}
                   disabled={!canEditSlug} style={{ ...inputStyle(!canEditSlug), fontFamily: "var(--volt-font-mono)" }}
@@ -234,12 +233,11 @@ export function TenantSettingsClient() {
             </SectionCard>
 
             {/* ── Defaults fuer neue Queries ───────────────────────── */}
-            <SectionCard title={de ? "Analyse-Defaults" : "Query defaults"} hint={
-              de
-                ? "Diese Werte werden als Kontext-Profile bei neuen Queries vorausgefuellt (Rolle, Industrie, Region)."
-                : "These values prefill the context profile for new queries (role, industry, region)."
-            }>
-              <Field label={de ? "Sprache" : "Language"}>
+            <SectionCard
+              title={t("tenant.queryDefaultsSection")}
+              hint={t("tenant.queryDefaultsHint")}
+            >
+              <Field label={t("tenant.languageLabel")}>
                 <select
                   value={settingsLocale}
                   onChange={e => setSettingsLocale(e.target.value as "de" | "en")}
@@ -250,7 +248,7 @@ export function TenantSettingsClient() {
                   <option value="en">English</option>
                 </select>
               </Field>
-              <Field label={de ? "Zeitzone" : "Timezone"}>
+              <Field label={t("tenant.timezoneLabel")}>
                 <input
                   type="text" value={timezone} onChange={e => setTimezone(e.target.value)}
                   disabled={!canEditSettings} placeholder="Europe/Berlin"
@@ -258,21 +256,21 @@ export function TenantSettingsClient() {
                 />
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                <Field label={de ? "Rolle" : "Role"}>
+                <Field label={t("tenant.roleLabel")}>
                   <input
                     type="text" value={role} onChange={e => setRole(e.target.value)}
-                    disabled={!canEditSettings} placeholder={de ? "z.B. Strategy Lead" : "e.g. Strategy Lead"}
+                    disabled={!canEditSettings} placeholder={t("tenant.rolePlaceholder")}
                     style={inputStyle(!canEditSettings)}
                   />
                 </Field>
-                <Field label={de ? "Industrie" : "Industry"}>
+                <Field label={t("tenant.industryLabel")}>
                   <input
                     type="text" value={industry} onChange={e => setIndustry(e.target.value)}
-                    disabled={!canEditSettings} placeholder={de ? "z.B. Automotive" : "e.g. Automotive"}
+                    disabled={!canEditSettings} placeholder={t("tenant.industryPlaceholder")}
                     style={inputStyle(!canEditSettings)}
                   />
                 </Field>
-                <Field label={de ? "Region" : "Region"}>
+                <Field label={t("tenant.regionLabel")}>
                   <input
                     type="text" value={region} onChange={e => setRegion(e.target.value)}
                     disabled={!canEditSettings} placeholder="DACH"
@@ -283,11 +281,7 @@ export function TenantSettingsClient() {
             </SectionCard>
 
             {/* ── Branding ─────────────────────────────────────────── */}
-            <SectionCard title={de ? "Branding" : "Branding"} hint={
-              de
-                ? "Header-Logo (PNG, JPEG, SVG oder WebP, max. 512 KB). Alternativ URL einer gehosteten Datei."
-                : "Header logo (PNG, JPEG, SVG or WebP, max 512 KB). Or link to a hosted URL."
-            }>
+            <SectionCard title={t("tenant.brandingSection")} hint={t("tenant.brandingHint")}>
               <LogoUploadField
                 logoUrl={logoUrl}
                 onChange={setLogoUrl}
@@ -300,7 +294,7 @@ export function TenantSettingsClient() {
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginTop: 4 }}>
               {saved && (
                 <span style={{ fontSize: 12, color: "var(--signal-positive, #1A9E5A)", fontFamily: "var(--volt-font-mono)" }}>
-                  {de ? "✓ Gespeichert" : "✓ Saved"}
+                  {t("tenant.savedNote")}
                 </span>
               )}
               <button
@@ -317,7 +311,7 @@ export function TenantSettingsClient() {
                   opacity: !canEditSettings || !settingsDirty ? 0.55 : 1,
                 }}
               >
-                {saving ? (de ? "Speichere…" : "Saving…") : (de ? "Speichern" : "Save")}
+                {saving ? t("admin.saving") : t("common.save")}
               </button>
             </div>
           </div>
@@ -405,9 +399,10 @@ function LogoUploadField({
   logoUrl: string;
   onChange: (v: string) => void;
   canEdit: boolean;
-  locale: "de" | "en";
+  locale: Locale;
 }) {
-  const de = locale === "de";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -469,7 +464,7 @@ function LogoUploadField({
               : "repeating-conic-gradient(#f0f0f0 0% 25%, #fff 0% 50%) 50% / 12px 12px",
             overflow: "hidden",
           }}
-          aria-label={de ? "Logo-Vorschau" : "Logo preview"}
+          aria-label={tl("tenant.logoPreview")}
         />
         {/* Actions */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -489,8 +484,8 @@ function LogoUploadField({
               }}
             >
               {uploading
-                ? (de ? "Lade hoch…" : "Uploading…")
-                : (logoUrl ? (de ? "Logo ersetzen" : "Replace logo") : (de ? "Logo hochladen" : "Upload logo"))}
+                ? tl("tenant.logoUploading")
+                : (logoUrl ? tl("tenant.logoReplace") : tl("tenant.logoUpload"))}
             </button>
             {logoUrl && canEdit && (
               <button
@@ -507,7 +502,7 @@ function LogoUploadField({
                   fontFamily: "var(--volt-font-ui)",
                 }}
               >
-                {de ? "Entfernen" : "Remove"}
+                {tl("tenant.logoRemove")}
               </button>
             )}
           </div>
@@ -523,12 +518,12 @@ function LogoUploadField({
             }}
           />
           <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            {de ? "Maximal 512 KB. PNG / JPEG / SVG / WebP." : "Max 512 KB. PNG / JPEG / SVG / WebP."}
+            {tl("tenant.logoConstraints")}
           </div>
         </div>
       </div>
       {/* URL fallback — fuer gehostete Logos ohne Upload */}
-      <Field label={de ? "Oder Logo-URL" : "Or logo URL"}>
+      <Field label={tl("tenant.logoUrlFallback")}>
         <input
           type="url"
           value={logoUrl}

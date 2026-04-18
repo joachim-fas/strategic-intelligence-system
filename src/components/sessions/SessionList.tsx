@@ -6,6 +6,10 @@
  * Shared list of sessions used by both /projects (active) and /projects/archive
  * (archived). Handles data fetching, row actions (archive / restore / delete),
  * framework categorization (chips + filter), and empty/error states.
+ *
+ * 2026-04-18 audit A5-H9: migrated from `de ? "x" : "y"` ternaries to
+ * the `sessions.*` / `common.*` namespaces via `useT()`. The caller
+ * still passes a `de: boolean` prop for backward compatibility.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +21,13 @@ import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 // native OS-Dialog haelt sich nicht an das Volt-Design und fuehlt sich
 // als Fremdkoerper an — jetzt in-app Modal mit konsistenter Typo/Spacing.
 import { voltConfirm } from "@/components/volt";
+import {
+  formatRelativeTime,
+  localeTag,
+  t as translate,
+  type Locale,
+  type TranslationKey,
+} from "@/lib/i18n";
 import {
   FRAMEWORK_CATEGORIES,
   type FrameworkCategory,
@@ -30,15 +41,14 @@ import { Archive, ArchiveRestore, Pencil, Trash2, Check, X as XIcon, ArrowDownUp
 type SortKey = "updated" | "created" | "name-asc" | "name-desc" | "size";
 interface SortOption {
   key: SortKey;
-  labelDe: string;
-  labelEn: string;
+  labelKey: TranslationKey;
 }
 const SORT_OPTIONS: SortOption[] = [
-  { key: "updated",   labelDe: "Zuletzt bearbeitet", labelEn: "Last edited" },
-  { key: "created",   labelDe: "Zuletzt erstellt",   labelEn: "Recently created" },
-  { key: "name-asc",  labelDe: "Name A → Z",          labelEn: "Name A → Z" },
-  { key: "name-desc", labelDe: "Name Z → A",          labelEn: "Name Z → A" },
-  { key: "size",      labelDe: "Meiste Nodes",        labelEn: "Most nodes" },
+  { key: "updated",   labelKey: "sessions.sortLastEdited" },
+  { key: "created",   labelKey: "sessions.sortRecentlyCreated" },
+  { key: "name-asc",  labelKey: "sessions.sortNameAsc" },
+  { key: "name-desc", labelKey: "sessions.sortNameDesc" },
+  { key: "size",      labelKey: "sessions.sortMostNodes" },
 ];
 
 export interface SessionRow {
@@ -60,27 +70,21 @@ interface Props {
   de: boolean;
 }
 
-function formatRelative(iso: string, de: boolean): string {
+function formatAbsolute(iso: string, locale: Locale): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  const diffMs = Date.now() - d.getTime();
-  const mins = Math.round(diffMs / 60_000);
-  if (mins < 1) return de ? "gerade eben" : "just now";
-  if (mins < 60) return de ? `vor ${mins} Min` : `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return de ? `vor ${hrs} Std` : `${hrs} h ago`;
-  const days = Math.round(hrs / 24);
-  if (days < 30) return de ? `vor ${days} Tg` : `${days} d ago`;
-  return d.toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "short", day: "numeric" });
-}
-
-function formatAbsolute(iso: string, de: boolean): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(de ? "de-DE" : "en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
+  return d.toLocaleDateString(localeTag(locale), {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
 export function SessionList({ mode, de }: Props) {
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
+    translate(locale, key, vars);
+
   // Tenant-Scope fuer localStorage-Writes. `activeTenantId` ist SSR-
   // hydratisiert, kann aber `null` sein, wenn die Komponente ohne Session
   // rendert (Logout-Flow). Wir ziehen Alt-Daten einmalig in den Scope, damit
@@ -173,10 +177,10 @@ export function SessionList({ mode, de }: Props) {
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+        alert(tl("common.timeout"));
       } else {
         console.error("[archive]", e);
-        alert(de ? "Archivieren fehlgeschlagen." : "Archive failed.");
+        alert(tl("sessions.archiveFailed"));
       }
     } finally {
       setBusyId(null);
@@ -196,10 +200,10 @@ export function SessionList({ mode, de }: Props) {
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+        alert(tl("common.timeout"));
       } else {
         console.error("[restore]", e);
-        alert(de ? "Wiederherstellen fehlgeschlagen." : "Restore failed.");
+        alert(tl("sessions.restoreFailed"));
       }
     } finally {
       setBusyId(null);
@@ -209,12 +213,10 @@ export function SessionList({ mode, de }: Props) {
   const deleteSession = async (id: string, name: string) => {
     if (busyId) return;
     const confirmed = await voltConfirm({
-      title: de ? "Projekt dauerhaft löschen?" : "Permanently delete project?",
-      message: de
-        ? `„${name}"\n\nDiese Aktion kann nicht rückgängig gemacht werden.`
-        : `"${name}"\n\nThis action cannot be undone.`,
-      confirmLabel: de ? "Löschen" : "Delete",
-      cancelLabel: de ? "Abbrechen" : "Cancel",
+      title: tl("sessions.deleteProjectQ"),
+      message: tl("sessions.deleteRowBody", { name }),
+      confirmLabel: tl("common.delete"),
+      cancelLabel: tl("common.cancel"),
       variant: "destructive",
     });
     if (!confirmed) return;
@@ -229,10 +231,10 @@ export function SessionList({ mode, de }: Props) {
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+        alert(tl("common.timeout"));
       } else {
         console.error("[delete]", e);
-        alert(de ? "Löschen fehlgeschlagen." : "Delete failed.");
+        alert(tl("sessions.deleteFailed"));
       }
     } finally {
       setBusyId(null);
@@ -268,10 +270,10 @@ export function SessionList({ mode, de }: Props) {
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, name: nextName } : s)));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        alert(de ? "Zeitlimit überschritten." : "Request timed out.");
+        alert(tl("common.timeout"));
       } else {
         console.error("[rename]", e);
-        alert(de ? "Umbenennen fehlgeschlagen." : "Rename failed.");
+        alert(tl("sessions.renameFailed"));
       }
     } finally {
       setBusyId(null);
@@ -342,7 +344,7 @@ export function SessionList({ mode, de }: Props) {
   if (loading) {
     return (
       <div style={{ textAlign: "center", fontSize: 13, color: "var(--volt-text-muted)", padding: "60px 0" }}>
-        {de ? "Lade Projekte…" : "Loading projects…"}
+        {tl("sessions.loadingProjects")}
       </div>
     );
   }
@@ -358,11 +360,7 @@ export function SessionList({ mode, de }: Props) {
         fontSize: 13,
         display: "flex", flexDirection: "column", gap: 12,
       }}>
-        <span>
-          {de
-            ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut."
-            : "Data could not be loaded. Please try again."}
-        </span>
+        <span>{tl("sessions.loadFailed")}</span>
         <button
           onClick={load}
           style={{
@@ -375,7 +373,7 @@ export function SessionList({ mode, de }: Props) {
             cursor: "pointer",
           }}
         >
-          {de ? "Erneut versuchen" : "Retry"}
+          {tl("common.retry")}
         </button>
       </div>
     );
@@ -383,15 +381,11 @@ export function SessionList({ mode, de }: Props) {
 
   if (sessions.length === 0) {
     const emptyTitle = mode === "active"
-      ? (de ? "Starte deinen ersten strategischen Arbeitsstrang" : "Start your first strategic thread")
-      : (de ? "Archiv ist leer" : "Archive is empty");
+      ? tl("sessions.emptyActiveTitle")
+      : tl("sessions.emptyArchivedTitle");
     const emptyDesc = mode === "active"
-      ? (de
-          ? "Eröffne ein Projekt direkt über die Startseite — mit einer Frage oder einem Framework."
-          : "Open a project from the home page — with a question or a framework.")
-      : (de
-          ? "Wenn du ein Projekt abschließt, kannst du es hier ablegen, ohne es zu löschen."
-          : "When you finish a project, archive it here without deleting.");
+      ? tl("sessions.emptyActiveDesc")
+      : tl("sessions.emptyArchivedDesc");
     return (
       <div style={{
         textAlign: "center",
@@ -406,8 +400,8 @@ export function SessionList({ mode, de }: Props) {
           color: "var(--volt-text-faint, #AAA)", marginBottom: 14,
         }}>
           {mode === "active"
-            ? (de ? "Keine Projekte vorhanden" : "No projects yet")
-            : (de ? "Keine archivierten Projekte" : "No archived projects")}
+            ? tl("sessions.emptyActiveCaption")
+            : tl("sessions.emptyArchivedCaption")}
         </div>
         <h2 style={{
           fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
@@ -435,7 +429,7 @@ export function SessionList({ mode, de }: Props) {
               fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
             }}
           >
-            {de ? "Zur Startseite →" : "Go to Home →"}
+            {tl("sessions.goHome")}
           </a>
         )}
       </div>
@@ -454,10 +448,10 @@ export function SessionList({ mode, de }: Props) {
           color: "var(--volt-text-faint, #999)",
           marginRight: 6,
         }}>
-          {de ? "Filter" : "Filter"}
+          {tl("sessions.filter")}
         </span>
         <FilterPill
-          label={de ? "Alle" : "All"}
+          label={tl("sessions.all")}
           count={annotated.length}
           active={filterId === "all"}
           onClick={() => setFilterId("all")}
@@ -496,7 +490,7 @@ export function SessionList({ mode, de }: Props) {
             }}
             aria-haspopup="listbox"
             aria-expanded={sortMenuOpen}
-            aria-label={de ? "Sortierung ändern" : "Change sort order"}
+            aria-label={tl("sessions.sortMenuAria")}
           >
             <ArrowDownUp size={12} strokeWidth={2} style={{ color: "var(--volt-text-faint, #999)" }} />
             <span style={{
@@ -504,9 +498,9 @@ export function SessionList({ mode, de }: Props) {
               fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
               color: "var(--volt-text-faint, #999)",
             }}>
-              {de ? "Sortierung" : "Sort"}
+              {tl("sessions.sort")}
             </span>
-            <span>{de ? currentSortOption.labelDe : currentSortOption.labelEn}</span>
+            <span>{tl(currentSortOption.labelKey)}</span>
             <span style={{ fontSize: 8, color: "var(--volt-text-faint, #999)", marginLeft: 2 }}>▼</span>
           </button>
 
@@ -561,7 +555,7 @@ export function SessionList({ mode, de }: Props) {
                       color: selected ? "var(--volt-text, #0A0A0A)" : "transparent",
                       fontSize: 12,
                     }}>✓</span>
-                    <span>{de ? opt.labelDe : opt.labelEn}</span>
+                    <span>{tl(opt.labelKey)}</span>
                   </button>
                 );
               })}
@@ -580,7 +574,7 @@ export function SessionList({ mode, de }: Props) {
           color: "var(--volt-text-muted, #6B6B6B)",
           textAlign: "center",
         }}>
-          {de ? "Keine Projekte in dieser Kategorie." : "No projects in this category."}
+          {tl("sessions.noneInCategory")}
         </div>
       )}
 
@@ -608,15 +602,13 @@ export function SessionList({ mode, de }: Props) {
         fontSize: 11, fontWeight: 600, letterSpacing: "-0.01em",
         color: "var(--volt-text-muted, #6B6B6B)",
       }}>
-        <div>{de ? "Projekt" : "Project"}</div>
-        <div>{de ? "Framework" : "Framework"}</div>
-        <div>{de ? "Gestartet" : "Started"}</div>
+        <div>{tl("sessions.project")}</div>
+        <div>{tl("sessions.framework")}</div>
+        <div>{tl("sessions.started")}</div>
         <div>
-          {mode === "active"
-            ? (de ? "Zuletzt bearbeitet" : "Last edit")
-            : (de ? "Archiviert" : "Archived")}
+          {mode === "active" ? tl("sessions.lastEdit") : tl("sessions.archived")}
         </div>
-        <div>{de ? "Umfang" : "Size"}</div>
+        <div>{tl("sessions.size")}</div>
         <div style={{ textAlign: "right" }} />
       </div>
 
@@ -630,7 +622,7 @@ export function SessionList({ mode, de }: Props) {
             const isLast = idx === sorted.length - 1;
             const isBusy = busyId === s.id;
             const secondDate = mode === "active" ? s.updated_at : (s.archived_at ?? s.updated_at);
-            const displayTitle = cleanSessionTitle(s.name) || (de ? "Unbenanntes Projekt" : "Untitled project");
+            const displayTitle = cleanSessionTitle(s.name) || tl("sessions.untitled");
             const activeBg = "rgba(228,255,151,0.16)";
             const hoverBg  = "rgba(228,255,151,0.04)";
 
@@ -746,7 +738,7 @@ export function SessionList({ mode, de }: Props) {
                       display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
                     }}>
                       <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--signal-positive, #1A9E5A)" }} />
-                      {de ? "Aktiv" : "Active"}
+                      {tl("sessions.active")}
                     </span>
                   )}
                 </div>
@@ -764,7 +756,7 @@ export function SessionList({ mode, de }: Props) {
 
             {/* Column 2: Framework chip (own column, no visual separator) */}
             <div style={{ display: "flex", alignItems: "center" }}>
-              <FrameworkChip category={s.category} de={de} />
+              <FrameworkChip category={s.category} locale={locale} />
             </div>
 
             {/* Started */}
@@ -773,10 +765,10 @@ export function SessionList({ mode, de }: Props) {
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
             }}>
               <span style={{ fontSize: 12, color: "var(--volt-text, #0A0A0A)", fontWeight: 500 }}>
-                {formatAbsolute(s.created_at, de)}
+                {formatAbsolute(s.created_at, locale)}
               </span>
               <span style={{ fontSize: 10, color: "var(--volt-text-faint, #A8A8A8)" }}>
-                {formatRelative(s.created_at, de)}
+                {formatRelativeTime(s.created_at, locale)}
               </span>
             </div>
 
@@ -786,10 +778,10 @@ export function SessionList({ mode, de }: Props) {
               fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
             }}>
               <span style={{ fontSize: 12, color: "var(--volt-text, #0A0A0A)", fontWeight: 500 }}>
-                {formatAbsolute(secondDate, de)}
+                {formatAbsolute(secondDate, locale)}
               </span>
               <span style={{ fontSize: 10, color: "var(--volt-text-faint, #A8A8A8)" }}>
-                {formatRelative(secondDate, de)}
+                {formatRelativeTime(secondDate, locale)}
               </span>
             </div>
 
@@ -801,15 +793,15 @@ export function SessionList({ mode, de }: Props) {
             }}>
               {hasContent ? (
                 <>
-                  <div>{s.nodeCount} {de ? "Nodes" : "nodes"}</div>
+                  <div>{s.nodeCount} {tl("sessions.nodesLabel")}</div>
                   {s.queryCount > 0 && (
                     <div style={{ fontSize: 10, color: "var(--volt-text-faint, #A8A8A8)" }}>
-                      {s.queryCount} {de ? "Fragen" : "queries"}
+                      {s.queryCount} {tl("sessions.queriesLabel")}
                     </div>
                   )}
                 </>
               ) : (
-                <span>{de ? "leer" : "empty"}</span>
+                <span>{tl("sessions.emptyRow")}</span>
               )}
             </div>
 
@@ -828,13 +820,13 @@ export function SessionList({ mode, de }: Props) {
               {editingId === s.id ? (
                 <>
                   <IconActionButton
-                    title={de ? "Speichern" : "Save"}
+                    title={tl("common.save")}
                     onClick={() => commitRename()}
                     disabled={isBusy}
                     icon={<Check size={16} strokeWidth={2} />}
                   />
                   <IconActionButton
-                    title={de ? "Abbrechen" : "Cancel"}
+                    title={tl("common.cancel")}
                     onClick={() => cancelRename()}
                     disabled={isBusy}
                     icon={<XIcon size={16} strokeWidth={2} />}
@@ -843,28 +835,28 @@ export function SessionList({ mode, de }: Props) {
               ) : (
                 <>
                   <IconActionButton
-                    title={de ? "Umbenennen" : "Rename"}
+                    title={tl("sessions.tipRename")}
                     onClick={() => beginRename(s.id, s.name)}
                     disabled={isBusy}
                     icon={<Pencil size={16} strokeWidth={1.75} />}
                   />
                   {mode === "active" ? (
                     <IconActionButton
-                      title={de ? "In Archiv verschieben" : "Move to archive"}
+                      title={tl("sessions.tipArchive")}
                       onClick={() => archive(s.id)}
                       disabled={isBusy}
                       icon={<Archive size={16} strokeWidth={1.75} />}
                     />
                   ) : (
                     <IconActionButton
-                      title={de ? "Aus Archiv wiederherstellen" : "Restore from archive"}
+                      title={tl("sessions.tipRestore")}
                       onClick={() => restore(s.id)}
                       disabled={isBusy}
                       icon={<ArchiveRestore size={16} strokeWidth={1.75} />}
                     />
                   )}
                   <IconActionButton
-                    title={de ? "Endgültig löschen" : "Permanently delete"}
+                    title={tl("sessions.tipDelete")}
                     onClick={() => deleteSession(s.id, s.name)}
                     disabled={isBusy}
                     destructive
@@ -940,10 +932,11 @@ function FilterPill({
   );
 }
 
-function FrameworkChip({ category, de }: { category: FrameworkCategory; de: boolean }) {
+function FrameworkChip({ category, locale }: { category: FrameworkCategory; locale: Locale }) {
+  const label = locale === "de" ? category.labelDe : category.labelEn;
   return (
     <span
-      title={de ? `Framework: ${category.labelDe}` : `Framework: ${category.labelEn}`}
+      title={translate(locale, "sessions.frameworkTip", { label })}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -960,7 +953,7 @@ function FrameworkChip({ category, de }: { category: FrameworkCategory; de: bool
         whiteSpace: "nowrap",
       }}
     >
-      {de ? category.labelDe : category.labelEn}
+      {label}
     </span>
   );
 }
