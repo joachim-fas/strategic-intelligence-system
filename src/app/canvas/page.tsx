@@ -2004,13 +2004,18 @@ function FormattedText({ text, fontSize = 13, lineHeight = 1.65, color = "var(--
 
 function DerivedNodeCard({
   node, de, selected, onSelect, onDragStart, onDelete, onResizeStart, onIterate: _onIterate, onPortDragStart, nodeW, dimmed, zoom: cardZoom,
-  onExplore: _onExplore, // kept for API compatibility, actions live in DetailPanel
+  onExplore,
+  onFollowUp,
   onAddTag, onSetStatus,
 }: {
   node: DerivedNode; de: boolean; selected: boolean;
   onSelect: (id: string) => void;
   onDragStart: (e: React.PointerEvent, id: string) => void;
   onExplore: (id: string, queryText: string) => void;
+  /** Opens a follow-up query dialogue for this derived node. Audit
+   *  finding A2-H1 (18.04.2026): previously missing on derived cards
+   *  so the three-dot menu had no "Folgefrage stellen" entry. */
+  onFollowUp?: (id: string, prefill?: string) => void;
   onDelete: (id: string) => void;
   onResizeStart: (e: React.PointerEvent, id: string, currentW: number, currentH: number, dir?: "h" | "v" | "both") => void;
   onIterate: (nodeId: string, prefill: string) => void;
@@ -2126,7 +2131,26 @@ function DerivedNodeCard({
           <div style={{ flex: 1 }} />
           {accentColorForStatus && <span style={{ width: 5, height: 5, borderRadius: "50%", background: accentColorForStatus, flexShrink: 0 }} title={NODE_STATUS_META[node.nodeStatus!].label} />}
           {(cardZoom === undefined || cardZoom >= 0.6) && (
-            <CardActionsMenu nodeId={node.id} nodeType={node.nodeType} de={de} onDelete={onDelete} onSetStatus={onSetStatus} onAddTag={onAddTag} currentStatus={node.nodeStatus} />
+            <CardActionsMenu
+              nodeId={node.id}
+              nodeType={node.nodeType}
+              de={de}
+              onDelete={onDelete}
+              onSetStatus={onSetStatus}
+              onAddTag={onAddTag}
+              // Audit finding A2-H1: wire Follow-up into the three-
+              // dot menu on derived cards. For follow-up / decision /
+              // dimensions / causalgraph types we use the node's
+              // queryText as prefill; for insight / scenario we use
+              // its content. onFollowUp is optional so older callers
+              // that don't pass it gracefully fall back to onExplore.
+              onFollowUp={(id) => {
+                const prefill = (node.queryText ?? node.content ?? "").trim();
+                if (onFollowUp) onFollowUp(id, prefill);
+                else onExplore(id, prefill);
+              }}
+              currentStatus={node.nodeStatus}
+            />
           )}
         </div>
         {/* Content */}
@@ -4895,6 +4919,14 @@ export default function CanvasPage() {
 
   // ── Template picker + Workflow ───────────────────────────────────────────
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  // Audit finding A2-H2 (18.04.2026): when a template tile is clicked
+  // we used to call `window.prompt()` to collect the topic. Native
+  // prompt breaks the glass-morphism modal aesthetic and may be
+  // suppressed in some iframe contexts. Now we stage the click in
+  // this state, reveal an inline topic input inside the modal, and
+  // only run the template-build after the user confirms.
+  const [pendingTemplate, setPendingTemplate] = useState<{ id: string; labelDe: string; labelEn: string } | null>(null);
+  const [pendingTopic, setPendingTopic] = useState("");
   const [templateTopic, setTemplateTopic] = useState("");
   const [activeWorkflow, setActiveWorkflow] = useState<WorkflowState | null>(null);
 
@@ -7498,6 +7530,87 @@ export default function CanvasPage() {
                 <span style={{ opacity: 0.7 }}>({TEMPLATES.length})</span>
               </div>
 
+              {/* Inline topic input — replaces the old window.prompt.
+                   Rendered only while a template is staged. On confirm
+                   we run the template-build + framework-launch logic
+                   that used to live inside the tile onClick. */}
+              {pendingTemplate && (
+                <div style={{
+                  marginBottom: 20,
+                  padding: "16px 18px",
+                  borderRadius: 12,
+                  border: "1px solid var(--volt-text, #0A0A0A)",
+                  background: "var(--muted, #FAFAFA)",
+                }}>
+                  <div style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                    textTransform: "uppercase" as const,
+                    color: "var(--muted-foreground)",
+                    marginBottom: 6,
+                  }}>
+                    {(de ? pendingTemplate.labelDe : pendingTemplate.labelEn)} — {de ? "Thema" : "Topic"}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      autoFocus
+                      value={pendingTopic}
+                      onChange={e => setPendingTopic(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Escape") { setPendingTemplate(null); setPendingTopic(""); }
+                        if (e.key === "Enter" && pendingTopic.trim()) {
+                          const topic = pendingTopic.trim();
+                          const t = TEMPLATES.find(x => x.id === pendingTemplate.id);
+                          if (!t) { setPendingTemplate(null); return; }
+                          const fw = FRAMEWORKS.find(f => f.id === t.id);
+                          if (fw) {
+                            const steps: WorkflowStep[] = fw.steps.map((s, i) => ({
+                              id: `step-${i}`, title: s.title, description: s.description,
+                              status: (i === 0 ? "pending" : "locked") as "pending" | "locked",
+                              queryTemplate: s.queryTemplate, dependsOn: s.dependsOn,
+                              userInputPrompt: s.userInputPrompt,
+                            }));
+                            steps.forEach((s, i) => {
+                              s.status = fw.steps[i].dependsOn.length === 0 ? "pending" : "locked";
+                            });
+                            setActiveWorkflow({
+                              frameworkId: fw.id,
+                              frameworkName: de ? fw.name : fw.nameEn,
+                              methodology: de ? fw.methodology : fw.methodologyEn,
+                              topic, steps, currentStepIndex: 0,
+                            });
+                          } else {
+                            const result = t.build(topic);
+                            setNodes(result.nodes as any[]);
+                            setConnections(result.conns as any[]);
+                            setZoom(0.7);
+                          }
+                          setPendingTemplate(null);
+                          setPendingTopic("");
+                          setShowTemplatePicker(false);
+                        }
+                      }}
+                      placeholder={de ? "Thema eingeben … (Enter zum Starten, Esc zum Abbrechen)" : "Enter topic … (Enter to start, Esc to cancel)"}
+                      style={{
+                        flex: 1, border: "1px solid var(--color-border)", borderRadius: 8,
+                        padding: "9px 12px", fontSize: 14, outline: "none",
+                        background: "var(--card, #fff)", color: "var(--foreground)",
+                        fontFamily: "var(--font-ui)",
+                      }}
+                    />
+                    <button
+                      onClick={() => { setPendingTemplate(null); setPendingTopic(""); }}
+                      style={{
+                        fontSize: 12, padding: "9px 14px", borderRadius: 8,
+                        border: "1px solid var(--color-border)", background: "transparent",
+                        color: "var(--muted-foreground)", cursor: "pointer",
+                        fontFamily: "var(--font-ui)",
+                      }}
+                    >{de ? "Abbrechen" : "Cancel"}</button>
+                  </div>
+                </div>
+              )}
+
               {/* Template Grid — Volt UI Node Canvas card style */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginBottom: 24 }}>
                 {TEMPLATES.map(t => {
@@ -7530,39 +7643,11 @@ export default function CanvasPage() {
                           setShowTemplatePicker(false);
                           return;
                         }
-                        const topic = window.prompt(de ? "Thema eingeben:" : "Enter topic:", "");
-                        if (!topic?.trim()) return;
-                        const fw = FRAMEWORKS.find(f => f.id === t.id);
-                        if (fw) {
-                          const steps: WorkflowStep[] = fw.steps.map((s, i) => ({
-                            id: `step-${i}`,
-                            title: s.title,
-                            description: s.description,
-                            status: (i === 0 ? "pending" : s.dependsOn.every(d => false) ? "pending" : "locked") as "pending" | "locked",
-                            queryTemplate: s.queryTemplate,
-                            dependsOn: s.dependsOn,
-                            userInputPrompt: s.userInputPrompt,
-                          }));
-                          steps.forEach((s, i) => {
-                            if (fw.steps[i].dependsOn.length === 0) s.status = "pending";
-                            else s.status = "locked";
-                          });
-                          setActiveWorkflow({
-                            frameworkId: fw.id,
-                            frameworkName: de ? fw.name : fw.nameEn,
-                            methodology: de ? fw.methodology : fw.methodologyEn,
-                            topic: topic.trim(),
-                            steps,
-                            currentStepIndex: 0,
-                          });
-                          setShowTemplatePicker(false);
-                          return;
-                        }
-                        const result = t.build(topic.trim());
-                        setNodes(result.nodes as any[]);
-                        setConnections(result.conns as any[]);
-                        setZoom(0.7);
-                        setShowTemplatePicker(false);
+                        // Stage the click instead of calling
+                        // window.prompt — see pendingTemplate state
+                        // declaration above for context.
+                        setPendingTemplate({ id: t.id, labelDe: t.labelDe, labelEn: t.labelEn });
+                        setPendingTopic("");
                       }}
                       style={{
                         display: "flex",
