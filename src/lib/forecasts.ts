@@ -320,6 +320,102 @@ export function recordPosition(params: {
 }
 
 /**
+ * Propose a resolution. SIS's differentiator over Manifold's
+ * creator-resolves-own-market: resolution requires TWO signers.
+ * This call records the outcome + rationale + who proposed it,
+ * but leaves the forecast in PENDING_RESOLUTION state. A second
+ * owner/admin (not the proposer) must call `approveResolution`
+ * to finalise.
+ *
+ * Transitions accepted: OPEN → PENDING_RESOLUTION, CLOSED →
+ * PENDING_RESOLUTION. Re-proposing (calling this on an already-
+ * PENDING_RESOLUTION forecast) is allowed and just overwrites
+ * the proposed outcome — the approver still needs to sign off.
+ */
+export function proposeResolution(params: {
+  forecastId: string;
+  tenantId: string;
+  proposerUserId: string;
+  resolution: ForecastResolution;
+  rationale: string;
+}): Forecast {
+  if (!params.rationale.trim()) {
+    throw new Error("Resolution rationale required");
+  }
+  const forecast = getForecast(params.forecastId, params.tenantId);
+  if (!forecast) throw new Error("Forecast not found in this tenant");
+  if (forecast.state !== "OPEN" && forecast.state !== "CLOSED" && forecast.state !== "PENDING_RESOLUTION") {
+    throw new Error(`Forecast cannot be proposed for resolution (state=${forecast.state})`);
+  }
+
+  const db = getSqliteHandle();
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE forecasts SET
+      state = 'PENDING_RESOLUTION',
+      resolution = ?,
+      resolution_rationale = ?,
+      resolved_by = ?,
+      resolution_approver = NULL,
+      updated_at = ?
+    WHERE id = ?`,
+  ).run(params.resolution, params.rationale.trim(), params.proposerUserId, now, params.forecastId);
+
+  return {
+    ...forecast,
+    state: "PENDING_RESOLUTION",
+    resolution: params.resolution,
+    resolutionRationale: params.rationale.trim(),
+    resolvedBy: params.proposerUserId,
+    resolutionApprover: null,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Second signature on a pending resolution — transitions the
+ * forecast to RESOLVED. The approver MUST be a different user
+ * than the proposer. Callers are responsible for enforcing the
+ * "owner/admin only" rule at the API layer (requireTenantRole).
+ */
+export function approveResolution(params: {
+  forecastId: string;
+  tenantId: string;
+  approverUserId: string;
+}): Forecast {
+  const forecast = getForecast(params.forecastId, params.tenantId);
+  if (!forecast) throw new Error("Forecast not found in this tenant");
+  if (forecast.state !== "PENDING_RESOLUTION") {
+    throw new Error(`Forecast is not pending resolution (state=${forecast.state})`);
+  }
+  if (!forecast.resolvedBy || !forecast.resolution) {
+    throw new Error("Forecast is pending but missing proposal details — data corruption?");
+  }
+  if (forecast.resolvedBy === params.approverUserId) {
+    throw new Error("The approver must be a different user than the proposer");
+  }
+
+  const db = getSqliteHandle();
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE forecasts SET
+      state = 'RESOLVED',
+      resolution_approver = ?,
+      resolved_at = ?,
+      updated_at = ?
+    WHERE id = ?`,
+  ).run(params.approverUserId, now, now, params.forecastId);
+
+  return {
+    ...forecast,
+    state: "RESOLVED",
+    resolutionApprover: params.approverUserId,
+    resolvedAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
  * Transition the state of a forecast. Permitted transitions are
  * enforced here rather than in SQL CHECK so error messages are
  * readable.

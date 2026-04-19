@@ -33,6 +33,8 @@ import {
   listForecasts,
   recordPosition,
   setForecastState,
+  proposeResolution,
+  approveResolution,
   forecastsEnabled,
 } from "../src/lib/forecasts";
 
@@ -234,6 +236,114 @@ directDb.close();
 let terminalBlocked = false;
 try { setForecastState(ft.id, TENANT_A, "OPEN"); } catch { terminalBlocked = true; }
 assert(terminalBlocked, "RESOLVED is terminal — no re-open");
+
+// ─── 11. Peer-signoff resolution ────────────────────────────────
+section("11. Resolution requires proposer ≠ approver (two signers)");
+const fResolve = createForecast({
+  tenantId: TENANT_A,
+  question: "peer-signoff test forecast",
+  createdBy: USER_1,
+});
+recordPosition({
+  forecastId: fResolve.id,
+  tenantId: TENANT_A,
+  userId: USER_1,
+  yesProbability: 0.7,
+});
+
+// Propose resolution as USER_1.
+const proposed = proposeResolution({
+  forecastId: fResolve.id,
+  tenantId: TENANT_A,
+  proposerUserId: USER_1,
+  resolution: "YES",
+  rationale: "EU publication confirmed on Monday",
+});
+assert(proposed.state === "PENDING_RESOLUTION", "state → PENDING_RESOLUTION");
+assert(proposed.resolution === "YES", "proposed resolution recorded");
+assert(proposed.resolvedBy === USER_1, "proposer recorded");
+assert(proposed.resolutionApprover === null, "no approver yet");
+
+// Cannot approve as same user (proposer ≠ approver rule).
+let sameSignerBlocked = false;
+try {
+  approveResolution({ forecastId: fResolve.id, tenantId: TENANT_A, approverUserId: USER_1 });
+} catch { sameSignerBlocked = true; }
+assert(sameSignerBlocked, "proposer cannot self-approve");
+
+// Approve as USER_2 (different user).
+const approved = approveResolution({
+  forecastId: fResolve.id,
+  tenantId: TENANT_A,
+  approverUserId: USER_2,
+});
+assert(approved.state === "RESOLVED", "state → RESOLVED after 2nd signer");
+assert(approved.resolvedBy === USER_1, "proposer preserved");
+assert(approved.resolutionApprover === USER_2, "approver recorded");
+assert(approved.resolvedAt !== null, "resolved_at set");
+
+// Cannot approve a non-pending forecast.
+let notPendingBlocked = false;
+try {
+  approveResolution({ forecastId: fResolve.id, tenantId: TENANT_A, approverUserId: USER_2 });
+} catch { notPendingBlocked = true; }
+assert(notPendingBlocked, "approving already-resolved forecast throws");
+
+// Cannot propose on an already-resolved forecast.
+let noProposeOnResolved = false;
+try {
+  proposeResolution({
+    forecastId: fResolve.id,
+    tenantId: TENANT_A,
+    proposerUserId: USER_1,
+    resolution: "NO",
+    rationale: "try to reverse",
+  });
+} catch { noProposeOnResolved = true; }
+assert(noProposeOnResolved, "proposing on RESOLVED forecast throws");
+
+// Empty rationale rejected.
+let emptyRationaleBlocked = false;
+try {
+  const fResolve2 = createForecast({
+    tenantId: TENANT_A,
+    question: "rationale-test forecast",
+    createdBy: USER_1,
+  });
+  proposeResolution({
+    forecastId: fResolve2.id,
+    tenantId: TENANT_A,
+    proposerUserId: USER_1,
+    resolution: "YES",
+    rationale: "   ",
+  });
+} catch { emptyRationaleBlocked = true; }
+assert(emptyRationaleBlocked, "empty/whitespace rationale rejected");
+
+// Re-proposing: an OPEN → PENDING → [different proposal by same user
+// or different user] → still PENDING (just overwrites proposed
+// outcome; approver still needs to be different).
+const fRe = createForecast({
+  tenantId: TENANT_A,
+  question: "re-proposal test",
+  createdBy: USER_1,
+});
+proposeResolution({
+  forecastId: fRe.id,
+  tenantId: TENANT_A,
+  proposerUserId: USER_1,
+  resolution: "YES",
+  rationale: "first proposal",
+});
+const rePropose = proposeResolution({
+  forecastId: fRe.id,
+  tenantId: TENANT_A,
+  proposerUserId: USER_2,
+  resolution: "NO",
+  rationale: "actually no",
+});
+assert(rePropose.resolution === "NO", "re-proposal overwrites outcome");
+assert(rePropose.resolvedBy === USER_2, "re-proposal records new proposer");
 
 // ─── Cleanup ────────────────────────────────────────────────────
 section("cleanup");
