@@ -540,6 +540,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.6,
     description: "Inequality and polarization push migration; large-scale migration amplifies instability in return",
     bidirectional: true,
+    source: "World Bank Poverty & Shared Prosperity 2024 + IOM World Migration Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "mega-migration-displacement",
@@ -629,6 +632,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Identity polarization fuels political fragmentation and culture-war dynamics",
+    source: "Pew Research Political Polarization reports + More in Common Hidden Tribes research",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "macro-web3-decentralization",
@@ -636,6 +642,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.5,
     description: "Self-sovereign identity tech aligns with values of autonomy and privacy",
+    source: "EU eIDAS 2.0 Regulation + EU Digital Identity Wallet pilot results",
+    timestamp: "2026-04-19",
+    confidence: 0.6,
   },
   {
     from: "mega-ai-transformation",
@@ -686,6 +695,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.65,
     description: "Edge and cloud are increasingly continuous — same primitives, different runtimes",
     bidirectional: true,
+    source: "CNCF TAG-Runtime Edge Native Whitepaper + AWS Wavelength / Azure Edge Zones announcements",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ── Exponential Manufacturing (was orphan) ─────────────────────────────
@@ -695,6 +707,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "3D printing, robotics, and digital twins compound into a manufacturing revolution",
+    source: "Wohlers Report 2024 (additive manufacturing state) + IFR World Robotics Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "macro-exponential-manufacturing",
@@ -702,6 +717,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.7,
     description: "On-demand local production enables design for repair, reuse, and recycling",
+    source: "Ellen MacArthur Foundation Circular Economy in 3D Printing + EU Ecodesign Directive 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.65,
   },
   {
     from: "macro-exponential-manufacturing",
@@ -709,6 +727,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Distributed manufacturing weakens reliance on single-source global supply chains",
+    source: "US CHIPS and Science Act (2022) + EU Chips Act + reshoring trend reports (Kearney Reshoring Index 2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
   {
     from: "mega-energy-transition",
@@ -725,6 +746,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.75,
     description: "Frontier R&D continues to push quantum closer to commercial relevance",
+    source: "IBM Quantum roadmap + Google Willow chip announcement (2024) + McKinsey Quantum Technology Monitor",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "macro-quantum-computing",
@@ -744,6 +768,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "AR/VR hardware leaps enable new spatial interaction paradigms",
+    source: "IDC Worldwide AR/VR Headset Tracker 2024 + Apple Vision Pro / Meta Quest 3 launch performance",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
   {
     from: "macro-spatial-computing",
@@ -825,6 +852,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.65,
     description: "Agentic platforms become the new layer above app stores and marketplaces",
+    source: "Anthropic Computer Use API + OpenAI Swarm / LangGraph / CrewAI framework growth (2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.6,
   },
 
   // ── Human-Machine Collaboration ────────────────────────────────────────
