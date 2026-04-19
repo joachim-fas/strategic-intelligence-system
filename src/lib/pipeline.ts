@@ -393,7 +393,7 @@ export async function runPipeline(): Promise<PipelineResult> {
 /** Minimal shape the shared `storeSignalsGeneric` loop needs from a
  *  dialect adapter. All methods may be async or sync; callers always
  *  `await` them so promise-wrapping is automatic. */
-interface SignalStore {
+export interface SignalStore {
   /** Insert-or-update a trend by slug, returns the trend's id. */
   upsertTrend(scored: ReturnType<typeof scoreTrend>): Promise<string>;
   /** Persist one raw signal linked to a trend. */
@@ -411,8 +411,12 @@ interface SignalStore {
 }
 
 /** The part that's identical across dialects. Groups → scores →
- *  upserts → signals → log → source-timestamp update. */
-async function storeSignalsGeneric(signals: RawSignal[], store: SignalStore) {
+ *  upserts → signals → log → source-timestamp update.
+ *  Exported so integration tests can pass a mock SignalStore and
+ *  assert the invariant order without hitting a real DB. Not part
+ *  of the public runtime API — callers should use
+ *  `storeSignalsAndUpdateScores` instead. */
+export async function storeSignalsGeneric(signals: RawSignal[], store: SignalStore) {
   try {
     const groups = groupSignalsByTopic(signals);
     for (const group of groups) {
