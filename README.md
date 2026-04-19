@@ -92,56 +92,71 @@ in Notion (linked from `project_tenant_rollout.md` in memory).
 | `/canvas` | Node canvas workspace |
 | `/projects` | Your projects list |
 | `/projects/archive` | Archived projects |
+| `/clusters` | Cluster history viewer (topic evolution + optional LLM changelog/foresight) |
+| `/clusters?id={slug}` | Pinned cluster detail |
+| `/forecasts` | Team prediction-market-lite (feature-flagged, see Deployment) |
+| `/briefing/{slug}-{hash}` | Canonical shareable briefing URL |
 | `/admin` | System admin landing |
 | `/admin/tenants` | Manage tenants |
 | `/admin/tenants/[id]` | Tenant detail + members + invites |
 | `/admin/audit` | Global audit log |
 | `/settings/tenant` | Tenant owner/admin settings |
 | `/invite/accept?token=…` | Public invite landing |
-| `/monitor` | Pipeline + data source health |
+| `/monitor` | Pipeline + data source health (now with per-source z-score anomaly badges) |
+
+The Cmd+K / Ctrl+K command palette is available globally and surfaces
+every navigation above without needing to know the paths.
 
 Legacy German slugs (`/verstehen`, `/sessions`, `/admin/mandanten`,
 `/settings/mandant`, etc.) redirect with query-param preservation.
 
 ### API (`/api/v1/*`)
 
-44 routes, grouped as:
-- **Tenant-scoped user data** (15): canvas, projects, radars,
-  scenarios, bsc_ratings, versions, alerts — all gated by
-  `requireTenantContext` + role.
+Grouped as:
+- **Tenant-scoped user data**: canvas, projects, radars, scenarios,
+  bsc_ratings, versions, alerts — all gated by `requireTenantContext`
+  + role.
 - **System admin** (`/admin/*`): tenants + memberships + invites +
   audit.
 - **Invite/auth**: invite-accept, switch-tenant.
 - **Stammdaten** (shared): trends, feed, signals, sources/status,
   pipeline, monitor, cron.
+- **Cluster history**: `/clusters` (list) + `/clusters/[id]/history`
+  (Perigon-inspired snapshot timeline with optional LLM changelog
+  and SIS-native forward-looking `foresight[]` slot).
+- **Forecasts** (feature-flagged): `/forecasts` (list + create),
+  `/forecasts/[id]` (detail), `/forecasts/[id]/positions` (stake),
+  `/forecasts/[id]/resolve` (two-signer peer-signoff),
+  `/forecasts/calibration/[userId]` (per-user Brier summary with
+  decile buckets). Every route returns 404 when
+  `FORECASTS_ENABLED` is unset.
 - **Health**: `/api/v1/health` (unauthenticated liveness probe for
   monitoring/k8s).
 
 ## Tests
 
-Plain tsx smoke tests, zero framework install:
+Plain tsx smoke tests, zero framework install. 232 assertions across
+eight suites — `npm test` runs them all in sequence:
 
-```bash
-npm run test:tenants    # 20 assertions — schema, isolation, guards
-npm run test:api        # 37 assertions — API envelope contract (needs dev server)
-npm run test            # runs both
-```
+| Script | Assertions | Scope |
+|---|---:|---|
+| `test:tenants` | 20 | Schema idempotency, default-tenant seeding, cross-tenant isolation, last-owner guard, invite/audit retention |
+| `test:stream` | 11 | streamQuery retry + reconnect logic (EDGE-17) |
+| `test:briefing-url` | 28 | FNV-1a hash + slug round-trip for `/briefing/{slug}-{hash}` (Welle A Item 3) |
+| `test:baseline` | 23 | Welford streaming variance + anomaly tiers (Welle B Item 3) |
+| `test:cluster-snapshots` | 38 | Cluster history CRUD against local.db (Welle B Item 2) |
+| `test:ai-text` | 22 | Anthropic → OpenRouter fallback routing (Welle C Item 1) |
+| `test:foresight-parser` | 26 | LLM-output JSON parser robustness (Welle B Item 2 follow-up) |
+| `test:forecasts` | 64 | Forecasts CRUD + peer-signoff + Brier calibration (Welle C Items 2 + 3) |
+| `test:api` | 37 | HTTP envelope contract (needs `npm run dev` on localhost:3001) |
 
-**`test:tenants`** — offline, uses an in-memory SQLite. Covers
-migration idempotency, default-tenant seeding, cross-tenant radar
-isolation, bsc_ratings tenant-unique, last-owner guard, invite
-expiry/uniqueness, audit-log truncation window.
-
-**`test:api`** — online, expects `npm run dev` running on
-`localhost:3001` (override with `BASE_URL=...`). Holds the line on
-the canonical `apiSuccess({data}) / apiError(msg, code)` envelope
-after the 18.04.2026 audit migration: hits every route that was
-touched and asserts both HTTP status and response shape.
+All offline except `test:api`. Suites tag their rows with a unique
+prefix and clean up on exit so parallel runs stay surgical.
 
 **Deferred (open ticket):** Playwright E2E for canvas save-roundtrip,
 home-query-to-briefing, and invite-accept happy path. Needs an
-explicit `npx playwright install` step (browser downloads) so
-deliberately not bundled into `npm install`.
+explicit `npx playwright install` step so deliberately not bundled
+into `npm install`.
 
 ## Repository layout
 
@@ -170,6 +185,12 @@ src/
     trend-signal-match.ts # Fuzzy matcher trends ↔ signals
     pipeline.ts         # 7-stage signals pipeline
     emails.ts           # Resend + SMTP + dry-run fallback
+    briefing-url.ts     # FNV-1a slug+hash for /briefing/{slug}-{hash}
+    commands.ts         # Cmd+K palette registry
+    cluster-snapshots.ts # Perigon-inspired cluster history + LLM diff/foresight
+    baseline.ts         # Welford streaming-variance anomaly baseline
+    ai-text.ts          # Anthropic → OpenRouter fallback helper
+    forecasts.ts        # Forecast-Layer + Brier calibration
 scripts/
   tenant-bootstrap.ts   # Promote user to system admin
   tenant-smoke-test.ts  # Zero-install integration tests
@@ -188,16 +209,48 @@ scripts/
 | `npm run signals:pump` | Trigger the signals pipeline once |
 | `npm run signals:status` | Per-source freshness table |
 | `npm run tenant:bootstrap -- <email>` | Promote user to system admin |
-| `npm run test:tenants` | Tenant-layer smoke tests (20 assertions, offline) |
-| `npm run test:api` | API envelope smoke tests (37 assertions, needs dev server) |
-| `npm run test` | Both test suites in sequence |
+| `npm run test:tenants` | Tenant-layer smoke tests (20, offline) |
+| `npm run test:stream` | streamQuery retry + reconnect (11, offline) |
+| `npm run test:briefing-url` | Briefing URL slug + hash (28, offline) |
+| `npm run test:baseline` | Welford baseline math (23, offline) |
+| `npm run test:cluster-snapshots` | Cluster history CRUD (38, offline) |
+| `npm run test:ai-text` | AI-router fallback (22, offline) |
+| `npm run test:foresight-parser` | Foresight JSON parser (26, offline) |
+| `npm run test:forecasts` | Forecasts + calibration (64, offline) |
+| `npm run test:api` | HTTP envelope smoke (37, needs dev server) |
+| `npm run test` | All suites in sequence |
 
 ## Deployment
 
 Targets Vercel. Cron job on `/api/v1/cron` every 4h runs the signal
-pipeline. Set `CRON_SECRET`, `NEXTAUTH_SECRET`, `AUTH_SECRET`,
-`RESEND_API_KEY`, `ANTHROPIC_API_KEY`, optionally `DATABASE_URL` for
-Postgres. See `.env.example` for the full list.
+pipeline. See `.env.example` for the full variable list.
+
+### Required secrets
+
+| Variable | Purpose |
+|---|---|
+| `CRON_SECRET` | Vercel cron auth |
+| `NEXTAUTH_SECRET`, `AUTH_SECRET` | Session signing |
+| `RESEND_API_KEY` (or SMTP creds) | Magic-link + invite emails |
+| `ANTHROPIC_API_KEY` | Primary LLM for briefings + ai-text helpers |
+
+### Optional connector keys
+
+`GUARDIAN_API_KEY`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `NEWSAPI_KEY`,
+`NEWSDATA_KEY`, `NYT_API_KEY`, `ACLED_KEY`, `OPENEXCHANGE_KEY`,
+optional `GITHUB_TOKEN` / `STACKOVERFLOW_KEY`. `/monitor` surfaces
+anything missing with a "Get key →" link. SIS stays online without
+them — affected connectors just go silent instead of erroring.
+
+### Optional feature flags
+
+| Flag | Effect |
+|---|---|
+| `FORECASTS_ENABLED=true` | Activates the full `/forecasts` feature (CRUD + peer-signoff resolution + Brier calibration). When unset, all `/api/v1/forecasts/*` routes return 404 and the `/forecasts` page renders a "not enabled" splash. |
+| `CLUSTER_DIFF_LLM_ENABLED=true` | Pipeline Phase 2d generates an LLM changelog between consecutive cluster snapshots. Cost: ~30 extra LLM calls per pipeline run (4h cadence × ~30 clusters in prod). |
+| `CLUSTER_FORESIGHT_LLM_ENABLED=true` | Pipeline Phase 2d generates 2–3 forward scenarios per cluster snapshot. Independent of the changelog flag; same cost shape. |
+| `OPENROUTER_API_KEY=<key>` | Activates the OpenRouter secondary provider in `src/lib/ai-text.ts`. Anthropic stays primary; OpenRouter only fires on 5xx / 429 / timeout. No behaviour change when unset. |
+| `SIS_ALLOW_DEV_AUTH=true` (dev only) | Explicit opt-in to the dev-mode auth bypass; keeps production builds safe even if `NODE_ENV` is misread. |
 
 ## License
 
