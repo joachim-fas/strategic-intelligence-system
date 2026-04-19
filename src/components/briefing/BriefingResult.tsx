@@ -69,13 +69,17 @@ export interface HistoryEntry {
 }
 
 // ── BriefingResult ────────────────────────────────────────────────────────────
-export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp }: {
+export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp, onProjectCreated }: {
   entry: HistoryEntry;
   locale: Locale;
   trendCount: number;
   onTrendClick: (trend: TrendDot) => void;
   activeProjectId?: string | null;
   onFollowUp?: (query: string) => void;
+  /** Optional: Callback wenn beim Speichern automatisch ein neues
+   *  Projekt angelegt wurde. Parent setzt damit seinen activeProjectId,
+   *  sodass folgende Briefings in dasselbe Projekt wandern. */
+  onProjectCreated?: (projectId: string) => void;
 }) {
   const { briefing } = entry;
   const isHelp = entry.query === "/help";
@@ -91,16 +95,45 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   const saveToProject = async () => {
     // Allow retry after a previous failure — but guard against repeated
     // clicks while a save is in flight or after a successful save.
-    if (!activeProjectId || saving) return;
-    if (saved) return;
+    if (saving || saved) return;
     setSaving(true);
     setSaveError(null);
     try {
+      // **Auto-Create-Logik (Audit-Fix 2026-04-19):**
+      //
+      // Früher war der Button `disabled={!activeProjectId}`, der Tooltip
+      // versprach aber trotzdem „Projekt wird automatisch angelegt" —
+      // widersprüchlich und bug-anfällig. Fix: wenn noch kein Projekt
+      // aktiv ist, erzeugen wir jetzt tatsächlich eins, benennen es nach
+      // der Query (erste 60 Zeichen), und speichern das Briefing dort
+      // rein. Der Parent bekommt den neuen projectId via Callback, sodass
+      // Folge-Briefings ins gleiche Projekt wandern.
+      let projectId = activeProjectId;
+      if (!projectId) {
+        const projName = (entry.query ?? "Neues Projekt").trim().slice(0, 60);
+        const createRes = await fetchWithTimeout("/api/v1/canvas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: projName }),
+        }, 30_000);
+        if (!createRes.ok) {
+          let m = `HTTP ${createRes.status}`;
+          try { const b = await createRes.json(); if (b?.error?.message) m = b.error.message; } catch {}
+          throw new Error(locale === "de" ? `Projekt-Anlage fehlgeschlagen: ${m}` : `Project creation failed: ${m}`);
+        }
+        const createJson = await createRes.json();
+        const newId = createJson?.data?.canvas?.id ?? createJson?.canvas?.id;
+        if (!newId) {
+          throw new Error(locale === "de" ? "Projekt-Anlage ohne ID zurückgekommen" : "Project creation returned no ID");
+        }
+        projectId = newId;
+        onProjectCreated?.(newId);
+      }
       // Briefing payloads are heavy (synthesis + chains + scenarios +
       // references) and on a cold dev-server the target route takes
       // 30-60 s to compile. Give this POST a 90 s budget instead of the
       // default 30 s so first-save after a restart actually completes.
-      const res = await fetchWithTimeout(`/api/v1/projects/${activeProjectId}/queries`, {
+      const res = await fetchWithTimeout(`/api/v1/projects/${projectId}/queries`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -292,19 +325,25 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
              and the tooltip explains why. */}
         {!isLoading && !isHelp && briefing.synthesis && (
           <Tooltip
-            content={!activeProjectId
-              ? (locale === "de" ? "Kein aktives Projekt — Projekt wird automatisch beim Speichern angelegt" : "No active project — saving will create one")
-              : saveError
-                ? saveError
-                : saved
-                  ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
+            content={saveError
+              ? saveError
+              : saved
+                ? (locale === "de" ? "Im Projekt gespeichert" : "Saved to project")
+                : !activeProjectId
+                  // Neue Auto-Create-Logik — Tooltip deckt jetzt den Fall
+                  // „kein aktives Projekt" mit einer klaren Ansage statt
+                  // dem alten „wird automatisch angelegt"-Disclaimer bei
+                  // disabled Button.
+                  ? (locale === "de" ? "Neues Projekt anlegen und Briefing darin speichern" : "Create a new project and save the briefing there")
                   : (locale === "de" ? "Briefing im aktiven Projekt speichern" : "Save briefing to active project")}
             placement="bottom"
           >
             <Button
               variant="ghost" size="sm"
               onClick={saveToProject}
-              disabled={!activeProjectId || saved || saving}
+              // Button ist NICHT mehr disabled wenn activeProjectId fehlt
+              // — wir legen das Projekt in `saveToProject` automatisch an.
+              disabled={saved || saving}
               className={cn(
                 "text-[12px] px-3 h-7 gap-1.5",
                 saved ? "text-[#1A9E5A]" : saveError ? "text-[#D93636]" : "text-[#9B9B9B]",

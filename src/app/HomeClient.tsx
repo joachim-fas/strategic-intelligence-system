@@ -2133,6 +2133,15 @@ export default function HomeClient() {
                   trendCount={trends.length}
                   onTrendClick={setSelectedTrend}
                   activeProjectId={activeProjectId}
+                  onProjectCreated={(pid) => {
+                    // Wenn der Save-Button ein Projekt auto-angelegt hat,
+                    // übernehmen wir den neuen projectId in unseren State
+                    // (+ Ref für Follow-up-Queries). So landen weitere
+                    // Briefings im selben Projekt ohne dass der User nochmal
+                    // manuell anlegen muss.
+                    setActiveProjectId(pid);
+                    activeProjectIdRef.current = pid;
+                  }}
                   onFollowUp={(q) => {
                     // Audit finding A1-H4 (18.04.2026): clicking a
                     // follow-up used to auto-submit the LLM call with
