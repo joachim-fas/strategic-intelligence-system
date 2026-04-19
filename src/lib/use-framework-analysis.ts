@@ -56,11 +56,40 @@ export function useFrameworkAnalysis(
     }
 
     try {
-      const res = await fetch("/api/v1/frameworks/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ frameworkId, topic, step: stepId, context, locale }),
-      });
+      // Notion-Plan P2-2 (#16): Phase-1-Retry (Connection Establishment).
+      // Bei 5xx / 529 bis zu 2 Retries mit exponentiellem Backoff.
+      // KEINEN Retry bei mid-stream-Drops — Partial-Synthesis würde sonst
+      // doppelt angezeigt werden. Same Pattern wie streamQuery.ts.
+      const MAX_RETRIES = 2;
+      let res: Response | null = null;
+      let connectErr: unknown = null;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          res = await fetch("/api/v1/frameworks/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ frameworkId, topic, step: stepId, context, locale }),
+          });
+          // Retry nur bei transienten Server-Problemen, NICHT bei 4xx (Client-Fehler).
+          if (!res.ok && (res.status === 529 || res.status >= 500) && attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          break;
+        } catch (e) {
+          // Netzwerk-Error — retry bis zum Limit
+          connectErr = e;
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw e;
+        }
+      }
+      if (!res) {
+        setSteps(prev => ({ ...prev, [stepId]: { status: "error", data: null, rawText: "", error: String(connectErr ?? "connect failed") } }));
+        return;
+      }
 
       if (!res.ok) {
         const err = await res.text();
