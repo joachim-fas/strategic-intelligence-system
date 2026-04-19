@@ -45,6 +45,12 @@ export function TenantsClient() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Tenant | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /*
+    Notion-Plan HIGH-H10 (#18): Aktions-Fehler als Inline-Banner statt
+    blockierende browser-alerts. Verhalten: verschwindet nach 6s oder
+    bei nächster erfolgreicher Aktion.
+  */
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,7 +94,8 @@ export function TenantsClient() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load();
     } catch (e) {
-      alert(t("common.actionFailed"));
+      setActionError(t("common.actionFailed"));
+      setTimeout(() => setActionError(null), 6000);
       console.error(e);
     } finally {
       setBusyId(null);
@@ -97,7 +104,8 @@ export function TenantsClient() {
 
   const onDelete = async (tenant: Tenant) => {
     if (!tenant.archived_at) {
-      alert(t("admin.archiveBeforeDelete"));
+      setActionError(t("admin.archiveBeforeDelete"));
+      setTimeout(() => setActionError(null), 6000);
       return;
     }
     const ok = await voltConfirm({
@@ -114,7 +122,8 @@ export function TenantsClient() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load();
     } catch (e) {
-      alert(t("admin.deleteFailed"));
+      setActionError(t("admin.deleteFailed"));
+      setTimeout(() => setActionError(null), 6000);
       console.error(e);
     } finally {
       setBusyId(null);
@@ -167,6 +176,42 @@ export function TenantsClient() {
 
         {loading && <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{t("common.loading")}</div>}
         {error && <div style={{ color: "var(--signal-negative, #C0341D)", fontSize: 13 }}>{error}</div>}
+        {/* Notion-Plan HIGH-H10: Inline-Fehler für Aktions-Failures statt alert(). */}
+        {actionError && (
+          <div
+            role="alert"
+            style={{
+              padding: "10px 14px",
+              marginBottom: 12,
+              borderRadius: 8,
+              background: "var(--signal-negative-light, rgba(192, 52, 29, 0.1))",
+              border: "1px solid var(--signal-negative-border, rgba(192, 52, 29, 0.35))",
+              color: "var(--signal-negative, #C0341D)",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <span>{actionError}</span>
+            <button
+              onClick={() => setActionError(null)}
+              aria-label={t("common.close")}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--signal-negative, #C0341D)",
+                fontSize: 16,
+                fontWeight: 700,
+                padding: "0 6px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {!loading && tenants.length === 0 && (
           <div style={{
