@@ -1181,6 +1181,24 @@ const en = {
     disconnected: "Disconnected",
   },
 
+  briefingView: {
+    confidence: "Confidence",
+    subheaderSources: "real-time sources",
+    subheaderTrends: "trends",
+    euFocus: "EU Focus",
+    synthesisHeading: "Synthesis",
+    scenariosHeading: "Scenarios",
+    scenarioOptimistic: "Optimistic",
+    scenarioBaseline: "Baseline",
+    scenarioPessimistic: "Pessimistic",
+    keyInsightsHeading: "Key Insights",
+    causalHeading: "Causal Relationships",
+    decisionFrameworkHeading: "Decision Framework",
+    sourcesHeading: "Sources",
+    confidential: "Confidential",
+    exportPdfButton: "Export as PDF (Cmd+P)",
+  },
+
   briefingExport: {
     copiedTooltip: "Copied to clipboard",
     exportTooltip: "Export briefing (Markdown, JSON)",
@@ -2301,6 +2319,24 @@ const de: Dictionary = {
     footerShortcut: "Ctrl+M zum Umschalten",
     connected: "Verbunden",
     disconnected: "Getrennt",
+  },
+
+  briefingView: {
+    confidence: "Konfidenz",
+    subheaderSources: "Echtzeit-Quellen",
+    subheaderTrends: "Trends",
+    euFocus: "EU-Fokus",
+    synthesisHeading: "Synthese",
+    scenariosHeading: "Szenarien",
+    scenarioOptimistic: "Optimistisch",
+    scenarioBaseline: "Basisfall",
+    scenarioPessimistic: "Pessimistisch",
+    keyInsightsHeading: "Erkenntnisse",
+    causalHeading: "Kausale Zusammenhänge",
+    decisionFrameworkHeading: "Entscheidungshilfe",
+    sourcesHeading: "Quellen",
+    confidential: "Vertraulich",
+    exportPdfButton: "Als PDF exportieren (Cmd+P)",
   },
 
   briefingExport: {
