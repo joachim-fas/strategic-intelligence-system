@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Space_Grotesk, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/locale-context";
@@ -8,6 +9,7 @@ import { ActivityPanel } from "@/components/ActivityPanel";
 import { DesktopOnlyGate } from "@/components/DesktopOnlyGate";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { Footer } from "@/components/Footer";
+import { NavProgress } from "@/components/NavProgress";
 import { auth } from "@/lib/auth";
 import { getSqliteHandle } from "@/db";
 import { getDefaultTenantId } from "@/db/sqlite-helpers";
@@ -115,6 +117,11 @@ export default async function RootLayout({
         <link rel="stylesheet" href="/volt-ui.css" />
       </head>
       <body className="antialiased volt-root pattern-dots">
+        {/* NavProgress nutzt useSearchParams → muss in Suspense stehen,
+            damit Next.js den Bundle statisch prerendern kann. */}
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         <LocaleProvider>
           <TenantProvider
             activeTenantId={tenantBootstrap.activeTenantId}
