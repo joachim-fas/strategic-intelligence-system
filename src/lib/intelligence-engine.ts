@@ -47,6 +47,20 @@ export interface IntelligenceBriefing {
   decisionFramework?: string;
   usedSignals?: { source: string; title: string; url: string | null; strength: number | null; date: string }[];
   /**
+   * STEEP+V-Dimensionen — im System-Prompt (v0.2) als steepV-Feld
+   * abgefragt und vom UI (BriefingResult.tsx) als 6-Kacheln-Grid
+   * gerendert. Notion-Plan P3-2 (2026-04-20): macht STEEP+V
+   * maschinenlesbar statt nur im Fließtext zu verschwinden.
+   */
+  steepV?: {
+    S?: string | null;
+    T?: string | null;
+    E_economy?: string | null;
+    E_environment?: string | null;
+    P?: string | null;
+    V?: string | null;
+  } | null;
+  /**
    * Raw matched trends in the flat MatchedTrend shape that the API delivers.
    * Kept alongside `matchedTrends: TrendMatch[]` so canvas/orbit views that
    * consume `QueryResult.matchedTrends` get the shape they expect without
