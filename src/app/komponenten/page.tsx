@@ -1,3 +1,15 @@
+/**
+ * /komponenten — Internal Volt UI component catalogue.
+ *
+ * **i18n note (A5-H9, 2026-04-19):** Like `/dokumentation`, this
+ * page intentionally keeps inline `de ? "…" : "…"` ternaries for
+ * its ~141 bilingual sentences. Prose here is single-use, lives
+ * next to the rendered components, and doubles as the reading
+ * context — moving it to `src/lib/i18n.ts` would hurt readability
+ * without any reuse benefit. See `/dokumentation` header for the
+ * full reasoning.
+ */
+
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";

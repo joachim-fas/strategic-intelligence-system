@@ -135,8 +135,9 @@ Grouped as:
 
 ## Tests
 
-Plain tsx smoke tests, zero framework install. 232 assertions across
-eight suites — `npm test` runs them all in sequence:
+Plain tsx smoke tests, zero framework install. **~315 assertions across
+12 offline suites + 1 online suite** — `npm test` runs them all in
+sequence:
 
 | Script | Assertions | Scope |
 |---|---:|---|
@@ -147,7 +148,11 @@ eight suites — `npm test` runs them all in sequence:
 | `test:cluster-snapshots` | 38 | Cluster history CRUD against local.db (Welle B Item 2) |
 | `test:ai-text` | 22 | Anthropic → OpenRouter fallback routing (Welle C Item 1) |
 | `test:foresight-parser` | 26 | LLM-output JSON parser robustness (Welle B Item 2 follow-up) |
-| `test:forecasts` | 64 | Forecasts CRUD + peer-signoff + Brier calibration (Welle C Items 2 + 3) |
+| `test:forecasts` | 69 | Forecasts CRUD + peer-signoff + Brier calibration (Welle C Items 2 + 3) |
+| `test:sse-client` | 26 | Shared SSE parser — CRLF, `[DONE]` sentinel, AbortSignal (API-09) |
+| `test:pipeline-store` | 14 | SignalStore adapter — SQLite/Postgres dedup (ARC-16) |
+| `test:pagination` | 25 | Offset+limit pagination helper (PERF-13) |
+| `test:openapi-spec` | 13 | OpenAPI 3.1 spec validation (API-19) |
 | `test:api` | 37 | HTTP envelope contract (needs `npm run dev` on localhost:3001) |
 
 All offline except `test:api`. Suites tag their rows with a unique
@@ -216,7 +221,11 @@ scripts/
 | `npm run test:cluster-snapshots` | Cluster history CRUD (38, offline) |
 | `npm run test:ai-text` | AI-router fallback (22, offline) |
 | `npm run test:foresight-parser` | Foresight JSON parser (26, offline) |
-| `npm run test:forecasts` | Forecasts + calibration (64, offline) |
+| `npm run test:forecasts` | Forecasts + calibration (69, offline) |
+| `npm run test:sse-client` | Shared SSE parser (26, offline) |
+| `npm run test:pipeline-store` | SignalStore adapter (14, offline) |
+| `npm run test:pagination` | Pagination helper (25, offline) |
+| `npm run test:openapi-spec` | OpenAPI 3.1 spec validation (13, offline) |
 | `npm run test:api` | HTTP envelope smoke (37, needs dev server) |
 | `npm run test` | All suites in sequence |
 

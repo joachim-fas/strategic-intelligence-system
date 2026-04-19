@@ -1,3 +1,17 @@
+/**
+ * /dokumentation — Internal developer docs surface.
+ *
+ * **i18n note (A5-H9, 2026-04-19):** This page and `/komponenten`
+ * intentionally use inline `de ? "…" : "…"` ternaries instead of
+ * the shared i18n dictionary. The strings are used exactly once,
+ * locally, and the content itself IS the point — migrating ~184
+ * sentences into `src/lib/i18n.ts` would double the dictionary
+ * size without buying any reuse. If a third locale ever lands,
+ * a co-located `content.ts` module is a better fit than the
+ * shared dictionary. Until then: inline bilingual is intentional,
+ * not tech debt.
+ */
+
 "use client";
 
 import { useState, useEffect } from "react";
