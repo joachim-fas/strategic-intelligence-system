@@ -10,15 +10,14 @@
 import { useState } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { SessionList } from "@/components/sessions/SessionList";
 import { SessionsSubNav } from "@/components/sessions/SessionsSubNav";
 
 export default function ProjectsPage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, de } = useT();
   const activeTenantId = useActiveTenantId();
   const [creating, setCreating] = useState(false);
 
@@ -29,7 +28,7 @@ export default function ProjectsPage() {
       const res = await fetchWithTimeout("/api/v1/canvas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: de ? "Neues Projekt" : "New Project" }),
+        body: JSON.stringify({ name: t("sessions.newProjectName") }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -60,7 +59,7 @@ export default function ProjectsPage() {
             textTransform: "uppercase", color: "var(--volt-text-faint, #AAA)",
             marginBottom: 10,
           }}>
-            {de ? "Deine strategischen Projekte" : "Your strategic projects"}
+            {t("sessions.heroCaption")}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <h1 style={{
@@ -68,7 +67,7 @@ export default function ProjectsPage() {
               fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em",
               color: "var(--volt-text, #0A0A0A)", margin: 0, lineHeight: 1.15,
             }}>
-              {de ? "Projekte" : "Projects"}
+              {t("sessions.projects")}
             </h1>
             {/* Volt UI Primary Button: 14px/600, h-36, px-20, rounded-lg (8px), bg-lime, tracking-tight */}
             <button
@@ -86,16 +85,14 @@ export default function ProjectsPage() {
                 transition: "all 0.2s ease-out",
               }}
             >
-              {creating ? (de ? "Erstelle…" : "Creating…") : (de ? "+ Neues Projekt" : "+ New Project")}
+              {creating ? t("sessions.newProjectCreating") : t("sessions.newProjectButton")}
             </button>
           </div>
           <p style={{
             fontSize: 14, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
             margin: "12px 0 20px", maxWidth: 620,
           }}>
-            {de
-              ? "Jedes Projekt ist ein zusammenhängender strategischer Arbeitsstrang — Fragen, Nodes, Szenarien, Entscheidungen. Klicke ein Projekt an, um im Node Canvas weiterzuarbeiten."
-              : "Each project is a connected strand of strategic work — questions, nodes, scenarios, decisions. Click a project to continue working in the Node Canvas."}
+            {t("sessions.heroBody")}
           </p>
 
           <SessionsSubNav active="active" de={de} />

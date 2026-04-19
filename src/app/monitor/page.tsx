@@ -129,12 +129,18 @@ function SourceBar({
     medium: signPositive ? "rgba(88,168,46,0.22)"  : "rgba(217,87,56,0.20)",
     high:   signPositive ? "rgba(26,158,90,0.25)"  : "rgba(196,36,27,0.22)",
   };
+  // Label maps stay inline (they're typed Record lookups, not
+  // translatable templated strings). The locale switch itself
+  // picks the right map.
   const tierLabelDe: Record<string, string> = { low: "auffällig", medium: "stark", high: "kritisch" };
   const tierLabelEn: Record<string, string> = { low: "anomalous", medium: "strong", high: "critical" };
+  const tierLabel = de ? tierLabelDe : tierLabelEn;
   const tierTitle = tier
-    ? `z = ${z?.toFixed(2)} (n=${anomaly?.n ?? 0}) · ${de ? tierLabelDe[tier] : tierLabelEn[tier]}`
+    ? `z = ${z?.toFixed(2)} (n=${anomaly?.n ?? 0}) · ${tierLabel[tier]}`
+    // `Baseline warming up (n=X)` is identical DE + EN; the old
+    // ternary was a no-op. Collapsed for clarity.
     : anomaly && anomaly.n < 10
-    ? de ? `Baseline warming up (n=${anomaly.n})` : `Baseline warming up (n=${anomaly.n})`
+    ? `Baseline warming up (n=${anomaly.n})`
     : undefined;
 
   return (
@@ -389,10 +395,9 @@ export default function MonitorPage() {
                 sub={(() => {
                   const cov = provenanceCoverage();
                   if (cov.partialPct === 0) {
-                    return `${data.knowledgeBase.regulations} ${t("monitor.regulations")} · ${de ? "0 % mit Quelle" : "0 % w/ source"}`;
+                    return `${data.knowledgeBase.regulations} ${t("monitor.regulations")} · ${t("monitor.coverageZeroShort")}`;
                   }
-                  const label = de ? "mit Quelle" : "w/ source";
-                  return `${cov.fullPct} % ${label} (${cov.full}/${cov.total})`;
+                  return `${cov.fullPct} % ${t("monitor.coverageWithSource")} (${cov.full}/${cov.total})`;
                 })()}
               />
               <StatCard

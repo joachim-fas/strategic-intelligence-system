@@ -523,6 +523,14 @@ const en = {
     tipRestore: "Restore from archive",
     tipDelete: "Permanently delete",
     emptyState: "No projects yet. Start a new analysis on the home page.",
+    heroCaption: "Your strategic projects",
+    heroBody: "Each project is a connected strand of strategic work — questions, nodes, scenarios, decisions. Click a project to continue working in the Node Canvas.",
+    newProjectName: "New Project",
+    newProjectButton: "+ New Project",
+    newProjectCreating: "Creating…",
+    archiveCaption: "Completed work",
+    archiveTitle: "Project Archive",
+    archiveBody: "Completed projects that are no longer actively worked on. You can restore them at any time or delete them permanently.",
   },
 
   invite: {
@@ -641,6 +649,8 @@ const en = {
     connectorRegistry: "Connector Registry",
     activityLog: "Activity Log",
     waitingForActivity: "Waiting for activity...",
+    coverageWithSource: "w/ source",
+    coverageZeroShort: "0 % w/ source",
   },
 
   sources: {
@@ -1462,6 +1472,14 @@ const de: Dictionary = {
     tipRestore: "Aus Archiv wiederherstellen",
     tipDelete: "Endgültig löschen",
     emptyState: "Noch keine Projekte. Starte eine neue Analyse auf der Startseite.",
+    heroCaption: "Deine strategischen Projekte",
+    heroBody: "Jedes Projekt ist ein zusammenhängender strategischer Arbeitsstrang — Fragen, Nodes, Szenarien, Entscheidungen. Klicke ein Projekt an, um im Node Canvas weiterzuarbeiten.",
+    newProjectName: "Neues Projekt",
+    newProjectButton: "+ Neues Projekt",
+    newProjectCreating: "Erstelle…",
+    archiveCaption: "Abgeschlossene Arbeit",
+    archiveTitle: "Projekt-Archiv",
+    archiveBody: "Abgeschlossene Projekte, die nicht mehr aktiv bearbeitet werden. Du kannst sie jederzeit wiederherstellen oder endgültig löschen.",
   },
 
   invite: {
@@ -1577,6 +1595,8 @@ const de: Dictionary = {
     connectorRegistry: "Connector-Registry",
     activityLog: "Aktivitätsprotokoll",
     waitingForActivity: "Warte auf Aktivität...",
+    coverageWithSource: "mit Quelle",
+    coverageZeroShort: "0 % mit Quelle",
   },
 
   sources: {

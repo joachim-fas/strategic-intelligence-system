@@ -9,13 +9,12 @@
  */
 
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { SessionList } from "@/components/sessions/SessionList";
 import { SessionsSubNav } from "@/components/sessions/SessionsSubNav";
 
 export default function ProjectsArchivePage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, de } = useT();
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -33,7 +32,7 @@ export default function ProjectsArchivePage() {
             textTransform: "uppercase", color: "var(--volt-text-faint, #AAA)",
             marginBottom: 10,
           }}>
-            {de ? "Abgeschlossene Arbeit" : "Completed work"}
+            {t("sessions.archiveCaption")}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <h1 style={{
@@ -41,16 +40,14 @@ export default function ProjectsArchivePage() {
               fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em",
               color: "var(--volt-text, #0A0A0A)", margin: 0, lineHeight: 1.15,
             }}>
-              {de ? "Projekt-Archiv" : "Project Archive"}
+              {t("sessions.archiveTitle")}
             </h1>
           </div>
           <p style={{
             fontSize: 14, lineHeight: 1.55, color: "var(--volt-text-muted, #6B6B6B)",
             margin: "12px 0 20px", maxWidth: 620,
           }}>
-            {de
-              ? "Abgeschlossene Projekte, die nicht mehr aktiv bearbeitet werden. Du kannst sie jederzeit wiederherstellen oder endgültig löschen."
-              : "Completed projects that are no longer actively worked on. You can restore them at any time or delete them permanently."}
+            {t("sessions.archiveBody")}
           </p>
 
           <SessionsSubNav active="archive" de={de} />
