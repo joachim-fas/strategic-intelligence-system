@@ -737,6 +737,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.5,
     description: "Renewable-powered factories enable carbon-aware production scheduling",
+    source: "Google / Microsoft carbon-aware compute papers + RE100 member manufacturing disclosures",
+    timestamp: "2026-04-19",
+    confidence: 0.58,
   },
 
   // ── Quantum Computing — fill out the second connection ─────────────────
@@ -778,6 +781,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.6,
     description: "Immersive collaboration reduces the in-person/remote experience gap",
+    source: "Meta Horizon Workrooms usage data + Microsoft Mesh for Teams launch (2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
   {
     from: "macro-spatial-computing",
@@ -785,6 +791,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Spatial learning environments transform training and skill acquisition",
+    source: "PwC VR Soft Skills Training study (2020, replicated 2023) + Meta Immersive Learning case studies",
+    timestamp: "2026-04-19",
+    confidence: 0.6,
   },
 
   // ── Web3 & Decentralization ────────────────────────────────────────────
@@ -794,6 +803,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.45,
     description: "Decentralized protocols challenge centralized platform monopolies",
+    source: "Electric Capital Developer Report 2024 + EU MiCA Regulation + Bluesky AT Protocol adoption",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
   {
     from: "macro-web3-decentralization",
@@ -801,6 +813,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.5,
     description: "Cryptographic primitives and decentralized identity reshape trust architectures",
+    source: "NIST Blockchain Technology Overview + ISO/TC 307 Blockchain standards work",
+    timestamp: "2026-04-19",
+    confidence: 0.6,
   },
 
   // ── Generative AI — second connection beyond mega-AI ───────────────────
@@ -864,6 +879,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Co-bots and copilots redefine the boundary of human and machine work",
+    source: "IFR Cobots Market Data + GitHub Copilot usage statistics (2024) + BLS Occupational Employment Projections",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-human-machine",
@@ -893,6 +911,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.5,
     description: "Cheap renewable power makes energy-intensive manufacturing carbon-viable",
+    source: "Lazard Levelized Cost of Energy Analysis v17 + IRENA Renewable Capacity Statistics 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
 
   // ── Circular Economy ───────────────────────────────────────────────────
@@ -913,6 +934,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.4,
     description: "Domestic material loops reduce dependence on critical-mineral exporting regions",
+    source: "EU Critical Raw Materials Act (2024) + USGS Mineral Commodity Summaries",
+    timestamp: "2026-04-19",
+    confidence: 0.65,
   },
 
   // ── Conscious Consumption ──────────────────────────────────────────────
@@ -922,6 +946,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.5,
     description: "Ethical consumers force platform marketplaces to expose supply chain transparency",
+    source: "EU Corporate Sustainability Reporting Directive (CSRD) + Amazon Climate Pledge Friendly program",
+    timestamp: "2026-04-19",
+    confidence: 0.65,
   },
 
   // ── Edge / IoT ─────────────────────────────────────────────────────────
@@ -931,6 +958,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Edge sensors are the substrate of ambient intelligence environments",
+    source: "Matter smart home standard (CSA) + Amazon Sidewalk / Google Ambient Platform announcements",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-edge-iot",
