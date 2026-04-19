@@ -41,6 +41,7 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GraphLightbox } from "@/components/ui/GraphLightbox";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -248,6 +249,13 @@ export default function CanvasPage() {
   const [zoom, setZoom] = useState(1);
   const { locale } = useLocale();
   const { t } = useT();
+  // Next.js router fuer client-side Navigation (z.B. Zusammenfassung-Button).
+  // Wichtig: NICHT `window.location.href = …` verwenden — das triggert einen
+  // Full-Page-Unload, der wiederum den beforeunload-Handler (Line 1133)
+  // aktiviert, der bei isDirty=true den „Website verlassen?"-Dialog anzeigt.
+  // Router-Push umgeht das; `flushPendingSave()` laeuft via onUnmount
+  // (weiter unten) automatisch vor dem Wechsel.
+  const router = useRouter();
   // Tenant-Scope fuer Client-localStorage. Der Hook ist SSR-hydratisiert, aber
   // wir spiegeln in einen Ref, damit Callbacks (onSave, loadProject, delete,
   // Init-Effect) den aktuellen Tenant sehen, ohne bei jedem Rerender neu
@@ -2368,9 +2376,16 @@ export default function CanvasPage() {
           >
             <button
               onClick={() => {
-                window.location.href = projectId
+                // Vor dem Wechsel: offene Saves rausdruecken, damit der
+                // beforeunload-Handler nichts mehr zu beklagen hat und die
+                // Zusammenfassung-Seite den aktuellen Stand zu sehen bekommt.
+                flushPendingSave();
+                isDirtyRef.current = false;
+                // Client-side Navigation statt window.location.href — kein
+                // „Website verlassen?"-Dialog mehr.
+                router.push(projectId
                   ? `/canvas/${projectId}/zusammenfassung`
-                  : "/projects";
+                  : "/projects");
               }}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 5,
