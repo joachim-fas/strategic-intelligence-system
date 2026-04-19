@@ -192,69 +192,204 @@ function PixelMan() {
 /**
  * Pixel-art inchworm sprite that replaces PixelMan in the reasoning walkway.
  *
- * Visual language is lifted from the standalone Pixel Worm HTML demo
- * (Downloads/Pixel Worm.html): a flat horizontal worm drawn as pixel cells
- * in a single ink colour (#0A0A0A) against the warm off-white card, with a
- * single light-coloured "eye" pixel near the head and an inchworm-style
- * arch in the middle segments.
+ * **2026-04-19: Zweite Version.** Die erste SVG-Variante mit statischen
+ * Segmenten und CSS-translateY-Wellen sah nicht aus wie der Referenz-Wurm
+ * aus `Downloads/Pixel Worm.html` — die hat eine echte parametrische
+ * Spine mit Compress/Arch-Phasen. Deshalb portieren wir jetzt den
+ * Canvas-Drawing-Code 1:1 in eine React-Komponente.
  *
- * Why SVG instead of canvas: the rest of the reasoning indicator uses
- * CSS keyframes on discrete DOM nodes (legs, eye, arm), which compose
- * cheaply with the rest of the card and respect prefers-reduced-motion
- * without extra wiring. The original canvas demo renders a smooth
- * parametric spine; here we approximate that look with a small fixed set
- * of segments whose vertical offset animates to produce the hunch.
+ * **Wie es funktioniert:**
+ *  - Ein hochauflösender Off-Screen-Canvas rendert den Wurm im Pixel-Gitter
+ *  - Die Inchworm-Physik ist identisch zur Referenz:
+ *      Phase 0.00–0.45  Tail-Anchor, Körper staucht sich, Bogen wächst
+ *      Phase 0.45–0.90  Head-Anchor, Körper streckt sich nach vorn
+ *      Phase 0.90–1.00  Flach, kurzer Atem-Hold
+ *  - Zusätzlich wandert der Wurm horizontal über die Bühne (links→rechts→links),
+ *    damit er nicht nur „auf der Stelle" hockt. Die World-X-Position wird
+ *    sinusförmig moduliert; Richtung (dir) kippt beim Vorzeichenwechsel.
+ *  - DevicePixelRatio-bewusst: Canvas ist intern HiDPI, aber der Context
+ *    hat `imageSmoothingEnabled = false`, damit das Pixel-Art scharf bleibt.
  *
- * Wrapper structure mirrors PixelMan:
- *   <div.sis-pixel-worm>        — owns left-right travel animation + vertical centering
- *     <div.pw-body>              — owns the subtle body wiggle (vertical breathing)
- *       <svg>                    — the pixel cells
+ * **Lebenszyklus:** der `requestAnimationFrame`-Loop wird in useEffect
+ * registriert und beim Unmount sauber abgebrochen. Der Wurm läuft solange
+ * die Komponente im DOM ist — für die Reasoning-Animation genau richtig.
  *
- * Grid is 24x8 (viewBox) rendered at 48x16 CSS px. That keeps the worm
- * the same height as PixelMan's torso area but stretches horizontally
- * enough to read as "worm". Each body segment is a 1x1 pixel with its
- * own small translateY keyframe offset in globals.css — the phase shifts
- * produce a travelling arch wave along the body.
+ * **Reduced Motion:** wenn `prefers-reduced-motion` gesetzt ist, wird
+ * der Wurm einmal flach gerendert und der Loop nicht gestartet.
  */
 function PixelWorm() {
-  const INK = "#0A0A0A";   // body — matches page text colour
-  const BG = "#F4F1EA";    // eye highlight — warm off-white, matches original demo palette
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // HiDPI: interner Puffer in DPR skaliert, CSS-Größe über style.
+    // Das Ergebnis ist auf Retina-Displays nicht verwaschen, und weil wir
+    // `imageSmoothingEnabled = false` setzen, bleiben die Pixel scharf.
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const cssW = 200;  // Sichtbare Bühnenbreite (CSS-px)
+    const cssH = 36;   // Sichtbare Bühnenhöhe (CSS-px)
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+    ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = false;
+
+    // ── Farben (identisch zur Vorlage) ──────────────────────────────
+    const INK = "#0A0A0A";
+    const BG = "#F4F1EA";
+
+    // ── TWEAKS — Referenz-Defaults aus Pixel Worm.html ──────────────
+    // speed 0.75 × period 1.6 s ≈ ein Inchworm-Schritt pro ~2.1 s.
+    // Das ist die Geschwindigkeit, bei der die Physik des Wurms schön
+    // lesbar ist (zu schnell → Flimmern, zu langsam → einschlafen).
+    const TWEAKS = {
+      pixelSize: 2,     // 2 css-px per worm-pixel — kompakt genug für die Bühne
+      speed: 0.75,
+      bodyLength: 28,   // Anzahl Segmente auf der Spine
+      archHeight: 1.0,
+    };
+
+    // ── Inchworm-Phasenmodell (1:1 aus der Vorlage) ─────────────────
+    const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const ANCHOR_TAIL = 0;
+    const ANCHOR_HEAD = 1;
+    const phase = (p: number) => {
+      if (p < 0.45) {
+        const u = easeInOut(p / 0.45);
+        return { compress: u, arch: Math.pow(u, 0.9), anchor: ANCHOR_TAIL, u };
+      } else if (p < 0.9) {
+        const u = easeInOut((p - 0.45) / 0.45);
+        return { compress: 1 - u, arch: Math.pow(1 - u, 0.9), anchor: ANCHOR_HEAD, u };
+      }
+      return { compress: 0, arch: 0, anchor: ANCHOR_TAIL, u: 1 };
+    };
+
+    // ── Bühnen-Wanderung ────────────────────────────────────────────
+    // Die Referenz-Demo bleibt zentriert; der User möchte aber, dass der
+    // Wurm „von links nach rechts schiebt und wieder zurück". Lösung:
+    // die x-Position des Körperzentrums wird mit einem langsamen Sinus
+    // (Periode 22 s) zwischen linkem und rechtem Bühnenrand moduliert.
+    // Die dir-Variable flippt beim Nulldurchgang, damit Kopf und Auge
+    // immer in Laufrichtung zeigen.
+    const TRAVEL_PERIOD = 22; // Sekunden für einen vollständigen Hin-/Rück-Zyklus
+
+    const drawWorm = (tSec: number) => {
+      const W = cssW;
+      const H = cssH;
+      ctx.clearRect(0, 0, W, H);
+
+      const PX = Math.max(2, TWEAKS.pixelSize | 0);
+
+      // Inchworm-Zyklus
+      const period = 1.6 / Math.max(0.05, TWEAKS.speed);
+      const p = ((tSec % period) + period) % period / period;
+      const { compress, arch } = phase(p);
+
+      // Wurm-Geometrie (in CSS-px des virtuellen Canvas)
+      const bodyLen = TWEAKS.bodyLength;
+      const radius = 2.1;
+      const cellSize = PX;
+
+      const stretched = bodyLen * cellSize;
+      const squished = stretched * 0.55;
+      const curLen = stretched + (squished - stretched) * compress;
+
+      const maxArch = stretched * 0.38 * TWEAKS.archHeight;
+      const archH = maxArch * arch;
+
+      // Ground line — etwas unterhalb der Mitte, damit der Bogen Platz
+      // nach oben hat
+      const groundY = Math.round(H * 0.72);
+
+      // Bühnen-Wanderung
+      const travel = Math.sin((2 * Math.PI * tSec) / TRAVEL_PERIOD);
+      const edgePad = curLen / 2 + cellSize * 4;
+      const cx = Math.round(W / 2 + travel * (W / 2 - edgePad));
+      // Richtung: +1 wenn Wurm nach rechts wandert, −1 wenn zurück.
+      // cos statt sin gibt uns den „Ist-die-Bewegung-nach-rechts?"-Indikator.
+      const dir = Math.cos((2 * Math.PI * tSec) / TRAVEL_PERIOD) >= 0 ? 1 : -1;
+
+      const halfLen = curLen / 2;
+      const headX = cx + dir * halfLen;
+      const tailX = cx - dir * halfLen;
+
+      // Spine sampeln + Pixel-Cells stempeln
+      const N = bodyLen;
+      const cells = new Set<string>();
+      const stamp = (scx: number, scy: number, r: number) => {
+        const r2 = r * r;
+        const iR = Math.ceil(r);
+        const gx = Math.round(scx / cellSize);
+        const gy = Math.round(scy / cellSize);
+        for (let dy = -iR; dy <= iR; dy++) {
+          for (let dx = -iR; dx <= iR; dx++) {
+            if (dx * dx + dy * dy <= r2 + 0.05) {
+              cells.add(gx + dx + "," + (gy + dy));
+            }
+          }
+        }
+      };
+
+      for (let i = 0; i <= N; i++) {
+        const s = i / N;
+        const x = tailX + s * (headX - tailX);
+        const bell = Math.sin(Math.PI * s);
+        const sharp = Math.pow(bell, 1 + 1.3 * compress);
+        const y = groundY - sharp * archH;
+        const taper = 1 - 0.35 * Math.pow(Math.abs(s - 0.5) * 2, 3.0);
+        const rr = radius * taper;
+        stamp(x, y, rr);
+      }
+
+      // Körper malen
+      ctx.fillStyle = INK;
+      for (const key of cells) {
+        const [gx, gy] = key.split(",").map(Number);
+        ctx.fillRect(gx * cellSize, gy * cellSize, cellSize, cellSize);
+      }
+
+      // Auge — am Kopfende, leicht nach oben versetzt
+      {
+        const s = 0.94;
+        const bell = Math.sin(Math.PI * s);
+        const sharp = Math.pow(bell, 1 + 1.3 * compress);
+        const ex = tailX + s * (headX - tailX);
+        const ey = groundY - sharp * archH;
+        const ox = dir * -0.2 * cellSize;
+        const oy = -0.6 * cellSize;
+        const egx = Math.round((ex + ox) / cellSize);
+        const egy = Math.round((ey + oy) / cellSize);
+        ctx.fillStyle = BG;
+        ctx.fillRect(egx * cellSize, egy * cellSize, cellSize, cellSize);
+      }
+    };
+
+    // Reduced-motion: einmal flach rendern, keinen Loop.
+    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (prefersReduced) {
+      drawWorm(0);
+      return;
+    }
+
+    // RAF-Loop
+    const startT = performance.now();
+    let rafId = 0;
+    const frame = (now: number) => {
+      drawWorm((now - startT) / 1000);
+      rafId = requestAnimationFrame(frame);
+    };
+    rafId = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
   return (
     <div className="sis-pixel-worm" aria-hidden="true">
-      <div className="pw-body">
-        <svg width="48" height="16" viewBox="0 0 24 8" shapeRendering="crispEdges">
-          {/* Body segments, left (tail) to right (head). Each .pw-seg-N rect
-               gets its own keyframe in globals.css; staggered vertical
-               offsets produce a travelling arch wave that looks like the
-               worm hunches forward. y=6 is the resting "ground line" for
-               the body; segments lift above it during the hunch. */}
-
-          {/* Tail tip — tapered (thin, 1px tall). Stays mostly on the ground. */}
-          <rect className="pw-seg-0" x="2"  y="6" width="1" height="1" fill={INK} />
-          <rect className="pw-seg-0" x="3"  y="5" width="1" height="2" fill={INK} />
-
-          {/* Mid-back body — thicker (2px tall). These lift the most during
-               the hunch to form the classic inchworm arch. */}
-          <rect className="pw-seg-1" x="4"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-2" x="5"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-3" x="6"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-4" x="7"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-5" x="8"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-6" x="9"  y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-7" x="10" y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-8" x="11" y="5" width="1" height="2" fill={INK} />
-          <rect className="pw-seg-9" x="12" y="5" width="1" height="2" fill={INK} />
-
-          {/* Head — wider, 3px tall to give the worm a bulbous snout. The
-               eye is a single light pixel inset from the head's front edge. */}
-          <rect className="pw-seg-10" x="13" y="4" width="1" height="3" fill={INK} />
-          <rect className="pw-seg-10" x="14" y="4" width="1" height="3" fill={INK} />
-          <rect className="pw-seg-10" x="15" y="4" width="1" height="3" fill={INK} />
-          <rect className="pw-seg-10" x="16" y="5" width="1" height="2" fill={INK} />
-          {/* Eye pixel — off-white on the head, slightly back from the front */}
-          <rect className="pw-eye"    x="14" y="5" width="1" height="1" fill={BG} />
-        </svg>
-      </div>
+      <canvas ref={canvasRef} />
     </div>
   );
 }
