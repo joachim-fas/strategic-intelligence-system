@@ -88,8 +88,8 @@ const SEVERITY_COLORS: Record<string, { bg: string; fg: string }> = {
 export default function WarGamingPage() {
   return (
     <FrameworkShell meta={getFrameworkMeta("war-gaming")}>
-      {({ topic, locale, de }) => (
-        <WarGamingContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <WarGamingContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
@@ -101,14 +101,16 @@ function WarGamingContent({
   topic,
   locale,
   de,
+  projectId,
 }: {
   topic: string;
   locale: string;
   de: boolean;
+  projectId?: string | null;
 }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
-  const { steps, runStep } = useFrameworkAnalysis("war-gaming");
+  const { steps, runStep } = useFrameworkAnalysis("war-gaming", projectId);
 
   const prev = (ids: string[]): Record<string, any> => {
     const out: Record<string, any> = {};

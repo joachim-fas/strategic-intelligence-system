@@ -109,8 +109,8 @@ const QUADRANT_LABELS_EN: [string, string, string, string] = [
 export default function StakeholderPage() {
   return (
     <FrameworkShell meta={getFrameworkMeta("stakeholder")}>
-      {({ topic, locale, de }) => (
-        <StakeholderContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <StakeholderContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
@@ -118,10 +118,10 @@ export default function StakeholderPage() {
 
 /* ---------- content component ---------- */
 
-function StakeholderContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+function StakeholderContent({ topic, locale, de, projectId }: { topic: string; locale: string; de: boolean; projectId?: string | null }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
-  const { steps, runStep } = useFrameworkAnalysis("stakeholder");
+  const { steps, runStep } = useFrameworkAnalysis("stakeholder", projectId);
 
   const previousData = (ids: string[]) => {
     const out: Record<string, any> = {};

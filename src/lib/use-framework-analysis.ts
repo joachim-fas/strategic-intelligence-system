@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { FrameworkId } from "@/types/frameworks";
 import { consumeSSE } from "@/lib/sse-client";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 export interface StepResult {
   status: "idle" | "running" | "done" | "error";
@@ -13,7 +14,26 @@ export interface StepResult {
   modelUsed?: string;
 }
 
-export function useFrameworkAnalysis(frameworkId: FrameworkId) {
+/**
+ * Framework-Analyse-Hook.
+ *
+ * Der optionale `projectId`-Parameter (User-Regel 2026-04-19: jede
+ * Framework-Eingabe definiert sofort ein Projekt) aktiviert die
+ * Step-Persistierung: sobald ein Step den Status `done` erreicht,
+ * wird das Ergebnis als Row in `project_queries` des Projekts
+ * gespeichert. Ohne projectId läuft der Hook wie bisher — rein im
+ * lokalen State ohne DB-Writes.
+ *
+ * Persistierung ist fire-and-forget: ein fehlschlagender Write
+ * blockiert die UI nicht, und das nächste Step-done führt einen neuen
+ * Versuch. Der Server-Handler ist idempotent genug (neuer Query-Row
+ * mit derselben Step-Bezeichnung ist ok — die Zusammenfassung
+ * dedupliziert später bei Bedarf).
+ */
+export function useFrameworkAnalysis(
+  frameworkId: FrameworkId,
+  projectId?: string | null,
+) {
   const [steps, setSteps] = useState<Record<string, StepResult>>({});
 
   const runStep = useCallback(async (
@@ -127,13 +147,47 @@ export function useFrameworkAnalysis(frameworkId: FrameworkId) {
         ...prev,
         [stepId]: { status: "done", data: result, rawText: fullText, modelUsed },
       }));
+
+      // Persistierung (User-Regel 2026-04-19): das fertige Step-
+      // Ergebnis landet als Query-Row im Projekt, damit die spätere
+      // Zusammenfassung ALLE Framework-Outputs merged — nicht nur das
+      // Bootstrap-Topic aus der FrameworkShell. Wir verwenden
+      // `query = "<frameworkId>/<stepId>"` als stabile, sprechende
+      // Kennung (z.B. `"pre-mortem/risks"`). Fire-and-forget: ein
+      // Netzwerkfehler blockiert die UI nicht, der User sieht das
+      // Ergebnis sofort.
+      if (projectId) {
+        const persistQuery = `${frameworkId}/${stepId}`;
+        const synthesisField = typeof result?.synthesis === "string" && result.synthesis.length > 0
+          ? result.synthesis
+          : `Framework ${frameworkId} · Step ${stepId} · Topic: ${topic}`;
+        fetchWithTimeout(`/api/v1/projects/${projectId}/queries`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: persistQuery,
+            result: {
+              ...result,
+              synthesis: synthesisField,
+              _framework: frameworkId,
+              _step: stepId,
+              _topic: topic,
+              _modelUsed: modelUsed,
+              _persistedAt: new Date().toISOString(),
+            },
+            locale,
+          }),
+        }, 60_000).catch((e) => {
+          console.warn(`[framework] step-persist ${frameworkId}/${stepId} failed`, e);
+        });
+      }
     } catch (err: any) {
       setSteps(prev => ({
         ...prev,
         [stepId]: { status: "error", data: null, rawText: "", error: err.message },
       }));
     }
-  }, [frameworkId]);
+  }, [frameworkId, projectId]);
 
   const reset = useCallback(() => setSteps({}), []);
 

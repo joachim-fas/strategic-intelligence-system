@@ -33,17 +33,17 @@ const FIXABILITY_COLORS: Record<string, string> = { hard: "#DC2626", medium: "#E
 export default function PostMortemPage() {
   return (
     <FrameworkShell meta={getFrameworkMeta("post-mortem")}>
-      {({ topic, locale, de }) => (
-        <PostMortemContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <PostMortemContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
 }
 
-function PostMortemContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+function PostMortemContent({ topic, locale, de, projectId }: { topic: string; locale: string; de: boolean; projectId?: string | null }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(tlocale, key, vars);
-  const { steps, runStep } = useFrameworkAnalysis("post-mortem");
+  const { steps, runStep } = useFrameworkAnalysis("post-mortem", projectId);
 
   const previousResults = (ids: string[]) => {
     const out: Record<string, any> = {};

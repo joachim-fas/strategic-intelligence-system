@@ -53,8 +53,8 @@ function fmtNum(v: unknown): string {
 export default function MarktanalysePage() {
   return (
     <FrameworkShell meta={getFrameworkMeta("marktanalyse")}>
-      {({ topic, locale, de }) => (
-        <MarktanalyseContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <MarktanalyseContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
@@ -66,12 +66,13 @@ interface ContentProps {
   topic: string;
   locale: string;
   de: boolean;
+  projectId?: string | null;
 }
 
-function MarktanalyseContent({ topic, locale, de }: ContentProps) {
+function MarktanalyseContent({ topic, locale, de, projectId }: ContentProps) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
-  const { steps, runStep } = useFrameworkAnalysis("marktanalyse");
+  const { steps, runStep } = useFrameworkAnalysis("marktanalyse", projectId);
 
   /* convenience accessors */
   const s1 = steps["market-structure"];

@@ -14,8 +14,8 @@ const BORDER = "#D8A8F0";
 export default function TrendDeepDivePage() {
   return (
     <FrameworkShell meta={getFrameworkMeta("trend-deep-dive")}>
-      {({ topic, locale, de }) => (
-        <TrendDeepDiveContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <TrendDeepDiveContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
@@ -23,10 +23,10 @@ export default function TrendDeepDivePage() {
 
 /* ── Content ─────────────────────────────────────────────── */
 
-function TrendDeepDiveContent({ topic, locale, de }: { topic: string; locale: string; de: boolean }) {
+function TrendDeepDiveContent({ topic, locale, de, projectId }: { topic: string; locale: string; de: boolean; projectId?: string | null }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
-  const { steps, runStep } = useFrameworkAnalysis("trend-deep-dive");
+  const { steps, runStep } = useFrameworkAnalysis("trend-deep-dive", projectId);
 
   const previousData = (ids: string[]) => {
     const out: Record<string, any> = {};

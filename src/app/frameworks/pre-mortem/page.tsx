@@ -38,8 +38,8 @@ export default function PreMortemPage() {
 
   return (
     <FrameworkShell meta={meta}>
-      {({ topic, locale, de }) => (
-        <PreMortemContent topic={topic} locale={locale} de={de} />
+      {({ topic, locale, de, projectId }) => (
+        <PreMortemContent topic={topic} locale={locale} de={de} projectId={projectId} />
       )}
     </FrameworkShell>
   );
@@ -52,14 +52,16 @@ function PreMortemContent({
   topic,
   locale,
   de,
+  projectId,
 }: {
   topic: string;
   locale: string;
   de: boolean;
+  projectId?: string | null;
 }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
-  const { steps, runStep } = useFrameworkAnalysis("pre-mortem");
+  const { steps, runStep } = useFrameworkAnalysis("pre-mortem", projectId);
 
   /* ── Helpers to gather previous‑step data for context ── */
   const prevData = (ids: string[]) => {
