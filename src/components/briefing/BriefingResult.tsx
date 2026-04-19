@@ -635,6 +635,81 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </VoltSectionCard>
           )}
 
+          {/*
+            STEEP+V Analyse-Kacheln — Notion-Plan P3-2 (2026-04-20)
+            Der System-Prompt fragt seit v0.2 ein steepV-Objekt mit je 6
+            Dimensionen (S/T/E_economy/E_environment/P/V) ab. Hier als
+            machine-readable + UI-sichtbar: 6 Kacheln nebeneinander, NULL-
+            Werte als neutraler Platzhalter. Macht die gedanklich wichtigste
+            analytische Achse des Briefings direkt scanbar — ohne dass der
+            User durch die synthesis lesen muss.
+          */}
+          {(briefing.steepV && typeof briefing.steepV === "object") && (() => {
+            const sv = briefing.steepV as Record<string, string | null | undefined>;
+            const dims: Array<{ key: string; label: { de: string; en: string }; value: string | null }> = [
+              { key: "S",           label: { de: "Society",     en: "Society" },     value: sv.S ?? null },
+              { key: "T",           label: { de: "Technology",  en: "Technology" },  value: sv.T ?? null },
+              { key: "E_economy",   label: { de: "Economy",     en: "Economy" },     value: sv.E_economy ?? null },
+              { key: "E_environment", label: { de: "Environment", en: "Environment" }, value: sv.E_environment ?? null },
+              { key: "P",           label: { de: "Politics",    en: "Politics" },    value: sv.P ?? null },
+              { key: "V",           label: { de: "Values",      en: "Values" },      value: sv.V ?? null },
+            ];
+            const activeCount = dims.filter((d) => d.value && d.value.trim().length > 0).length;
+            if (activeCount === 0) return null;
+            return (
+              <VoltSectionCard
+                icon={<LayoutGrid size={18} />}
+                iconVariant="blue"
+                title={locale === "de" ? "STEEP+V Dimensionen" : "STEEP+V Dimensions"}
+                subtitle={locale === "de"
+                  ? `${activeCount} von 6 Dimensionen relevant für diese Frage`
+                  : `${activeCount} of 6 dimensions relevant to this question`}
+              >
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 10,
+                }}>
+                  {dims.map((d) => {
+                    const hasContent = d.value && d.value.trim().length > 0;
+                    return (
+                      <div
+                        key={d.key}
+                        style={{
+                          padding: "10px 12px",
+                          background: hasContent ? "var(--color-surface, #FAFAFA)" : "transparent",
+                          border: `1px solid ${hasContent ? "var(--color-border)" : "rgba(0,0,0,0.06)"}`,
+                          borderRadius: 8,
+                          opacity: hasContent ? 1 : 0.45,
+                        }}
+                      >
+                        <div style={{
+                          fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700,
+                          letterSpacing: "0.10em", textTransform: "uppercase",
+                          color: "var(--volt-text-faint, #9B9B9B)",
+                          marginBottom: 5,
+                        }}>
+                          {d.key} · {locale === "de" ? d.label.de : d.label.en}
+                        </div>
+                        <div style={{
+                          fontSize: 13, lineHeight: 1.55,
+                          color: "var(--color-text-primary)",
+                          fontFamily: "var(--font-ui)",
+                        }}>
+                          {hasContent
+                            ? <InlineProvenance text={d.value!} locale={locale} />
+                            : <span style={{ fontStyle: "italic" }}>
+                                {locale === "de" ? "— nicht relevant" : "— not relevant"}
+                              </span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </VoltSectionCard>
+            );
+          })()}
+
           {/* Trend chips — scales from 1 to N, each chip carries ring + velocity cues */}
           {briefing.matchedTrends.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
