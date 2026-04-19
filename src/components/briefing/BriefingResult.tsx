@@ -386,22 +386,44 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         {!isLoading && !isHelp && briefing.synthesis && briefing.synthesis.length > 20 && (
           <BriefingExport entry={entry} locale={locale} />
         )}
-        {briefing.confidence > 0 && !isLoading && (
-          <Badge
-            variant="outline"
-            title={locale === "de"
-              ? `Konfidenz ${(briefing.confidence * 100).toFixed(0)}% — basiert auf ${b.usedSignals?.length ?? 0} Live-Signalen und ${b.references?.length ?? 0} Quellen. Hohe Werte = breite, aktuelle Datenbasis.`
-              : `Confidence ${(briefing.confidence * 100).toFixed(0)}% — based on ${b.usedSignals?.length ?? 0} live signals and ${b.references?.length ?? 0} sources. High values = broad, current data basis.`}
-            className={cn(
-              "text-[11px] cursor-help",
-              briefing.confidence > 0.7 ? "bg-[var(--pastel-mint)] text-[var(--pastel-mint-text)] border-[var(--pastel-mint-border)]" :
-              briefing.confidence > 0.4 ? "bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]" :
-              "bg-[var(--signal-negative-light)] text-[var(--signal-negative-text)] border-[var(--signal-negative-border)]"
-            )}
-          >
-            {(briefing.confidence * 100).toFixed(0)}%
-          </Badge>
-        )}
+        {briefing.confidence > 0 && !isLoading && (() => {
+          /*
+            Notion-Plan P3-3 (#17): Confidence Decay. Eine 30 Tage alte
+            gespeicherte Analyse verliert Wert; der angezeigte Score
+            sinkt entsprechend ab (exp(-0.03 * days_elapsed) pro Tag).
+            Der UNDECAYED-Wert bleibt im Tooltip + als Titel für
+            Transparenz.
+          */
+          const ageDays = Math.max(0, (Date.now() - entry.timestamp.getTime()) / (1000 * 60 * 60 * 24));
+          const decayFactor = Math.exp(-0.03 * ageDays);
+          const decayedConf = briefing.confidence * decayFactor;
+          const showDecay = ageDays >= 1; // erst nach 1 Tag anzeigen
+          const displayConf = showDecay ? decayedConf : briefing.confidence;
+          const confPct = Math.round(displayConf * 100);
+          const isStale = showDecay && decayFactor < 0.7; // >12 Tage ≈ 30% Verlust
+          const tooltipBase = locale === "de"
+            ? `Konfidenz ${confPct}% — basiert auf ${b.usedSignals?.length ?? 0} Live-Signalen und ${b.references?.length ?? 0} Quellen.`
+            : `Confidence ${confPct}% — based on ${b.usedSignals?.length ?? 0} live signals and ${b.references?.length ?? 0} sources.`;
+          const tooltipDecay = showDecay
+            ? (locale === "de"
+              ? ` Alter ${ageDays.toFixed(1)} Tage — ursprünglich ${Math.round(briefing.confidence * 100)}%, mit 3%/Tag Decay.`
+              : ` Age ${ageDays.toFixed(1)} days — original ${Math.round(briefing.confidence * 100)}%, with 3%/day decay.`)
+            : "";
+          return (
+            <Badge
+              variant="outline"
+              title={tooltipBase + tooltipDecay}
+              className={cn(
+                "text-[11px] cursor-help",
+                displayConf > 0.7 ? "bg-[var(--pastel-mint)] text-[var(--pastel-mint-text)] border-[var(--pastel-mint-border)]" :
+                displayConf > 0.4 ? "bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]" :
+                "bg-[var(--signal-negative-light)] text-[var(--signal-negative-text)] border-[var(--signal-negative-border)]"
+              )}
+            >
+              {confPct}%{isStale && <span style={{ opacity: 0.7, marginLeft: 3 }}>↓</span>}
+            </Badge>
+          );
+        })()}
         {/* VAL-01: Data quality warnings from validation pipeline */}
         {!isLoading && (b as any)._repaired && (
           <Badge variant="outline" className="text-[10px] cursor-help bg-[var(--pastel-butter)] text-[var(--pastel-butter-text)] border-[var(--pastel-butter-border)]"
