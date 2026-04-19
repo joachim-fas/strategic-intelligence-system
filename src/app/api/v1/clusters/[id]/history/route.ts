@@ -37,14 +37,15 @@
  */
 
 import { NextResponse } from "next/server";
-import { getClusterHistory } from "@/lib/cluster-snapshots";
+import { getClusterHistory, countClusterSnapshots } from "@/lib/cluster-snapshots";
 import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
+import {
+  parsePaginationParams,
+  buildPaginationEnvelope,
+} from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
 
 export async function GET(
   request: Request,
@@ -60,18 +61,15 @@ export async function GET(
     return apiError("Missing cluster id", 400);
   }
 
-  // Parse + clamp limit. `Number()` returns NaN on non-numeric input
-  // which our clamp treats as the default; no need for separate
-  // validation pass.
+  // PERF-13 — standardised offset+limit pagination via the shared
+  // helper. Existing callers that only passed ?limit= keep working
+  // because offset defaults to 0.
   const url = new URL(request.url);
-  const raw = url.searchParams.get("limit");
-  const parsed = raw != null ? Number(raw) : DEFAULT_LIMIT;
-  const limit = Number.isFinite(parsed) && parsed > 0
-    ? Math.min(MAX_LIMIT, Math.floor(parsed))
-    : DEFAULT_LIMIT;
+  const { offset, limit } = parsePaginationParams(url, { defaultLimit: 50 });
 
   try {
-    const snapshots = getClusterHistory(id, limit);
+    const snapshots = getClusterHistory(id, limit, offset);
+    const total = countClusterSnapshots(id);
     return apiSuccess(
       {
         clusterId: id,
@@ -86,6 +84,9 @@ export async function GET(
           changelog: s.changelog,
           foresight: s.foresight,
         })),
+        pagination: buildPaginationEnvelope({
+          total, offset, limit, returned: snapshots.length,
+        }),
       },
       200,
       CACHE_HEADERS.short,

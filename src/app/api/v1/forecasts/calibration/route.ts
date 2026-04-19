@@ -33,6 +33,10 @@ import {
 } from "@/lib/api-helpers";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import {
+  parsePaginationParams,
+  buildPaginationEnvelope,
+} from "@/lib/pagination";
+import {
   getTenantCalibrationLeaderboard,
   forecastsEnabled,
 } from "@/lib/forecasts";
@@ -56,17 +60,31 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const url = new URL(request.url);
   const minRaw = url.searchParams.get("min");
-  const limitRaw = url.searchParams.get("limit");
   const min = minRaw ? Math.max(1, Math.min(50, Number(minRaw) || 3)) : 3;
-  const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) || 50)) : 50;
+  // PERF-13 — shared pagination helper. `limit` capped at 200 via
+  // `maxLimit` override since this list is bounded by tenant-
+  // member-count, which is small.
+  const { offset, limit } = parsePaginationParams(url, {
+    defaultLimit: 50, maxLimit: 200,
+  });
 
   try {
-    const leaderboard = getTenantCalibrationLeaderboard(ctx.tenantId, {
+    // Read the full set under the min-predictions threshold, then
+    // slice. SQL LIMIT/OFFSET could replace this, but the set is
+    // bounded by the tenant's member count — rarely >50 rows.
+    const all = getTenantCalibrationLeaderboard(ctx.tenantId, {
       minPredictions: min,
-      limit,
+      limit: 500, // internal hard cap; paginate via the envelope below
     });
+    const page = all.slice(offset, offset + limit);
     return apiSuccess(
-      { count: leaderboard.length, leaderboard },
+      {
+        count: page.length,
+        leaderboard: page,
+        pagination: buildPaginationEnvelope({
+          total: all.length, offset, limit, returned: page.length,
+        }),
+      },
       200,
       CACHE_HEADERS.short,
     );

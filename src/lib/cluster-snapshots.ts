@@ -167,11 +167,13 @@ export function createClusterSnapshot(params: {
  * Read snapshots for a cluster, newest first. Empty array if the
  * cluster has no history yet. `limit` caps the result set so the API
  * doesn't dump multi-year history unless asked to; default is 50
- * which covers ~8 days at a 4h pipeline cadence.
+ * which covers ~8 days at a 4h pipeline cadence. `offset` supports
+ * offset-based pagination (PERF-13).
  */
 export function getClusterHistory(
   clusterId: string,
   limit = 50,
+  offset = 0,
 ): ClusterSnapshot[] {
   const db = getSqliteHandle();
   const rows = db.prepare(
@@ -180,8 +182,8 @@ export function getClusterHistory(
        FROM cluster_snapshots
       WHERE cluster_id = ?
       ORDER BY triggered_at DESC
-      LIMIT ?`,
-  ).all(clusterId, limit) as Array<{
+      LIMIT ? OFFSET ?`,
+  ).all(clusterId, limit, Math.max(0, Math.floor(offset))) as Array<{
     id: string;
     cluster_id: string;
     topic: string;
@@ -204,6 +206,18 @@ export function getClusterHistory(
     changelog: r.changelog,
     foresight: r.foresight != null ? safeJsonParse(r.foresight) : null,
   }));
+}
+
+/**
+ * Count snapshots for a cluster — companion to getClusterHistory
+ * for paginated endpoints.
+ */
+export function countClusterSnapshots(clusterId: string): number {
+  const db = getSqliteHandle();
+  const row = db.prepare(
+    `SELECT COUNT(*) AS n FROM cluster_snapshots WHERE cluster_id = ?`,
+  ).get(clusterId) as { n: number } | undefined;
+  return row?.n ?? 0;
 }
 
 /**

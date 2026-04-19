@@ -218,26 +218,46 @@ export function getForecast(id: string, tenantId: string): Forecast | null {
 /**
  * List forecasts in a tenant. Supports optional state filtering;
  * default order is newest-first by updated_at so recently-edited
- * items surface. No pagination for MVP (strategy teams rarely
- * have more than a few dozen open forecasts at once).
+ * items surface. Supports offset-based pagination.
  */
 export function listForecasts(
   tenantId: string,
-  opts: { state?: ForecastState; limit?: number } = {},
+  opts: { state?: ForecastState; limit?: number; offset?: number } = {},
 ): Forecast[] {
   const db = getSqliteHandle();
   const limit = Math.min(Math.max(1, opts.limit ?? 100), 500);
+  const offset = Math.max(0, Math.floor(opts.offset ?? 0));
   let sql = `SELECT * FROM forecasts WHERE tenant_id = ?`;
   const args: unknown[] = [tenantId];
   if (opts.state) {
     sql += ` AND state = ?`;
     args.push(opts.state);
   }
-  sql += ` ORDER BY updated_at DESC LIMIT ?`;
-  args.push(limit);
+  sql += ` ORDER BY updated_at DESC LIMIT ? OFFSET ?`;
+  args.push(limit, offset);
 
   const rows = db.prepare(sql).all(...args) as Parameters<typeof rowToForecast>[0][];
   return rows.map(rowToForecast);
+}
+
+/**
+ * Count all forecasts in a tenant matching the same filters as
+ * `listForecasts`. Companion for paginated list endpoints — callers
+ * run this alongside `listForecasts` to compute `hasMore`.
+ */
+export function countForecasts(
+  tenantId: string,
+  opts: { state?: ForecastState } = {},
+): number {
+  const db = getSqliteHandle();
+  let sql = `SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id = ?`;
+  const args: unknown[] = [tenantId];
+  if (opts.state) {
+    sql += ` AND state = ?`;
+    args.push(opts.state);
+  }
+  const row = db.prepare(sql).get(...args) as { n: number } | undefined;
+  return row?.n ?? 0;
 }
 
 /** Load a forecast with its positions + derived aggregate. */

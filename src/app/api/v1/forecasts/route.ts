@@ -25,8 +25,13 @@ import {
 } from "@/lib/api-helpers";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import {
+  parsePaginationParams,
+  buildPaginationEnvelope,
+} from "@/lib/pagination";
+import {
   createForecast,
   listForecasts,
+  countForecasts,
   forecastsEnabled,
   type ForecastState,
 } from "@/lib/forecasts";
@@ -51,12 +56,21 @@ export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const stateParam = url.searchParams.get("state");
   const state = isForecastState(stateParam) ? stateParam : undefined;
-  const limitRaw = url.searchParams.get("limit");
-  const limit = limitRaw ? Math.max(1, Math.min(500, Number(limitRaw) || 100)) : 100;
 
-  const forecasts = listForecasts(ctx.tenantId, { state, limit });
+  // PERF-13 — offset+limit pagination. Callers that don't specify
+  // either get the first 50 rows, matching the shared default.
+  const { offset, limit } = parsePaginationParams(url, { defaultLimit: 50 });
+
+  const forecasts = listForecasts(ctx.tenantId, { state, limit, offset });
+  const total = countForecasts(ctx.tenantId, { state });
   return apiSuccess(
-    { count: forecasts.length, forecasts },
+    {
+      count: forecasts.length,
+      forecasts,
+      pagination: buildPaginationEnvelope({
+        total, offset, limit, returned: forecasts.length,
+      }),
+    },
     200,
     CACHE_HEADERS.short,
   );

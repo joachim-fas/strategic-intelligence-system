@@ -28,7 +28,8 @@
     "test:forecasts": "tsx scripts/forecasts-test.ts",
     "test:sse-client": "tsx scripts/sse-client-test.ts",
     "test:pipeline-store": "tsx scripts/pipeline-store-test.ts",
-    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:forecasts && npm run test:sse-client && npm run test:pipeline-store && npm run test:api"
+    "test:pagination": "tsx scripts/pagination-test.ts",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:forecasts && npm run test:sse-client && npm run test:pipeline-store && npm run test:pagination && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",

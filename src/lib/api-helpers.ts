@@ -12,8 +12,13 @@
 // No deduplication, no stale-while-revalidate, no error recovery.
 // FIX: Introduce SWR or TanStack Query as the standard data fetching layer.
 
-// TODO: PERF-13 — No pagination on any GET endpoint. All results returned at once.
-// FIX: Add cursor-based pagination with limit/offset to all list endpoints.
+// PERF-13 PARTIAL FIX: `src/lib/pagination.ts` provides a shared
+// offset+limit helper. Applied to /api/v1/forecasts,
+// /api/v1/clusters, /api/v1/clusters/[id]/history,
+// /api/v1/forecasts/calibration. Still-open endpoints migrate
+// opportunistically on next touch. Admin/audit uses its own
+// time-series cursor (pre-existing, more correct for growing
+// logs) and stays as-is.
 
 
 // API-09 FIX: Shared SSE client lives in src/lib/sse-client.ts;

@@ -26,6 +26,10 @@ import { NextResponse } from "next/server";
 import { listClusters } from "@/lib/cluster-snapshots";
 import { apiSuccess, apiError, CACHE_HEADERS } from "@/lib/api-helpers";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
+import {
+  parsePaginationParams,
+  buildPaginationEnvelope,
+} from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +39,24 @@ export async function GET(request: Request): Promise<NextResponse> {
     return tooManyRequests();
   }
 
+  // PERF-13 — pagination. The cluster set is small (<~100 rows
+  // even on busy tenants), so we still fetch the full list in-
+  // memory and slice; switching to SQL LIMIT/OFFSET is a cheap
+  // follow-up if tenants ever grow past that.
+  const url = new URL(request.url);
+  const { offset, limit } = parsePaginationParams(url, { defaultLimit: 50 });
+
   try {
-    const clusters = listClusters();
+    const all = listClusters();
+    const page = all.slice(offset, offset + limit);
     return apiSuccess(
-      { count: clusters.length, clusters },
+      {
+        count: page.length,
+        clusters: page,
+        pagination: buildPaginationEnvelope({
+          total: all.length, offset, limit, returned: page.length,
+        }),
+      },
       200,
       CACHE_HEADERS.short,
     );
