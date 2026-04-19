@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { FRAMEWORK_META, FrameworkMeta } from "@/types/frameworks";
 
 export default function FrameworksPage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t, de } = useT();
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--background)" }}>
@@ -32,16 +31,13 @@ export default function FrameworksPage() {
             fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em",
             color: "var(--foreground)", margin: 0, lineHeight: 1.2,
           }}>
-            {de ? "Analyse-Frameworks" : "Analysis Frameworks"}
+            {t("frameworksList.heroHeading")}
           </h1>
           <p style={{
             fontSize: 14, lineHeight: 1.7, color: "var(--muted-foreground)",
             marginTop: 10, maxWidth: 520, margin: "10px auto 0",
           }}>
-            {de
-              ? "Sechs spezialisierte Denk- und Analysemodi — mit eigenem Erkenntnisziel, eigenen Datenquellen und Visualisierungen."
-              : "Six specialized analysis modes — each with its own purpose, data sources, and visualizations."
-            }
+            {t("frameworksList.heroBody")}
           </p>
         </div>
       </div>
@@ -68,19 +64,19 @@ export default function FrameworksPage() {
             fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
             fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 10,
           }}>
-            {de ? "Gemeinsame Infrastruktur" : "Shared Infrastructure"}
+            {t("frameworksList.sharedInfrastructureHeading")}
           </div>
           <div style={{
             display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
             gap: 8,
           }}>
             {[
-              { icon: "⇄", label: de ? "Kausal-Graph" : "Causal Graph", desc: de ? "Jedes Framework liest & erweitert Kausalketten" : "Every framework reads & extends causal chains" },
-              { icon: "⚡", label: de ? "Signal-Pipeline" : "Signal Pipeline", desc: de ? "Alle Live-Connectors für alle Frameworks" : "All live connectors for all frameworks" },
-              { icon: "◎", label: "STEEP+V", desc: de ? "Einheitliche Kategorisierung" : "Unified categorization" },
-              { icon: "≡", label: de ? "3-Szenarien-Modell" : "3-Scenario Model", desc: de ? "Optimistisch / Wahrscheinlich / Pessimistisch" : "Optimistic / Probable / Pessimistic" },
-              { icon: "▸", label: "Intelligence Terminal", desc: de ? "Natürlichsprachliche Abfragen" : "Natural language queries" },
-              { icon: "◻", label: de ? "Rollen-Kontext" : "Role Context", desc: de ? "Outputs je Nutzerrolle adaptiert" : "Outputs adapted by user role" },
+              { icon: "⇄", label: t("frameworksList.infraCausalLabel"), desc: t("frameworksList.infraCausalDesc") },
+              { icon: "⚡", label: t("frameworksList.infraSignalLabel"), desc: t("frameworksList.infraSignalDesc") },
+              { icon: "◎", label: "STEEP+V", desc: t("frameworksList.infraSteepDesc") },
+              { icon: "≡", label: t("frameworksList.infraScenarioLabel"), desc: t("frameworksList.infraScenarioDesc") },
+              { icon: "▸", label: "Intelligence Terminal", desc: t("frameworksList.infraTerminalDesc") },
+              { icon: "◻", label: t("frameworksList.infraRoleLabel"), desc: t("frameworksList.infraRoleDesc") },
             ].map((item, i) => (
               <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                 <span style={{
@@ -102,12 +98,18 @@ export default function FrameworksPage() {
 }
 
 function FrameworkCard({ fw, de }: { fw: FrameworkMeta; de: boolean }) {
+  const { t } = useT();
+  // Data-field lookups from FRAMEWORK_META — these stay as-is because the
+  // metadata object carries both translations per entry, not i18n keys.
   const name = de ? fw.name.de : fw.name.en;
   const subtitle = de ? fw.subtitle.de : fw.subtitle.en;
   const timeHorizon = de ? fw.timeHorizon.de : fw.timeHorizon.en;
-  const intensityLabels = de
-    ? { low: "Niedrig", medium: "Mittel", high: "Hoch", "very-high": "Sehr hoch" }
-    : { low: "Low", medium: "Medium", high: "High", "very-high": "Very high" };
+  const intensityLabels = {
+    low: t("frameworksList.intensityLow"),
+    medium: t("frameworksList.intensityMedium"),
+    high: t("frameworksList.intensityHigh"),
+    "very-high": t("frameworksList.intensityVeryHigh"),
+  };
 
   return (
     <a
@@ -173,7 +175,7 @@ function FrameworkCard({ fw, de }: { fw: FrameworkMeta; de: boolean }) {
         color: fw.color.accent,
         fontFamily: "var(--font-ui)",
       }}>
-        {de ? "Framework öffnen" : "Open framework"} →
+        {t("frameworksList.openFramework")} →
       </div>
     </a>
   );

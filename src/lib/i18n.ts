@@ -1215,6 +1215,28 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  frameworksList: {
+    heroHeading: "Analysis Frameworks",
+    heroBody: "Six specialized analysis modes — each with its own purpose, data sources, and visualizations.",
+    sharedInfrastructureHeading: "Shared Infrastructure",
+    infraCausalLabel: "Causal Graph",
+    infraCausalDesc: "Every framework reads & extends causal chains",
+    infraSignalLabel: "Signal Pipeline",
+    infraSignalDesc: "All live connectors for all frameworks",
+    infraSteepDesc: "Unified categorization",
+    infraScenarioLabel: "3-Scenario Model",
+    infraScenarioDesc: "Optimistic / Probable / Pessimistic",
+    infraTerminalDesc: "Natural language queries",
+    infraRoleLabel: "Role Context",
+    infraRoleDesc: "Outputs adapted by user role",
+    // Framework card
+    openFramework: "Open framework",
+    intensityLow: "Low",
+    intensityMedium: "Medium",
+    intensityHigh: "High",
+    intensityVeryHigh: "Very high",
+  },
+
   howTo: {
     // Lead
     leadHeadline: "What is SIS — and how do you use it?",
@@ -2442,6 +2464,27 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  frameworksList: {
+    heroHeading: "Analyse-Frameworks",
+    heroBody: "Sechs spezialisierte Denk- und Analysemodi — mit eigenem Erkenntnisziel, eigenen Datenquellen und Visualisierungen.",
+    sharedInfrastructureHeading: "Gemeinsame Infrastruktur",
+    infraCausalLabel: "Kausal-Graph",
+    infraCausalDesc: "Jedes Framework liest & erweitert Kausalketten",
+    infraSignalLabel: "Signal-Pipeline",
+    infraSignalDesc: "Alle Live-Connectors für alle Frameworks",
+    infraSteepDesc: "Einheitliche Kategorisierung",
+    infraScenarioLabel: "3-Szenarien-Modell",
+    infraScenarioDesc: "Optimistisch / Wahrscheinlich / Pessimistisch",
+    infraTerminalDesc: "Natürlichsprachliche Abfragen",
+    infraRoleLabel: "Rollen-Kontext",
+    infraRoleDesc: "Outputs je Nutzerrolle adaptiert",
+    openFramework: "Framework öffnen",
+    intensityLow: "Niedrig",
+    intensityMedium: "Mittel",
+    intensityHigh: "Hoch",
+    intensityVeryHigh: "Sehr hoch",
   },
 
   howTo: {
