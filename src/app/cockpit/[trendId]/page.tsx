@@ -6,7 +6,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { useParams } from "next/navigation";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { megaTrends } from "@/lib/mega-trends";
 import { TrendDot } from "@/types";
 import dynamic from "next/dynamic";
@@ -14,8 +14,7 @@ import dynamic from "next/dynamic";
 const TrendDetailPanel = dynamic(() => import("@/components/radar/TrendDetailPanel"), { ssr: false });
 
 export default function TrendDetailPage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const params = useParams();
   const trendId = params.trendId as string;
 
@@ -49,7 +48,7 @@ export default function TrendDetailPage() {
       <AppHeader />
         <main className="volt-container" style={{ padding: "32px 24px 80px", textAlign: "center" }}>
           <div style={{ padding: 60, color: "var(--color-text-muted)" }}>
-            {de ? "Lade Trend-Details..." : "Loading trend details..."}
+            {t("trendDetail.loading")}
           </div>
         </main>
       </div>
@@ -64,7 +63,7 @@ export default function TrendDetailPage() {
           <div style={{ padding: 60 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 8 }}>
-              {de ? "Trend nicht gefunden" : "Trend not found"}
+              {t("trendDetail.notFound")}
             </div>
             <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>
               ID: {trendId}
@@ -74,7 +73,7 @@ export default function TrendDetailPage() {
               background: "var(--volt-black, #0A0A0A)", color: "var(--volt-white, #fff)",
               textDecoration: "none", display: "inline-block",
             }}>
-              {de ? "Alle Trends anzeigen" : "Show all trends"} →
+              {t("trendDetail.showAll")} →
             </Link>
           </div>
         </main>
@@ -118,7 +117,7 @@ export default function TrendDetailPage() {
             letterSpacing: "0.10em", textTransform: "uppercase" as const,
             color: "var(--volt-text-faint, #AAA)", marginBottom: 16,
           }}>
-            {de ? "Aktionen" : "Actions"}
+            {t("trendDetail.actionsHeading")}
           </div>
 
           <a
@@ -133,10 +132,10 @@ export default function TrendDetailPage() {
             onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
           >
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 2 }}>
-              {de ? "Frag mich dazu" : "Ask about this"} →
+              {t("trendDetail.askAboutLabel")} →
             </div>
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 11, color: "var(--color-text-muted)" }}>
-              {de ? "Vollständige Intelligence-Analyse" : "Full intelligence analysis"}
+              {t("trendDetail.askAboutDesc")}
             </div>
           </a>
 
@@ -152,10 +151,10 @@ export default function TrendDetailPage() {
             onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
           >
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 2 }}>
-              {de ? "Im Netzwerk anzeigen" : "View in Network"} ⬡
+              {t("trendDetail.viewInNetworkLabel")} ⬡
             </div>
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 11, color: "var(--color-text-muted)" }}>
-              {de ? "Kausale Verbindungen erkunden" : "Explore causal connections"}
+              {t("trendDetail.viewInNetworkDesc")}
             </div>
           </a>
 
@@ -171,11 +170,11 @@ export default function TrendDetailPage() {
             onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
           >
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", marginBottom: 2, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              {de ? "Im Radar anzeigen" : "View in Radar"}
+              {t("trendDetail.viewInRadarLabel")}
               <Radar size={13} strokeWidth={2} />
             </div>
             <div style={{ fontFamily: "var(--volt-font-ui)", fontSize: 11, color: "var(--color-text-muted)" }}>
-              {de ? "Position im Ring-Modell" : "Position in ring model"}
+              {t("trendDetail.viewInRadarDesc")}
             </div>
           </a>
         </div>

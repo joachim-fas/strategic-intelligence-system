@@ -1229,6 +1229,19 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  trendDetail: {
+    loading: "Loading trend details...",
+    notFound: "Trend not found",
+    showAll: "Show all trends",
+    actionsHeading: "Actions",
+    askAboutLabel: "Ask about this",
+    askAboutDesc: "Full intelligence analysis",
+    viewInNetworkLabel: "View in Network",
+    viewInNetworkDesc: "Explore causal connections",
+    viewInRadarLabel: "View in Radar",
+    viewInRadarDesc: "Position in ring model",
+  },
+
   queryCard: {
     // {{n}} = duplicate index — e.g. "Duplicate #2 of this query"
     duplicateTitle: "Duplicate #{{n}} of this query",
@@ -2557,6 +2570,19 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  trendDetail: {
+    loading: "Lade Trend-Details...",
+    notFound: "Trend nicht gefunden",
+    showAll: "Alle Trends anzeigen",
+    actionsHeading: "Aktionen",
+    askAboutLabel: "Frag mich dazu",
+    askAboutDesc: "Vollständige Intelligence-Analyse",
+    viewInNetworkLabel: "Im Netzwerk anzeigen",
+    viewInNetworkDesc: "Kausale Verbindungen erkunden",
+    viewInRadarLabel: "Im Radar anzeigen",
+    viewInRadarDesc: "Position im Ring-Modell",
   },
 
   queryCard: {
