@@ -67,10 +67,12 @@ export interface TrendEdge {
  */
 export const TREND_EDGES: TrendEdge[] = [
   // ─── Climate drives everything ─────────────────────────────
-  // The five edges immediately below carry explicit provenance as
-  // the reference template for Welle B Item 1 (Delphi-style). New
-  // curated edges should follow this shape; legacy edges migrate
-  // opportunistically whenever they're touched for another reason.
+  // All 102 edges in this file now carry explicit provenance
+  // (source / timestamp / confidence) per Welle B Item 1. The
+  // five edges in this first section were the reference template;
+  // the remaining 97 were curated in batches on 2026-04-18 /
+  // 2026-04-19. New edges MUST carry provenance on creation —
+  // `hasProvenance()` coverage metric on /monitor will flag regressions.
   {
     from: "mega-climate-sustainability",
     to: "mega-energy-transition",
@@ -991,6 +993,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.6,
     description: "Data-as-asset reshapes individual rights, consent norms, and self-conception",
+    source: "EU GDPR enforcement trends (EDPB Annual Reports) + Apple App Tracking Transparency impact studies",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ── Cybersecurity — strengthen the web ────────────────────────────────
@@ -1000,6 +1005,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.5,
     description: "Security skills are now a horizontal requirement across every job role",
+    source: "ISC2 Cybersecurity Workforce Study 2024 + (ISC)² Cybersecurity Skills Gap Report",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ── Digital Health ─────────────────────────────────────────────────────
@@ -1019,6 +1027,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.6,
     description: "Continuous health data streams form one of the largest emerging data markets",
+    source: "Apple/Fitbit/Oura health platform disclosures + EU EHDS (European Health Data Space) 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
 
   // ── Genomics ───────────────────────────────────────────────────────────
@@ -1038,6 +1049,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.45,
     description: "Genomic medicine reshapes how individuals understand ancestry, risk, and self",
+    source: "23andMe/Ancestry consumer genomics uptake reports + American Society of Human Genetics policy statements",
+    timestamp: "2026-04-19",
+    confidence: 0.58,
   },
 
   // ── Engineered Evolution ───────────────────────────────────────────────
@@ -1070,6 +1084,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.5,
     description: "Knowledge production migrates to creator platforms and short-form formats",
+    source: "Reuters Digital News Report 2024 + Pew Research News Platform Use studies",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ── Remote / Hybrid Work ───────────────────────────────────────────────
@@ -1089,6 +1106,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.4,
     description: "Async work patterns reshape attention allocation and meeting culture",
+    source: "Microsoft Work Trend Index 2024 (async + meeting overload findings) + Slack State of Work",
+    timestamp: "2026-04-19",
+    confidence: 0.62,
   },
 
   // ── Smart Surroundings ─────────────────────────────────────────────────
@@ -1122,6 +1142,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.35,
     description: "Frictionless commerce shapes purchase decisions through micro-content and recommendations",
+    source: "TikTok Shop commerce integration reports + Shopify Audiences launch + Amazon Sponsored Display insights",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
 
   // ── Attention Economy ──────────────────────────────────────────────────
