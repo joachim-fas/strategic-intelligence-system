@@ -133,6 +133,25 @@ Grouped as:
 - **Health**: `/api/v1/health` (unauthenticated liveness probe for
   monitoring/k8s).
 
+## System-Prompts
+
+All LLM system prompts SIS sends to Anthropic / OpenRouter are
+documented in [`SYSTEM_PROMPTS.md`](./SYSTEM_PROMPTS.md) and rendered
+live at `/dokumentation/prompts` in the running app. Single source of
+truth: `src/lib/system-prompts-registry.ts`.
+
+Prompts inventoried:
+- `briefing-main` — the main query-to-briefing prompt
+- `framework-analyze` — Pre-Mortem, War-Gaming, Stakeholder, etc.
+- `canvas-summary-single` — strategic sparring summary for 1-analysis projects
+- `cluster-diff` — pipeline changelog (flag-gated)
+- `cluster-foresight` — pipeline forward scenarios (flag-gated)
+
+Every prompt includes a temporal-context block (current date) injected
+via `buildDateContext()` in `src/lib/llm.ts` — prevents the LLM from
+treating its training cutoff as "now" and producing past-as-future
+forecasts.
+
 ## Tests
 
 Plain tsx smoke tests, zero framework install. **~315 assertions across
