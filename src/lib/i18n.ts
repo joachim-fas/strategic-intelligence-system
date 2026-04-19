@@ -1104,6 +1104,21 @@ const en = {
     contradicts: "contradicts",
     validates: "validates",
   },
+
+  scenarioCards: {
+    modelHeading: "3-Scenario Model",
+    optimistic: "Optimistic",
+    pessimistic: "Pessimistic",
+    probable: "Probable",
+  },
+
+  calibration: {
+    noPredictions: "No resolved predictions yet.",
+    predictions: "Predictions",
+    meanBrier: "mean Brier",
+    axisObserved: "Observed",
+    axisPredicted: "Predicted",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2019,6 +2034,21 @@ const de: Dictionary = {
     buildsOn: "baut auf",
     contradicts: "widerspricht",
     validates: "bestätigt",
+  },
+
+  scenarioCards: {
+    modelHeading: "3-Szenarien-Modell",
+    optimistic: "Optimistisch",
+    pessimistic: "Pessimistisch",
+    probable: "Wahrscheinlich",
+  },
+
+  calibration: {
+    noPredictions: "Noch keine aufgelösten Prognosen.",
+    predictions: "Vorhersagen",
+    meanBrier: "Ø Brier",
+    axisObserved: "Beobachtet",
+    axisPredicted: "Vorhergesagt",
   },
 };
 

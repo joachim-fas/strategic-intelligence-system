@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 interface Scenario {
   type: "optimistic" | "probable" | "pessimistic" | string;
@@ -19,6 +20,8 @@ const SCENARIO_COLORS: Record<string, { bg: string; border: string; text: string
 
 export function ScenarioCards({ scenarios, de }: { scenarios: Scenario[]; de?: boolean }) {
   const [active, setActive] = useState<string | null>(null);
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
 
   if (!scenarios || scenarios.length === 0) return null;
 
@@ -28,7 +31,7 @@ export function ScenarioCards({ scenarios, de }: { scenarios: Scenario[]; de?: b
         fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
         fontFamily: "var(--font-mono)", color: "var(--muted-foreground)", marginBottom: 4,
       }}>
-        {de ? "3-Szenarien-Modell" : "3-Scenario Model"}
+        {tl("scenarioCards.modelHeading")}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
         {scenarios.map((s, i) => {
@@ -58,9 +61,9 @@ export function ScenarioCards({ scenarios, de }: { scenarios: Scenario[]; de?: b
                   color: colors.text, fontFamily: "var(--font-mono)",
                   background: colors.badge, padding: "2px 8px", borderRadius: 4,
                 }}>
-                  {s.type === "optimistic" ? (de ? "Optimistisch" : "Optimistic") :
-                   s.type === "pessimistic" ? (de ? "Pessimistisch" : "Pessimistic") :
-                   (de ? "Wahrscheinlich" : "Probable")}
+                  {s.type === "optimistic" ? tl("scenarioCards.optimistic") :
+                   s.type === "pessimistic" ? tl("scenarioCards.pessimistic") :
+                   tl("scenarioCards.probable")}
                 </span>
                 {s.probability != null && (
                   <span style={{ fontSize: 11, fontWeight: 700, color: colors.text, fontFamily: "var(--font-mono)" }}>

@@ -25,6 +25,7 @@
  */
 
 import React from "react";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 export interface CalibrationBucketDto {
   bucketMid: number;
@@ -51,6 +52,9 @@ export function CalibrationCurve({
   de = true,
   size = 220,
 }: CalibrationCurveProps) {
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
+
   const pad = 32;
   const chartSize = size - pad * 2;
 
@@ -83,7 +87,7 @@ export function CalibrationCurve({
         fontSize: 12, color: "var(--color-text-muted)",
         border: "1px dashed var(--color-border)", borderRadius: 8,
       }}>
-        {de ? "Noch keine aufgelösten Prognosen." : "No resolved predictions yet."}
+        {tl("calibration.noPredictions")}
       </div>
     );
   }
@@ -96,11 +100,11 @@ export function CalibrationCurve({
         fontSize: 12, marginBottom: 8,
       }}>
         <span style={{ color: "var(--color-text-muted)" }}>
-          {de ? "Vorhersagen" : "Predictions"}
+          {tl("calibration.predictions")}
         </span>
         <strong>{totalResolved}</strong>
         <span style={{ color: "var(--color-text-muted)", marginLeft: 8 }}>
-          {de ? "Ø Brier" : "mean Brier"}
+          {tl("calibration.meanBrier")}
         </span>
         <strong>{meanBrier != null ? meanBrier.toFixed(3) : "—"}</strong>
       </div>
@@ -139,7 +143,7 @@ export function CalibrationCurve({
           textAnchor="end" dominantBaseline="middle"
           transform={`rotate(-90 ${pad - 8} ${toSvgY(0.5)})`}
         >
-          {de ? "Beobachtet" : "Observed"}
+          {tl("calibration.axisObserved")}
         </text>
         <text
           x={toSvgX(0.5)} y={size - 6}
@@ -147,7 +151,7 @@ export function CalibrationCurve({
           fill="var(--color-text-muted)"
           textAnchor="middle"
         >
-          {de ? "Vorhergesagt" : "Predicted"}
+          {tl("calibration.axisPredicted")}
         </text>
 
         {/* Corner labels */}
