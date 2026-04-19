@@ -1146,6 +1146,14 @@ const en = {
     loadFailedDefault: "Data could not be loaded. Please try again.",
     retryLabel: "Retry",
   },
+
+  appHeader: {
+    menuTooltip: "Menu",
+    menuAriaLabel: "Open main navigation",
+    mainNavAriaLabel: "Main navigation",
+    activityTooltip: "Activity Monitor (Ctrl+M)",
+    activityAriaLabel: "Open Activity Monitor",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2103,6 +2111,14 @@ const de: Dictionary = {
     waitingForResponse: "Modell antwortet…",
     loadFailedDefault: "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
     retryLabel: "Erneut",
+  },
+
+  appHeader: {
+    menuTooltip: "Menü",
+    menuAriaLabel: "Hauptnavigation öffnen",
+    mainNavAriaLabel: "Hauptnavigation",
+    activityTooltip: "Activity Monitor (Ctrl+M)",
+    activityAriaLabel: "Activity Monitor öffnen",
   },
 };
 
