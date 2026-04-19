@@ -1215,6 +1215,17 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  frameworkShell: {
+    breadcrumbHome: "SIS",
+    breadcrumbFrameworks: "Frameworks",
+    topicPlaceholder: "Enter topic — e.g. \"AI in Healthcare\"",
+    analyzeButton: "Analyze",
+    // Empty state — {{name}} = framework name (e.g. "Trend Deep Dive")
+    emptyStateStart: "Start {{name}}",
+    emptyStateBody: "Enter a topic above to start the analysis. The framework guides you through each step.",
+    horizonLabel: "Horizon",
+  },
+
   scenarioSelector: {
     header: "Future Scenarios",
     headerHint: "Select card · Actions below",
@@ -2477,6 +2488,16 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  frameworkShell: {
+    breadcrumbHome: "SIS",
+    breadcrumbFrameworks: "Frameworks",
+    topicPlaceholder: "Thema eingeben — z.B. \"KI im Gesundheitswesen\"",
+    analyzeButton: "Analysieren",
+    emptyStateStart: "{{name}} starten",
+    emptyStateBody: "Gib oben ein Thema ein, um die Analyse zu starten. Das Framework führt dich Schritt für Schritt durch die Analyse.",
+    horizonLabel: "Zeithorizont",
   },
 
   scenarioSelector: {

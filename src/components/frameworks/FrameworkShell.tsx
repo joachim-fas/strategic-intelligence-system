@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useLocale, useT } from "@/lib/locale-context";
 import { FrameworkMeta } from "@/types/frameworks";
 
 interface FrameworkShellProps {
@@ -15,6 +15,7 @@ interface FrameworkShellProps {
 
 export function FrameworkShell({ meta, children }: FrameworkShellProps) {
   const { locale } = useLocale();
+  const { t } = useT();
   const de = locale === "de";
   const [topic, setTopic] = useState("");
   const [activeTopic, setActiveTopic] = useState("");
@@ -42,10 +43,10 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           {/* Breadcrumb */}
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-            <Link href="/" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>SIS</Link>
+            <Link href="/" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>{t("frameworkShell.breadcrumbHome")}</Link>
             <span style={{ opacity: 0.55 }}>/</span>
             <Link href="/frameworks" style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>
-              {de ? "Frameworks" : "Frameworks"}
+              {t("frameworkShell.breadcrumbFrameworks")}
             </Link>
             <span style={{ opacity: 0.55 }}>/</span>
             <span style={{ color: meta.color.accent, fontWeight: 600 }}>{name}</span>
@@ -84,7 +85,7 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
               value={topic}
               onChange={e => setTopic(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
-              placeholder={de ? "Thema eingeben — z.B. \"KI im Gesundheitswesen\"" : "Enter topic — e.g. \"AI in Healthcare\""}
+              placeholder={t("frameworkShell.topicPlaceholder")}
               style={{
                 flex: 1, height: 42, padding: "0 14px",
                 fontSize: 14, fontFamily: "var(--font-ui)",
@@ -111,7 +112,7 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
                 whiteSpace: "nowrap",
               }}
             >
-              {de ? "Analysieren" : "Analyze"} →
+              {t("frameworkShell.analyzeButton")} →
             </button>
           </div>
         </div>
@@ -130,9 +131,17 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
 }
 
 function EmptyState({ meta, de }: { meta: FrameworkMeta; de: boolean }) {
+  const { t } = useT();
+  // Framework name comes from FRAMEWORK_META, which carries both translations
+  // per entry. The locale choice drives the empty-state heading.
+  const name = de ? meta.name.de : meta.name.en;
   const timeHorizon = de ? meta.timeHorizon.de : meta.timeHorizon.en;
-  const intensity = { low: "Niedrig", medium: "Mittel", high: "Hoch", "very-high": "Sehr hoch" };
-  const intensityEn = { low: "Low", medium: "Medium", high: "High", "very-high": "Very high" };
+  const intensityLabels = {
+    low: t("frameworksList.intensityLow"),
+    medium: t("frameworksList.intensityMedium"),
+    high: t("frameworksList.intensityHigh"),
+    "very-high": t("frameworksList.intensityVeryHigh"),
+  };
 
   return (
     <div style={{
@@ -152,13 +161,10 @@ function EmptyState({ meta, de }: { meta: FrameworkMeta; de: boolean }) {
         fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700,
         color: "var(--color-text-heading)", marginBottom: 8,
       }}>
-        {de ? `${meta.name.de} starten` : `Start ${meta.name.en}`}
+        {t("frameworkShell.emptyStateStart", { name })}
       </h2>
       <p style={{ fontSize: 13, color: "var(--color-text-muted)", maxWidth: 400, lineHeight: 1.6 }}>
-        {de
-          ? "Gib oben ein Thema ein, um die Analyse zu starten. Das Framework führt dich Schritt für Schritt durch die Analyse."
-          : "Enter a topic above to start the analysis. The framework guides you through each step."
-        }
+        {t("frameworkShell.emptyStateBody")}
       </p>
       <div style={{
         display: "flex", gap: 16, marginTop: 20,
@@ -166,9 +172,9 @@ function EmptyState({ meta, de }: { meta: FrameworkMeta; de: boolean }) {
         fontFamily: "var(--font-mono)",
         textTransform: "uppercase", letterSpacing: "0.05em",
       }}>
-        <span>{de ? "Zeithorizont" : "Horizon"}: {timeHorizon}</span>
+        <span>{t("frameworkShell.horizonLabel")}: {timeHorizon}</span>
         <span>|</span>
-        <span>LLM: {de ? intensity[meta.llmIntensity] : intensityEn[meta.llmIntensity]}</span>
+        <span>LLM: {intensityLabels[meta.llmIntensity]}</span>
       </div>
     </div>
   );
