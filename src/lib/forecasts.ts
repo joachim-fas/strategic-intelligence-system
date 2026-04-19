@@ -524,6 +524,52 @@ export interface CalibrationSummary {
 const DECILE_BOUNDS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 
 /**
+ * Per-user aggregate for a tenant-wide leaderboard. Returns one
+ * row per user with at least one resolved prediction in this
+ * tenant, sorted by mean Brier ascending (best-calibrated first).
+ *
+ * `minPredictions` filters out users who've only resolved 1–2
+ * predictions — their mean Brier is too noisy to ranked against.
+ * Default 3 mirrors Manifold's own "needs ≥10 markets" threshold
+ * scaled down for the typical <15-user tenant.
+ */
+export interface CalibrationLeaderboardRow {
+  userId: string;
+  totalResolved: number;
+  meanBrier: number;
+}
+
+export function getTenantCalibrationLeaderboard(
+  tenantId: string,
+  opts: { minPredictions?: number; limit?: number } = {},
+): CalibrationLeaderboardRow[] {
+  const minPredictions = opts.minPredictions ?? 3;
+  const limit = Math.max(1, Math.min(200, opts.limit ?? 50));
+
+  const db = getSqliteHandle();
+  const rows = db.prepare(
+    `SELECT
+       user_id,
+       COUNT(*) AS n,
+       AVG(brier_score) AS mean_brier
+     FROM forecast_calibration
+     WHERE tenant_id = ?
+     GROUP BY user_id
+     HAVING n >= ?
+     ORDER BY mean_brier ASC
+     LIMIT ?`,
+  ).all(tenantId, minPredictions, limit) as Array<{
+    user_id: string; n: number; mean_brier: number;
+  }>;
+
+  return rows.map((r) => ({
+    userId: r.user_id,
+    totalResolved: r.n,
+    meanBrier: r.mean_brier,
+  }));
+}
+
+/**
  * Build a decile calibration summary for a user. Null `meanBrier`
  * and empty buckets when the user has no resolved positions yet.
  * The Stanford calibration convention: lower Brier is better,

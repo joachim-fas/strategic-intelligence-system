@@ -68,6 +68,8 @@ function ForecastsInner() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<Array<{ userId: string; totalResolved: number; meanBrier: number }> | null>(null);
+  const [lbOpen, setLbOpen] = useState(false);
 
   const loadList = useCallback(async () => {
     setListLoading(true);
@@ -89,6 +91,22 @@ function ForecastsInner() {
   }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
+
+  // Leaderboard loads separately — it's optional data for the
+  // header; a 404 here just means "no one has resolved enough
+  // yet", which is fine and the UI absorbs gracefully.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithTimeout("/api/v1/forecasts/calibration", {}, 5000);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setLeaderboard(json.data?.leaderboard ?? []);
+      } catch { /* optional data; silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -170,6 +188,94 @@ function ForecastsInner() {
             : "Each question collects individual probability estimates from team members. Resolution requires two signers (proposer + approver)."}
         </p>
       </div>
+
+      {/* Team calibration leaderboard — collapsible header strip.
+           Only renders when we actually have leaderboard data; a
+           fresh tenant with zero resolved forecasts sees no strip
+           instead of an empty table. */}
+      {leaderboard && leaderboard.length > 0 && (
+        <div style={{
+          border: "1px solid var(--color-border)",
+          borderRadius: 10,
+          marginBottom: 20,
+          overflow: "hidden",
+        }}>
+          <button
+            type="button"
+            onClick={() => setLbOpen((v) => !v)}
+            style={{
+              width: "100%", textAlign: "left" as const,
+              padding: "10px 14px", border: "none",
+              background: "var(--color-surface-2, #FAFAFA)",
+              cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 10,
+              fontFamily: "inherit",
+            }}
+          >
+            <span style={{
+              fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase" as const,
+              color: "var(--color-text-muted)",
+            }}>
+              {de ? "Team-Kalibrierung" : "Team Calibration"}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+              {de
+                ? `${leaderboard.length} ${leaderboard.length === 1 ? "Nutzer" : "Nutzer"} mit ≥3 aufgelösten Prognosen`
+                : `${leaderboard.length} user${leaderboard.length === 1 ? "" : "s"} with ≥3 resolved predictions`}
+            </span>
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--color-text-muted)" }}>
+              {lbOpen ? "▴" : "▾"}
+            </span>
+          </button>
+          {lbOpen && (
+            <div style={{ padding: "8px 14px 12px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ color: "var(--color-text-muted)" }}>
+                    <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 600 }}>#</th>
+                    <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 600 }}>{de ? "Nutzer" : "User"}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>{de ? "Vorhersagen" : "Predictions"}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Ø Brier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((r, i) => (
+                    <tr key={r.userId} style={{ borderTop: "1px solid var(--color-border)" }}>
+                      <td style={{ padding: "4px 8px", color: "var(--color-text-muted)", fontFamily: "var(--volt-font-mono)" }}>
+                        {i + 1}
+                      </td>
+                      <td style={{ padding: "4px 8px", fontFamily: "var(--volt-font-mono)" }}>
+                        {r.userId.slice(0, 8)}
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right", fontFamily: "var(--volt-font-mono)" }}>
+                        {r.totalResolved}
+                      </td>
+                      <td style={{
+                        padding: "4px 8px", textAlign: "right",
+                        fontFamily: "var(--volt-font-mono)", fontWeight: 700,
+                        color: r.meanBrier < 0.10 ? "#1A9E5A"
+                          : r.meanBrier < 0.25 ? "#D97706" : "#C4241B",
+                      }}>
+                        {r.meanBrier.toFixed(3)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{
+                fontSize: 10, color: "var(--color-text-faint)",
+                marginTop: 6, fontFamily: "var(--volt-font-mono)",
+              }}>
+                {de
+                  ? "Niedriger = besser kalibriert. Grün <0.10 / Amber <0.25 / Rot >0.25."
+                  : "Lower = better-calibrated. Green <0.10 / Amber <0.25 / Red >0.25."}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Create button */}
       {canCreate && !createOpen && (

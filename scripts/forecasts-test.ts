@@ -38,6 +38,7 @@ import {
   forecastsEnabled,
   getUserCalibration,
   getCalibrationSummary,
+  getTenantCalibrationLeaderboard,
 } from "../src/lib/forecasts";
 
 let passed = 0;
@@ -433,6 +434,25 @@ const emptySummary = getCalibrationSummary(TENANT_A, "user-that-never-staked");
 assert(emptySummary.totalResolved === 0, "empty user: 0 resolved");
 assert(emptySummary.meanBrier === null, "empty user: null mean");
 assert(emptySummary.buckets.length === 0, "empty user: no buckets");
+
+// ─── 13. Leaderboard ────────────────────────────────────────────
+section("13. Leaderboard returns users sorted by mean Brier ASC");
+// USER_1 has at least (0.04 + 0.01) resolved; USER_2 has 0.49.
+const lb = getTenantCalibrationLeaderboard(TENANT_A, { minPredictions: 1 });
+assert(lb.length >= 2, `≥2 users in leaderboard (got ${lb.length})`);
+// Find positions in the leaderboard
+const u1LbIdx = lb.findIndex(r => r.userId === USER_1);
+const u2LbIdx = lb.findIndex(r => r.userId === USER_2);
+assert(u1LbIdx < u2LbIdx, "USER_1 (better Brier) ranks above USER_2");
+assert(lb[u1LbIdx].meanBrier < lb[u2LbIdx].meanBrier, "USER_1 mean < USER_2 mean");
+
+// minPredictions filter drops low-sample users
+const lbStrict = getTenantCalibrationLeaderboard(TENANT_A, { minPredictions: 100 });
+assert(lbStrict.length === 0, "minPredictions=100 filters out everyone");
+
+// Tenant scoping: TENANT_B has no calibration data
+const lbOtherTenant = getTenantCalibrationLeaderboard(TENANT_B, { minPredictions: 1 });
+assert(lbOtherTenant.length === 0, "other tenant returns empty leaderboard");
 
 // ─── Cleanup ────────────────────────────────────────────────────
 section("cleanup");
