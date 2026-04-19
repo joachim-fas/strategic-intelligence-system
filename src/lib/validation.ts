@@ -143,10 +143,53 @@ const UsedSourceSchema = z.object({
   date: z.string().max(50).optional(),
 });
 
+/**
+ * Critical-Fix-Plan P1-2 (Notion 2026-04-20): Domains, deren URLs wir als
+ * "editorially verified" markieren. Reihenfolge ist irrelevant; der
+ * Match läuft via `host === domain || host.endsWith("." + domain)`.
+ *
+ * Kriterien für Aufnahme in diese Liste:
+ *  - Autoritative Primär-Quelle (Regierung, internationale Org, Research)
+ *  - Connector-Backend (GDELT, Polymarket, arXiv etc. — Quellen der
+ *    Live-Signal-Pipeline)
+ *  - Etablierte Fachmedien mit redaktioneller Verantwortung
+ *
+ * NICHT auf der Liste: Blogs, Medium-Artikel, beliebige
+ * Sub-Domain-Konstrukte. Für die zeigt die UI explizit
+ * "unverifizierte Quelle".
+ */
+const KNOWN_DOMAINS: string[] = [
+  // EU + nationale Behörden
+  "europa.eu", "ec.europa.eu", "eurostat.ec.europa.eu",
+  "bundestag.de", "bundesregierung.de", "parlament.gv.at",
+  // Internationale Organisationen
+  "un.org", "who.int", "imf.org", "worldbank.org", "oecd.org",
+  "wto.org", "iea.org", "unfccc.int", "weforum.org",
+  // Research + Academic
+  "arxiv.org", "nature.com", "science.org", "ssrn.com",
+  "jrc.ec.europa.eu", "nber.org",
+  // Connectors
+  "polymarket.com", "kalshi.com", "manifold.markets",
+  "github.com", "news.ycombinator.com", "reddit.com",
+  "fred.stlouisfed.org", "bls.gov", "eia.gov",
+  "npm.js", "pypi.org", "producthunt.com", "wikipedia.org",
+  "stackoverflow.com", "gdelt.org", "gdeltproject.org",
+  // Etablierte Fachmedien
+  "ft.com", "economist.com", "bloomberg.com", "reuters.com",
+  "wsj.com", "nytimes.com", "spiegel.de", "zeit.de", "faz.net",
+  "handelsblatt.com", "diepresse.com", "derstandard.at",
+  "politico.eu", "bruegel.org", "carnegieendowment.org",
+  // Tech + Industry Research
+  "gartner.com", "forrester.com", "mckinsey.com", "bcg.com",
+  "bain.com", "deloitte.com", "pwc.com", "ey.com", "kpmg.com",
+];
+
 const ReferenceSchema = z.object({
   title: z.string().max(500).default(""),
   url: z.string().max(2000).default(""),
   relevance: z.string().max(500).optional(),
+  /** Gesetzt vom Validator nach Domain-Check (P1-2). */
+  verified: z.boolean().optional(),
 });
 
 const BSCPerspectiveSchema = z.object({
@@ -390,21 +433,45 @@ export function validateLLMResponse(
     warnings.push(`Expected 3 scenarios, got ${data.scenarios.length}`);
   }
 
-  // Step 4: Validate reference URLs — check format, drop malformed
-  data.references = data.references.filter((ref) => {
-    if (!ref.url || ref.url.length === 0) return true; // Title-only ref is OK
-    try {
-      const url = new URL(ref.url);
-      if (!["http:", "https:"].includes(url.protocol)) {
-        warnings.push(`Dropped reference with invalid protocol: ${ref.url}`);
+  // Step 4: Validate reference URLs — check format, drop malformed +
+  // mark whether the URL is from a known, audited domain.
+  //
+  // Critical-Fix-Plan P1-2 (Notion 2026-04-20): LLMs fabrizieren
+  // gerne plausibel aussehende URLs ("Verordnung 2022/1426"). Vollständige
+  // HEAD-Requests wären zu teuer + blockieren Streaming; stattdessen
+  // halten wir eine Allowlist verifizierter Domains. Alles was dort nicht
+  // drauf ist, bekommt ein verified:false-Flag — die UI kann das als
+  // "nicht editorially geprüft" kennzeichnen (siehe BriefingExport /
+  // BriefingResult references-Sektion).
+  data.references = data.references
+    .filter((ref) => {
+      if (!ref.url || ref.url.length === 0) return true; // Title-only ref is OK
+      try {
+        const url = new URL(ref.url);
+        if (!["http:", "https:"].includes(url.protocol)) {
+          warnings.push(`Dropped reference with invalid protocol: ${ref.url}`);
+          return false;
+        }
+        return true;
+      } catch {
+        warnings.push(`Dropped reference with malformed URL: ${ref.url}`);
         return false;
       }
-      return true;
-    } catch {
-      warnings.push(`Dropped reference with malformed URL: ${ref.url}`);
-      return false;
-    }
-  });
+    })
+    .map((ref) => {
+      if (!ref.url) return ref;
+      try {
+        const host = new URL(ref.url).hostname.toLowerCase();
+        const verified = KNOWN_DOMAINS.some(
+          (d) => host === d || host.endsWith("." + d),
+        );
+        // Legacy references don't have the verified-field. z.infer still works
+        // because the schema's shape is open-ended via `.default`.
+        return { ...ref, verified } as typeof ref & { verified: boolean };
+      } catch {
+        return ref;
+      }
+    });
 
   // Step 5: Confidence sanity check
   if (data.confidence === 0) {

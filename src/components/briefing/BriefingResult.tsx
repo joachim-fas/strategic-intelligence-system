@@ -793,18 +793,65 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               icon={<BookOpen size={18} />}
               iconVariant="light"
               title={locale === "de" ? "Quellen" : "Sources"}
-              subtitle={locale === "de"
-                ? `${b.references.length} Referenzen — von KI vorgeschlagen, nicht redaktionell verifiziert`
-                : `${b.references.length} references — AI-suggested, not editorially verified`}
+              subtitle={(() => {
+                // Critical-Fix-Plan P1-2 (Notion 2026-04-20): Verifizierte
+                // vs unverifizierte Quellen getrennt ausweisen. Der Validator
+                // setzt `verified: true` für Refs auf bekannten, autoritativen
+                // Domains (EU, UN, Research, Connector-Backends). Alles andere
+                // gilt als "AI-suggested, domain not on verified allowlist".
+                const refs = b.references as Array<{ url?: string; verified?: boolean }>;
+                const verifiedCount = refs.filter((r) => r.verified).length;
+                const total = refs.length;
+                if (verifiedCount === 0) {
+                  return locale === "de"
+                    ? `${total} Referenzen — von KI vorgeschlagen, nicht auf Allowlist`
+                    : `${total} references — AI-suggested, not on allowlist`;
+                }
+                if (verifiedCount === total) {
+                  return locale === "de"
+                    ? `${total} Referenzen · alle aus verifizierten Domains`
+                    : `${total} references · all from verified domains`;
+                }
+                return locale === "de"
+                  ? `${total} Referenzen · ${verifiedCount} verifiziert, ${total - verifiedCount} unverifiziert`
+                  : `${total} references · ${verifiedCount} verified, ${total - verifiedCount} unverified`;
+              })()}
             >
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {b.references.map((ref: { title: string; url: string; relevance?: string }, i: number) => (
-                  <VoltReferencePill
-                    key={i}
-                    href={ref.url}
-                    title={ref.title}
-                    externalTitle={ref.relevance}
-                  />
+                {b.references.map((ref: { title: string; url: string; relevance?: string; verified?: boolean }, i: number) => (
+                  <div key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <VoltReferencePill
+                      href={ref.url}
+                      title={ref.title}
+                      externalTitle={ref.relevance}
+                    />
+                    {/* Verifikations-Indikator: grüner Punkt für
+                         bekannte Domain, gelbes "?" für unverifizierte.
+                         Klickbar-Detail: Domain-Info im Tooltip. */}
+                    {ref.url && (
+                      <span
+                        title={ref.verified
+                          ? (locale === "de" ? "Domain auf Allowlist (Autoritätsquelle)" : "Domain on allowlist (authoritative source)")
+                          : (locale === "de" ? "Domain nicht verifiziert — prüfen" : "Domain not verified — review")}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          width: 14,
+                          height: 14,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "50%",
+                          background: ref.verified ? "rgba(26, 158, 90, 0.14)" : "rgba(245, 198, 80, 0.18)",
+                          color: ref.verified ? "#0F6038" : "#7A5C00",
+                          border: `1px solid ${ref.verified ? "rgba(26, 158, 90, 0.35)" : "rgba(245, 198, 80, 0.45)"}`,
+                          cursor: "help",
+                        }}
+                      >
+                        {ref.verified ? "✓" : "?"}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             </VoltSectionCard>
