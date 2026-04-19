@@ -26,7 +26,13 @@
 // use-framework-analysis) all call `consumeSSE()` now — single
 // protocol implementation, one set of tests.
 
-// TODO: API-19 — No OpenAPI/Swagger documentation for any API route.
+// API-19 PARTIAL FIX: hand-curated OpenAPI 3.1 spec lives in
+// src/lib/openapi-spec.ts, served at GET /api/v1/openapi.json.
+// Covers /health, /clusters/*, /forecasts/* — the integrator-facing
+// endpoints. Internal admin routes are deliberately out of scope.
+// Shape is validated by scripts/openapi-spec-test.ts (13 asserts)
+// including a "documented path has matching route.ts" check so the
+// spec can't silently drift out of sync.
 // TODO: API-20 — No API versioning mechanism beyond /api/v1/ prefix.
 
 // TODO: ARC-13 — src/lib/ has 36 files with no organization.

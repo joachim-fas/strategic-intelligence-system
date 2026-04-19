@@ -63,6 +63,16 @@ const SELF_AUTHED_API_PREFIXES: readonly string[] = [
   "/api/v1/cron",    // External cron — validated by CRON_SECRET in route handler
 ] as const;
 
+/**
+ * API routes that are genuinely public (no auth at all, no self-auth).
+ * SECURITY: These routes must expose ONLY non-sensitive data. Adding an
+ * entry here is an explicit decision to make the endpoint world-readable.
+ */
+const PUBLIC_API_PREFIXES: readonly string[] = [
+  "/api/v1/health",       // Liveness probe — no secrets, uptime monitors
+  "/api/v1/openapi.json", // OpenAPI 3.1 spec — public API reference
+] as const;
+
 function isPublicPath(pathname: string): boolean {
   // Static assets and auth endpoints
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;
@@ -70,6 +80,8 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PAGE_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true;
   // Self-authenticated API routes
   if (SELF_AUTHED_API_PREFIXES.some((p) => pathname.startsWith(p))) return true;
+  // Explicitly-public API routes
+  if (PUBLIC_API_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true;
   return false;
 }
 
