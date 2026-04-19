@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 export default function SignInClient() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -31,17 +30,12 @@ export default function SignInClient() {
         setSubmitted(true);
       } else {
         // Audit A5-M3 (18.04.2026): sign-in error strings were the
-        // only untranslated copy on the auth surface — English-only
-        // regardless of locale, which lands jarring for German users
-        // on the first interactive screen.
-        setError(de
-          ? "Anmeldung fehlgeschlagen. Deine E-Mail ist möglicherweise nicht freigeschaltet."
-          : "Sign-in failed. Your email may not be on the allowlist.");
+        // only untranslated copy on the auth surface. Now routed
+        // through the shared dictionary (signin namespace).
+        setError(t("signin.signinFailed"));
       }
     } catch {
-      setError(de
-        ? "Netzwerkfehler. Bitte erneut versuchen."
-        : "Network error. Please try again.");
+      setError(t("signin.networkError"));
     }
   }
 
@@ -52,12 +46,11 @@ export default function SignInClient() {
           <div style={{ width: 48, height: 48, borderRadius: "var(--radius-lg)", background: "var(--pastel-mint)", border: "1px solid var(--pastel-mint-border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 20px" }}>
             ✓
           </div>
-          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", marginBottom: 10 }}>{de ? "E-Mail gesendet" : "Email sent"}</h1>
+          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", marginBottom: 10 }}>{t("signin.emailSentHeading")}</h1>
           <p className="volt-body-sm" style={{ color: "var(--color-text-subtle)", lineHeight: 1.6 }}>
-            {de
-              ? <>Ein Anmeldelink wurde an <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong> gesendet. Klicke auf den Link in der E-Mail um die Anmeldung abzuschließen.</>
-              : <>A sign-in link has been sent to <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>. Click the link in the email to complete sign-in.</>
-            }
+            {t("signin.emailSentBodyPrefix")}
+            <strong style={{ color: "var(--color-text-primary)" }}>{email}</strong>
+            {t("signin.emailSentBodySuffix")}
           </p>
         </div>
       </div>
@@ -72,20 +65,20 @@ export default function SignInClient() {
           <Image src="/icons/volt-signet.svg" alt="SIS" width={32} height={21} />
           <div>
             <div className="volt-heading" style={{ color: "var(--color-text-heading)" }}>Strategic Intelligence System</div>
-            <div className="volt-body-sm" style={{ color: "var(--color-text-muted)" }}>{de ? "Zugang nur für autorisierte Nutzer" : "Access for authorized users only"}</div>
+            <div className="volt-body-sm" style={{ color: "var(--color-text-muted)" }}>{t("signin.tagline")}</div>
           </div>
         </div>
 
         <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-2xl)", padding: "28px 24px", boxShadow: "var(--shadow-sm)" }}>
-          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", margin: "0 0 6px" }}>{de ? "Anmelden" : "Sign In"}</h1>
+          <h1 className="volt-heading" style={{ color: "var(--color-text-heading)", margin: "0 0 6px" }}>{t("signin.heading")}</h1>
           <p className="volt-body-sm" style={{ color: "var(--color-text-muted)", margin: "0 0 24px" }}>
-            {de ? "Gib deine E-Mail ein — du erhältst einen Magic Link." : "Enter your email — you'll receive a magic link."}
+            {t("signin.subheading")}
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label htmlFor="email" className="volt-label-text" style={{ display: "block", color: "var(--color-text-subtle)", marginBottom: 6 }}>
-                {de ? "E-Mail-Adresse" : "Email address"}
+                {t("signin.emailLabel")}
               </label>
               <input
                 id="email"
@@ -93,7 +86,7 @@ export default function SignInClient() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder={de ? "du@beispiel.de" : "you@example.com"}
+                placeholder={t("signin.emailPlaceholder")}
                 className="volt-input"
                 style={{ width: "100%", boxSizing: "border-box" }}
               />
@@ -110,7 +103,7 @@ export default function SignInClient() {
               className="volt-btn volt-btn-solid"
               style={{ width: "100%" }}
             >
-              {de ? "Magic Link senden →" : "Send Magic Link →"}
+              {t("signin.submitButton")}
             </button>
           </form>
         </div>

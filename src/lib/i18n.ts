@@ -1190,6 +1190,20 @@ const en = {
     changeBadge: "Change",
     foresightBadge: "Foresight",
   },
+
+  signin: {
+    emailSentHeading: "Email sent",
+    emailSentBodyPrefix: "A sign-in link has been sent to ",
+    emailSentBodySuffix: ". Click the link in the email to complete sign-in.",
+    tagline: "Access for authorized users only",
+    heading: "Sign In",
+    subheading: "Enter your email — you'll receive a magic link.",
+    emailLabel: "Email address",
+    emailPlaceholder: "you@example.com",
+    submitButton: "Send Magic Link →",
+    signinFailed: "Sign-in failed. Your email may not be on the allowlist.",
+    networkError: "Network error. Please try again.",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2190,6 +2204,20 @@ const de: Dictionary = {
     latestBadge: "AKTUELL",
     changeBadge: "Änderung",
     foresightBadge: "Vorausschau",
+  },
+
+  signin: {
+    emailSentHeading: "E-Mail gesendet",
+    emailSentBodyPrefix: "Ein Anmeldelink wurde an ",
+    emailSentBodySuffix: " gesendet. Klicke auf den Link in der E-Mail um die Anmeldung abzuschließen.",
+    tagline: "Zugang nur für autorisierte Nutzer",
+    heading: "Anmelden",
+    subheading: "Gib deine E-Mail ein — du erhältst einen Magic Link.",
+    emailLabel: "E-Mail-Adresse",
+    emailPlaceholder: "du@beispiel.de",
+    submitButton: "Magic Link senden →",
+    signinFailed: "Anmeldung fehlgeschlagen. Deine E-Mail ist möglicherweise nicht freigeschaltet.",
+    networkError: "Netzwerkfehler. Bitte erneut versuchen.",
   },
 };
 
