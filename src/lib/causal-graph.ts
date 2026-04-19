@@ -181,6 +181,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "Fragmentation accelerates data sovereignty demands",
+    source: "CJEU Schrems II judgment (C-311/18) + EU Data Act + China PIPL enforcement",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-geopolitical-fracturing",
@@ -196,6 +199,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "State-level cyber threats and supply chain risks increase",
+    source: "SIPRI Yearbook 2024 + NATO Cyber Defence Pledge + CISA Advisories 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.88,
   },
   {
     from: "mega-geopolitical-fracturing",
@@ -212,6 +218,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.9,
     description: "Aging populations drive healthcare innovation demand",
+    source: "UN World Population Prospects 2024 + WHO Global Spending on Health",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "mega-demographic-shift",
@@ -219,6 +228,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "Shrinking workforces drive automation adoption",
+    source: "McKinsey Global Institute — The Future of Work (2024) + OECD Employment Outlook 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-demographic-shift",
@@ -249,6 +261,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.8,
     description: "Connected data fuels AI training and deployment",
+    source: "Common Crawl Foundation Reports + OpenAI GPT-4 Technical Report (2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-connectivity",
@@ -265,6 +280,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.95,
     description: "Growing threats drive cybersecurity investment",
+    source: "IBM Cost of a Data Breach Report 2024 + Gartner Cybersecurity Spending Forecast 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.92,
   },
   {
     from: "macro-cybersecurity",
@@ -282,6 +300,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.9,
     description: "Health R&D produces digital health solutions",
+    source: "McKinsey Digital Health Ecosystem 2024 + WHO Digital Health Strategy 2020-2025",
+    timestamp: "2026-04-19",
+    confidence: 0.88,
   },
   {
     from: "mega-health-biotech",
@@ -305,6 +326,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.95,
     description: "Transition policies drive renewable energy adoption",
+    source: "IEA Renewables 2024 Report + IRENA World Energy Transitions Outlook 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.94,
   },
   {
     from: "mega-energy-transition",
@@ -312,6 +336,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.8,
     description: "Electrification enables autonomous vehicle adoption",
+    source: "IEA Global EV Outlook 2024 + BloombergNEF Electric Vehicle Outlook 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "mega-energy-transition",
@@ -328,6 +355,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.9,
     description: "Work transformation includes location flexibility",
+    source: "Bloom et al. Stanford SIEPR Working Paper on Work-from-Home (2024) + WFH Research Global Survey",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "mega-future-of-work",
