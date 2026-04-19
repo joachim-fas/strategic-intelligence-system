@@ -221,18 +221,10 @@ function PacMan() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const parent = canvas.parentElement;
+    if (!parent) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const cssW = 200;
-    const cssH = 36;
-    canvas.width = cssW * dpr;
-    canvas.height = cssH * dpr;
-    canvas.style.width = cssW + "px";
-    canvas.style.height = cssH + "px";
-    ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = true;
 
     // ── Farben ────────────────────────────────────────────────────────
     // Invertierte Palette (User-Feedback): Pac-Man + Dots in der Haupt-
@@ -241,37 +233,71 @@ function PacMan() {
     const BODY = "#0A0A0A";      // Pac-Man & Dots — schwarz
     const EYE = "#F0FF00";       // Auge — neongelb
 
-    // ── Geometrie ─────────────────────────────────────────────────────
+    // ── Geometrie-Konstanten ──────────────────────────────────────────
+    // Feste Werte, die nicht von der Bühnenbreite abhängen.
     const PAC_R = 9;                    // Pac-Man-Radius
     const DOT_R = 1.6;                  // Dot-Radius
-    const DOT_COUNT = 7;                // Anzahl Dots auf der Bühne
-    const midY = cssH / 2;
-    const leftX = PAC_R + 2;
-    const rightX = cssW - PAC_R - 2;
-    const pathLen = rightX - leftX;
+    const DOT_SPACING = 28;             // gleichmäßiger Abstand zwischen Dots
+    const EDGE_PADDING = 8;             // Abstand zu den Text-Rändern links/rechts
+    const CHOMP_HZ = 5;                 // 5 Mund-Öffnungen pro Sekunde
 
-    // Dot-Positionen gleichmäßig auf der Bahn verteilt
-    const dotXs = Array.from({ length: DOT_COUNT }, (_, i) =>
-      leftX + PAC_R + 8 + ((pathLen - PAC_R * 2 - 16) * (i + 0.5)) / DOT_COUNT,
-    );
+    // Scroll-Geschwindigkeit statt Halbzyklus-Zeit: der Pac-Man läuft
+    // immer gleich schnell, egal wie breit der Container ist. Vorher
+    // dauerte ein Durchlauf fix 5.5 s — bei doppelter Breite wäre der
+    // Wurm doppelt so schnell gewesen, bei halber doppelt so langsam.
+    const SPEED_PX_PER_S = 55;          // ~9 s pro 500 px Halbzyklus
 
-    // ── Bewegung ──────────────────────────────────────────────────────
-    // Ein Durchlauf (L → R oder R → L) dauert TRAVEL_HALF_S Sekunden.
-    // Insgesamt also 2 × TRAVEL_HALF_S für hin-und-zurück.
-    const TRAVEL_HALF_S = 5.5;
-    const CHOMP_HZ = 5;  // 5 Mund-Öffnungen pro Sekunde
+    // ── Dynamische Bühnen-Dimensionen ─────────────────────────────────
+    // Das Canvas skaliert mit der Container-Breite. ResizeObserver
+    // passt die Auflösung bei jedem Layout-Change neu an.
+    let cssW = 0;
+    let cssH = 36;
+    let leftX = 0;
+    let rightX = 0;
+    let pathLen = 0;
+    let midY = cssH / 2;
+    let dotXs: number[] = [];
+
+    const setup = () => {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      cssW = Math.max(60, parent.clientWidth - EDGE_PADDING * 2);
+      cssH = 36;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      canvas.style.width = cssW + "px";
+      canvas.style.height = cssH + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = true;
+
+      // Layout-Werte für diese Breite neu berechnen
+      midY = cssH / 2;
+      leftX = PAC_R + 2;
+      rightX = cssW - PAC_R - 2;
+      pathLen = rightX - leftX;
+
+      // Dots so viele wie reinpassen, gleichmäßig zentriert in der Bahn
+      const dotsAvailable = pathLen - PAC_R * 2 - 16;
+      const dotCount = Math.max(1, Math.floor(dotsAvailable / DOT_SPACING));
+      const dotsStart = (cssW - (dotCount - 1) * DOT_SPACING) / 2;
+      dotXs = Array.from({ length: dotCount }, (_, i) => dotsStart + i * DOT_SPACING);
+    };
+
+    setup();
+    const ro = new ResizeObserver(() => setup());
+    ro.observe(parent);
 
     const drawFrame = (tSec: number) => {
       const W = cssW;
       const H = cssH;
       ctx.clearRect(0, 0, W, H);
 
-      // Richtung: + = nach rechts, − = nach links. Hin-und-zurück-
-      // Zyklus von 2 × TRAVEL_HALF_S Sekunden. u ∈ [0, 1] innerhalb
-      // jedes Halbzyklus.
-      const cycleT = tSec % (TRAVEL_HALF_S * 2);
-      const goingRight = cycleT < TRAVEL_HALF_S;
-      const u = (goingRight ? cycleT : cycleT - TRAVEL_HALF_S) / TRAVEL_HALF_S;
+      // Halbzyklus-Dauer aus aktueller Breite + konstanter Speed.
+      // Das hält die Geschwindigkeit unabhängig vom Viewport stabil.
+      const halfS = Math.max(1.5, pathLen / SPEED_PX_PER_S);
+      const cycleT = tSec % (halfS * 2);
+      const goingRight = cycleT < halfS;
+      const u = (goingRight ? cycleT : cycleT - halfS) / halfS;
       const pacX = goingRight
         ? leftX + u * pathLen
         : rightX - u * pathLen;
@@ -291,26 +317,18 @@ function PacMan() {
       }
 
       // ── Pac-Man zeichnen ────────────────────────────────────────────
-      // Mund-Öffnung: sinusförmig zwischen 0 (zu) und MAX_OPEN (auf).
-      // `Math.abs(Math.sin(...))` sorgt dafür, dass der Mund sauber
-      // zumacht und wieder öffnet (zwei Zyklen pro Sinus-Periode).
-      const MAX_OPEN = 0.9; // ~51° geöffneter Keil pro Hälfte
+      const MAX_OPEN = 0.9;
       const mouth = Math.abs(Math.sin(tSec * Math.PI * CHOMP_HZ)) * MAX_OPEN;
-
-      // Blickrichtung = Reiserichtung
       const facing = goingRight ? 0 : Math.PI;
 
       ctx.fillStyle = BODY;
       ctx.beginPath();
-      // Startpunkt im Zentrum, damit Mund-Keil als „Cut" funktioniert
       ctx.moveTo(pacX, midY);
-      // Arc von mouth/2 bis (2π − mouth/2), relativ zur Blickrichtung
       ctx.arc(pacX, midY, PAC_R, facing + mouth, facing + Math.PI * 2 - mouth);
       ctx.closePath();
       ctx.fill();
 
       // ── Auge ────────────────────────────────────────────────────────
-      // Über dem Zentrum, leicht in Blickrichtung versetzt.
       const eyeDx = Math.cos(facing) * PAC_R * 0.15;
       const eyeDy = -PAC_R * 0.45;
       ctx.fillStyle = EYE;
@@ -323,6 +341,7 @@ function PacMan() {
     const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     if (prefersReduced) {
       drawFrame(0);
+      ro.disconnect();
       return;
     }
 
@@ -333,7 +352,10 @@ function PacMan() {
       rafId = requestAnimationFrame(frame);
     };
     rafId = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
   }, []);
 
   return (
@@ -383,11 +405,12 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
       aria-label={locale === "de" ? `Reasoning läuft, ${mm} Minuten ${ss} Sekunden` : `Reasoning in progress, ${mm} minutes ${ss} seconds`}
       style={{
         display: "flex", alignItems: "center", gap: 14,
-        padding: "16px 22px",
-        // The pixel-man now lives in an explicit walkway between label and
-        // timer, so the card no longer needs a padded bottom lane. 64px is
-        // enough to fit the character (42px tall) plus the progress pill.
-        minHeight: 64,
+        padding: "14px 22px",
+        // Die Box muss hoch genug sein, damit der Canvas (36 px) mit dem
+        // Padding (14 oben/unten) ohne Clipping reinpasst — und damit die
+        // 3-Pixel-Progress-Pill unten sichtbar bleibt ohne Überlappung mit
+        // dem Inhalt. 72 px reicht genau dafür.
+        minHeight: 72,
         borderRadius: "var(--volt-radius-lg, 14px)",
         border: "1.5px solid var(--volt-border, #E8E8E8)",
         background: "var(--volt-surface-raised, #fff)",
@@ -463,7 +486,14 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
         style={{
           flex: 1,
           position: "relative",
-          alignSelf: "stretch",
+          // `alignSelf: stretch` war hier falsch — das zog den Walkway auf
+          // volle Container-Höhe und hat die Flex-Zentrierung der Nachbarn
+          // (Label/Timer) visuell gegen diesen stretched Block verschoben.
+          // Ohne stretch nimmt der Walkway nur die Canvas-Höhe (36 px) ein
+          // und wird per alignItems: "center" des Parent-Flex sauber mit
+          // Label/Timer auf einer Linie zentriert.
+          height: 36,
+          display: "flex", alignItems: "center",
           overflow: "hidden",
           minWidth: 120,
         }}

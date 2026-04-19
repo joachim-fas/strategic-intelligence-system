@@ -1005,12 +1005,15 @@ h1, h2, h3, h4, h5, h6 {
    Pose, kein Loop).
    ────────────────────────────────────────────────────────────────────── */
 
+/* Pac-Man-Wrapper: nimmt die volle Breite des Walkways und zentriert
+ * den Canvas darin. Der Canvas selbst ist jetzt responsive — die
+ * Komponente misst parent.clientWidth und skaliert die Canvas-Breite
+ * dynamisch (siehe PacMan.useEffect → ResizeObserver). */
 .sis-pac-man {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  z-index: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
 }
 
