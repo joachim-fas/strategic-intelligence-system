@@ -997,19 +997,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ──────────────────────────────────────────────────────────────────────
-   Reasoning indicator: pixel-worm crawl (Canvas-Version, 19.04.2026)
+   Reasoning indicator: Pac-Man munching dots (Canvas, 19.04.2026)
    ──────────────────────────────────────────────────────────────────────
-   Die Animation läuft komplett per requestAnimationFrame im <canvas> —
-   die frühere SVG/Keyframe-Variante bildete die parametrische Spine der
-   Vorlage (Downloads/Pixel Worm.html) nicht korrekt ab. Jetzt ist der
-   Drawing-Code 1:1 aus der Vorlage portiert; dieser CSS-Block definiert
-   nur noch den Wrapper (horizontales Zentrieren im Walkway).
-
-   Reduced-Motion wird in der Komponente selbst erkannt: der RAF-Loop
-   startet dann nicht, der Wurm bleibt statisch im flachen Ruhezustand.
+   Pac-Man läuft zwischen „Reasoning"-Label und mm:ss-Clock, frisst sich
+   durch eine Reihe neongelber Dots und dreht am Rand um. Canvas + RAF,
+   Reduced-Motion wird in der Komponente selbst abgefangen (statische
+   Pose, kein Loop).
    ────────────────────────────────────────────────────────────────────── */
 
-.sis-pixel-worm {
+.sis-pac-man {
   position: absolute;
   inset: 0;
   display: grid;
@@ -1018,15 +1014,9 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-.sis-pixel-worm canvas {
+.sis-pac-man canvas {
   display: block;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* Kein Override nötig — die Komponente startet den RAF-Loop erst gar
-   * nicht, wenn prefers-reduced-motion gesetzt ist. */
+  /* Kantenweich — Pac-Man ist kein Pixelart, der Kreis darf smooth sein. */
 }
 
 /* Hero background with lime radial orbs */

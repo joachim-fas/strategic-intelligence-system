@@ -190,34 +190,32 @@ function PixelMan() {
 }
 
 /**
- * Pixel-art inchworm sprite that replaces PixelMan in the reasoning walkway.
+ * PacMan — Reasoning-Animation, die den Slot zwischen „Reasoning"-Label
+ * und mm:ss-Clock füllt, solange die Pipeline läuft.
  *
- * **2026-04-19: Zweite Version.** Die erste SVG-Variante mit statischen
- * Segmenten und CSS-translateY-Wellen sah nicht aus wie der Referenz-Wurm
- * aus `Downloads/Pixel Worm.html` — die hat eine echte parametrische
- * Spine mit Compress/Arch-Phasen. Deshalb portieren wir jetzt den
- * Canvas-Drawing-Code 1:1 in eine React-Komponente.
+ * **Warum Pac-Man:** User wünsch dir's, nach dem Wurm-Experiment.
+ * Pac-Man hat als Metapher perfekt zu „System denkt" gepasst — er
+ * frisst sich durch etwas. Hier: Dots, die als Reihe auf der Bühne
+ * liegen.
  *
- * **Wie es funktioniert:**
- *  - Ein hochauflösender Off-Screen-Canvas rendert den Wurm im Pixel-Gitter
- *  - Die Inchworm-Physik ist identisch zur Referenz:
- *      Phase 0.00–0.45  Tail-Anchor, Körper staucht sich, Bogen wächst
- *      Phase 0.45–0.90  Head-Anchor, Körper streckt sich nach vorn
- *      Phase 0.90–1.00  Flach, kurzer Atem-Hold
- *  - Zusätzlich wandert der Wurm horizontal über die Bühne (links→rechts→links),
- *    damit er nicht nur „auf der Stelle" hockt. Die World-X-Position wird
- *    sinusförmig moduliert; Richtung (dir) kippt beim Vorzeichenwechsel.
- *  - DevicePixelRatio-bewusst: Canvas ist intern HiDPI, aber der Context
- *    hat `imageSmoothingEnabled = false`, damit das Pixel-Art scharf bleibt.
+ * **Visuals:**
+ *   - Gelber Pac-Man-Kreis mit chomp-Animation (Mund öffnet/schließt,
+ *     Keilwinkel oszilliert zwischen ~55° geöffnet und 0° geschlossen)
+ *   - Eine Reihe kleiner Dots auf Höhe des Pac-Man-Zentrums
+ *   - Pac-Man wandert langsam von links nach rechts, frisst dabei die
+ *     Dots (Dot verschwindet sobald seine x-Position erreicht ist).
+ *   - Am rechten Rand: Richtung flipt, Dots werden neu generiert, Pac-
+ *     Man frisst sich zurück nach links.
  *
- * **Lebenszyklus:** der `requestAnimationFrame`-Loop wird in useEffect
- * registriert und beim Unmount sauber abgebrochen. Der Wurm läuft solange
- * die Komponente im DOM ist — für die Reasoning-Animation genau richtig.
+ * **Rendering:** Canvas mit `requestAnimationFrame`. HiDPI-bewusst
+ * (DPR-Scaling), `imageSmoothingEnabled = true` (anders als beim
+ * Pixel-Wurm) — Pac-Man darf kantenweich sein, das ist keine Pixel-
+ * art.
  *
- * **Reduced Motion:** wenn `prefers-reduced-motion` gesetzt ist, wird
- * der Wurm einmal flach gerendert und der Loop nicht gestartet.
+ * **Reduced Motion:** einmal mit offenem Mund rendern, keinen RAF-
+ * Loop starten.
  */
-function PixelWorm() {
+function PacMan() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -226,161 +224,109 @@ function PixelWorm() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // HiDPI: interner Puffer in DPR skaliert, CSS-Größe über style.
-    // Das Ergebnis ist auf Retina-Displays nicht verwaschen, und weil wir
-    // `imageSmoothingEnabled = false` setzen, bleiben die Pixel scharf.
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const cssW = 200;  // Sichtbare Bühnenbreite (CSS-px)
-    const cssH = 36;   // Sichtbare Bühnenhöhe (CSS-px)
+    const cssW = 200;
+    const cssH = 36;
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
     canvas.style.width = cssW + "px";
     canvas.style.height = cssH + "px";
     ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
 
-    // ── Farben (identisch zur Vorlage) ──────────────────────────────
-    const INK = "#0A0A0A";
-    const BG = "#F4F1EA";
+    // ── Farben ────────────────────────────────────────────────────────
+    const YELLOW = "#F0FF00";    // Pac-Man & Dots — neongelb
+    const INK = "#0A0A0A";       // Auge
 
-    // ── TWEAKS — Referenz-Defaults aus Pixel Worm.html ──────────────
-    // speed 0.75 × period 1.6 s ≈ ein Inchworm-Schritt pro ~2.1 s.
-    // Das ist die Geschwindigkeit, bei der die Physik des Wurms schön
-    // lesbar ist (zu schnell → Flimmern, zu langsam → einschlafen).
-    const TWEAKS = {
-      pixelSize: 2,     // 2 css-px per worm-pixel — kompakt genug für die Bühne
-      speed: 0.75,
-      bodyLength: 28,   // Anzahl Segmente auf der Spine
-      archHeight: 1.0,
-    };
+    // ── Geometrie ─────────────────────────────────────────────────────
+    const PAC_R = 9;                    // Pac-Man-Radius
+    const DOT_R = 1.6;                  // Dot-Radius
+    const DOT_COUNT = 7;                // Anzahl Dots auf der Bühne
+    const midY = cssH / 2;
+    const leftX = PAC_R + 2;
+    const rightX = cssW - PAC_R - 2;
+    const pathLen = rightX - leftX;
 
-    // ── Inchworm-Phasenmodell (1:1 aus der Vorlage) ─────────────────
-    const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-    const ANCHOR_TAIL = 0;
-    const ANCHOR_HEAD = 1;
-    const phase = (p: number) => {
-      if (p < 0.45) {
-        const u = easeInOut(p / 0.45);
-        return { compress: u, arch: Math.pow(u, 0.9), anchor: ANCHOR_TAIL, u };
-      } else if (p < 0.9) {
-        const u = easeInOut((p - 0.45) / 0.45);
-        return { compress: 1 - u, arch: Math.pow(1 - u, 0.9), anchor: ANCHOR_HEAD, u };
-      }
-      return { compress: 0, arch: 0, anchor: ANCHOR_TAIL, u: 1 };
-    };
+    // Dot-Positionen gleichmäßig auf der Bahn verteilt
+    const dotXs = Array.from({ length: DOT_COUNT }, (_, i) =>
+      leftX + PAC_R + 8 + ((pathLen - PAC_R * 2 - 16) * (i + 0.5)) / DOT_COUNT,
+    );
 
-    // ── Bühnen-Wanderung ────────────────────────────────────────────
-    // Die Referenz-Demo bleibt zentriert; der User möchte aber, dass der
-    // Wurm „von links nach rechts schiebt und wieder zurück". Lösung:
-    // die x-Position des Körperzentrums wird mit einem langsamen Sinus
-    // (Periode 22 s) zwischen linkem und rechtem Bühnenrand moduliert.
-    // Die dir-Variable flippt beim Nulldurchgang, damit Kopf und Auge
-    // immer in Laufrichtung zeigen.
-    const TRAVEL_PERIOD = 22; // Sekunden für einen vollständigen Hin-/Rück-Zyklus
+    // ── Bewegung ──────────────────────────────────────────────────────
+    // Ein Durchlauf (L → R oder R → L) dauert TRAVEL_HALF_S Sekunden.
+    // Insgesamt also 2 × TRAVEL_HALF_S für hin-und-zurück.
+    const TRAVEL_HALF_S = 5.5;
+    const CHOMP_HZ = 5;  // 5 Mund-Öffnungen pro Sekunde
 
-    const drawWorm = (tSec: number) => {
+    const drawFrame = (tSec: number) => {
       const W = cssW;
       const H = cssH;
       ctx.clearRect(0, 0, W, H);
 
-      const PX = Math.max(2, TWEAKS.pixelSize | 0);
+      // Richtung: + = nach rechts, − = nach links. Hin-und-zurück-
+      // Zyklus von 2 × TRAVEL_HALF_S Sekunden. u ∈ [0, 1] innerhalb
+      // jedes Halbzyklus.
+      const cycleT = tSec % (TRAVEL_HALF_S * 2);
+      const goingRight = cycleT < TRAVEL_HALF_S;
+      const u = (goingRight ? cycleT : cycleT - TRAVEL_HALF_S) / TRAVEL_HALF_S;
+      const pacX = goingRight
+        ? leftX + u * pathLen
+        : rightX - u * pathLen;
 
-      // Inchworm-Zyklus
-      const period = 1.6 / Math.max(0.05, TWEAKS.speed);
-      const p = ((tSec % period) + period) % period / period;
-      const { compress, arch } = phase(p);
-
-      // Wurm-Geometrie (in CSS-px des virtuellen Canvas)
-      const bodyLen = TWEAKS.bodyLength;
-      const radius = 2.1;
-      const cellSize = PX;
-
-      const stretched = bodyLen * cellSize;
-      const squished = stretched * 0.55;
-      const curLen = stretched + (squished - stretched) * compress;
-
-      const maxArch = stretched * 0.38 * TWEAKS.archHeight;
-      const archH = maxArch * arch;
-
-      // Ground line — etwas unterhalb der Mitte, damit der Bogen Platz
-      // nach oben hat
-      const groundY = Math.round(H * 0.72);
-
-      // Bühnen-Wanderung
-      const travel = Math.sin((2 * Math.PI * tSec) / TRAVEL_PERIOD);
-      const edgePad = curLen / 2 + cellSize * 4;
-      const cx = Math.round(W / 2 + travel * (W / 2 - edgePad));
-      // Richtung: +1 wenn Wurm nach rechts wandert, −1 wenn zurück.
-      // cos statt sin gibt uns den „Ist-die-Bewegung-nach-rechts?"-Indikator.
-      const dir = Math.cos((2 * Math.PI * tSec) / TRAVEL_PERIOD) >= 0 ? 1 : -1;
-
-      const halfLen = curLen / 2;
-      const headX = cx + dir * halfLen;
-      const tailX = cx - dir * halfLen;
-
-      // Spine sampeln + Pixel-Cells stempeln
-      const N = bodyLen;
-      const cells = new Set<string>();
-      const stamp = (scx: number, scy: number, r: number) => {
-        const r2 = r * r;
-        const iR = Math.ceil(r);
-        const gx = Math.round(scx / cellSize);
-        const gy = Math.round(scy / cellSize);
-        for (let dy = -iR; dy <= iR; dy++) {
-          for (let dx = -iR; dx <= iR; dx++) {
-            if (dx * dx + dy * dy <= r2 + 0.05) {
-              cells.add(gx + dx + "," + (gy + dy));
-            }
-          }
-        }
-      };
-
-      for (let i = 0; i <= N; i++) {
-        const s = i / N;
-        const x = tailX + s * (headX - tailX);
-        const bell = Math.sin(Math.PI * s);
-        const sharp = Math.pow(bell, 1 + 1.3 * compress);
-        const y = groundY - sharp * archH;
-        const taper = 1 - 0.35 * Math.pow(Math.abs(s - 0.5) * 2, 3.0);
-        const rr = radius * taper;
-        stamp(x, y, rr);
+      // ── Dots zeichnen ───────────────────────────────────────────────
+      // Sichtbar sind nur Dots, die der Pac-Man in der aktuellen
+      // Halbzyklus-Richtung noch NICHT überfahren hat. Bei jeder
+      // Richtungsumkehr erscheinen sie wieder frisch (neue Halbzyklus-
+      // Iteration) — klassisches Pac-Man-Respawn.
+      ctx.fillStyle = YELLOW;
+      for (const dx of dotXs) {
+        const eaten = goingRight ? dx < pacX - PAC_R * 0.5 : dx > pacX + PAC_R * 0.5;
+        if (eaten) continue;
+        ctx.beginPath();
+        ctx.arc(dx, midY, DOT_R, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      // Körper malen
+      // ── Pac-Man zeichnen ────────────────────────────────────────────
+      // Mund-Öffnung: sinusförmig zwischen 0 (zu) und MAX_OPEN (auf).
+      // `Math.abs(Math.sin(...))` sorgt dafür, dass der Mund sauber
+      // zumacht und wieder öffnet (zwei Zyklen pro Sinus-Periode).
+      const MAX_OPEN = 0.9; // ~51° geöffneter Keil pro Hälfte
+      const mouth = Math.abs(Math.sin(tSec * Math.PI * CHOMP_HZ)) * MAX_OPEN;
+
+      // Blickrichtung = Reiserichtung
+      const facing = goingRight ? 0 : Math.PI;
+
+      ctx.fillStyle = YELLOW;
+      ctx.beginPath();
+      // Startpunkt im Zentrum, damit Mund-Keil als „Cut" funktioniert
+      ctx.moveTo(pacX, midY);
+      // Arc von mouth/2 bis (2π − mouth/2), relativ zur Blickrichtung
+      ctx.arc(pacX, midY, PAC_R, facing + mouth, facing + Math.PI * 2 - mouth);
+      ctx.closePath();
+      ctx.fill();
+
+      // ── Auge ────────────────────────────────────────────────────────
+      // Über dem Zentrum, leicht in Blickrichtung versetzt.
+      const eyeDx = Math.cos(facing) * PAC_R * 0.15;
+      const eyeDy = -PAC_R * 0.45;
       ctx.fillStyle = INK;
-      for (const key of cells) {
-        const [gx, gy] = key.split(",").map(Number);
-        ctx.fillRect(gx * cellSize, gy * cellSize, cellSize, cellSize);
-      }
-
-      // Auge — am Kopfende, leicht nach oben versetzt
-      {
-        const s = 0.94;
-        const bell = Math.sin(Math.PI * s);
-        const sharp = Math.pow(bell, 1 + 1.3 * compress);
-        const ex = tailX + s * (headX - tailX);
-        const ey = groundY - sharp * archH;
-        const ox = dir * -0.2 * cellSize;
-        const oy = -0.6 * cellSize;
-        const egx = Math.round((ex + ox) / cellSize);
-        const egy = Math.round((ey + oy) / cellSize);
-        ctx.fillStyle = BG;
-        ctx.fillRect(egx * cellSize, egy * cellSize, cellSize, cellSize);
-      }
+      ctx.beginPath();
+      ctx.arc(pacX + eyeDx, midY + eyeDy, 1.3, 0, Math.PI * 2);
+      ctx.fill();
     };
 
-    // Reduced-motion: einmal flach rendern, keinen Loop.
+    // Reduced-Motion: Eine statische Pose, kein Loop.
     const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     if (prefersReduced) {
-      drawWorm(0);
+      drawFrame(0);
       return;
     }
 
-    // RAF-Loop
     const startT = performance.now();
     let rafId = 0;
     const frame = (now: number) => {
-      drawWorm((now - startT) / 1000);
+      drawFrame((now - startT) / 1000);
       rafId = requestAnimationFrame(frame);
     };
     rafId = requestAnimationFrame(frame);
@@ -388,7 +334,7 @@ function PixelWorm() {
   }, []);
 
   return (
-    <div className="sis-pixel-worm" aria-hidden="true">
+    <div className="sis-pac-man" aria-hidden="true">
       <canvas ref={canvasRef} />
     </div>
   );
@@ -503,14 +449,12 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-2 1.5s infinite" }}>.</span>
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-3 1.5s infinite" }}>.</span>
       </span>
-      {/* Pixel-worm walkway — the explicit strip between label and timer where
-           the tiny pixel-art inchworm slides back and forth. Anchored
-           position: relative so the absolutely-positioned PixelWorm animates
-           against this parent's width (the left-% keyframes in
-           sis-worm-travel). overflow: hidden clips the worm at the walkway's
-           left/right edges so its body doesn't bleed over the "Reasoning
-           läuft" label or the mm:ss timer. minWidth keeps the walkway
-           usable on narrow cards. */}
+      {/* Pac-Man walkway — the explicit strip between label and timer where
+           Pac-Man chomps through a row of dots. Anchored `position: relative`
+           so the absolutely-positioned <canvas> centres itself against this
+           parent. `overflow: hidden` keeps the character clipped at the
+           walkway's left/right edges, `minWidth` keeps the strip usable on
+           narrow cards. */}
       <div
         aria-hidden="true"
         style={{
@@ -521,7 +465,7 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
           minWidth: 120,
         }}
       >
-        <PixelWorm />
+        <PacMan />
       </div>
       <span style={{
         fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
