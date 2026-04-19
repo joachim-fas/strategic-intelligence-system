@@ -494,6 +494,7 @@ const en = {
     noneInCategory: "No projects in this category.",
     sort: "Sort",
     sortMenuAria: "Change sort order",
+    areaAria: "Projects area",
     sortLastEdited: "Last edited",
     sortRecentlyCreated: "Recently created",
     sortNameAsc: "Name A → Z",
@@ -1080,6 +1081,29 @@ const en = {
     inviteRevokedSuffix: "revoked",
     inviteAccepted: "Invite accepted ({{role}})",
   },
+
+  desktopOnly: {
+    noticeLabel: "Notice",
+    title: "Best viewed on desktop",
+    body: "The canvas, cockpit, and admin surfaces are not yet optimised for mobile. Open SIS on a laptop or desktop (width ≥ 768 px) for the full experience.",
+    continueAnyway: "Continue anyway",
+  },
+
+  impressum: {
+    testProjectTitle: "Experimental Test Project",
+    testProjectBody: "The Strategic Intelligence System (SIS) is an experimental research project. It serves to explore AI-assisted strategic analysis and is not a commercial product. All generated analyses, scenarios, and recommendations are machine-generated, not editorially verified, and do not constitute advice.",
+    tmgHeading: "Information according to § 5 TMG",
+    technologyHeading: "Technology",
+    technologyBody: "SIS uses the Anthropic Claude API for AI-based analysis. Processing occurs on Anthropic servers (USA). Submitted queries are sent to the API. No personal data is collected or stored.",
+    disclaimerHeading: "Disclaimer",
+    disclaimerBody: "Content is machine-generated. Despite careful selection of data sources and validation, no guarantee can be given for the accuracy, completeness, or timeliness of generated analyses.",
+  },
+
+  connections: {
+    buildsOn: "builds on",
+    contradicts: "contradicts",
+    validates: "validates",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -1392,6 +1416,7 @@ const de: Dictionary = {
     noneInCategory: "Keine Projekte in dieser Kategorie.",
     sort: "Sortierung",
     sortMenuAria: "Sortierung ändern",
+    areaAria: "Projekt-Bereich",
     sortLastEdited: "Zuletzt bearbeitet",
     sortRecentlyCreated: "Zuletzt erstellt",
     sortNameAsc: "Name A → Z",
@@ -1971,6 +1996,29 @@ const de: Dictionary = {
     inviteRevokedPrefix: "Einladung für",
     inviteRevokedSuffix: "zurückgezogen",
     inviteAccepted: "Einladung angenommen ({{role}})",
+  },
+
+  desktopOnly: {
+    noticeLabel: "Hinweis",
+    title: "Beste Ansicht am Desktop",
+    body: "Der Canvas, das Cockpit und die Admin-Oberflächen sind aktuell noch nicht für mobile Geräte optimiert. Öffne SIS auf einem Laptop oder Desktop (ab 768 px Breite) für die volle Funktionalität.",
+    continueAnyway: "Trotzdem fortfahren",
+  },
+
+  impressum: {
+    testProjectTitle: "Experimentelles Test-Projekt",
+    testProjectBody: "Das Strategic Intelligence System (SIS) ist ein experimentelles Forschungsprojekt. Es dient der Erprobung von KI-gestützter strategischer Analyse und stellt kein kommerzielles Produkt dar. Alle generierten Analysen, Szenarien und Empfehlungen sind maschinell erstellt, nicht redaktionell verifiziert und stellen keine Beratung dar.",
+    tmgHeading: "Angaben gemäß § 5 TMG",
+    technologyHeading: "Technologie",
+    technologyBody: "SIS nutzt die Anthropic Claude API für KI-basierte Analysen. Die Verarbeitung erfolgt auf Servern von Anthropic (USA). Eingegebene Abfragen werden an die API übermittelt. Es werden keine personenbezogenen Daten erhoben oder gespeichert.",
+    disclaimerHeading: "Haftungsausschluss",
+    disclaimerBody: "Die Inhalte werden maschinell generiert. Trotz sorgfältiger Auswahl der Datenquellen und Validierung kann keine Gewähr für Richtigkeit, Vollständigkeit oder Aktualität der generierten Analysen übernommen werden.",
+  },
+
+  connections: {
+    buildsOn: "baut auf",
+    contradicts: "widerspricht",
+    validates: "bestätigt",
   },
 };
 

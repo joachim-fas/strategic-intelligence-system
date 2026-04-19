@@ -1,11 +1,10 @@
 "use client";
 
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 export default function ImpressumPage() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
 
   return (
     <>
@@ -30,16 +29,14 @@ export default function ImpressumPage() {
             marginBottom: 6,
             fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
           }}>
-            {de ? "Experimentelles Test-Projekt" : "Experimental Test Project"}
+            {t("impressum.testProjectTitle")}
           </div>
           <p style={{
             fontSize: 13, lineHeight: 1.6,
             color: "#92400E",
             margin: 0,
           }}>
-            {de
-              ? "Das Strategic Intelligence System (SIS) ist ein experimentelles Forschungsprojekt. Es dient der Erprobung von KI-gestützter strategischer Analyse und stellt kein kommerzielles Produkt dar. Alle generierten Analysen, Szenarien und Empfehlungen sind maschinell erstellt, nicht redaktionell verifiziert und stellen keine Beratung dar."
-              : "The Strategic Intelligence System (SIS) is an experimental research project. It serves to explore AI-assisted strategic analysis and is not a commercial product. All generated analyses, scenarios, and recommendations are machine-generated, not editorially verified, and do not constitute advice."}
+            {t("impressum.testProjectBody")}
           </p>
         </div>
 
@@ -54,7 +51,7 @@ export default function ImpressumPage() {
 
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-            {de ? "Angaben gemäß § 5 TMG" : "Information according to § 5 TMG"}
+            {t("impressum.tmgHeading")}
           </h2>
           <div style={{ fontSize: 14, lineHeight: 1.8, color: "var(--color-text-primary, #333)" }}>
             <p style={{ margin: "0 0 4px" }}><strong>Joachim Unterberger</strong></p>
@@ -70,23 +67,19 @@ export default function ImpressumPage() {
 
         <section style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-            {de ? "Technologie" : "Technology"}
+            {t("impressum.technologyHeading")}
           </h2>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text-primary, #333)", margin: 0 }}>
-            {de
-              ? "SIS nutzt die Anthropic Claude API für KI-basierte Analysen. Die Verarbeitung erfolgt auf Servern von Anthropic (USA). Eingegebene Abfragen werden an die API übermittelt. Es werden keine personenbezogenen Daten erhoben oder gespeichert."
-              : "SIS uses the Anthropic Claude API for AI-based analysis. Processing occurs on Anthropic servers (USA). Submitted queries are sent to the API. No personal data is collected or stored."}
+            {t("impressum.technologyBody")}
           </p>
         </section>
 
         <section>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, color: "var(--color-text-heading)" }}>
-            {de ? "Haftungsausschluss" : "Disclaimer"}
+            {t("impressum.disclaimerHeading")}
           </h2>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--color-text-primary, #333)", margin: 0 }}>
-            {de
-              ? "Die Inhalte werden maschinell generiert. Trotz sorgfältiger Auswahl der Datenquellen und Validierung kann keine Gewähr für Richtigkeit, Vollständigkeit oder Aktualität der generierten Analysen übernommen werden."
-              : "Content is machine-generated. Despite careful selection of data sources and validation, no guarantee can be given for the accuracy, completeness, or timeliness of generated analyses."}
+            {t("impressum.disclaimerBody")}
           </p>
         </section>
       </main>

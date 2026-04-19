@@ -20,6 +20,7 @@
 import { useMemo } from "react";
 import { getNodeHeight, getNodeWidth } from "./utils";
 import type { CanvasNode, Connection } from "./types";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 // ── ConnectionsSVG ────────────────────────────────────────────────────────
 
@@ -27,6 +28,11 @@ export function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: 
   nodes: CanvasNode[]; connections: Connection[]; pipelineChain?: Set<string>; selectedId?: string | null;
   zoom: number; activeTagFilter: string | null; nodeTagMap: Map<string, string[]>; nodeGroupMap: Map<string, string>; connVisMode: "auto" | "show" | "hide"; de: boolean;
 }) {
+  // Local translator — this component receives `de` as a prop so we
+  // can't use useT() directly.
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
+
   const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
 
   // Pre-compute direct edges from selected node (once, before map loop)
@@ -134,9 +140,9 @@ export function ConnectionsSVG({ nodes, connections, pipelineChain, selectedId: 
         const CONN_STYLES: Record<string, { stroke: string; dash: string; width: number; marker: string; label: string; labelColor: string }> = {
           "derived":      { stroke: "#64748B", dash: "",    width: 1.4, marker: "url(#arr-d)",          label: "",                             labelColor: "" },
           "refreshed":    { stroke: "#F5A623", dash: "6 4", width: 1.2, marker: "url(#arr-r)",          label: "↻",                            labelColor: "#F5A623" },
-          "builds-on":    { stroke: "#1A9E5A", dash: "",    width: 2.0, marker: "url(#arr-builds)",     label: de ? "baut auf" : "builds on",  labelColor: "#1A9E5A" },
-          "contradicts":  { stroke: "#E8402A", dash: "3 2", width: 1.8, marker: "url(#arr-contradicts)",label: de ? "widerspricht" : "contradicts", labelColor: "#E8402A" },
-          "validates":    { stroke: "#2563EB", dash: "",    width: 1.8, marker: "url(#arr-validates)",  label: de ? "bestätigt" : "validates", labelColor: "#2563EB" },
+          "builds-on":    { stroke: "#1A9E5A", dash: "",    width: 2.0, marker: "url(#arr-builds)",     label: tl("connections.buildsOn"),    labelColor: "#1A9E5A" },
+          "contradicts":  { stroke: "#E8402A", dash: "3 2", width: 1.8, marker: "url(#arr-contradicts)",label: tl("connections.contradicts"), labelColor: "#E8402A" },
+          "validates":    { stroke: "#2563EB", dash: "",    width: 1.8, marker: "url(#arr-validates)",  label: tl("connections.validates"),   labelColor: "#2563EB" },
         };
 
         const cStyle = ct ? CONN_STYLES[ct] ?? CONN_STYLES.derived

@@ -31,14 +31,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 const MIN_WIDTH = 768;
 const OVERRIDE_KEY = "sis:desktop-only:override";
 
 export function DesktopOnlyGate() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
 
   // `narrow` stays null until the first client-side measurement so we
   // never render the overlay during hydration on a wide screen.
@@ -124,7 +123,7 @@ export function DesktopOnlyGate() {
             marginBottom: 10,
           }}
         >
-          {de ? "Hinweis" : "Notice"}
+          {t("desktopOnly.noticeLabel")}
         </div>
         <h2
           id="sis-desktop-only-title"
@@ -138,7 +137,7 @@ export function DesktopOnlyGate() {
             color: "var(--color-text-heading, #0A0A0A)",
           }}
         >
-          {de ? "Beste Ansicht am Desktop" : "Best viewed on desktop"}
+          {t("desktopOnly.title")}
         </h2>
         <p
           id="sis-desktop-only-desc"
@@ -149,9 +148,7 @@ export function DesktopOnlyGate() {
             color: "var(--color-text-primary, #1A1A1A)",
           }}
         >
-          {de
-            ? "Der Canvas, das Cockpit und die Admin-Oberflächen sind aktuell noch nicht für mobile Geräte optimiert. Öffne SIS auf einem Laptop oder Desktop (ab 768 px Breite) für die volle Funktionalität."
-            : "The canvas, cockpit, and admin surfaces are not yet optimised for mobile. Open SIS on a laptop or desktop (width ≥ 768 px) for the full experience."}
+          {t("desktopOnly.body")}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button
@@ -168,7 +165,7 @@ export function DesktopOnlyGate() {
               fontFamily: "inherit",
             }}
           >
-            {de ? "Trotzdem fortfahren" : "Continue anyway"}
+            {t("desktopOnly.continueAnyway")}
           </button>
         </div>
       </div>

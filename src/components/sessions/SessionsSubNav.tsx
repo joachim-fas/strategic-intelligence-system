@@ -8,20 +8,27 @@
  * Inactive tab has a subtle hover state with background tint.
  */
 
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
+
 interface Props {
   active: "active" | "archive";
   de: boolean;
 }
 
 export function SessionsSubNav({ active, de }: Props) {
+  // Local translator — this component receives `de` as a prop so
+  // we can't reach for useT() directly. See i18n.ts migration recipe.
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
+
   const tabs: Array<{ key: "active" | "archive"; href: string; label: string }> = [
-    { key: "active",  href: "/projects",         label: de ? "Aktiv"  : "Active"  },
-    { key: "archive", href: "/projects/archive", label: de ? "Archiv" : "Archive" },
+    { key: "active",  href: "/projects",         label: tl("sessions.active")  },
+    { key: "archive", href: "/projects/archive", label: tl("sessions.archive") },
   ];
 
   return (
     <nav
-      aria-label={de ? "Projekt-Bereich" : "Projects area"}
+      aria-label={tl("sessions.areaAria")}
       style={{
         display: "flex",
         gap: 4,
