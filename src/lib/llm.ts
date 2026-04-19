@@ -259,7 +259,7 @@ Methodische Transparenz: Benenne die analytische Grundlage (welche Quellen, welc
 
 ANTWORTE NUR als JSON (kein Text ausserhalb):
 {
-  "synthesis": "6-10 substanzielle Saetze, GEGLIEDERT in 2-3 Absaetze (getrennt durch \\n\\n). Erster Absatz: Kernaussage und aktueller Stand. Zweiter Absatz: Treibende Kraefte und Dynamiken. Dritter Absatz: Implikationen und Unsicherheiten. Nenne konkrete Beispiele, Zahlen, Zeitrahmen. Belege mit [Quelle, Datum]. VERBOTEN: Saetze wie 'X ist ein Megatrend mit Y% Relevanz'.",
+  "synthesis": "6-10 substanzielle Saetze, GEGLIEDERT in 2-3 Absaetze (getrennt durch \\n\\n). OPTIONAL: Jeder Absatz darf mit einer Markdown-Ueberschrift beginnen (Format: '## Titel\\n<Absatztext>' — maximal 4 Woerter, themenspezifisch). Wenn keine Ueberschrift gesetzt ist, zeigt das Frontend automatisch die Default-Labels (Kernaussage / Treibende Dynamiken / Implikationen). Erster Absatz: Kernaussage und aktueller Stand. Zweiter Absatz: Treibende Kraefte und Dynamiken. Dritter Absatz: Implikationen und Unsicherheiten. Nenne konkrete Beispiele, Zahlen, Zeitrahmen. Belege mit [Quelle, Datum]. VERBOTEN: Saetze wie 'X ist ein Megatrend mit Y% Relevanz'.",
   "reasoningChains": ["Kausale Kette: Ausgangsfaktor → Zwischenschritt → Strategische Implikation", "..."],
   "steepV": {
     "S": "Society-Dimension: 1-2 Saetze wie diese Frage die Gesellschaft betrifft (oder null wenn irrelevant)",

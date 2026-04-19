@@ -196,16 +196,44 @@ export function SynthesisBlock({ text, locale, isHelp }: {
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // 1. Absätze am Doppel-Newline splitten. Zusätzlich single-line-breaks
-  //    als weicher Zeilenumbruch beibehalten (seltener, aber vorkommend).
-  const allParagraphs = useMemo(
-    () =>
-      text
-        .split(/\n{2,}/)
-        .map((p) => p.trim())
-        .filter((p) => p.length > 0),
-    [text],
-  );
+  // 1. Absätze am Doppel-Newline splitten und jedem eine Überschrift
+  //    zuordnen. Der System-Prompt gibt dem LLM eine feste Gliederung vor:
+  //      Absatz 1 → Kernaussage und aktueller Stand
+  //      Absatz 2 → Treibende Kräfte und Dynamiken
+  //      Absatz 3 → Implikationen und Unsicherheiten
+  //
+  //    Der LLM darf zusätzlich eine Markdown-Überschrift (`## Titel`) als
+  //    erste Zeile eines Absatzes setzen — die übernehmen wir dann
+  //    wörtlich. Falls keine Custom-Heading vorliegt, fallen wir auf
+  //    positionsbasierte Default-Labels zurück.
+  const defaultHeadings = useMemo(() => {
+    if (locale === "de") return ["Kernaussage", "Treibende Dynamiken", "Implikationen & Ausblick"];
+    return ["Core finding", "Driving dynamics", "Implications & outlook"];
+  }, [locale]);
+
+  const allParagraphs = useMemo(() => {
+    const blocks = text
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    // Pro Block: Custom-Heading extrahieren (optional), Rest bleibt Body.
+    // Erkennt `## Titel`, `### Titel`, `**Titel**` am Start.
+    return blocks.map((raw, i) => {
+      const firstLineMatch = raw.match(/^(#{2,4}\s*|(\*\*))([^\n]+?)(\*\*)?\s*\n([\s\S]*)$/);
+      if (firstLineMatch) {
+        const heading = firstLineMatch[3].trim().replace(/\*+$/, "").replace(/^\*+/, "");
+        const body = firstLineMatch[5].trim();
+        if (heading && body) return { heading, body };
+      }
+      // Kein Custom-Heading → Default-Label nach Position. Ab Absatz 4
+      // (kommt selten vor) lassen wir die Überschrift leer.
+      return {
+        heading: i < defaultHeadings.length ? defaultHeadings[i] : null,
+        body: raw,
+      };
+    });
+  }, [text, defaultHeadings]);
 
   // 2. Collapsed-Modus: zeigt nur den ersten Absatz. /help ist immer voll.
   const hasMore = allParagraphs.length > 1;
@@ -216,34 +244,54 @@ export function SynthesisBlock({ text, locale, isHelp }: {
   return (
     <div style={{ fontFamily: "var(--font-ui)" }}>
       {shownParagraphs.map((para, i) => {
-        const segs = parseSegments(para);
+        const segs = parseSegments(para.body);
         return (
-          <p
-            key={i}
-            style={{
-              color: "var(--color-text-primary)",
-              margin: i === 0 ? 0 : "14px 0 0",
-              fontFamily: "var(--font-ui)",
-              fontSize: 16,
-              lineHeight: 1.7,
-              fontWeight: 400,
-              letterSpacing: "-0.005em",
-              maxWidth: "72ch",
-            }}
-          >
-            {segs.map((s, j) =>
-              s.kind === "text" ? (
-                <React.Fragment key={j}>{s.text}</React.Fragment>
-              ) : (
-                <ProvenanceTag
-                  key={j}
-                  tagKind={s.tagKind!}
-                  detail={s.tagDetail}
-                  locale={locale}
-                />
-              ),
+          <section key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
+            {/* Zwischenüberschrift — klein, mono, als Marker über dem Absatz.
+             * Stilistisch wie ein Section-Label, nicht wie eine Hero-H2. Die
+             * eigentliche Hierarchie (H1 = Frage, H2 = Synthesis-Überschrift
+             * des Briefings) bleibt dem Parent überlassen. */}
+            {para.heading && (
+              <h4
+                style={{
+                  margin: "0 0 8px",
+                  fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase" as const,
+                  color: "var(--volt-text-faint, #9B9B9B)",
+                }}
+              >
+                {para.heading}
+              </h4>
             )}
-          </p>
+            <p
+              style={{
+                color: "var(--color-text-primary)",
+                margin: 0,
+                fontFamily: "var(--font-ui)",
+                fontSize: 16,
+                lineHeight: 1.7,
+                fontWeight: 400,
+                letterSpacing: "-0.005em",
+                maxWidth: "72ch",
+              }}
+            >
+              {segs.map((s, j) =>
+                s.kind === "text" ? (
+                  <React.Fragment key={j}>{s.text}</React.Fragment>
+                ) : (
+                  <ProvenanceTag
+                    key={j}
+                    tagKind={s.tagKind!}
+                    detail={s.tagDetail}
+                    locale={locale}
+                  />
+                ),
+              )}
+            </p>
+          </section>
         );
       })}
       {hasMore && !isHelp && (
