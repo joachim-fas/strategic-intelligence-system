@@ -233,6 +233,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.75,
     description: "Geopolitical tensions fuel domestic polarization",
+    source: "V-Dem Democracy Report 2024 + Pew Research Global Attitudes Survey",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
 
   // ─── Demographics shape demand ─────────────────────────────
@@ -435,6 +438,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.85,
     description: "Platform infrastructure enables omnichannel commerce",
+    source: "Stripe State of Commerce 2024 + Shopify Global Commerce Report",
+    timestamp: "2026-04-19",
+    confidence: 0.8,
   },
   {
     from: "macro-platform-economy",
@@ -442,6 +448,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.5,
     description: "Platform monopolies increase inequality concerns",
+    source: "FTC v Meta + US v Google antitrust proceedings (2023-2024) + EU Digital Services Act",
+    timestamp: "2026-04-19",
+    confidence: 0.68,
   },
 
   // ─── Urbanization chains ───────────────────────────────────
@@ -483,6 +492,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.6,
     description: "XR enables new shopping and interaction experiences",
+    source: "Apple Vision Pro commercial rollout (Feb 2024) + Meta Reality Labs retail partnerships",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
   {
     from: "macro-web3-decentralization",
@@ -490,6 +502,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.5,
     description: "Decentralization offers alternative data ownership models",
+    source: "a16z State of Crypto Report 2024 + W3C Decentralized Identifiers (DID) 1.0 specification",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
 
   // ─── Migration & Displacement (added 2026-04) ─────────────────
@@ -532,6 +547,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "correlates",
     strength: 0.55,
     description: "Migration flows reshape demographic composition in aging societies",
+    source: "OECD International Migration Outlook 2024 + Eurostat Population Projections (EUROPOP2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
 
   // ─── Sprint 4a expansion (2026-04-10) ────────────────────────────────────
@@ -548,6 +566,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.95,
     description: "Mobility transformation directly drives autonomous vehicle adoption",
+    source: "SAE J3016 Level 3-5 Definitions + Waymo/Cruise/Zoox commercial deployment permits 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-energy-transition",
@@ -566,6 +587,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.7,
     description: "New mobility forms reshape urban density, parking, and street design",
     bidirectional: true,
+    source: "ITF Transport Outlook 2024 + NACTO Urban Street Design Guide",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
   {
     from: "mega-climate-sustainability",
@@ -585,6 +609,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "Cultural and educational shifts reshape generational value systems",
+    source: "World Values Survey Wave 7 (2017-2022) + Ronald Inglehart Silent Revolution follow-up research",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "mega-identity-values",
@@ -616,6 +643,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.65,
     description: "AI authorship, deepfakes, and synthetic media destabilize concepts of authenticity",
+    source: "AP News guidelines on AI-generated imagery + Content Authenticity Initiative (C2PA) standards",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ── Cloud Native (was orphan) ──────────────────────────────────────────
