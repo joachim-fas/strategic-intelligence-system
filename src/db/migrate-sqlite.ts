@@ -351,6 +351,28 @@ const statements = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS forecast_positions_unique
     ON forecast_positions(forecast_id, user_id)`,
+
+  // ─── Forecast calibration (Welle C Item 3 — per-user Brier) ──────────────
+  // One row per (user, resolved forecast). Written when a forecast
+  // transitions from PENDING_RESOLUTION → RESOLVED (in
+  // `approveResolution`). Stores the user's final probability plus the
+  // derived Brier score so the calibration-curve endpoint can read
+  // history without recomputing from raw positions. Tenant-scoped via
+  // the foreign-key path: forecast_id → forecasts.tenant_id.
+  `CREATE TABLE IF NOT EXISTS forecast_calibration (
+    id TEXT PRIMARY KEY,
+    forecast_id TEXT NOT NULL REFERENCES forecasts(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    yes_probability REAL NOT NULL,
+    outcome INTEGER NOT NULL CHECK(outcome IN (0, 1)),
+    brier_score REAL NOT NULL,
+    recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS forecast_calibration_unique
+    ON forecast_calibration(forecast_id, user_id)`,
+  `CREATE INDEX IF NOT EXISTS forecast_calibration_tenant_user
+    ON forecast_calibration(tenant_id, user_id, recorded_at DESC)`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);

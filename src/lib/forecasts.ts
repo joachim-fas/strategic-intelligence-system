@@ -377,6 +377,10 @@ export function proposeResolution(params: {
  * forecast to RESOLVED. The approver MUST be a different user
  * than the proposer. Callers are responsible for enforcing the
  * "owner/admin only" rule at the API layer (requireTenantRole).
+ *
+ * Welle C Item 3 hook: on successful transition to RESOLVED, we
+ * snapshot per-user Brier scores into `forecast_calibration`.
+ * This is what feeds the calibration-curve endpoint.
  */
 export function approveResolution(params: {
   forecastId: string;
@@ -406,12 +410,164 @@ export function approveResolution(params: {
     WHERE id = ?`,
   ).run(params.approverUserId, now, now, params.forecastId);
 
+  // Welle C Item 3 — snapshot calibration for every position.
+  // Only BINARY YES/NO map to a numeric outcome; PARTIAL and
+  // CANCEL don't produce a clean ground truth, so we skip
+  // calibration writes in those cases. The caller still gets a
+  // successful RESOLVED state — we just don't feed a noisy
+  // sample into the Brier stats.
+  if (forecast.resolution === "YES" || forecast.resolution === "NO") {
+    const outcome = forecast.resolution === "YES" ? 1 : 0;
+    const positionRows = db.prepare(
+      `SELECT user_id, yes_probability FROM forecast_positions WHERE forecast_id = ?`,
+    ).all(params.forecastId) as Array<{ user_id: string; yes_probability: number }>;
+
+    const insert = db.prepare(
+      `INSERT INTO forecast_calibration (
+        id, forecast_id, tenant_id, user_id, yes_probability,
+        outcome, brier_score, recorded_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(forecast_id, user_id) DO UPDATE SET
+        yes_probability = excluded.yes_probability,
+        outcome = excluded.outcome,
+        brier_score = excluded.brier_score,
+        recorded_at = excluded.recorded_at`,
+    );
+
+    for (const row of positionRows) {
+      const brier = (row.yes_probability - outcome) ** 2;
+      insert.run(
+        `${params.forecastId}-${row.user_id}`,
+        params.forecastId,
+        params.tenantId,
+        row.user_id,
+        row.yes_probability,
+        outcome,
+        brier,
+        now,
+      );
+    }
+  }
+
   return {
     ...forecast,
     state: "RESOLVED",
     resolutionApprover: params.approverUserId,
     resolvedAt: now,
     updatedAt: now,
+  };
+}
+
+// ─── Calibration read helpers (Welle C Item 3) ──────────────────────
+
+export interface CalibrationRow {
+  forecastId: string;
+  userId: string;
+  yesProbability: number;
+  outcome: 0 | 1;
+  brierScore: number;
+  recordedAt: string;
+}
+
+/** Raw calibration history for one user in one tenant. */
+export function getUserCalibration(
+  tenantId: string,
+  userId: string,
+  limit = 200,
+): CalibrationRow[] {
+  const db = getSqliteHandle();
+  const rows = db.prepare(
+    `SELECT forecast_id, user_id, yes_probability, outcome, brier_score, recorded_at
+       FROM forecast_calibration
+      WHERE tenant_id = ? AND user_id = ?
+      ORDER BY recorded_at DESC
+      LIMIT ?`,
+  ).all(tenantId, userId, Math.max(1, Math.min(500, limit))) as Array<{
+    forecast_id: string; user_id: string; yes_probability: number;
+    outcome: 0 | 1; brier_score: number; recorded_at: string;
+  }>;
+  return rows.map((r) => ({
+    forecastId: r.forecast_id,
+    userId: r.user_id,
+    yesProbability: r.yes_probability,
+    outcome: r.outcome,
+    brierScore: r.brier_score,
+    recordedAt: r.recorded_at,
+  }));
+}
+
+/**
+ * Decile-bucketed calibration curve for one user. Each bucket:
+ *   { bucketMid: 0.05, 0.15, ..., 0.95
+ *     count: number of predictions whose yesProbability fell in
+ *             that bucket,
+ *     observedRate: mean outcome in the bucket (what % actually
+ *             resolved YES)
+ *   }
+ * A well-calibrated user has `observedRate ≈ bucketMid` across
+ * the curve. The UI can plot (bucketMid, observedRate) against
+ * the y=x diagonal — deviation = calibration error.
+ */
+export interface CalibrationBucket {
+  bucketMid: number;
+  count: number;
+  observedRate: number | null;
+}
+
+export interface CalibrationSummary {
+  user: string;
+  totalResolved: number;
+  meanBrier: number | null;
+  buckets: CalibrationBucket[];
+}
+
+const DECILE_BOUNDS = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+
+/**
+ * Build a decile calibration summary for a user. Null `meanBrier`
+ * and empty buckets when the user has no resolved positions yet.
+ * The Stanford calibration convention: lower Brier is better,
+ * 0.0 = perfectly calibrated on every call, 0.25 = always 50-50,
+ * 1.0 = maximally wrong.
+ */
+export function getCalibrationSummary(
+  tenantId: string,
+  userId: string,
+): CalibrationSummary {
+  const rows = getUserCalibration(tenantId, userId, 500);
+  if (rows.length === 0) {
+    return { user: userId, totalResolved: 0, meanBrier: null, buckets: [] };
+  }
+
+  const meanBrier = rows.reduce((sum, r) => sum + r.brierScore, 0) / rows.length;
+
+  const buckets: CalibrationBucket[] = [];
+  for (let i = 0; i < DECILE_BOUNDS.length - 1; i++) {
+    const low = DECILE_BOUNDS[i];
+    const high = DECILE_BOUNDS[i + 1];
+    // Last bucket is closed on both sides so p=1.0 lands in it.
+    const inBucket = rows.filter((r) =>
+      i === DECILE_BOUNDS.length - 2
+        ? r.yesProbability >= low && r.yesProbability <= high
+        : r.yesProbability >= low && r.yesProbability < high,
+    );
+    if (inBucket.length === 0) {
+      buckets.push({ bucketMid: (low + high) / 2, count: 0, observedRate: null });
+      continue;
+    }
+    const observed = inBucket.reduce((sum, r) => sum + r.outcome, 0) / inBucket.length;
+    buckets.push({
+      bucketMid: (low + high) / 2,
+      count: inBucket.length,
+      observedRate: observed,
+    });
+  }
+
+  return {
+    user: userId,
+    totalResolved: rows.length,
+    meanBrier,
+    buckets,
   };
 }
 

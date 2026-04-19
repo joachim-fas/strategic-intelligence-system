@@ -196,6 +196,25 @@ export function ensureMultiTenantSchema(db: Database.Database): void {
   )`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS forecast_positions_unique
     ON forecast_positions(forecast_id, user_id)`);
+
+  // ── Forecast calibration (Welle C Item 3 — per-user Brier) ──
+  // Per (user, resolved forecast). Written at resolution-approval
+  // time so read-side calibration curves don't need to recompute
+  // from raw positions. Mirrored in src/db/migrate-sqlite.ts.
+  db.exec(`CREATE TABLE IF NOT EXISTS forecast_calibration (
+    id TEXT PRIMARY KEY,
+    forecast_id TEXT NOT NULL REFERENCES forecasts(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    yes_probability REAL NOT NULL,
+    outcome INTEGER NOT NULL CHECK(outcome IN (0, 1)),
+    brier_score REAL NOT NULL,
+    recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS forecast_calibration_unique
+    ON forecast_calibration(forecast_id, user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS forecast_calibration_tenant_user
+    ON forecast_calibration(tenant_id, user_id, recorded_at DESC)`);
 }
 
 /**

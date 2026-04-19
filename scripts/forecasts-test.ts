@@ -36,6 +36,8 @@ import {
   proposeResolution,
   approveResolution,
   forecastsEnabled,
+  getUserCalibration,
+  getCalibrationSummary,
 } from "../src/lib/forecasts";
 
 let passed = 0;
@@ -345,9 +347,97 @@ const rePropose = proposeResolution({
 assert(rePropose.resolution === "NO", "re-proposal overwrites outcome");
 assert(rePropose.resolvedBy === USER_2, "re-proposal records new proposer");
 
+// ─── 12. Calibration hook on resolution ─────────────────────────
+section("12. Calibration snapshot on RESOLVED (Welle C Item 3)");
+// Fresh forecast that will resolve YES. USER_1 predicts 0.8, USER_2 predicts 0.3.
+const fCal = createForecast({
+  tenantId: TENANT_A,
+  question: "calibration test forecast",
+  createdBy: USER_1,
+});
+recordPosition({ forecastId: fCal.id, tenantId: TENANT_A, userId: USER_1, yesProbability: 0.8 });
+recordPosition({ forecastId: fCal.id, tenantId: TENANT_A, userId: USER_2, yesProbability: 0.3 });
+
+// No calibration row yet — forecast isn't resolved.
+const preCal = getUserCalibration(TENANT_A, USER_1);
+assert(preCal.every(r => r.forecastId !== fCal.id), "no calibration row pre-resolution");
+
+// Resolve YES by proposer USER_1 + approver USER_2.
+proposeResolution({
+  forecastId: fCal.id, tenantId: TENANT_A, proposerUserId: USER_1,
+  resolution: "YES", rationale: "occurred",
+});
+approveResolution({
+  forecastId: fCal.id, tenantId: TENANT_A, approverUserId: USER_2,
+});
+
+const u1Cal = getUserCalibration(TENANT_A, USER_1);
+const u2Cal = getUserCalibration(TENANT_A, USER_2);
+const u1Row = u1Cal.find(r => r.forecastId === fCal.id);
+const u2Row = u2Cal.find(r => r.forecastId === fCal.id);
+assert(u1Row !== undefined, "USER_1 calibration row written");
+assert(u2Row !== undefined, "USER_2 calibration row written");
+assert(u1Row?.outcome === 1, "outcome stored as 1 for YES resolution");
+// Brier for USER_1 (p=0.8, outcome=1): (0.8-1)^2 = 0.04
+assert(Math.abs((u1Row?.brierScore ?? 0) - 0.04) < 1e-9, `USER_1 Brier ≈ 0.04 (got ${u1Row?.brierScore})`);
+// Brier for USER_2 (p=0.3, outcome=1): (0.3-1)^2 = 0.49
+assert(Math.abs((u2Row?.brierScore ?? 0) - 0.49) < 1e-9, `USER_2 Brier ≈ 0.49 (got ${u2Row?.brierScore})`);
+
+// Resolve a second forecast NO, USER_1 predicts 0.1 (good) → Brier 0.01
+const fCal2 = createForecast({
+  tenantId: TENANT_A,
+  question: "calibration NO test",
+  createdBy: USER_2,
+});
+recordPosition({ forecastId: fCal2.id, tenantId: TENANT_A, userId: USER_1, yesProbability: 0.1 });
+proposeResolution({
+  forecastId: fCal2.id, tenantId: TENANT_A, proposerUserId: USER_2,
+  resolution: "NO", rationale: "did not occur",
+});
+approveResolution({
+  forecastId: fCal2.id, tenantId: TENANT_A, approverUserId: USER_1,
+});
+const u1CalAfter = getUserCalibration(TENANT_A, USER_1);
+const u1Row2 = u1CalAfter.find(r => r.forecastId === fCal2.id);
+assert(u1Row2?.outcome === 0, "outcome stored as 0 for NO resolution");
+assert(Math.abs((u1Row2?.brierScore ?? 0) - 0.01) < 1e-9, `USER_1 Brier on NO forecast ≈ 0.01 (got ${u1Row2?.brierScore})`);
+
+// Summary
+const u1Summary = getCalibrationSummary(TENANT_A, USER_1);
+assert(u1Summary.totalResolved >= 2, `USER_1 has ≥2 resolved predictions (${u1Summary.totalResolved})`);
+// Mean Brier for USER_1 (across fCal and fCal2) = (0.04 + 0.01) / 2 = 0.025 —
+// but only if these are the only two. We'll just check it's in [0, 1].
+assert((u1Summary.meanBrier ?? -1) >= 0 && (u1Summary.meanBrier ?? -1) <= 1, "mean Brier in [0,1]");
+assert(u1Summary.buckets.length === 10, "10 decile buckets");
+assert(u1Summary.buckets.every(b => b.count >= 0), "all bucket counts non-negative");
+
+// PARTIAL / CANCEL resolutions don't write calibration rows.
+const fCancel = createForecast({
+  tenantId: TENANT_A,
+  question: "cancel test",
+  createdBy: USER_1,
+});
+recordPosition({ forecastId: fCancel.id, tenantId: TENANT_A, userId: USER_1, yesProbability: 0.6 });
+proposeResolution({
+  forecastId: fCancel.id, tenantId: TENANT_A, proposerUserId: USER_1,
+  resolution: "CANCEL", rationale: "question became irrelevant",
+});
+approveResolution({
+  forecastId: fCancel.id, tenantId: TENANT_A, approverUserId: USER_2,
+});
+const u1Final = getUserCalibration(TENANT_A, USER_1);
+assert(u1Final.every(r => r.forecastId !== fCancel.id), "CANCEL resolution does not write calibration");
+
+// Empty user → meaningful null summary.
+const emptySummary = getCalibrationSummary(TENANT_A, "user-that-never-staked");
+assert(emptySummary.totalResolved === 0, "empty user: 0 resolved");
+assert(emptySummary.meanBrier === null, "empty user: null mean");
+assert(emptySummary.buckets.length === 0, "empty user: no buckets");
+
 // ─── Cleanup ────────────────────────────────────────────────────
 section("cleanup");
 const clean = new Database(dbPath);
+clean.prepare("DELETE FROM forecast_calibration WHERE tenant_id IN (?, ?)").run(TENANT_A, TENANT_B);
 clean.prepare("DELETE FROM forecast_positions WHERE forecast_id IN (SELECT id FROM forecasts WHERE tenant_id IN (?, ?))").run(TENANT_A, TENANT_B);
 const beforeDel = clean.prepare("SELECT COUNT(*) AS n FROM forecasts WHERE tenant_id IN (?, ?)").get(TENANT_A, TENANT_B) as { n: number };
 clean.prepare("DELETE FROM forecasts WHERE tenant_id IN (?, ?)").run(TENANT_A, TENANT_B);
