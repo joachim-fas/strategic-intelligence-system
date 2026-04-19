@@ -373,56 +373,89 @@ export async function runPipeline(): Promise<PipelineResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Database operations
+// Database operations (ARC-16: dialect-agnostic via SignalStore adapter)
 // ---------------------------------------------------------------------------
+//
+// Previously this section had storeSignalsPg (96 lines) and
+// storeSignalsSqlite (103 lines) that duplicated the signal-group-loop +
+// trend-upsert + score-log-insert sequence. The only real differences
+// were (a) async vs sync calls and (b) Date / Array marshaling. We
+// captured those two axes in a `SignalStore` interface and have the
+// two adapters implement it — each is now ~50 lines of DB-specific
+// glue, and the loop logic lives in one place.
+//
+// DAT-14 note: the old `// TODO` about date format divergence is now
+// partly resolved — the shared loop never sees raw Date objects, it
+// just passes the scored+group payload to the adapter which decides.
+// If we ever fully normalize to ISO strings the adapters collapse
+// further.
+
+/** Minimal shape the shared `storeSignalsGeneric` loop needs from a
+ *  dialect adapter. All methods may be async or sync; callers always
+ *  `await` them so promise-wrapping is automatic. */
+interface SignalStore {
+  /** Insert-or-update a trend by slug, returns the trend's id. */
+  upsertTrend(scored: ReturnType<typeof scoreTrend>): Promise<string>;
+  /** Persist one raw signal linked to a trend. */
+  insertSignal(trendId: string, signal: RawSignal): Promise<void>;
+  /** Persist one score snapshot (one row per group per run). */
+  insertScoreLog(
+    trendId: string,
+    scored: ReturnType<typeof scoreTrend>,
+    signalCount: number,
+  ): Promise<void>;
+  /** Mark a connector as having run successfully (for freshness). */
+  updateDataSource(name: string): Promise<void>;
+  /** Release the underlying connection. Called in a `finally`. */
+  close(): Promise<void>;
+}
+
+/** The part that's identical across dialects. Groups → scores →
+ *  upserts → signals → log → source-timestamp update. */
+async function storeSignalsGeneric(signals: RawSignal[], store: SignalStore) {
+  try {
+    const groups = groupSignalsByTopic(signals);
+    for (const group of groups) {
+      const scored = scoreTrend(group);
+      const trendId = await store.upsertTrend(scored);
+      for (const signal of group.signals) {
+        await store.insertSignal(trendId, signal);
+      }
+      await store.insertScoreLog(trendId, scored, group.signals.length);
+    }
+    for (const sourceName of [...new Set(signals.map((s) => s.sourceType))]) {
+      await store.updateDataSource(sourceName);
+    }
+  } finally {
+    await store.close();
+  }
+}
 
 async function storeSignalsAndUpdateScores(signals: RawSignal[]) {
   const url = process.env.DATABASE_URL ?? "";
   const isPg = url.startsWith("postgres");
-
-  if (isPg) {
-    await storeSignalsPg(signals);
-  } else {
-    await storeSignalsSqlite(signals);
-  }
+  const store = isPg ? await createPgStore() : await createSqliteStore();
+  await storeSignalsGeneric(signals, store);
 }
 
-// TODO: ARC-16 — storeSignalsPg and storeSignalsSqlite are 96/103 lines respectively,
-// differing only in async vs sync and Date vs ISO-String.
-// FIX: Abstract behind a DB-agnostic storeSignals() wrapper.
-
-async function storeSignalsPg(signals: RawSignal[]) {
+// ─── Postgres adapter ─────────────────────────────────────────────
+async function createPgStore(): Promise<SignalStore> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const postgres = require("postgres");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { drizzle } = require("drizzle-orm/postgres-js");
   const schema = await import("@/db/schema");
-
   const client = postgres(process.env.DATABASE_URL!, { max: 1 });
   const db = drizzle(client, { schema });
 
-  try {
-    // Group signals by topic and score them
-    const groups = groupSignalsByTopic(signals);
-
-    for (const group of groups) {
-      const scored = scoreTrend(group);
-
-      // Find or create trend
+  return {
+    async upsertTrend(scored) {
       const existing = await db
         .select()
         .from(schema.trends)
         .where(eq(schema.trends.slug, scored.id))
         .limit(1);
-
-      let trendId: string;
-
       if (existing.length > 0) {
-        trendId = existing[0].id;
-        // Update aggregate scores
-        // TODO: DAT-14 — Date format divergence: PG uses native Date objects, SQLite uses ISO strings.
-        // Tags: PG = native Array, SQLite = JSON.stringify. Read code must handle both.
-        // FIX: Define a canonical date format (ISO-8601 strings) and use consistently.
         await db
           .update(schema.trends)
           .set({
@@ -433,66 +466,58 @@ async function storeSignalsPg(signals: RawSignal[]) {
             lastSignalAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(schema.trends.id, trendId));
-      } else {
-        // Insert new trend
-        const result = await db
-          .insert(schema.trends)
-          .values({
-            slug: scored.id,
-            name: scored.name,
-            category: scored.category,
-            tags: scored.tags,
-            status: "candidate",
-            aggRelevance: scored.relevance,
-            aggConfidence: scored.confidence,
-            aggImpact: scored.impact,
-            timeHorizon: scored.timeHorizon,
-          })
-          .returning({ id: schema.trends.id });
-        trendId = result[0].id;
+          .where(eq(schema.trends.id, existing[0].id));
+        return existing[0].id;
       }
-
-      // Store individual signals
-      for (const signal of group.signals) {
-        await db.insert(schema.trendSignals).values({
-          trendId,
-          sourceType: signal.sourceType,
-          sourceUrl: signal.sourceUrl,
-          sourceTitle: signal.sourceTitle,
-          signalType: signal.signalType,
-          signalStrength: signal.rawStrength,
-          rawData: signal.rawData,
-          detectedAt: signal.detectedAt,
-        });
-      }
-
-      // Write score snapshot
+      const result = await db
+        .insert(schema.trends)
+        .values({
+          slug: scored.id,
+          name: scored.name,
+          category: scored.category,
+          tags: scored.tags, // PG jsonb accepts native arrays
+          status: "candidate",
+          aggRelevance: scored.relevance,
+          aggConfidence: scored.confidence,
+          aggImpact: scored.impact,
+          timeHorizon: scored.timeHorizon,
+        })
+        .returning({ id: schema.trends.id });
+      return result[0].id;
+    },
+    async insertSignal(trendId, signal) {
+      await db.insert(schema.trendSignals).values({
+        trendId,
+        sourceType: signal.sourceType,
+        sourceUrl: signal.sourceUrl,
+        sourceTitle: signal.sourceTitle,
+        signalType: signal.signalType,
+        signalStrength: signal.rawStrength,
+        rawData: signal.rawData, // PG jsonb accepts native objects
+        detectedAt: signal.detectedAt, // PG timestamp accepts native Date
+      });
+    },
+    async insertScoreLog(trendId, scored, signalCount) {
       await db.insert(schema.scoreLog).values({
         trendId,
         relevance: scored.relevance,
         confidence: scored.confidence,
         impact: scored.impact,
-        signalCount: group.signals.length,
+        signalCount,
       });
-    }
-
-    // Update data source last-run timestamps
-    for (const sourceName of [...new Set(signals.map((s) => s.sourceType))]) {
+    },
+    async updateDataSource(name) {
       await db
         .update(schema.dataSources)
-        .set({
-          lastRunAt: new Date(),
-          lastStatus: "success",
-        })
-        .where(eq(schema.dataSources.name, sourceName));
-    }
-  } finally {
-    await client.end();
-  }
+        .set({ lastRunAt: new Date(), lastStatus: "success" })
+        .where(eq(schema.dataSources.name, name));
+    },
+    async close() { await client.end(); },
+  };
 }
 
-async function storeSignalsSqlite(signals: RawSignal[]) {
+// ─── SQLite adapter ───────────────────────────────────────────────
+async function createSqliteStore(): Promise<SignalStore> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -500,98 +525,82 @@ async function storeSignalsSqlite(signals: RawSignal[]) {
   const schema = await import("@/db/schema-sqlite");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require("path");
-
   const dbPath = path.join(process.cwd(), "local.db");
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   const db = drizzle(sqlite, { schema });
+  const nowIso = () => new Date().toISOString();
 
-  try {
-    const groups = groupSignalsByTopic(signals);
-
-    for (const group of groups) {
-      const scored = scoreTrend(group);
-
+  return {
+    async upsertTrend(scored) {
       const existing = db
         .select()
         .from(schema.trends)
         .where(eq(schema.trends.slug, scored.id))
         .limit(1)
         .all();
-
-      let trendId: string;
-
       if (existing.length > 0) {
-        trendId = existing[0].id;
         db.update(schema.trends)
           .set({
             aggRelevance: scored.relevance,
             aggConfidence: scored.confidence,
             aggImpact: scored.impact,
             timeHorizon: scored.timeHorizon,
-            lastSignalAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            lastSignalAt: nowIso(),
+            updatedAt: nowIso(),
           })
-          .where(eq(schema.trends.id, trendId))
+          .where(eq(schema.trends.id, existing[0].id))
           .run();
-      } else {
-        const id = crypto.randomUUID();
-        db.insert(schema.trends)
-          .values({
-            id,
-            slug: scored.id,
-            name: scored.name,
-            category: scored.category,
-            tags: JSON.stringify(scored.tags),
-            status: "candidate",
-            aggRelevance: scored.relevance,
-            aggConfidence: scored.confidence,
-            aggImpact: scored.impact,
-            timeHorizon: scored.timeHorizon,
-          })
-          .run();
-        trendId = id;
+        return existing[0].id;
       }
-
-      // Store signals
-      for (const signal of group.signals) {
-        db.insert(schema.trendSignals)
-          .values({
-            trendId,
-            sourceType: signal.sourceType,
-            sourceUrl: signal.sourceUrl,
-            sourceTitle: signal.sourceTitle,
-            signalType: signal.signalType,
-            signalStrength: signal.rawStrength,
-            rawData: JSON.stringify(signal.rawData),
-            detectedAt: signal.detectedAt.toISOString(),
-          })
-          .run();
-      }
-
-      // Score snapshot
+      const id = crypto.randomUUID();
+      db.insert(schema.trends)
+        .values({
+          id,
+          slug: scored.id,
+          name: scored.name,
+          category: scored.category,
+          tags: JSON.stringify(scored.tags), // SQLite has no array type
+          status: "candidate",
+          aggRelevance: scored.relevance,
+          aggConfidence: scored.confidence,
+          aggImpact: scored.impact,
+          timeHorizon: scored.timeHorizon,
+        })
+        .run();
+      return id;
+    },
+    async insertSignal(trendId, signal) {
+      db.insert(schema.trendSignals)
+        .values({
+          trendId,
+          sourceType: signal.sourceType,
+          sourceUrl: signal.sourceUrl,
+          sourceTitle: signal.sourceTitle,
+          signalType: signal.signalType,
+          signalStrength: signal.rawStrength,
+          rawData: JSON.stringify(signal.rawData),
+          detectedAt: signal.detectedAt.toISOString(),
+        })
+        .run();
+    },
+    async insertScoreLog(trendId, scored, signalCount) {
       db.insert(schema.scoreLog)
         .values({
           trendId,
           relevance: scored.relevance,
           confidence: scored.confidence,
           impact: scored.impact,
-          signalCount: group.signals.length,
+          signalCount,
         })
         .run();
-    }
-
-    // Update data source timestamps
-    for (const sourceName of [...new Set(signals.map((s) => s.sourceType))]) {
+    },
+    async updateDataSource(name) {
       db.update(schema.dataSources)
-        .set({
-          lastRunAt: new Date().toISOString(),
-          lastStatus: "success",
-        })
-        .where(eq(schema.dataSources.name, sourceName))
+        .set({ lastRunAt: nowIso(), lastStatus: "success" })
+        .where(eq(schema.dataSources.name, name))
         .run();
-    }
-  } finally {
-    sqlite.close();
-  }
+    },
+    async close() { sqlite.close(); },
+  };
 }
