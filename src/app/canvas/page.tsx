@@ -3762,9 +3762,13 @@ export default function CanvasPage() {
                       return (
                       <div key={n.id}
                         onClick={() => handleSelectNode(n.id)}
+                        // Gruppen-Akzent links nur spreaden (nicht mit
+                        // `undefined` überschreiben), damit die Basis-Border
+                        // auf der linken Seite stehen bleibt wenn keine
+                        // Gruppe gesetzt ist.
                         style={{
                           padding: "10px 12px", borderRadius: 10, border: `1px solid ${selectedId === n.id ? col.color : "var(--color-border)"}`,
-                          borderLeft: grpColor ? `3px solid ${grpColor}` : undefined,
+                          ...(grpColor ? { borderLeft: `3px solid ${grpColor}` } : {}),
                           background: "var(--color-surface)", cursor: "pointer", transition: "all 0.12s",
                           boxShadow: selectedId === n.id ? `0 0 0 2px ${col.color}40` : "0 1px 4px rgba(0,0,0,0.06)",
                         }}
@@ -3882,7 +3886,19 @@ export default function CanvasPage() {
                     // overlay behaviour as Board view) and Timeline stays
                     // on screen behind it.
                     onClick={() => handleSelectNode(n.id)}
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--color-border)", borderLeft: grpColor ? `3px solid ${grpColor}` : undefined, background: "var(--color-surface)", cursor: "pointer", marginBottom: 8, transition: "all 0.1s" }}
+                    // Vorher: `borderLeft: grpColor ? "3px solid X" : undefined`
+                    // — `undefined` im Inline-Style **löscht** die per `border:`
+                    // gesetzte linke Kante in React-CSSOM. Ergebnis: Box war
+                    // links offen, wenn keine Gruppe zugewiesen. Fix: die
+                    // Gruppen-Akzent-Border nur konditional spreaden, damit
+                    // der Basis-Border ungestört stehen bleibt.
+                    style={{
+                      flex: 1, padding: "8px 12px", borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      ...(grpColor ? { borderLeft: `3px solid ${grpColor}` } : {}),
+                      background: "var(--color-surface)", cursor: "pointer",
+                      marginBottom: 8, transition: "all 0.1s",
+                    }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = color; (e.currentTarget as HTMLElement).style.background = "var(--color-page-bg)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.background = "var(--color-surface)"; }}
                   >
@@ -3959,25 +3975,75 @@ export default function CanvasPage() {
           </div>
         )}
         {viewMode === "orbit" && orbitSubMode === "netzwerk" && (() => {
-          // Aggregate all causal edges + trend names from causalgraph nodes
-          const cgNodes = nodes.filter(n => n.nodeType === "causalgraph") as DerivedNode[];
-          const orbitEdges = cgNodes.flatMap(n => n.causalEdges ?? []);
+          // ── Aggregate causal network across ALL analyses on the canvas ──
+          //
+          // Zweck der Netzwerk-Ansicht: Ein Kausal-Explorer, der die Trends
+          // und Verbindungen aus ALLEN Queries des Canvas als zusammenhängendes
+          // Netz zeigt. Antwortet drei Fragen:
+          //   1. Welche Trends tauchen wiederholt auf? (Node-Radius ~ Grad)
+          //   2. Welche Cluster bilden sich? (Force-directed Layout)
+          //   3. Welche Kausalbeziehungen existieren? (Kanten-Farbe nach Typ)
+          //
+          // **Daten-Quellen (in Prioritätsreihenfolge):**
+          //   A. `query.result.matchedEdges` + `query.result.matchedTrends` —
+          //      die frischeste Quelle, seit dem ID-Fix (Commit 45917a7)
+          //      gefüllt. Das ist der Standardweg moderner Canvases.
+          //   B. Legacy `causalgraph`-Nodes mit `causalEdges` +
+          //      `causalTrendNames` — existiert in älteren Canvases als
+          //      eigener Derived-Node-Typ. Wird weiter unterstützt.
+          //
+          // Edges aus beiden Quellen werden dedupliziert (`from→to`-Key,
+          // strongest wins). Der `trendQueryMap` verlinkt jeden Trend mit
+          // allen Queries, die ihn referenziert haben — damit der Query-
+          // Filter im Sidebar funktioniert.
+          const orbitEdges: MatchedEdge[] = [];
           const orbitNames: Record<string, string> = {};
-          cgNodes.forEach(n => { Object.assign(orbitNames, n.causalTrendNames ?? {}); });
           const trendQueryMap: Record<string, string[]> = {};
           const queryLabels: Record<string, string> = {};
+
+          const linkTrendToQuery = (trendId: string, queryId: string) => {
+            if (!trendQueryMap[trendId]) trendQueryMap[trendId] = [];
+            if (!trendQueryMap[trendId].includes(queryId)) {
+              trendQueryMap[trendId].push(queryId);
+            }
+          };
+
+          // Source A: query.result.matchedEdges / matchedTrends
+          const queryNodes = nodes.filter(n => n.nodeType === "query") as QueryNode[];
+          queryNodes.forEach(q => {
+            const r = q.result;
+            if (!r) return;
+            queryLabels[q.id] = q.query ?? q.id;
+            // Trends — nimm ID → Name-Mapping mit, damit der Graph nicht
+            // mit UUIDs beschriftet ist
+            (r.matchedTrends ?? []).forEach((t) => {
+              if (t?.id && t.name) orbitNames[t.id] = t.name;
+              if (t?.id) linkTrendToQuery(t.id, q.id);
+            });
+            (r.matchedEdges ?? []).forEach((e: MatchedEdge) => {
+              orbitEdges.push(e);
+              linkTrendToQuery(e.from, q.id);
+              linkTrendToQuery(e.to, q.id);
+            });
+          });
+
+          // Source B: Legacy causalgraph-nodes (ältere Canvases)
+          const cgNodes = nodes.filter(n => n.nodeType === "causalgraph") as DerivedNode[];
           cgNodes.forEach(cg => {
+            Object.assign(orbitNames, cg.causalTrendNames ?? {});
             const parentQId = cg.parentId;
-            if (!parentQId) return;
-            const parentQ = nodes.find(n => n.id === parentQId);
-            if (parentQ && parentQ.nodeType === "query" && "query" in parentQ) {
-              queryLabels[parentQId] = (parentQ as { query?: string }).query ?? parentQId;
+            if (parentQId) {
+              const parentQ = nodes.find(n => n.id === parentQId);
+              if (parentQ && parentQ.nodeType === "query" && "query" in parentQ) {
+                queryLabels[parentQId] = (parentQ as { query?: string }).query ?? parentQId;
+              }
             }
             (cg.causalEdges ?? []).forEach(e => {
-              [e.from, e.to].forEach(tid => {
-                if (!trendQueryMap[tid]) trendQueryMap[tid] = [];
-                if (!trendQueryMap[tid].includes(parentQId)) trendQueryMap[tid].push(parentQId);
-              });
+              orbitEdges.push(e);
+              if (parentQId) {
+                linkTrendToQuery(e.from, parentQId);
+                linkTrendToQuery(e.to, parentQId);
+              }
             });
           });
           return (
