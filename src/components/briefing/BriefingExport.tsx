@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Upload, Clipboard, Download, FileCode2 } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { Locale } from "@/lib/i18n";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import type { HistoryEntry } from "./BriefingResult";
 import {
   copyBriefingToClipboard,
@@ -14,7 +14,7 @@ import {
 export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale: Locale }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
-  const de = locale === "de";
+  const tl = (key: TranslationKey) => translate(locale, key);
 
   const handleCopy = async () => {
     await copyBriefingToClipboard(entry, locale);
@@ -51,10 +51,10 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
 
   return (
     <div style={{ position: "relative" }}>
-      <Tooltip content={copied ? (de ? "In Zwischenablage kopiert" : "Copied to clipboard") : (de ? "Briefing exportieren (Markdown, JSON)" : "Export briefing (Markdown, JSON)")} placement="bottom">
+      <Tooltip content={copied ? tl("briefingExport.copiedTooltip") : tl("briefingExport.exportTooltip")} placement="bottom">
         <button
           onClick={() => setOpen((v) => !v)}
-          aria-label={de ? "Exportieren" : "Export"}
+          aria-label={tl("briefingExport.exportAriaLabel")}
           style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             height: 28,
@@ -71,7 +71,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"}
         >
           {copied ? <Check size={13} strokeWidth={2.5} /> : <Upload size={13} strokeWidth={2} />}
-          <span>{copied ? (de ? "Kopiert" : "Copied") : (de ? "Export" : "Export")}</span>
+          <span>{copied ? tl("briefingExport.copiedButton") : tl("briefingExport.exportButton")}</span>
         </button>
       </Tooltip>
 
@@ -100,7 +100,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               textTransform: "uppercase", letterSpacing: "0.06em",
               color: "var(--color-text-muted)",
             }}>
-              {de ? "Diese Analyse" : "This analysis"}
+              {tl("briefingExport.thisAnalysis")}
             </div>
             <button
               style={buttonBase}
@@ -109,7 +109,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
               <span style={iconStyle}><Clipboard size={14} strokeWidth={2} /></span>
-              <span>{de ? "Markdown kopieren" : "Copy as Markdown"}</span>
+              <span>{tl("briefingExport.copyMarkdown")}</span>
             </button>
             <button
               style={buttonBase}
@@ -118,7 +118,7 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
               <span style={iconStyle}><Download size={14} strokeWidth={2} /></span>
-              <span>{de ? "Als .md speichern" : "Save as .md"}</span>
+              <span>{tl("briefingExport.saveMarkdown")}</span>
             </button>
             <button
               style={buttonBase}
@@ -127,13 +127,11 @@ export function BriefingExport({ entry, locale }: { entry: HistoryEntry; locale:
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
             >
               <span style={iconStyle}><FileCode2 size={14} strokeWidth={2} /></span>
-              <span>{de ? "Als .json speichern" : "Save as .json"}</span>
+              <span>{tl("briefingExport.saveJson")}</span>
             </button>
             <div style={{ height: 1, background: "var(--color-border)", margin: "4px 0" }} />
             <div style={{ padding: "4px 12px 6px", fontSize: 11, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
-              {de
-                ? "Weiterverarbeiten in Notion, Obsidian, Word…"
-                : "Use in Notion, Obsidian, Word…"}
+              {tl("briefingExport.outroHint")}
             </div>
           </div>
         </>

@@ -1154,6 +1154,19 @@ const en = {
     activityTooltip: "Activity Monitor (Ctrl+M)",
     activityAriaLabel: "Open Activity Monitor",
   },
+
+  briefingExport: {
+    copiedTooltip: "Copied to clipboard",
+    exportTooltip: "Export briefing (Markdown, JSON)",
+    exportAriaLabel: "Export",
+    copiedButton: "Copied",
+    exportButton: "Export",
+    thisAnalysis: "This analysis",
+    copyMarkdown: "Copy as Markdown",
+    saveMarkdown: "Save as .md",
+    saveJson: "Save as .json",
+    outroHint: "Use in Notion, Obsidian, Word…",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2119,6 +2132,19 @@ const de: Dictionary = {
     mainNavAriaLabel: "Hauptnavigation",
     activityTooltip: "Activity Monitor (Ctrl+M)",
     activityAriaLabel: "Activity Monitor öffnen",
+  },
+
+  briefingExport: {
+    copiedTooltip: "In Zwischenablage kopiert",
+    exportTooltip: "Briefing exportieren (Markdown, JSON)",
+    exportAriaLabel: "Exportieren",
+    copiedButton: "Kopiert",
+    exportButton: "Export",
+    thisAnalysis: "Diese Analyse",
+    copyMarkdown: "Markdown kopieren",
+    saveMarkdown: "Als .md speichern",
+    saveJson: "Als .json speichern",
+    outroHint: "Weiterverarbeiten in Notion, Obsidian, Word…",
   },
 };
 
