@@ -235,8 +235,11 @@ function PacMan() {
     ctx.imageSmoothingEnabled = true;
 
     // ── Farben ────────────────────────────────────────────────────────
-    const YELLOW = "#F0FF00";    // Pac-Man & Dots — neongelb
-    const INK = "#0A0A0A";       // Auge
+    // Invertierte Palette (User-Feedback): Pac-Man + Dots in der Haupt-
+    // Ink-Farbe der Seite, Auge als neongelber Akzent. Macht das Auge
+    // zum deutlich lesbaren Hingucker gegen die schwarze Silhouette.
+    const BODY = "#0A0A0A";      // Pac-Man & Dots — schwarz
+    const EYE = "#F0FF00";       // Auge — neongelb
 
     // ── Geometrie ─────────────────────────────────────────────────────
     const PAC_R = 9;                    // Pac-Man-Radius
@@ -278,7 +281,7 @@ function PacMan() {
       // Halbzyklus-Richtung noch NICHT überfahren hat. Bei jeder
       // Richtungsumkehr erscheinen sie wieder frisch (neue Halbzyklus-
       // Iteration) — klassisches Pac-Man-Respawn.
-      ctx.fillStyle = YELLOW;
+      ctx.fillStyle = BODY;
       for (const dx of dotXs) {
         const eaten = goingRight ? dx < pacX - PAC_R * 0.5 : dx > pacX + PAC_R * 0.5;
         if (eaten) continue;
@@ -297,7 +300,7 @@ function PacMan() {
       // Blickrichtung = Reiserichtung
       const facing = goingRight ? 0 : Math.PI;
 
-      ctx.fillStyle = YELLOW;
+      ctx.fillStyle = BODY;
       ctx.beginPath();
       // Startpunkt im Zentrum, damit Mund-Keil als „Cut" funktioniert
       ctx.moveTo(pacX, midY);
@@ -310,9 +313,9 @@ function PacMan() {
       // Über dem Zentrum, leicht in Blickrichtung versetzt.
       const eyeDx = Math.cos(facing) * PAC_R * 0.15;
       const eyeDy = -PAC_R * 0.45;
-      ctx.fillStyle = INK;
+      ctx.fillStyle = EYE;
       ctx.beginPath();
-      ctx.arc(pacX + eyeDx, midY + eyeDy, 1.3, 0, Math.PI * 2);
+      ctx.arc(pacX + eyeDx, midY + eyeDy, 1.6, 0, Math.PI * 2);
       ctx.fill();
     };
 
