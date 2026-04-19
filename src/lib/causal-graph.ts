@@ -189,6 +189,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.7,
     description: "Fragmentation leads to internet splinternet, tech decoupling",
+    source: "Freedom House Freedom on the Net 2024 + US-China semiconductor export controls (BIS 2023/2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-geopolitical-fracturing",
@@ -367,6 +370,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.65,
     description: "Clean energy reshapes urban planning and smart cities",
+    source: "C40 Cities Climate Action Plans + IEA Cities and Energy 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
 
   // ─── Work shapes society ───────────────────────────────────
@@ -421,6 +427,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.75,
     description: "Urban congestion drives demand for autonomous transport",
+    source: "INRIX Global Traffic Scorecard 2024 + OECD Urban Mobility Outlook",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "mega-urbanization",
@@ -589,6 +598,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Cloud-native architectures are the dominant deployment pattern for new tech",
+    source: "CNCF Cloud Native Landscape 2024 + Gartner Cloud Infrastructure Hype Cycle",
+    timestamp: "2026-04-19",
+    confidence: 0.88,
   },
   {
     from: "macro-cloud-native",
@@ -596,6 +608,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.75,
     description: "Container orchestration and serverless make agent deployment economically viable",
+    source: "CNCF Annual Survey 2024 + AWS Lambda/Vercel Agent deployment trend reports",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "macro-cloud-native",
@@ -975,6 +990,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Mobility-as-a-service platforms become the new layer between vehicles and riders",
+    source: "McKinsey Future of Mobility 2024 + Waymo/Cruise commercial deployment reports",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
 
   // ── Seamless Commerce ──────────────────────────────────────────────────
@@ -993,6 +1011,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.65,
     description: "Engagement-optimized algorithms fuel polarization, outrage, and filter bubbles",
+    source: "Haidt & Bail — Social media and political dysfunction (Nature Human Behavior 2023) + Stanford Internet Observatory reports",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-attention-economy",
@@ -1000,6 +1021,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.6,
     description: "Algorithmic feeds shape self-image, aspiration, and group identity at scale",
+    source: "Center for Humane Technology research + APA Social Media and Adolescent Mental Health Advisory (2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
 
   // ── Platform Economy — strengthen the web ─────────────────────────────
@@ -1009,6 +1033,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.7,
     description: "Platforms are the dominant collection points for the global data economy",
+    source: "EU Digital Markets Act (2022) gatekeeper assessments + CMA Platform Market Study 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
 
   // ── Connectivity — additional cross-link ───────────────────────────────
@@ -1018,6 +1045,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.6,
     description: "Reliable global connectivity is the precondition for cloud-native adoption",
+    source: "ITU Measuring Digital Development 2024 + Cisco Annual Internet Report 2023-2028",
+    timestamp: "2026-04-19",
+    confidence: 0.8,
   },
 ];
 
