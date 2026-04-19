@@ -861,12 +861,24 @@ export async function POST(req: Request) {
           const possiblePairs = Math.max(1, (matchedTrends.length * (matchedTrends.length - 1)) / 2);
           const causalCoverage = Math.min(1, matchedEdges.length / possiblePairs);
 
+          // Critical-Fix-Plan P3-1: Anteil Referenzen auf autoritativen
+          // Domains (KNOWN_DOMAINS-Allowlist in validation.ts). Der
+          // Validator hat das `verified`-Flag bereits gesetzt (P1-2).
+          // Ohne Referenzen: neutral-Wert 0.5 — weder Bonus noch Abzug.
+          const refs = validated.references || [];
+          const refsWithUrl = refs.filter((r) => r.url && r.url.length > 0);
+          const verifiedRefs = refsWithUrl.filter((r) => (r as any).verified === true);
+          const refVerification = refsWithUrl.length > 0
+            ? verifiedRefs.length / refsWithUrl.length
+            : 0.5;
+
           const calibrated = computeCalibratedConfidence({
             signalCoverage,
             signalRecency,
             signalStrength,
             sourceVerification,
             causalCoverage,
+            refVerification,
           });
 
           // Overwrite the LLM's self-assessed confidence with the
@@ -901,6 +913,10 @@ export async function POST(req: Request) {
             causalCoverage: {
               de: "Kausal-Graph deckt die Trend-Konstellation dünn ab",
               en: "Causal graph sparsely covers the trend pairs",
+            },
+            refVerification: {
+              de: "Referenzen stammen mehrheitlich von nicht-verifizierten Domains",
+              en: "References are mostly from unverified domains",
             },
           };
           const backendCoverageGaps = calibrated.limitingFactors

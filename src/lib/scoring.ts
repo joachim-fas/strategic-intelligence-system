@@ -354,6 +354,14 @@ export interface ConfidenceCalibrationInputs {
   sourceVerification: number;
   /** Fraction of causal links present in the edge graph. [0, 1]. */
   causalCoverage: number;
+  /**
+   * Critical-Fix-Plan P3-1 (Notion 2026-04-20): Anteil Referenzen auf
+   * verifizierten Domains (KNOWN_DOMAINS-Allowlist aus validation.ts).
+   * Optional — wenn der Caller es nicht setzt, fällt die Berechnung auf
+   * 0.5 (neutral) zurück, damit alte Pfade keinen Confidence-Verlust
+   * erleben. [0, 1].
+   */
+  refVerification?: number;
 }
 
 export interface CalibratedConfidence {
@@ -363,24 +371,42 @@ export interface CalibratedConfidence {
   limitingFactors: Array<{ factor: keyof ConfidenceCalibrationInputs; contribution: number; missing: number }>;
 }
 
+/**
+ * Notion v0.2 (28/22/18/14/8) plus Critical-Fix-Plan P3-1 (+10%
+ * refVerification). Die Summe der 6 Gewichte = 1.00.
+ *
+ * Designprinzip: die Prompt-Anweisungen im System-Prompt spiegeln
+ * die v0.2-Formel wider (signalCoverage 30% etc.). Bei der Migration
+ * auf 6 Faktoren wurden alle v0.2-Gewichte proportional um 7% gekürzt
+ * und refVerification mit 10% dazugegeben. Der LLM-seitige "self-score"-
+ * Vergleich stimmt weiter grob, und die neue Dimension (Anteil
+ * verifizierter Refs gegen KNOWN_DOMAINS-Allowlist) belohnt Queries
+ * mit Zitaten auf autoritativen Quellen.
+ */
 const CONFIDENCE_WEIGHTS: Record<keyof ConfidenceCalibrationInputs, number> = {
-  signalCoverage: 0.30,
-  signalRecency: 0.25,
-  signalStrength: 0.20,
-  sourceVerification: 0.15,
-  causalCoverage: 0.10,
+  signalCoverage: 0.28,
+  signalRecency: 0.22,
+  signalStrength: 0.18,
+  sourceVerification: 0.14,
+  causalCoverage: 0.08,
+  refVerification: 0.10,
 };
 
 export function computeCalibratedConfidence(
   inputs: ConfidenceCalibrationInputs,
 ): CalibratedConfidence {
   const clamp01 = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
-  const norm: ConfidenceCalibrationInputs = {
+  const norm: Required<ConfidenceCalibrationInputs> = {
     signalCoverage: clamp01(inputs.signalCoverage),
     signalRecency: clamp01(inputs.signalRecency),
     signalStrength: clamp01(inputs.signalStrength),
     sourceVerification: clamp01(inputs.sourceVerification),
     causalCoverage: clamp01(inputs.causalCoverage),
+    // Wenn der Caller refVerification nicht setzt (z.B. alte Pfade
+    // ohne KNOWN_DOMAINS-Check), nutzen wir 0.5 als neutralen Wert —
+    // halber Bonus, halber Abschlag, beeinflusst die Summe also nur
+    // marginal.
+    refVerification: clamp01(inputs.refVerification ?? 0.5),
   };
 
   const rawScore =
@@ -388,7 +414,8 @@ export function computeCalibratedConfidence(
     norm.signalRecency     * CONFIDENCE_WEIGHTS.signalRecency +
     norm.signalStrength    * CONFIDENCE_WEIGHTS.signalStrength +
     norm.sourceVerification* CONFIDENCE_WEIGHTS.sourceVerification +
-    norm.causalCoverage    * CONFIDENCE_WEIGHTS.causalCoverage;
+    norm.causalCoverage    * CONFIDENCE_WEIGHTS.causalCoverage +
+    norm.refVerification   * CONFIDENCE_WEIGHTS.refVerification;
 
   const score = Math.round(rawScore * 100);
 
