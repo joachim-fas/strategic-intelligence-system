@@ -1215,6 +1215,19 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  scenarioSelector: {
+    header: "Future Scenarios",
+    headerHint: "Select card · Actions below",
+    combineTooltip: "Combine selected scenarios into a meta-analysis",
+    // {{n}} = number of selected scenarios
+    combineButton: "Combine {{n}}",
+    generateMoreTooltip: "Generate 3 more fundamentally different scenarios",
+    generateMoreButton: "More",
+    saveTooltipSaved: "Saved",
+    saveTooltip: "Save to scenario builder",
+    saveAriaLabel: "Save to scenario builder",
+  },
+
   frameworksList: {
     heroHeading: "Analysis Frameworks",
     heroBody: "Six specialized analysis modes — each with its own purpose, data sources, and visualizations.",
@@ -2464,6 +2477,18 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  scenarioSelector: {
+    header: "Zukunftsszenarien",
+    headerHint: "Karte wählen · Aktionen unten",
+    combineTooltip: "Ausgewählte Szenarien zu einer Meta-Analyse kombinieren",
+    combineButton: "{{n}} kombinieren",
+    generateMoreTooltip: "3 weitere, fundamental andere Szenarien generieren",
+    generateMoreButton: "Weitere",
+    saveTooltipSaved: "Gespeichert",
+    saveTooltip: "Im Szenario-Builder speichern",
+    saveAriaLabel: "Im Szenario-Builder speichern",
   },
 
   frameworksList: {

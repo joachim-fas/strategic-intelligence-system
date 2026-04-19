@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { Locale } from "@/lib/i18n";
+import { useT } from "@/lib/locale-context";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { VoltSectionLabel } from "@/components/verstehen/VoltPrimitives";
@@ -91,6 +92,7 @@ function ScenarioCard({
   de: boolean;
   query?: string;
 }) {
+  const { t } = useT();
   const [saved, setSaved] = useState(false);
   const saveToBuilder = async () => {
     if (saved) return;
@@ -228,10 +230,10 @@ function ScenarioCard({
           />
         ))}
         <span style={{ flex: 1 }} />
-        <Tooltip content={saved ? (de ? "Gespeichert" : "Saved") : (de ? "Im Szenario-Builder speichern" : "Save to scenario builder")} placement="top">
+        <Tooltip content={saved ? t("scenarioSelector.saveTooltipSaved") : t("scenarioSelector.saveTooltip")} placement="top">
           <button
             onClick={(e) => { e.stopPropagation(); saveToBuilder(); }}
-            aria-label={de ? "Im Szenario-Builder speichern" : "Save to scenario builder"}
+            aria-label={t("scenarioSelector.saveAriaLabel")}
             style={{
               width: 26, height: 26, borderRadius: 6,
               border: "none",
@@ -293,6 +295,7 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
   onFollowUp?: (q: string) => void;
   hideHeader?: boolean;
 }) {
+  const { t } = useT();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const de = locale === "de";
 
@@ -328,25 +331,25 @@ export function ScenarioSelector({ scenarios, query, locale, onFollowUp, hideHea
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 12, gap: 12 }}>
           <div style={{ flex: 1 }}>
             <VoltSectionLabel
-              hint={de ? "Karte wählen · Aktionen unten" : "Select card · Actions below"}
+              hint={t("scenarioSelector.headerHint")}
             >
-              {de ? "Zukunftsszenarien" : "Future Scenarios"}
+              {t("scenarioSelector.header")}
             </VoltSectionLabel>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {selected.size > 1 && (
-              <Tooltip content={de ? "Ausgewählte Szenarien zu einer Meta-Analyse kombinieren" : "Combine selected scenarios into a meta-analysis"} placement="top">
+              <Tooltip content={t("scenarioSelector.combineTooltip")} placement="top">
                 <Button onClick={combineSelected} size="sm"
                   className="text-[12px] bg-[#E4FF97] text-[#0A0A0A] hover:bg-[#D4F080] border border-black/10 font-semibold gap-1.5">
                   <MergeIcon size={13} />
-                  {de ? `${selected.size} kombinieren` : `Combine ${selected.size}`}
+                  {t("scenarioSelector.combineButton", { n: String(selected.size) })}
                 </Button>
               </Tooltip>
             )}
-            <Tooltip content={de ? "3 weitere, fundamental andere Szenarien generieren" : "Generate 3 more fundamentally different scenarios"} placement="top">
+            <Tooltip content={t("scenarioSelector.generateMoreTooltip")} placement="top">
               <Button variant="outline" onClick={generateMore} size="sm" className="text-[12px] gap-1.5">
                 <PlusIcon size={13} />
-                {de ? "Weitere" : "More"}
+                {t("scenarioSelector.generateMoreButton")}
               </Button>
             </Tooltip>
           </div>
