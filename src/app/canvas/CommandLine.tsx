@@ -14,6 +14,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import BlockCursor from "@/components/common/BlockCursor";
 
 export function CommandLine({
   onSubmit, onClose, locale, prefill, contextLabel,
@@ -25,10 +26,11 @@ export function CommandLine({
   contextLabel?: string;
 }) {
   const [value, setValue] = useState(prefill ?? "");
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const tl = (key: TranslationKey) => translate(locale as Locale, key);
 
-  useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
+  useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); setFocused(true); }, []);
   useEffect(() => { setValue(prefill ?? ""); }, [prefill]);
 
   const submit = () => {
@@ -76,14 +78,41 @@ export function CommandLine({
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "2px solid #0A0A0A", borderRadius: 14, padding: "8px 10px 8px 14px", boxShadow: "0 12px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)" }}>
           <span style={{ fontSize: 15, color: "var(--color-text-muted)", flexShrink: 0 }}>⌕</span>
-          <input
-            ref={inputRef}
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
-            placeholder={tl("commandLine.placeholder")}
-            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--color-text-primary)", fontFamily: "inherit" }}
-          />
+          {/*
+            Wrapper for the BlockCursor (DOS-style terminal cursor with
+            invert-glyph, matching the hero Home search and the framework
+            topic inputs). position:relative is required so the cursor's
+            absolute-positioned block can sit precisely over the caret.
+          */}
+          <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center" }}>
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={tl("commandLine.placeholder")}
+              style={{
+                width: "100%", background: "transparent", border: "none", outline: "none",
+                fontSize: 15, color: "var(--color-text-primary)", fontFamily: "inherit",
+                // Hide the thin native caret — BlockCursor owns the visible cursor.
+                caretColor: "transparent",
+              }}
+            />
+            <BlockCursor
+              targetRef={inputRef}
+              value={value}
+              focused={focused}
+              color="#E4FF97"
+              // The command-line bar has a near-opaque white background
+              // (rgba(255,255,255,0.96)). Using solid white as the
+              // invert-glyph colour makes the underlying glyph appear to
+              // vanish into the bar behind the cursor block — exact DOS
+              // feel on a light surface.
+              invertGlyphColor="#FFFFFF"
+            />
+          </div>
           <button onClick={submit} style={{ flexShrink: 0, padding: "6px 16px", borderRadius: 8, background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
             {tl("commandLine.analyze")} ↵
           </button>

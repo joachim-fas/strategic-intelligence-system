@@ -7,6 +7,7 @@ import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { useLocale, useT } from "@/lib/locale-context";
 import { FrameworkMeta } from "@/types/frameworks";
+import BlockCursor from "@/components/common/BlockCursor";
 
 interface FrameworkShellProps {
   meta: FrameworkMeta;
@@ -19,6 +20,7 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
   const de = locale === "de";
   const [topic, setTopic] = useState("");
   const [activeTopic, setActiveTopic] = useState("");
+  const [topicFocused, setTopicFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -80,23 +82,57 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
 
           {/* Topic Input */}
           <div style={{ display: "flex", gap: 8, marginTop: 16, maxWidth: 640 }}>
-            <input
-              ref={inputRef}
-              value={topic}
-              onChange={e => setTopic(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
-              placeholder={t("frameworkShell.topicPlaceholder")}
-              style={{
-                flex: 1, height: 42, padding: "0 14px",
-                fontSize: 14, fontFamily: "var(--font-ui)",
-                border: `1.5px solid ${meta.color.border}`,
-                borderRadius: 10, background: "var(--background)",
-                color: "var(--foreground)",
-                outline: "none",
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = meta.color.accent; }}
-              onBlur={e => { e.currentTarget.style.borderColor = meta.color.border; }}
-            />
+            {/*
+              Wrapper must be position:relative so the BlockCursor can
+              absolutely-position its block INSIDE this cell. The flex child
+              keeps the input at its original 1fr width.
+            */}
+            <div style={{ position: "relative", flex: 1 }}>
+              <input
+                ref={inputRef}
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
+                onFocus={e => {
+                  e.currentTarget.style.borderColor = meta.color.accent;
+                  setTopicFocused(true);
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = meta.color.border;
+                  setTopicFocused(false);
+                }}
+                placeholder={t("frameworkShell.topicPlaceholder")}
+                style={{
+                  width: "100%", height: 42, padding: "0 14px",
+                  fontSize: 14, fontFamily: "var(--font-ui)",
+                  border: `1.5px solid ${meta.color.border}`,
+                  borderRadius: 10,
+                  // The input's own background is the framework card colour;
+                  // the BlockCursor uses the same colour as its invert-glyph
+                  // so the cursor appears to "cut through" the input and let
+                  // the framework accent shine, with the character ghosted
+                  // in the card tint.
+                  background: "var(--background)",
+                  color: "var(--foreground)",
+                  outline: "none",
+                  // Hide the native thin caret — BlockCursor takes over.
+                  caretColor: "transparent",
+                }}
+              />
+              {/*
+                Per-framework accent. The invertGlyphColor is the INPUT's
+                own background (not the card wrapper behind it) so that
+                the ghost-glyph inside the cursor matches what the letter
+                would look like on the input surface.
+              */}
+              <BlockCursor
+                targetRef={inputRef}
+                value={topic}
+                focused={topicFocused}
+                color={meta.color.accent}
+                invertGlyphColor="var(--background, #FFFFFF)"
+              />
+            </div>
             <button
               onClick={handleSubmit}
               disabled={!topic.trim()}

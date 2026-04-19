@@ -12,11 +12,22 @@
  *      where the caret sits — including after soft wraps in a multi-line
  *      textarea.
  *   3. Drawing a `<div>` at that position as an opaque colored block.
- *      We render opaque (no mix-blend-mode) so light pastel framework
- *      tints — e.g. #F0D4FF or #D4E8FF — stay visibly on white surfaces.
- *      The glyph under the cursor is hidden while the block is "on" and
- *      reappears each half-cycle when the blink animation takes it to
- *      zero opacity, which is the standard DOS/terminal behaviour.
+ *
+ * ## Invert-glyph (DOS/terminal inversion, 2026-04)
+ *
+ * Classic terminals render the block cursor with the character that lives
+ * under it shown in the BACKGROUND colour — the glyph is visible through
+ * the block "negatively", and flashes back to its normal colour every
+ * half-cycle as the cursor blinks. Without this, a wide block cursor
+ * simply covers the next character and you can't read what you're about
+ * to overwrite.
+ *
+ * We copy the target's computed font properties into the cursor block, put
+ * the next character inside as a `<span>` painted in `invertGlyphColor`
+ * (default: the input's background — `var(--background, #FFFFFF)`), and
+ * let the same `sis-blink` animation flash the whole block (background +
+ * inverted glyph) in sync. Cursor ON → lime block with ghost-white glyph.
+ * Cursor OFF → the original black glyph reappears at its normal position.
  *
  * The component renders absolute-positioned children into its nearest
  * positioned ancestor, so the CALLER must wrap the target in a
@@ -39,6 +50,17 @@ export interface BlockCursorProps {
    *  including the pastel framework tints — shows up at full saturation
    *  on white surfaces. */
   color?: string;
+  /**
+   * Colour of the glyph shown INSIDE the cursor block (the "inverted"
+   * character that shines through the cursor). Default:
+   * `var(--background, #FFFFFF)` — the typical white page background.
+   *
+   * For dark / pastel framework inputs the caller can override with the
+   * input's actual background colour so the invert effect stays visually
+   * coherent (e.g. a pastel-tinted input keeps its card colour showing
+   * through the cursor block).
+   */
+  invertGlyphColor?: string;
   /** Minimum cursor width in px — used at end-of-input or over zero-width
    *  characters so the cursor stays visibly clickable. */
   minWidth?: number;
@@ -62,17 +84,42 @@ const MIRROR_COPY_PROPS = [
   "tabSize", "MozTabSize",
 ] as const;
 
+/**
+ * Font properties we mirror onto the cursor's invert-glyph span. Pulled
+ * into a narrower set than MIRROR_COPY_PROPS because the mirror cares
+ * about BOX metrics (padding, border) while the glyph inside the cursor
+ * is a one-character centered span that only needs TEXT metrics.
+ */
+interface CursorFont {
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: string;
+  fontStyle: string;
+  fontVariant: string;
+  letterSpacing: string;
+  lineHeight: string;
+  textTransform: string;
+}
+
 export default function BlockCursor({
   targetRef,
   value,
   focused,
   color = "#E4FF97",
+  invertGlyphColor = "var(--background, #FFFFFF)",
   minWidth = 9,
   hidden = false,
 }: BlockCursorProps) {
   const mirrorRef = useRef<HTMLDivElement>(null);
   const [selStart, setSelStart] = useState(0);
   const [rect, setRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // The character that sits under the cursor (if any) + the font
+  // properties needed to render it identically inside the cursor block.
+  // Split into two pieces because `rect` re-renders on every measurement
+  // but the font rarely changes — React's reference equality keeps the
+  // cursor-block re-render cheap.
+  const [glyph, setGlyph] = useState<string>("");
+  const [font, setFont] = useState<CursorFont | null>(null);
 
   // Track caret position via any event that can move it. `selectionchange`
   // on document catches arrow-key drags and programmatic changes in
@@ -107,7 +154,7 @@ export default function BlockCursor({
   // Recompute the cursor rect synchronously before paint so the block stays
   // glued to the character as the user types — no one-frame lag.
   useLayoutEffect(() => {
-    if (!focused || hidden) { setRect(null); return; }
+    if (!focused || hidden) { setRect(null); setGlyph(""); return; }
     const el = targetRef.current;
     const mirror = mirrorRef.current;
     if (!el || !mirror) return;
@@ -136,7 +183,8 @@ export default function BlockCursor({
     // "next character" is undefined — use a non-breaking space so the marker
     // still has measurable width/height for positioning.
     const nextChar = value[pos];
-    marker.textContent = nextChar && nextChar !== "\n" ? nextChar : "\u00a0";
+    const hasRealGlyph = Boolean(nextChar && nextChar !== "\n" && nextChar !== "\r");
+    marker.textContent = hasRealGlyph ? (nextChar as string) : "\u00a0";
     mirror.appendChild(marker);
 
     const mRect = mirror.getBoundingClientRect();
@@ -150,6 +198,17 @@ export default function BlockCursor({
     const w = Math.max(markerRect.width, minWidth);
 
     setRect({ left, top, width: w, height: h });
+    setGlyph(hasRealGlyph ? (nextChar as string) : "");
+    setFont({
+      fontFamily: cs.fontFamily,
+      fontSize: cs.fontSize,
+      fontWeight: cs.fontWeight,
+      fontStyle: cs.fontStyle,
+      fontVariant: cs.fontVariant,
+      letterSpacing: cs.letterSpacing,
+      lineHeight: cs.lineHeight,
+      textTransform: cs.textTransform,
+    });
   }, [focused, value, selStart, hidden, targetRef, minWidth]);
 
   return (
@@ -169,16 +228,49 @@ export default function BlockCursor({
             width: rect.width,
             height: rect.height,
             background: color,
-            // Opaque block. The blink animation already cycles the cursor
-            // between visible and invisible, so glyphs underneath reappear
-            // every half-second — we don't need a blend mode to keep them
-            // readable, and an opaque block guarantees the chosen color
-            // (lime, framework pastel, whatever) is faithfully on-screen.
+            // Inline-flex so the invert-glyph centers inside the block.
+            // `overflow: hidden` keeps a too-wide glyph from escaping
+            // (can happen with oversized italic or ligature chars).
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
             pointerEvents: "none",
+            // The blink cycles the WHOLE block — background AND invert
+            // glyph together. Cursor ON: both visible (block + ghost
+            // glyph through it). Cursor OFF: both gone, the normal
+            // underlying glyph at the input's own layer shows through.
             animation: "sis-blink 1s steps(1, end) infinite",
             zIndex: 2,
+            // Font metrics mirror exactly so the invert-glyph sits at
+            // the SAME position it would have had as a regular
+            // character. Without this the glyph can drift by a subpixel
+            // on different font stacks and the user sees a ghosting
+            // effect when the cursor blinks off.
+            fontFamily: font?.fontFamily,
+            fontSize: font?.fontSize,
+            fontWeight: font?.fontWeight,
+            fontStyle: font?.fontStyle,
+            fontVariant: font?.fontVariant,
+            letterSpacing: font?.letterSpacing,
+            lineHeight: font?.lineHeight,
+            textTransform: font?.textTransform as React.CSSProperties["textTransform"],
           }}
-        />
+        >
+          {glyph && (
+            <span
+              style={{
+                color: invertGlyphColor,
+                // The glyph inherits all font properties from the block
+                // so we don't re-declare them. Whitespace: no char ->
+                // no span -> no ghost artifact.
+                userSelect: "none",
+              }}
+            >
+              {glyph}
+            </span>
+          )}
+        </div>
       )}
     </>
   );
