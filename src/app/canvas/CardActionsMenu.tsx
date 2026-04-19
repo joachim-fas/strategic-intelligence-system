@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { MoreHorizontal, MessageSquarePlus, Copy, TagIcon, Trash2 } from "lucide-react";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 import {
   VoltDropdownMenu,
   VoltDropdownMenuTrigger,
@@ -47,6 +48,10 @@ export function CardActionsMenu({
 }) {
   const [tagInput, setTagInput] = useState("");
   const [showTagInput, setShowTagInput] = useState(false);
+  // Local translator — `de` is a prop (card menu is used inside
+  // many different parent components).
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
 
   return (
     <VoltDropdownMenu>
@@ -78,21 +83,21 @@ export function CardActionsMenu({
         </button>
       </VoltDropdownMenuTrigger>
       <VoltDropdownMenuContent align="end" side="bottom" className="min-w-[180px]">
-        <VoltDropdownMenuLabel>{de ? "Aktionen" : "Actions"}</VoltDropdownMenuLabel>
+        <VoltDropdownMenuLabel>{tl("cardActions.actionsHeading")}</VoltDropdownMenuLabel>
         {onFollowUp && (
           <VoltDropdownMenuItem onClick={() => onFollowUp(nodeId)}>
             <MessageSquarePlus size={14} />
-            {de ? "Folgefrage stellen" : "Ask follow-up"}
+            {tl("cardActions.followUp")}
           </VoltDropdownMenuItem>
         )}
         {onCopy && (
           <VoltDropdownMenuItem onClick={() => onCopy(nodeId)}>
             <Copy size={14} />
-            {de ? "Synthese kopieren" : "Copy synthesis"}
+            {tl("cardActions.copySynthesis")}
           </VoltDropdownMenuItem>
         )}
         <VoltDropdownMenuSeparator />
-        <VoltDropdownMenuLabel>{de ? "Status" : "Status"}</VoltDropdownMenuLabel>
+        <VoltDropdownMenuLabel>{tl("cardActions.statusHeading")}</VoltDropdownMenuLabel>
         {(["open", "active", "decided", "pinned"] as NodeStatus[]).map((s) => (
           <VoltDropdownMenuItem key={s} onClick={() => onSetStatus(nodeId, s)}>
             <StatusIcon status={s} size={14} />
@@ -111,7 +116,7 @@ export function CardActionsMenu({
             }}
           >
             <TagIcon size={14} />
-            {de ? "Tag hinzufügen" : "Add tag"}
+            {tl("cardActions.addTag")}
           </VoltDropdownMenuItem>
         ) : (
           <div
@@ -131,7 +136,7 @@ export function CardActionsMenu({
                 }
                 if (e.key === "Escape") setShowTagInput(false);
               }}
-              placeholder={de ? "Tag eingeben…" : "Enter tag…"}
+              placeholder={tl("cardActions.tagPlaceholder")}
               style={{
                 width: "100%",
                 fontSize: 12,
@@ -148,7 +153,7 @@ export function CardActionsMenu({
         <VoltDropdownMenuSeparator />
         <VoltDropdownMenuItem variant="destructive" onClick={() => onDelete(nodeId)}>
           <Trash2 size={14} />
-          {de ? "Löschen" : "Delete"}
+          {tl("cardActions.delete")}
         </VoltDropdownMenuItem>
       </VoltDropdownMenuContent>
     </VoltDropdownMenu>

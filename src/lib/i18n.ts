@@ -1204,6 +1204,16 @@ const en = {
     signinFailed: "Sign-in failed. Your email may not be on the allowlist.",
     networkError: "Network error. Please try again.",
   },
+
+  cardActions: {
+    actionsHeading: "Actions",
+    followUp: "Ask follow-up",
+    copySynthesis: "Copy synthesis",
+    statusHeading: "Status",
+    addTag: "Add tag",
+    tagPlaceholder: "Enter tag…",
+    delete: "Delete",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2218,6 +2228,16 @@ const de: Dictionary = {
     submitButton: "Magic Link senden →",
     signinFailed: "Anmeldung fehlgeschlagen. Deine E-Mail ist möglicherweise nicht freigeschaltet.",
     networkError: "Netzwerkfehler. Bitte erneut versuchen.",
+  },
+
+  cardActions: {
+    actionsHeading: "Aktionen",
+    followUp: "Folgefrage stellen",
+    copySynthesis: "Synthese kopieren",
+    statusHeading: "Status",
+    addTag: "Tag hinzufügen",
+    tagPlaceholder: "Tag eingeben…",
+    delete: "Löschen",
   },
 };
 
