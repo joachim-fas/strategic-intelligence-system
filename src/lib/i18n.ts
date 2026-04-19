@@ -1229,6 +1229,25 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  queryCard: {
+    // {{n}} = duplicate index — e.g. "Duplicate #2 of this query"
+    duplicateTitle: "Duplicate #{{n}} of this query",
+    signalsLabel: "signals",
+    derivedHeading: "Derived",
+    insightsLabel: "Insights",
+    scenariosLabel: "Scenarios",
+    decisionsLabel: "Decisions",
+    followupsLabel: "Follow-ups",
+    causalGraphLabel: "Causal graph",
+    // Streaming phase labels — shown while an analysis runs
+    phaseReadSignals: "Reading signals…",
+    phaseSynthesis: "Synthesis…",
+    phaseCausalChains: "Causal chains…",
+    phaseScenarios: "Scenarios…",
+    phaseInsights: "Insights…",
+    phaseFinishing: "Finishing…",
+  },
+
   derivedCard: {
     badgeInsight: "INSIGHT",
     badgeDecision: "DECISION",
@@ -2538,6 +2557,23 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  queryCard: {
+    duplicateTitle: "Wiederholung #{{n}} dieser Frage",
+    signalsLabel: "Signale",
+    derivedHeading: "Abgeleitet",
+    insightsLabel: "Erkenntnisse",
+    scenariosLabel: "Szenarien",
+    decisionsLabel: "Empfehlungen",
+    followupsLabel: "Folgefragen",
+    causalGraphLabel: "Kausalnetz",
+    phaseReadSignals: "Signale lesen…",
+    phaseSynthesis: "Synthese…",
+    phaseCausalChains: "Kausalketten…",
+    phaseScenarios: "Szenarien…",
+    phaseInsights: "Erkenntnisse…",
+    phaseFinishing: "Abschliessen…",
   },
 
   derivedCard: {

@@ -14,6 +14,7 @@
 "use client";
 
 import React from "react";
+import { useT } from "@/lib/locale-context";
 import { CardActionsMenu } from "../CardActionsMenu";
 import { FormattedText } from "../FormattedText";
 import { NODE_STATUS_META, QUERY_NODE_W } from "../constants";
@@ -80,6 +81,7 @@ export function QueryNodeCard({
   onFollowUp: _onFollowUp, onFollowUpQ: _onFollowUpQ, onToggleCollapse: _onToggleCollapse, onRefresh: _onRefresh,
   onAddTag, onSetStatus,
 }: QueryNodeCardProps) {
+  const { t } = useT();
   const isLoading = node.status === "loading" || node.status === "streaming";
   const age = nodeAge(node.createdAt);
   const staleAccent = age === "stale" ? "#F5A623" : age === "aging" ? "rgba(245,166,35,0.5)" : null;
@@ -164,7 +166,7 @@ export function QueryNodeCard({
           </p>
           {duplicateIndex !== undefined && duplicateIndex > 0 && (
             <span
-              title={de ? `Wiederholung #${duplicateIndex} dieser Frage` : `Duplicate #${duplicateIndex} of this query`}
+              title={t("queryCard.duplicateTitle", { n: String(duplicateIndex) })}
               style={{
                 flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.02em",
                 fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
@@ -212,7 +214,7 @@ export function QueryNodeCard({
                     }}>{src}</span>
                   ))}
                   <span style={{ fontSize: 8, color: "var(--color-text-muted)", alignSelf: "center" }}>
-                    {node.result.usedSignals.length} {de ? "Signale" : "signals"}
+                    {node.result.usedSignals.length} {t("queryCard.signalsLabel")}
                   </span>
                 </div>
               )}
@@ -260,32 +262,32 @@ export function QueryNodeCard({
           {(!node.synthesis || (cardZoom !== undefined && cardZoom < 0.6)) && !isLoading && node.status !== "error" && childCounts && (childCounts.insights + childCounts.scenarios + childCounts.decisions + childCounts.followups + childCounts.causal) > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 2 }}>
               <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.08em", color: "var(--color-text-muted)", textTransform: "uppercase" }}>
-                {de ? "Abgeleitet" : "Derived"}
+                {t("queryCard.derivedHeading")}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                 {childCounts.insights > 0 && (
                   <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(26,158,90,0.08)", color: "#1A9E5A", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {childCounts.insights} {de ? "Erkenntnisse" : "Insights"}
+                    {childCounts.insights} {t("queryCard.insightsLabel")}
                   </span>
                 )}
                 {childCounts.scenarios > 0 && (
                   <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(37,99,235,0.08)", color: "#2563EB", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {childCounts.scenarios} {de ? "Szenarien" : "Scenarios"}
+                    {childCounts.scenarios} {t("queryCard.scenariosLabel")}
                   </span>
                 )}
                 {childCounts.decisions > 0 && (
                   <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(124,26,158,0.08)", color: "#7C1A9E", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {childCounts.decisions} {de ? "Empfehlungen" : "Decisions"}
+                    {childCounts.decisions} {t("queryCard.decisionsLabel")}
                   </span>
                 )}
                 {childCounts.followups > 0 && (
                   <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(245,166,35,0.10)", color: "#955A20", fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {childCounts.followups} {de ? "Folgefragen" : "Follow-ups"}
+                    {childCounts.followups} {t("queryCard.followupsLabel")}
                   </span>
                 )}
                 {childCounts.causal > 0 && (
                   <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 10, background: "rgba(26,158,90,0.12)", color: "#1A9E5A", fontWeight: 600, whiteSpace: "nowrap", border: "1px solid rgba(26,158,90,0.25)" }}>
-                    {de ? "Kausalnetz" : "Causal graph"}
+                    {t("queryCard.causalGraphLabel")}
                   </span>
                 )}
               </div>
@@ -302,9 +304,14 @@ export function QueryNodeCard({
             </div>
           )}
           {isLoading && !node.synthesis && (() => {
-            const phases = de
-              ? ["Signale lesen…", "Synthese…", "Kausalketten…", "Szenarien…", "Erkenntnisse…", "Abschliessen…"]
-              : ["Reading signals…", "Synthesis…", "Causal chains…", "Scenarios…", "Insights…", "Finishing…"];
+            const phases = [
+              t("queryCard.phaseReadSignals"),
+              t("queryCard.phaseSynthesis"),
+              t("queryCard.phaseCausalChains"),
+              t("queryCard.phaseScenarios"),
+              t("queryCard.phaseInsights"),
+              t("queryCard.phaseFinishing"),
+            ];
             const phase = node.streamingPhase ?? 0;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
