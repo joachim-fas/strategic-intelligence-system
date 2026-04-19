@@ -207,10 +207,15 @@ export function checkScenarioDivergence(scenarios: ScenarioForCheck[]): Scenario
     [0.30, 0.40, 0.30],
     [0.33, 0.34, 0.33],
     [0.25, 0.55, 0.20],
+    [0.20, 0.60, 0.20],
   ];
-  // Toleranz: 2 Prozentpunkte pro Szenario (LLM rundet manchmal).
+  // Toleranz: 4 Prozentpunkte pro Szenario. Demo-Test 2026-04-20 hat
+  // gezeigt, dass der LLM das 2pp-Schema umgeht indem er minimal
+  // verschiebt (22/55/23 statt 20/55/25). 4pp fängt das ab, ohne
+  // echte legitime Verteilungen zu treffen (mature markets: 65/20/15
+  // sind weit genug weg von allen Defaults).
   const matchesDefault = DEFAULT_FALLBACK_DISTRIBUTIONS.some((tmpl) =>
-    tmpl.every((tv, i) => Math.abs((probs[i] ?? 0) - tv) < 0.02),
+    tmpl.every((tv, i) => Math.abs((probs[i] ?? 0) - tv) <= 0.04),
   );
   if (matchesDefault) {
     findings.push({
@@ -218,8 +223,24 @@ export function checkScenarioDivergence(scenarios: ScenarioForCheck[]): Scenario
       severity: "major",
       message:
         "Scenario probabilities match a known default template " +
-        "(e.g. 20/55/25) — LLM likely fell back to schema placeholder " +
-        "instead of deriving from signals. Confidence should be penalized.",
+        "(e.g. 20/55/25) within 4pp tolerance — LLM likely fell back " +
+        "to schema placeholder instead of deriving from signals. " +
+        "Confidence should be penalized.",
+    });
+  }
+
+  // Zusätzliche Heuristik: zwei identische Probabilities zeigen fast
+  // immer, dass der LLM kopiert hat ("nochmal dasselbe, nur ein anderes
+  // Label dran"). Echte Daten-getriebene Einschätzungen haben fast nie
+  // exakt gleiche Werte über zwei der drei Szenarien.
+  const uniqueProbs = new Set(probs.map((p) => Math.round(p * 100) / 100));
+  if (uniqueProbs.size < probs.length) {
+    findings.push({
+      rule: "probability_sum",
+      severity: "minor",
+      message:
+        `Two scenarios share the same probability (${probs.join("/")}) — ` +
+        "unlikely to reflect genuine data-derived estimates.",
     });
   }
 
