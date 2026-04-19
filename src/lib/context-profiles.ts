@@ -247,3 +247,114 @@ export function parseContextFromText(text: string): Partial<ContextProfile> {
 
   return profile;
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// Notion v0.2 — Context Profile Prompt Prefix (Section 7)
+//
+// When a context profile is active, this block is prepended to the
+// main system prompt to recalibrate LANGUAGE and RECOMMENDATIONS to the
+// user's decision frame. The scoring side is handled separately by
+// `applyContextProfile()` above — the prompt side is purely about:
+//
+//   - which trends / regulations to emphasize
+//   - which vocabulary and decision horizon to use
+//   - which recommendations fall within the user's decision authority
+//
+// Important: this does NOT override source rules, anti-hallucination
+// constraints, or temporal validity.
+//
+// The prefix is currently NOT automatically injected — the main query
+// route attaches a short `[Context: role / industry / region]` tag to
+// the USER message instead (see `/api/v1/query/route.ts`). The full
+// prefix below is published here as Notion-spec source of truth so
+// that when a richer context-aware route is wired, the prompt is
+// ready to drop in.
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * Render the Notion v0.2 context profile prefix with the user's
+ * profile interpolated. The output is an English system-prompt
+ * fragment intended to be prepended before the main briefing prompt.
+ */
+export function buildContextProfilePrefix(profile: Partial<ContextProfile>): string {
+  const role = profile.role || "—";
+  const industry = profile.industry || "—";
+  const region = profile.region || "Global";
+  const orgSize = profile.orgSize || "—";
+  const categoryWeights = profile.trendWeights
+    ? Object.entries(profile.trendWeights)
+        .map(([k, v]) => `${k}:${v.toFixed(1)}x`)
+        .join(", ")
+    : "(default weights)";
+
+  return `## Active Context Filter
+
+The user has activated a context profile. Calibrate all responses accordingly:
+
+Role: ${role}
+Industry: ${industry}
+Region: ${region}
+OrgSize: ${orgSize}
+
+Calibration rules:
+
+1. RELEVANCE FILTER: Emphasize trends and signals directly relevant to ${role} in ${industry}.
+   Reweight STEEP+V categories: ${categoryWeights}
+   Surface regulations applicable to ${industry} in ${region} first.
+
+2. LANGUAGE: Use the frame of reference of ${role}.
+   A CTO thinks in tech stack, team capacity, and build/buy/partner decisions.
+   A CFO thinks in EBITDA impact and cash flow risk.
+   A Policy Maker thinks in regulatory windows and coalition feasibility.
+   Match this framing in recommendations — not just vocabulary.
+
+3. RECOMMENDATIONS: Action recommendations must fall within the typical decision authority of ${role}.
+   Do not recommend actions that require a different role's budget or mandate.
+
+4. REGULATORY FOCUS: Prioritize regulations applicable to ${region} and ${industry}.
+   EU-focus for DACH profiles. US-focus for US profiles.
+   Name compliance deadlines explicitly.
+
+5. CONFIDENCE CALIBRATION: Apply ${role}-specific signal weighting.
+   For a CTO: technical signals weight more. For a CFO: financial signals weight more.
+
+This profile does not override source rules, anti-hallucination constraints, or temporal validity rules.
+
+TEMPORAL VALIDITY applies equally under all context profiles: all recommendations, action windows, and scenario horizons must be future-dated relative to CURRENT_DATE.`;
+}
+
+/** Raw English template for registry/docs. Placeholders intact. */
+export const CONTEXT_PROFILE_PREFIX_TEMPLATE_EN = `## Active Context Filter
+
+The user has activated a context profile. Calibrate all responses accordingly:
+
+Role: ROLE           // e.g. "CTO", "CEO", "Investor", "Policy Maker"
+Industry: INDUSTRY   // e.g. "Automotive", "Finance", "Healthcare"
+Region: REGION       // e.g. "DACH", "EU", "Global"
+OrgSize: ORG_SIZE
+
+Calibration rules:
+
+1. RELEVANCE FILTER: Emphasize trends and signals directly relevant to ROLE in INDUSTRY.
+   Reweight STEEP+V categories: CATEGORY_WEIGHTS
+   Surface regulations applicable to INDUSTRY in REGION first.
+
+2. LANGUAGE: Use the frame of reference of ROLE.
+   A CTO thinks in tech stack, team capacity, and build/buy/partner decisions.
+   A CFO thinks in EBITDA impact and cash flow risk.
+   A Policy Maker thinks in regulatory windows and coalition feasibility.
+   Match this framing in recommendations — not just vocabulary.
+
+3. RECOMMENDATIONS: Action recommendations must fall within the typical decision authority of ROLE.
+   Do not recommend actions that require a different role's budget or mandate.
+
+4. REGULATORY FOCUS: Prioritize regulations applicable to REGION and INDUSTRY.
+   EU-focus for DACH profiles. US-focus for US profiles.
+   Name compliance deadlines explicitly.
+
+5. CONFIDENCE CALIBRATION: Apply ROLE-specific signal weighting.
+   For a CTO: technical signals weight more. For a CFO: financial signals weight more.
+
+This profile does not override source rules, anti-hallucination constraints, or temporal validity rules.
+
+TEMPORAL VALIDITY applies equally under all context profiles: all recommendations, action windows, and scenario horizons must be future-dated relative to CURRENT_DATE.`;

@@ -320,3 +320,120 @@ export function processSignals(
     .map((g) => scoreTrend(g, sourceWeights, dimensionWeights))
     .sort((a, b) => b.relevance - a.relevance);
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// Notion v0.2 — Calibrated Confidence Formula
+//
+// Replaces the LLM-self-reported confidence with a deterministic, weighted
+// composite of five measurable factors. Matches the spec from
+// https://www.notion.so/SIS-Prompt-Bibliothek-76a86ccd7e92443f952e75f4a1159370
+// (section 2.5 Confidence Calibration):
+//
+//   confidence = (
+//     signalCoverage    * 0.30 +
+//     signalRecency     * 0.25 +
+//     signalStrength    * 0.20 +
+//     sourceVerification* 0.15 +
+//     causalCoverage    * 0.10
+//   ) * 100
+//
+// Each input is a [0, 1] score. The output is 0-100 (not 0-1) to match
+// the Notion interpretation bands (80-100 high / 60-79 medium / 40-59 low).
+// Callers that need 0-1 divide by 100. The companion band() helper returns
+// the human label.
+// ═════════════════════════════════════════════════════════════════════
+
+export interface ConfidenceCalibrationInputs {
+  /** Fraction of relevant signal types covered. [0, 1]. */
+  signalCoverage: number;
+  /** Newest signal age: < 24h = 1.0, < 48h = 0.7, < 72h = 0.4, older = 0.1. */
+  signalRecency: number;
+  /** Average rawScore of used signals, normalized. [0, 1]. */
+  signalStrength: number;
+  /** Fraction of claims attributable to non-LLM sources. [0, 1]. */
+  sourceVerification: number;
+  /** Fraction of causal links present in the edge graph. [0, 1]. */
+  causalCoverage: number;
+}
+
+export interface CalibratedConfidence {
+  score: number;           // 0-100
+  band: "high" | "medium" | "low" | "very_low";
+  /** The three highest-weight factors that LIMITED confidence, in descending order. */
+  limitingFactors: Array<{ factor: keyof ConfidenceCalibrationInputs; contribution: number; missing: number }>;
+}
+
+const CONFIDENCE_WEIGHTS: Record<keyof ConfidenceCalibrationInputs, number> = {
+  signalCoverage: 0.30,
+  signalRecency: 0.25,
+  signalStrength: 0.20,
+  sourceVerification: 0.15,
+  causalCoverage: 0.10,
+};
+
+export function computeCalibratedConfidence(
+  inputs: ConfidenceCalibrationInputs,
+): CalibratedConfidence {
+  const clamp01 = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
+  const norm: ConfidenceCalibrationInputs = {
+    signalCoverage: clamp01(inputs.signalCoverage),
+    signalRecency: clamp01(inputs.signalRecency),
+    signalStrength: clamp01(inputs.signalStrength),
+    sourceVerification: clamp01(inputs.sourceVerification),
+    causalCoverage: clamp01(inputs.causalCoverage),
+  };
+
+  const rawScore =
+    norm.signalCoverage    * CONFIDENCE_WEIGHTS.signalCoverage +
+    norm.signalRecency     * CONFIDENCE_WEIGHTS.signalRecency +
+    norm.signalStrength    * CONFIDENCE_WEIGHTS.signalStrength +
+    norm.sourceVerification* CONFIDENCE_WEIGHTS.sourceVerification +
+    norm.causalCoverage    * CONFIDENCE_WEIGHTS.causalCoverage;
+
+  const score = Math.round(rawScore * 100);
+
+  // Which factors LIMITED the score most? For each factor: its "missing"
+  // contribution is (1 - factor) * weight. The top 3 of those tell us
+  // what to report in dataQuality.coverageGaps.
+  const limitingFactors = (Object.entries(norm) as Array<[keyof ConfidenceCalibrationInputs, number]>)
+    .map(([factor, value]) => ({
+      factor,
+      contribution: value * CONFIDENCE_WEIGHTS[factor],
+      missing: (1 - value) * CONFIDENCE_WEIGHTS[factor],
+    }))
+    .sort((a, b) => b.missing - a.missing)
+    .slice(0, 3);
+
+  const band: CalibratedConfidence["band"] =
+    score >= 80 ? "high" :
+    score >= 60 ? "medium" :
+    score >= 40 ? "low" :
+                  "very_low";
+
+  return { score, band, limitingFactors };
+}
+
+/**
+ * Helper: map a "newest signal age" (in hours) to the Notion v0.2 recency curve.
+ * < 24h = 1.0, < 48h = 0.7, < 72h = 0.4, older = 0.1.
+ */
+export function recencyFromHours(hours: number | null | undefined): number {
+  if (hours == null || !Number.isFinite(hours)) return 0.1;
+  if (hours < 24) return 1.0;
+  if (hours < 48) return 0.7;
+  if (hours < 72) return 0.4;
+  return 0.1;
+}
+
+/**
+ * Notion v0.2 confidence decay for stored analyses: 3% per day
+ * (exponential). 30-day-old analysis ≈ 40% reduction. Useful for the
+ * history view, where older briefings should carry visible weathering.
+ */
+export function decayStoredConfidence(
+  originalScore: number,
+  daysElapsed: number,
+): number {
+  const decayed = originalScore * Math.exp(-0.03 * Math.max(0, daysElapsed));
+  return Math.round(decayed * 100) / 100;
+}

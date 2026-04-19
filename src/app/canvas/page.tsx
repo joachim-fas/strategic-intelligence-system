@@ -65,6 +65,7 @@ import { consumeSSE } from "@/lib/sse-client";
 import { useLocale, useT } from "@/lib/locale-context";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
+import { expandSlashCommand } from "@/lib/slash-prompts";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, CircleDot, Plus, Zap,
@@ -1398,10 +1399,10 @@ export default function CanvasPage() {
       return;
     }
     if (lower.startsWith("/trend ") || lower === "/trend") {
-      const topic = trimmed.slice(6).trim();
-      const q = topic
-        ? `Analysiere den Trend: ${topic} — Entwicklung, Treiber, Auswirkungen und Zeithorizont.`
-        : "Welche Megatrends prägen die strategische Landschaft aktuell?";
+      // v0.2 (Notion): locale-aware expansion with explicit provenance/ring
+      // asks — the main buildSystemPrompt enforces the JSON schema, so we
+      // only need to set up the right query intent here.
+      const q = expandSlashCommand(trimmed, locale) ?? trimmed;
       // Fall through to normal query with the generated query text
       pushHistory();
       setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
@@ -1432,15 +1433,10 @@ export default function CanvasPage() {
       return;
     }
     if (lower.startsWith("/scenario") || lower.startsWith("/signal")) {
-      const isScenario = lower.startsWith("/scenario");
-      const topic = trimmed.slice(isScenario ? 9 : 7).trim();
-      const q = isScenario
-        ? (topic
-          ? `Entwickle optimistische, wahrscheinliche und pessimistische Szenarien für: ${topic}`
-          : "Entwickle Szenarien für die wichtigsten strategischen Unsicherheiten.")
-        : (topic
-          ? `Identifiziere schwache Signale und Frühwarnzeichen für: ${topic}`
-          : "Welche schwachen Signale und Frühwarnzeichen gibt es aktuell?");
+      // v0.2 (Notion): locale-aware expansion. The main system prompt
+      // enforces the 3-scenario-divergence rules; we just shape the
+      // intent here.
+      const q = expandSlashCommand(trimmed, locale) ?? trimmed;
       pushHistory();
       setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
       const id3 = uid();

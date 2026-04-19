@@ -978,7 +978,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, paddingLeft: 22 }}>
                 {briefing.regulatoryContext.map((reg: string, i: number) => (
                   <div key={i} style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.55 }}>
-                    {reg}
+                    <InlineProvenance text={reg} locale={locale} />
                   </div>
                 ))}
                 {/* Insights > 3 used to be appended here with a Sparkles
@@ -987,6 +987,109 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                      the Key Insights section above. */}
               </div>
             </details>
+          )}
+
+          {/*
+            Anomaly Signals (v0.2 Notion spec)
+            ----------------------------------
+            When a live signal contradicts the dominant trend direction,
+            the LLM surfaces it here with an interpretation. This is the
+            single most valuable diagnostic a user can get — a curated
+            list of "things that don't fit the narrative". Lives between
+            Regulatory Context and Eigener Gedanke because it's another
+            form of provenance-grade context, not an action section.
+          */}
+          {((b as any).anomalySignals?.length ?? 0) > 0 && (
+            <details>
+              <summary style={{
+                fontSize: 11, color: "var(--muted-foreground)", cursor: "pointer",
+                listStyle: "none", display: "flex", alignItems: "center", gap: 8, userSelect: "none",
+                fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700,
+                padding: "8px 0",
+              }}>
+                <AlertTriangle size={14} />
+                <span>{locale === "de" ? "Anomalien im Signalbild" : "Anomaly signals"}</span>
+                <span style={{ opacity: 0.6 }}>({(b as any).anomalySignals.length})</span>
+              </summary>
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 12, paddingLeft: 22 }}>
+                {(b as any).anomalySignals.map((a: { signal: string; contradicts: string; interpretation: string }, i: number) => (
+                  <div key={i} style={{
+                    padding: 10,
+                    background: "rgba(245, 158, 11, 0.04)",
+                    borderLeft: "2px solid rgba(245, 158, 11, 0.35)",
+                    borderRadius: 4,
+                  }}>
+                    <div style={{ fontSize: 13, color: "var(--foreground)", fontWeight: 500, lineHeight: 1.5 }}>
+                      <InlineProvenance text={a.signal} locale={locale} />
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 4 }}>
+                      <strong style={{ fontWeight: 600 }}>{locale === "de" ? "Widerspricht: " : "Contradicts: "}</strong>
+                      <InlineProvenance text={a.contradicts} locale={locale} />
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted-foreground)", marginTop: 4, fontStyle: "italic" }}>
+                      <InlineProvenance text={a.interpretation} locale={locale} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/*
+            Data Quality badge (v0.2 Notion spec)
+            -------------------------------------
+            Tiny metadata line showing how wide and fresh the signal
+            coverage was for this answer. Helps users quickly gauge
+            whether the analysis rests on a recent signal base or is
+            mostly LLM knowledge. Rendered inline, not as a Section Card
+            — the goal is "glance, don't read".
+          */}
+          {(b as any).dataQuality && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: "8px 12px",
+                fontSize: 11,
+                color: "var(--muted-foreground)",
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.04em",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 12,
+                alignItems: "center",
+                background: "rgba(0, 0, 0, 0.02)",
+                borderRadius: 4,
+                border: "1px solid var(--color-border, #E5E5E5)",
+              }}
+            >
+              <span style={{ fontWeight: 700, textTransform: "uppercase" }}>
+                {locale === "de" ? "Datenlage" : "Data quality"}
+              </span>
+              {typeof (b as any).dataQuality.signalCount === "number" && (
+                <span>
+                  {(b as any).dataQuality.signalCount}{" "}
+                  {locale === "de" ? "Signale" : "signals"}
+                </span>
+              )}
+              {(b as any).dataQuality.newestSignalAge && (
+                <span>
+                  {locale === "de" ? "neuestes: " : "newest: "}
+                  {(b as any).dataQuality.newestSignalAge}
+                </span>
+              )}
+              {(b as any).dataQuality.dominantSourceType && (
+                <span>
+                  {locale === "de" ? "Basis: " : "basis: "}
+                  {(b as any).dataQuality.dominantSourceType}
+                </span>
+              )}
+              {((b as any).dataQuality.coverageGaps?.length ?? 0) > 0 && (
+                <span title={(b as any).dataQuality.coverageGaps.join("\n")}>
+                  {(b as any).dataQuality.coverageGaps.length}{" "}
+                  {locale === "de" ? "Lücken" : "gaps"}
+                </span>
+              )}
+            </div>
           )}
 
           {/* Eigener Gedanke */}

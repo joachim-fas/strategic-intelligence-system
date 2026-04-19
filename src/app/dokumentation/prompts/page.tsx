@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { SYSTEM_PROMPTS, DATE_CONTEXT_TEMPLATE_DE, DATE_CONTEXT_TEMPLATE_EN } from "@/lib/system-prompts-registry";
+import { SYSTEM_PROMPTS, DATE_CONTEXT_TEMPLATE_DE, DATE_CONTEXT_TEMPLATE_EN, groupPromptsByCategory } from "@/lib/system-prompts-registry";
 import { ChevronDown, ChevronRight, FileText, Info } from "lucide-react";
 
 export default function PromptsDocPage() {
@@ -78,14 +78,33 @@ export default function PromptsDocPage() {
           <CodeBlock label="English" content={DATE_CONTEXT_TEMPLATE_EN} />
         </section>
 
-        {/* Liste aller Prompts */}
+        {/* Liste aller Prompts — gruppiert nach Kategorie (v0.2 Notion Blueprint) */}
         <section>
           <h2 className="volt-heading" style={{ margin: "0 0 14px" }}>
             Prompt-Inventar · {SYSTEM_PROMPTS.length} Einträge
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {SYSTEM_PROMPTS.map((p) => (
-              <PromptCard key={p.id} entry={p} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+            {groupPromptsByCategory().map((group) => (
+              <div key={group.category}>
+                <h3
+                  style={{
+                    margin: "0 0 12px",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "var(--volt-text-faint, #9B9B9B)",
+                  }}
+                >
+                  {group.label} · {group.entries.length}
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {group.entries.map((p) => (
+                    <PromptCard key={p.id} entry={p} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -245,7 +264,12 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
               )}
             </div>
             <CodeBlock
-              content={lang === "de" ? entry.templateDe : entry.templateEn ?? entry.templateDe}
+              content={
+                (lang === "de"
+                  ? entry.templateDe ?? entry.templateEn
+                  : entry.templateEn ?? entry.templateDe
+                ) ?? "(no template registered)"
+              }
             />
           </div>
         </div>

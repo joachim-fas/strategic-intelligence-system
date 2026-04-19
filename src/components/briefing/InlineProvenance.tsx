@@ -12,22 +12,23 @@
  * Klammer-Marker als Debug-Text im UI stehen. Deshalb gibt's ihn jetzt
  * als wiederverwendbare Komponente.
  *
- * Unterstützt die vier vom System-Prompt definierten Tag-Typen:
+ * Unterstützt die fünf vom System-Prompt (v0.2) definierten Tag-Typen:
  *   [SIGNAL: <quelle>, <datum>]     → gelb, Radio-Icon
  *   [TREND: <name>]                 → grün, TrendingUp-Icon
  *   [REG: <kürzel>]                 → blau, FileText-Icon
- *   [LLM-Einschätzung|-Einschaetzung|-Assessment|LLM]  → grau, Brain-Icon
+ *   [EDGE: <trendA> → <trendB>]     → violett, GitBranch-Icon
+ *   [LLM-KNOWLEDGE|-Einschätzung|-Einschaetzung|-Assessment|LLM]  → grau, Brain-Icon
  *
  * Unbekannte `[…]`-Klammern bleiben als Plain-Text stehen (inkl. der
  * Klammern), damit keine Information verschluckt wird.
  */
 
 import React from "react";
-import { Radio, TrendingUp, FileText, Brain } from "lucide-react";
+import { Radio, TrendingUp, FileText, Brain, GitBranch } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Locale } from "@/lib/i18n";
 
-export type ProvenanceKind = "signal" | "trend" | "reg" | "llm";
+export type ProvenanceKind = "signal" | "trend" | "reg" | "edge" | "llm";
 
 interface Segment {
   kind: "text" | "tag";
@@ -72,6 +73,15 @@ const TAG_META: Record<ProvenanceKind, {
     border: "rgba(26, 74, 138, 0.30)",
     Icon: FileText,
   },
+  edge: {
+    short: "EDGE",
+    fullDe: "Kausal-Kante aus dem Trend-Graphen",
+    fullEn: "Causal edge from the trend graph",
+    color: "#6B3FA0",
+    bg: "rgba(107, 63, 160, 0.10)",
+    border: "rgba(107, 63, 160, 0.32)",
+    Icon: GitBranch,
+  },
   llm: {
     short: "LLM",
     fullDe: "Vom Sprachmodell formuliert — kein externer Beleg",
@@ -112,7 +122,13 @@ export function parseProvenanceSegments(text: string): Segment[] {
     } else if (head === "reg" || head === "regulation") {
       tagKind = "reg";
       detail = rest;
+    } else if (head === "edge") {
+      // v0.2 Notion spec: [EDGE: TrendA → TrendB] or [EDGE: TrendA -> TrendB].
+      // Normalize "->" to "→" so the rendered tag always shows the arrow.
+      tagKind = "edge";
+      detail = rest.replace(/\s*->\s*/g, " → ").replace(/\s*–>\s*/g, " → ");
     } else if (
+      lower === "llm-knowledge" ||
       lower === "llm-einschätzung" ||
       lower === "llm-einschaetzung" ||
       lower === "llm-assessment" ||

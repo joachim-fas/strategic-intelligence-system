@@ -246,3 +246,76 @@ export function clearHistoryStorage() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_KEY);
 }
+
+// ═════════════════════════════════════════════════════════════════════
+// Notion v0.2 — Export prompt templates (Section 6)
+//
+// These are LLM-backed polishers that transform a full briefing into a
+// C-level executive summary or a shareable email/Slack briefing. They
+// are separate from the deterministic Markdown export above: the
+// deterministic path preserves every detail, the LLM polishers
+// prioritize for a specific audience.
+//
+// The templates live here as editorial source of truth and are exposed
+// via the system-prompts registry + /dokumentation/prompts. A dedicated
+// API route that runs them can be wired later without touching the
+// prompt wording.
+// ═════════════════════════════════════════════════════════════════════
+
+export const EXECUTIVE_SUMMARY_PROMPT_EN = `You are writing an executive summary from a strategic analysis.
+Target audience: C-level, no time, needs to grasp the core immediately.
+
+<full_analysis>
+BRIEFING_OR_FRAMEWORK_OUTPUT
+</full_analysis>
+
+Rules:
+- Maximum 250 words
+- No jargon without explanation
+- First sentence = most important finding (no warm-up, no context-setting)
+- Last paragraph: 1-2 concrete recommendations
+- Never begin with: "In this analysis...", "This briefing shows...", "To summarize..."
+- Confidence level must be mentioned: append "(Confidence: X%)" to the first section heading
+- If confidence < 60: add a one-sentence caveat before recommendations
+
+Return plain text, formatted with Markdown headings:
+
+## [Title of the key finding] (Confidence: X%)
+[2-3 sentences: core message. Causal. Direct.]
+
+[If confidence < 60: one sentence caveat on data quality]
+
+**Strategic Implications:**
+- [Implication 1]
+- [Implication 2]
+
+**Recommendation:** [1 concrete action, with urgency indicator: immediate / near-term / long-term]`;
+
+export const SHAREABLE_BRIEFING_PROMPT_EN = `Create a shareable short version of this analysis —
+formatted to read well in an email or Slack message and comprehensible without prior context.
+
+<analysis>
+BRIEFING
+</analysis>
+
+Return plain text:
+
+**SIS Intelligence Briefing | DATE**
+**Query:** QUERY
+**Confidence:** CONFIDENCE% | **Sources:** SIGNAL_COUNT signals (newest: NEWEST_SIGNAL_AGE)
+
+**Core Finding:** [2 sentences — the most important conclusion, causally stated]
+
+**Top 3 Insights:**
+1. ...
+2. ...
+3. ...
+
+**Scenarios:**
+Optimistic (PROB%): [1 sentence]
+Likely (PROB%): [1 sentence]
+Pessimistic (PROB%): [1 sentence]
+
+**Data note:** [1 sentence on coverage gaps if confidence < 70, else omit]
+
+*Generated with Strategic Intelligence System — sis.free-agents.io*`;

@@ -1,357 +1,267 @@
-# SIS — System-Prompt-Inventar
+# SIS — System-Prompts Inventory (v0.2)
 
-Vollständige Referenz aller LLM-System-Prompts, die das Strategic
-Intelligence System an externe Modelle (Anthropic Claude, optional
-OpenRouter-Fallback) schickt. Einziger Autoritätsort ist die Registry in
-`src/lib/system-prompts-registry.ts` — diese Markdown-Version ist ein
-Abzug davon und wird im Build aktuell gehalten (siehe Abschnitt
-"Aktualität" am Ende).
+This document mirrors `src/lib/system-prompts-registry.ts`. The registry is the **single source of truth**; this Markdown file is a rendered snapshot for offline review and code audits.
 
-Die UI-Variante dieser Doku lebt unter `/dokumentation/prompts` und liest
-dieselbe Registry zur Laufzeit — so bleibt sie synchron mit dem Code.
+The authoritative live view is `/dokumentation/prompts` inside the app. If the two drift, the registry wins.
+
+## Architecture overview
+
+Based on the Notion blueprint "SIS — Prompt-Bibliothek: System-Prompts, Meta-Prompts & Framework-Prompts (vollständig)". Prompt layers:
+
+| Layer | Type | Count | Code file |
+|---|---|---:|---|
+| System Prompt | System | 1 | `src/lib/llm.ts` |
+| Meta-Prompts | Inline + second-pass | 5 | `src/lib/meta-prompts.ts`, `src/lib/scoring.ts` |
+| Framework-Prompts | User / System | 6 (3–5 steps each) | `src/app/api/v1/frameworks/analyze/route.ts` |
+| Slash Commands | User template | 2 registered + 4 via expansion | `src/lib/slash-prompts.ts` |
+| Canvas Prompts | System | 3 | `src/lib/canvas-prompts.ts` |
+| Export Prompts | User | 2 | `src/lib/briefing-export.ts` |
+| Context Profile Prefix | System prefix | 1 | `src/lib/context-profiles.ts` |
+| Pipeline / Summary | System | 3 | `src/lib/cluster-snapshots.ts`, `src/app/api/v1/canvas/[id]/summary/route.ts` |
+
+**Implementation rule (Claude Code):** Always use the ENGLISH templates when writing or updating code. German templates (where present) are editorial-review only.
+
+**Runtime injections into `buildSystemPrompt()`:**
+
+- `CURRENT_DATE` — ISO date at the top of the context block (temporal validity enforcement).
+- `TOP_40_TRENDS_FORMATTED` — from `getTrendContext()` / DB.
+- `TOP_42_EDGES_FORMATTED` — from `TREND_EDGES` in `src/lib/causal-graph.ts`.
+- `18_REGULATIONS_FORMATTED` — from `GLOBAL_REGULATIONS` in `src/lib/regulations.ts`.
+- `RAG_INJECTED_SIGNALS` — from `getRelevantSignals(query)`, formatted via `formatSignalsForPrompt()`.
+
+Without these injections, the model falls back entirely to `[LLM-KNOWLEDGE]` which must never be the sole basis for action recommendations.
 
 ---
 
-## Übersicht
+## Shared: Temporal Context Block
 
-| ID | Name | Wann gefeuert | Modell |
-|---|---|---|---|
-| [briefing-main](#briefing-main) | Briefing-Haupt-Prompt | Jede User-Frage auf Home / Canvas | claude-sonnet-4-5 |
-| [framework-analyze](#framework-analyze) | Framework-Analyse | Pre-Mortem / War-Gaming / Stakeholder / … | claude-sonnet-4-5 |
-| [canvas-summary-single](#canvas-summary-single) | Canvas → Zusammenfassung (1 Analyse) | Zusammenfassung-Button, 1 Query im Projekt | claude-sonnet-4-5 |
-| [cluster-diff](#cluster-diff) | Cluster-Changelog | Pipeline-Hintergrund, Flag-gated | claude-haiku-4-5 |
-| [cluster-foresight](#cluster-foresight) | Cluster-Foresight | Pipeline-Hintergrund, Flag-gated | claude-haiku-4-5 |
+Every prompt prepends this block so the model never treats its training cutoff as "now":
 
----
+**German:**
 
-## Gemeinsamer Baustein: Zeitlicher Kontext
-
-**Jeder** SIS-System-Prompt bekommt folgenden Block vorangestellt (definiert
-in `src/lib/llm.ts → buildDateContext()`). Ohne diesen Block würde Claude
-sein Training-Cutoff (~Q4 2024) stillschweigend als „jetzt" behandeln und
-Prognosen für längst vergangene Zeiträume ausgeben.
-
-### DE
 ```
+CURRENT_DATE: <YYYY-MM-DD>
 ═══ ZEITLICHER KONTEXT ═══
-Heute ist <TAG>. <MONAT> <JAHR> (ISO: <YYYY-MM-DD>). Alles vor diesem
-Datum ist Vergangenheit und wird im Präteritum/Perfekt behandelt.
-Formuliere Prognosen NUR für Zeiträume, die nach diesem Datum beginnen.
-Prüfe bei jeder Zeitangabe, ob sie in der Vergangenheit oder Zukunft
-liegt.
+Heute ist <TAG>. <MONAT> <JAHR> (ISO: <YYYY-MM-DD>). Alles vor diesem Datum ist Vergangenheit und wird im Präteritum/Perfekt behandelt. Formuliere Prognosen NUR für Zeiträume, die nach diesem Datum beginnen. Prüfe bei jeder Zeitangabe, ob sie in der Vergangenheit oder Zukunft liegt.
 ```
 
-### EN
+**English:**
+
 ```
+CURRENT_DATE: <YYYY-MM-DD>
 ═══ TEMPORAL CONTEXT ═══
-Today is <MONTH> <DAY>, <YEAR> (ISO: <YYYY-MM-DD>). Everything before
-this date is past and must be phrased in past tense. Forecasts may only
-cover time periods starting after this date. Verify every date reference
-against the current date before writing.
+Today is <MONTH> <DAY>, <YEAR> (ISO: <YYYY-MM-DD>). Everything before this date is past and must be phrased in past tense. Forecasts may only cover time periods starting after this date. Verify every date reference against the current date before writing.
 ```
+
+Source: `buildDateContext()` in `src/lib/llm.ts`.
 
 ---
 
-## `briefing-main` — Briefing-Haupt-Prompt <a id="briefing-main"></a>
+## 1. System Prompt — Intelligence Terminal
 
-**Datei:** `src/lib/llm.ts` → `buildSystemPrompt()`
+- **File:** `src/lib/llm.ts` → `buildSystemPrompt(trends, locale, liveSignalsContext?)`
+- **Model:** `claude-sonnet-4-6` (primary), `max_tokens: 12000`
+- **Called:** Every request to `/api/v1/query`
+- **Status:** v0.2 Draft
 
-**Zweck:** Beantwortet jede freie User-Frage mit einem strukturierten
-Intelligence-Briefing — Synthesis, Erkenntnisse, Szenarien, Kausalketten,
-Decision-Framework, Quellen, Konfidenz.
+Full English template: see registry entry `briefing-main` in `src/lib/system-prompts-registry.ts`.
 
-**Trigger:** User schickt eine Frage aus der Startseite oder aus dem
-Canvas-Command-Line (`POST /api/v1/query`).
+Core structure:
 
-**Response-Form:** Strict JSON mit ~15 Feldern:
-`synthesis`, `reasoningChains`, `matchedTrendIds`, `keyInsights`,
-`regulatoryContext`, `causalAnalysis`, `steepV`, `scenarios` (genau 3),
-`decisionFramework`, `references`, `followUpQuestions`, `confidence`,
-`interpretation`, `newsContext`.
+1. **Identity** — senior strategy advisor with curated world model
+2. **6-step reasoning discipline** before JSON
+3. **Live world model** — `<trends>`, `<causal_edges>`, `<regulations>`, `<live_signals>`
+4. **Source rules** — inline provenance tags `[SIGNAL/TREND/REG/EDGE/LLM-KNOWLEDGE]`
+5. **Source conflict priority** — SIGNAL > TREND > REG > EDGE > LLM-KNOWLEDGE
+6. **Temporal validity** — every forward-looking recommendation future-dated
+7. **Response contract** — strict JSON combining v0.2 fields and legacy aliases
 
-**Dynamisch injizierter Kontext:**
-
-1. Zeitlicher Kontext (heutiges Datum)
-2. Top 40 Trends aus der DB (ID, Name, Kategorie, Ring, Relevanz,
-   Confidence, Impact, Velocity, Signal-Count, Top-Quellen, Edges)
-3. Alle globalen Regulierungen mit Jurisdiktion, Status, betroffenen
-   Trends
-4. Alle kuratierten Kausal-Edges (~102 Kanten mit Typ + Stärke)
-5. Live-Signale der letzten 14 Tage, gefiltert nach Query-Keywords +
-   Trend-Namen (bis 16 Signale, formatiert als Bullet-Liste)
-6. Optionaler Context-Profile-Block (Rolle, Industrie, Region des Users)
-
-**Modell:** `claude-sonnet-4-5`, `max_tokens=8000`.
-
-### Template (DE)
-
-```
-Du bist das Strategic Intelligence System (SIS) — ein Denk-Instrument auf
-dem Niveau eines erstklassigen Think-Tanks mit explizitem EU-Fokus.
-[Sprach-Instruktion]
-
-[ZEITLICHER KONTEXT]
-
-⚠️ KRITISCH: Deine GESAMTE Antwort MUSS ein EINZIGES JSON-Objekt sein.
-Kein Text vor { oder nach }. Kein Markdown. Nur reines JSON. Die genaue
-Struktur kommt weiter unten.
-
-═══ ANALYTISCHES FRAMEWORK: STEEP+V ═══
-Analysiere JEDE Frage systematisch entlang dieser 6 Dimensionen:
-S = Society        (Demografischer Wandel, Urbanisierung, Migration, Wertewandel)
-T = Technology     (KI, Digitalisierung, Biotech, Quantencomputing, Cybersecurity)
-E = Economy        (Globalisierung, Handelskonflikte, Arbeitsmarkt, Inflation, Ungleichheit)
-E = Environment    (Klimawandel, Biodiversität, Energie, Ressourcen)
-P = Politics       (Regulierung, Geopolitik, Demokratie, EU-Politik, Governance)
-V = Values         (Vertrauenserosion, Polarisierung, Akzeptanz, kulturelle Verschiebungen)
-Nicht jede Dimension ist für jede Frage gleich relevant — gewichte
-dynamisch.
-
-═══ EU-REFERENZRAHMEN ═══
-Orientiere dich an den 14 EU JRC Megatrends (European Commission Joint
-Research Centre):
- 1. Beschleunigte technologische Veränderung & Hyperkonnektivität
- 2. Zunehmende demografische Ungleichgewichte
- 3. Verschärfter Klimawandel & ökologische Degradation
- 4. Wachsende ökonomische Ungleichheiten
- 5. Zunehmende geopolitische Spannungen
- 6. Fortschreitende menschliche Erweiterung (Enhancement)
- 7. Machtverschiebungen zwischen Staaten
- 8. Wachsende Bedeutung globaler Gemeingüter
- 9. Entstehung neuer Governance-Formen
-10. Schwächung von Demokratie & institutionellem Vertrauen
-11. Veränderung von Arbeit & Bildung
-12. Zunehmende globale Gesundheitsherausforderungen
-13. Wachsende Rolle von Städten & Urbanisierung
-14. Steigende Aspirationen & Erwartungen
-
-═══ ABSOLUTE PFLICHTEN ═══
-1. BEANTWORTE DIE FRAGE DIREKT UND SUBSTANZIELL — nicht die Frage welche
-   Trends passen.
-2. Die synthesis MUSS 6-10 Sätze lang sein. Kurze synthesis = Fehler.
-3. Nenne KONKRETE Zahlen, Länder, Unternehmen, Technologien, Zeitrahmen.
-4. Verwende die Trends als HINTERGRUND-KONTEXT — sie sind Signalgeber,
-   nicht deine Antwort.
-5. VERBOTE: Schreibe NIEMALS Sätze wie "X ist ein Megatrend mit Y%
-   Relevanz" — das ist Datendump, keine Analyse.
-6. scenarios IMMER generieren — GENAU 3 Szenarien: optimistic, baseline,
-   pessimistic. Niemals null, niemals weniger, niemals mehr. Die Summe
-   der Wahrscheinlichkeiten MUSS ungefähr 100% ergeben.
-7. TRANSPARENZ & QUELLENHERKUNFT (Provenance Tagging):
-   - Fakten aus Live-Signalen:       [SIGNAL: Quellenname, Datum]
-   - Fakten aus Trend-Daten:          [TREND: Trendname]
-   - Fakten aus Regulierungs-Daten:   [REG: Kürzel]
-   - Eigenes Wissen ohne externe Quelle: [LLM-Einschätzung]
-   - ERFINDE NIEMALS URLs oder Verordnungsnummern. Wenn du eine konkrete
-     URL nicht kennst, lasse sie weg.
-
-[DYNAMIC CONTEXT: Trend-Liste, Regulierungen, Kausal-Edges, Live-Signale]
-
-[JSON-SCHEMA mit Feldbeschreibungen, inkl. synthesis-Regel
- "6-10 Sätze, 2-3 Absätze, optional ## Überschriften"]
-```
-
-Die EN-Variante hat denselben Aufbau, ersetzt den Sprach-Hinweis durch
-„Respond in English." — der inhaltliche Rahmen bleibt identisch.
+Output JSON includes both v0.2 (`matchedTrends[]` objects, `causalChain`, `anomalySignals`, `dataQuality`, `usedSources`, scenarios as named object) AND legacy fields (`matchedTrendIds`, `causalAnalysis`, legacy scenario array, `interpretation`, `references`, `steepV`, `balancedScorecard`) for UI backward compatibility.
 
 ---
 
-## `framework-analyze` — Framework-Analyse <a id="framework-analyze"></a>
+## 2. Meta-Prompts (Anti-Hallucination Layer)
 
-**Datei:** `src/app/api/v1/frameworks/analyze/route.ts`
+Operate on the OUTPUT of the system prompt. Second-pass calls or pure validators.
 
-**Zweck:** Führt den User schrittweise durch strategische Frameworks
-(Pre-Mortem, War-Gaming, Stakeholder-Mapping, Post-Mortem, Marktanalyse,
-Trend-Deep-Dive). Jeder Framework-Schritt wird einzeln aufgerufen.
+### 2.1 Provenance Tagging Rule
 
-**Trigger:** User startet oder iteriert auf einem Framework über
-`/frameworks/<slug>` (`POST /api/v1/frameworks/analyze`).
+- **File:** `src/lib/meta-prompts.ts` → `PROVENANCE_TAGGING_PROMPT_EN`
+- **Type:** Inline fragment of the main system prompt
+- **Purpose:** Every claim tagged `[SIGNAL: Source, Date]` / `[TREND: Name]` / `[REG: Short]` / `[EDGE: A → B]` / `[LLM-KNOWLEDGE]`. `[LLM-KNOWLEDGE]` may never be the sole basis for a forward-looking action recommendation.
 
-**Response-Form:** Strict JSON — Struktur ist framework- und step-spezifisch.
-Typisch: ein Array aus Insights / Risiken / Stakeholdern / Szenarien mit
-jeweils Titel + Beschreibung + Bewertung.
+### 2.2 Contradiction Detection
 
-**Dynamisch injizierter Kontext:**
+- **File:** `src/lib/meta-prompts.ts` → `buildContradictionCheckPrompt()`, `runContradictionCheck()`
+- **Model:** `claude-haiku-4-5`, `max_tokens: 2000`
+- **Type:** Optional second-pass, only in `mode: 'deep'`
+- **Purpose:** Detects claims that CONTRADICT the provided signals/trends/edges — does not regrade whether an assessment is "correct". Returns `{ contradictions[], structuralIssues[], overallVerdict, confidenceAdjustment }`.
 
-1. Zeitlicher Kontext
-2. Framework-Name, Step-Kennung, User-Topic
-3. Kontext aus vorherigen Schritten (falls Step > 1)
+### 2.3 Scenario Divergence Check
 
-**Modell:** `claude-sonnet-4-5`, `max_tokens=4000`.
+- **File:** `src/lib/meta-prompts.ts` → `checkScenarioDivergence()`
+- **Type:** Pure validator (no LLM call)
+- **Purpose:** Enforces the six Notion rules: probability sum ≈ 1.0, causal distinctness, ≥2 falsifiable assumptions per scenario, mixed horizons, ≥1 early indicator per scenario, actor differentiation.
 
-### Template (DE)
+### 2.4 Assumption Extraction
+
+- **File:** `src/lib/meta-prompts.ts` → `buildAssumptionExtractionPrompt()`, `runAssumptionExtraction()`
+- **Model:** `claude-sonnet-4-5`, `max_tokens: 3000`
+- **Type:** Optional meta-step after briefing/framework
+- **Purpose:** Surfaces implicit foundational assumptions together with `falsifiableBy`, `monitoringSignal`, `timeToFalsification` per assumption. Names the single `criticalAssumption` whose failure breaks everything.
+
+### 2.5 Confidence Calibration
+
+- **File:** `src/lib/scoring.ts` → `computeCalibratedConfidence()`
+- **Type:** Algorithmic (no LLM call)
+- **Formula:**
 
 ```
-[ZEITLICHER KONTEXT]
-
-Du bist ein Senior-Strategieberater im Strategic Intelligence System
-(SIS). Du lieferst strukturierte, datengestützte Analysen. Antworte
-IMMER als valides JSON — kein Markdown-Codefence, kein Fließtext
-davor/danach, NUR das JSON-Objekt. Sei konkret: nenne echte Unternehmen,
-echte Zahlen, echte Regulierungen. Sprache: Deutsch.
+confidence = (
+  signalCoverage    * 0.30 +
+  signalRecency     * 0.25 +
+  signalStrength    * 0.20 +
+  sourceVerification* 0.15 +
+  causalCoverage    * 0.10
+) * 100
 ```
 
-EN-Variante: identische Struktur, „Respond in English.", „real companies,
-real numbers, real regulations."
+Bands: 80–100 high / 60–79 medium / 40–59 low / 0–39 very low. Stored decay: 3 % per day.
 
 ---
 
-## `canvas-summary-single` — Canvas → Zusammenfassung <a id="canvas-summary-single"></a>
+## 3. Framework Prompts (6 × 3–5 steps)
 
-**Datei:** `src/app/api/v1/canvas/[id]/summary/route.ts` →
-`buildSingleQueryReviewPrompt()`
+- **File:** `src/app/api/v1/frameworks/analyze/route.ts` → `FRAMEWORK_PROMPTS[frameworkId](topic, step, context, locale, worldModel)`
+- **Model:** `claude-sonnet-4-5` → `claude-haiku-4-5` → `claude-sonnet-4-6` (fallback chain)
+- **World model:** Injected into every step via `buildWorldModelBlock()` (top 30 trends, 20 edges, 20 regulations)
 
-**Zweck:** Wenn ein Projekt erst EINE Analyse enthält, schreibt dieser
-Prompt keinen zweiten Briefing-Durchlauf, sondern nimmt die bestehende
-Analyse als Sparring-Partner auseinander — identifiziert die echte
-Frage hinter der Frage, Spannungen, offene Flanken.
+### 3.1 Market Analysis (4 steps)
 
-**Trigger:** User klickt „Zusammenfassung" in einem Canvas-Projekt mit
-genau einer Query (`POST /api/v1/canvas/[id]/summary`).
+`market-structure` → `competitor-radar` → `trends-regulation` → `benchmarking`
 
-**Response-Form:** JSON mit den Feldern:
-`sessionTitle`, `realQuestion`, `redThread`, `crossQueryPatterns[]`,
-`tensions[]`, `metaDecisionFramework[]`, `openFlanks[]`, `confidence`,
-`critique`.
+### 3.2 War-Gaming (4 steps)
 
-**Dynamisch injizierter Kontext:**
+`actors` → `moves` → `responses` → `red-team`
 
-1. Zeitlicher Kontext
-2. Die einzige Query des Projekts mit voller Payload: question,
-   synthesis, keyInsights, scenarios, interpretation, decisionFramework
+### 3.3 Pre-Mortem (3 steps)
 
-**Modell:** `claude-sonnet-4-5`, `max_tokens=3000`.
+`risks` → `assessment` → `mitigation`
 
-### Template (DE)
+### 3.4 Post-Mortem (3 steps)
 
-```
-[ZEITLICHER KONTEXT]
+`timeline` → `causes` → `lessons`
 
-Du bist ein Senior-Stratege im SIS. Dieses Projekt enthält bisher GENAU
-EINE Analyse. Deine Aufgabe: keinen zweiten Briefing-Durchlauf schreiben
-— sondern die bestehende Analyse als strategischer Sparring-Partner
-auseinandernehmen.
+### 3.5 Trend Deep-Dive (5 steps)
 
-Liefere in EXAKT dem Schema unten:
+`definition` → `evidence` → `drivers` → `impact` → `actions`
 
-- sessionTitle: knappe Benennung der Frage (4-6 Wörter).
-- realQuestion: die eigentliche strategische Frage hinter der
-  Formulierung (1 Satz, scharf).
-- redThread: 2-4 Sätze. Der implizite gedankliche Rahmen der Analyse.
-- crossQueryPatterns: 3-5 STRUKTURELLE Themen/Muster, die in der einen
-  Analyse quer liegen. queryRefs ist immer [0].
-- tensions: 2-4 Trade-offs, Spannungen oder Widersprüche, die in der
-  Analyse bereits angelegt sind. between ist immer [0].
-- metaDecisionFramework: 3-5 nicht-verhandelbare Handlungsmaximen aus
-  der Analyse.
-- openFlanks: 2-4 konkrete Folgefragen, die der User jetzt stellen
-  sollte.
-- confidence: 0..1, realistisch eingeschätzt.
-- critique: 1-2 Sätze, ehrlich zur Tiefe und Belastbarkeit dieser einen
-  Analyse.
+### 3.6 Stakeholder Analysis (4 steps)
 
-Antworte ausschließlich als valides JSON — kein Markdown, kein Vorwort.
-Sprache: Deutsch.
-```
+`inventory` → `power-matrix` → `coalitions` → `engagement`
 
-EN-Variante analog, „Respond only as valid JSON — no markdown, no
-preamble."
+Per-step prompts enforce inline provenance, world-model usage, temporal validity, and the original v0.1 JSON output contracts (so the Canvas UI keeps rendering). Full English templates live in `FRAMEWORK_PROMPTS` in the route file.
 
 ---
 
-## `cluster-diff` — Cluster-Changelog <a id="cluster-diff"></a>
+## 4. Slash-Command Prompts
 
-**Datei:** `src/lib/cluster-snapshots.ts` → `generateClusterDiff()`
+- **File:** `src/lib/slash-prompts.ts` — `expandSlashCommand()` + dedicated templates
 
-**Zweck:** Pipeline-Hintergrund-Prompt: vergleicht zwei aufeinanderfolgende
-Snapshot-Zusammenfassungen desselben Trend-Clusters und beschreibt in
-EINEM Satz, was sich verändert hat.
+### 4.1 `/trend [topic]`
 
-**Trigger:** Pipeline-Phase 2d bei jedem Pipeline-Run
-(Cron / `npm run signals:pump`). Nur wenn `CLUSTER_DIFF_LLM_ENABLED=true`.
+Dedicated compact template: `TREND_SHORTFORM_PROMPT_EN`. Returns a structured trend briefing (name / oneLiner / ring / velocity / confidence / keyDrivers / topRisks / connectedTrends / latestSignal / regulatoryPressure / recommendedAction).
 
-**Response-Form:** Plain-Text, eine Zeile, ≤30 Wörter. Keine
-Anführungszeichen, keine Anrede.
+Currently wired via query-expansion through the main briefing pipeline; a dedicated lightweight route can be built later using the template.
 
-**Dynamisch injizierter Kontext:**
+### 4.2 `/scenario [question]`
 
-1. Thema des Clusters
-2. Vorherige Zusammenfassung + Signal-Count
-3. Aktuelle Zusammenfassung + Signal-Count
+Dedicated compact template: `SCENARIO_INSTANT_PROMPT_EN`. Returns three scenarios (optimistic / likely / pessimistic) — probabilities sum to 100, each scenario by a DIFFERENT causal mechanism, plus a `dominantUncertainty` field naming the single biggest unknown.
 
-**Modell:** `claude-haiku-4-5`, `max_tokens=100` (eine Zeile reicht).
-
-### Template (DE)
-
-```
-Du vergleichst zwei Kurz-Zusammenfassungen desselben Trend-Clusters und
-beschreibst in EINEM Satz (≤30 Wörter), was sich verändert hat. Nenne
-konkrete Akteure, Zahlen oder neue Themen. Keine Anrede, keine
-Wiederholung des Input, keine Anführungszeichen.
-```
-
-### Template (EN)
-
-```
-Compare two short summaries of the same trend cluster and describe the
-change in ONE sentence (≤30 words). Name concrete actors, numbers, or
-new topics. No preamble, no paraphrasing, no quoted material.
-```
+Other slash commands (`/signal`, `/compare`, `/explain`, `/history`, `/context`, `/export`) are handled by the expander or by non-LLM code paths.
 
 ---
 
-## `cluster-foresight` — Cluster-Foresight <a id="cluster-foresight"></a>
+## 5. Canvas Prompts
 
-**Datei:** `src/lib/cluster-snapshots.ts` → `generateClusterForesight()`
+- **File:** `src/lib/canvas-prompts.ts`
 
-**Zweck:** Pipeline-Hintergrund-Prompt: formuliert zu einem Trend-Cluster
-2–3 Zukunftsszenarien für die nächsten 12–24 Monate. SIS-Differenzierung
-gegenüber Perigon (nur retrospektiv).
+### 5.1 Node Generation
 
-**Trigger:** Pipeline-Phase 2d bei jedem Pipeline-Run. Nur wenn
-`CLUSTER_FORESIGHT_LLM_ENABLED=true`.
+`CANVAS_NODE_GENERATION_PROMPT_EN` — translates a briefing or framework result into Canvas nodes (insight / trend / risk / actor / scenario / action / question) with causally justified connections. Quality over compression — 15 precise nodes > 5 overloaded ones.
 
-**Response-Form:** JSON-Array mit 2–3 Einträgen:
-```json
-[{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …]
-```
+### 5.2 Workflow Step Description
 
-**Dynamisch injizierter Kontext:**
+`CANVAS_WORKFLOW_STEP_PROMPT_EN` — guides the user through a framework step inside Canvas. Focus on "what should the user DO next" rather than what the system does.
 
-1. Zeitlicher Kontext
-2. Thema des Clusters, Signal-Count, Kurz-Zusammenfassung
+### 5.3 Derived Node
 
-**Modell:** `claude-haiku-4-5`, `max_tokens=400`.
-
-### Template (DE)
-
-```
-Du bist ein Strategieanalyst. Gegeben ein Trend-Cluster mit einer
-Kurzzusammenfassung, formulierst du 2–3 mögliche Zukunftsszenarien der
-nächsten 12–24 Monate. Jedes Szenario hat: einen Titel (max 5 Wörter),
-eine Konfidenz (0–1 basiert auf Signalstärke), und bis zu 3 Treiber (je
-max 10 Wörter). Antworte AUSSCHLIESSLICH als JSON-Array mit genau
-dieser Struktur:
-  [{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …]
-Keine Einleitung, kein Markdown, kein Text außerhalb des Arrays.
-
-[ZEITLICHER KONTEXT]
-```
-
-EN-Variante analog.
+`CANVAS_DERIVED_NODE_PROMPT_EN` — generates a new node from N selected source nodes by derivation type (SYNTHESIS / IMPLICATION / CONTRADICTION / ACTION / QUESTION). Must be traceable: explain why the derivation follows.
 
 ---
 
-## Aktualität
+## 6. Export & Briefing Prompts
 
-Diese Markdown-Doku ist ein Abzug der Registry in
-`src/lib/system-prompts-registry.ts`. Wenn dort ein Prompt geändert wird,
-wird diese Datei per Hand nachgezogen. Die **verlässliche** Quelle ist
-entweder:
+- **File:** `src/lib/briefing-export.ts`
 
-- der Source-Code der jeweiligen Datei (siehe Location-Feld), **oder**
-- die UI-Route `/dokumentation/prompts`, die direkt aus der Registry
-  rendert und damit immer synchron mit dem Build ist.
+### 6.1 Executive Summary
 
-Bei Diskrepanz gewinnt die UI-Route. Diese Markdown-Doku ist primär für
-Entwickler-Offline-Review, Code-Reviews und Audits gedacht.
+`EXECUTIVE_SUMMARY_PROMPT_EN` — polishes a full briefing into a C-level executive summary (max 250 words, first sentence = most important finding, `(Confidence: X%)` appended to heading, concrete recommendation at the end).
+
+### 6.2 Shareable Briefing
+
+`SHAREABLE_BRIEFING_PROMPT_EN` — email/Slack-formatted short briefing: core finding, top 3 insights, one-liner scenarios, data note.
+
+---
+
+## 7. Context Profile Prompt Prefix
+
+- **File:** `src/lib/context-profiles.ts` → `buildContextProfilePrefix()` + `CONTEXT_PROFILE_PREFIX_TEMPLATE_EN`
+
+Prepended to the system prompt when a context profile is active. Calibrates LANGUAGE and RECOMMENDATIONS to the user's decision frame (CTO thinks in tech stack, CFO in EBITDA, Policy Maker in coalition feasibility). Does NOT override source / temporal rules.
+
+Currently: a short `[Context: role / industry / region]` tag is attached at the user-message tail (`src/app/api/v1/query/route.ts`). The full prefix is published here as editorial source of truth for future wiring.
+
+---
+
+## 8. Pipeline / Canvas-Summary Prompts
+
+### 8.1 Canvas Summary (single-query sparring)
+
+- **File:** `src/app/api/v1/canvas/[id]/summary/route.ts` → `buildSingleQueryReviewPrompt()`
+- **Purpose:** When a project has exactly one query, the summary does NOT rewrite the briefing — it takes the analysis apart as a strategic sparring partner (real question behind the question, tensions, open flanks).
+
+### 8.2 Cluster-Diff
+
+- **File:** `src/lib/cluster-snapshots.ts` → `generateClusterDiff()`
+- **Model:** `claude-haiku-4-5`, `max_tokens: 100`
+- **Purpose:** Pipeline background — compares two snapshot summaries of the same trend cluster and describes the change in ONE sentence (≤30 words).
+
+### 8.3 Cluster-Foresight
+
+- **File:** `src/lib/cluster-snapshots.ts` → `generateClusterForesight()`
+- **Model:** `claude-haiku-4-5`, `max_tokens: 400`
+- **Purpose:** Pipeline background — formulates 2–3 forward scenarios (12–24 months) per trend cluster. SIS's differentiator vs retrospective-only news analytics.
+
+---
+
+## Versioning
+
+| Area | Version | Status |
+|---|---|---|
+| System Prompt | v0.2 | Draft |
+| Meta-Prompts (5) | v0.2 | Draft |
+| Framework-Prompts (6) | v0.2 | Draft |
+| Slash-Commands | v0.2 | Draft |
+| Canvas-Prompts (3) | v0.2 | Draft |
+| Export-Prompts (2) | v0.2 | Draft |
+| Context Profile Prefix | v0.2 | Draft |
+| Canvas Summary (single-query) | v0.1.1 | Production |
+| Cluster-Diff | v0.1 | Production |
+| Cluster-Foresight | v0.1 | Production |
+
+Status lifecycle: Draft → In Review → Production → Deprecated.
+
+---
+
+*Created: 2026-04-19 (v0.2 Notion-blueprint integration) · Single source of truth: `src/lib/system-prompts-registry.ts`.*

@@ -17,22 +17,130 @@ import { z } from "zod";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const ScenarioSchema = z.object({
-  type: z.enum(["optimistic", "baseline", "pessimistic", "wildcard"]).optional(),
+  type: z.enum(["optimistic", "baseline", "likely", "pessimistic", "wildcard"]).optional(),
   name: z.string().max(200).default("Unnamed Scenario"),
+  title: z.string().max(200).optional(), // v0.2 alias for name
   description: z.string().max(2000).default(""),
   probability: z.preprocess(
     (val) => {
-      if (typeof val === "number") return val;
+      if (val === null || val === undefined) return null;
+      if (typeof val === "number") {
+        // v0.2 Notion spec uses 0-100 integers; legacy used 0-1 floats.
+        // Normalize to 0-1.
+        return val > 1 ? val / 100 : val;
+      }
       if (typeof val === "string") {
         const parsed = parseFloat(val);
-        return isNaN(parsed) ? null : parsed;
+        if (isNaN(parsed)) return null;
+        return parsed > 1 ? parsed / 100 : parsed;
       }
       return null;
     },
     z.number().min(0).max(1).nullable()
   ),
   timeframe: z.string().max(200).optional(),
+  horizon: z.enum(["short", "mid", "long"]).optional(), // v0.2
   keyDrivers: z.array(z.string().max(300)).max(10).optional(),
+  keyAssumptions: z.array(z.string().max(400)).max(10).optional(), // v0.2
+  earlyIndicators: z.array(z.string().max(400)).max(10).optional(), // v0.2
+});
+
+/**
+ * v0.2 scenario-as-named-object shape. The Notion spec switched from
+ * `scenarios: [{type: "optimistic", …}, …]` to
+ * `scenarios: {optimistic: {…}, likely: {…}, pessimistic: {…}}`. We
+ * accept both in the preprocessor below and normalize to the legacy
+ * array shape so the rest of the pipeline doesn't need to change.
+ */
+const ScenarioObjectSchema = z.object({
+  optimistic: ScenarioSchema.optional(),
+  likely: ScenarioSchema.optional(),
+  baseline: ScenarioSchema.optional(),
+  pessimistic: ScenarioSchema.optional(),
+});
+
+/** Normalize `scenarios` from either Notion-v0.2 object or legacy array to a legacy array. */
+function normalizeScenarios(raw: unknown): Array<z.infer<typeof ScenarioSchema>> {
+  if (Array.isArray(raw)) return raw as Array<z.infer<typeof ScenarioSchema>>;
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  const out: Array<Record<string, unknown>> = [];
+  // Notion uses "likely" for the middle scenario; legacy UI expects "baseline".
+  for (const [key, type] of [["optimistic", "optimistic"], ["likely", "baseline"], ["baseline", "baseline"], ["pessimistic", "pessimistic"]] as const) {
+    const entry = obj[key];
+    if (!entry || typeof entry !== "object") continue;
+    // Don't double-add if both "likely" and "baseline" are present
+    if (type === "baseline" && out.some((e) => e.type === "baseline")) continue;
+    const e = entry as Record<string, unknown>;
+    out.push({
+      ...e,
+      type,
+      name: (e.name as string) ?? (e.title as string) ?? "",
+    });
+  }
+  return out as Array<z.infer<typeof ScenarioSchema>>;
+}
+
+/**
+ * v0.2 structured regulatory context. Accepted alongside legacy string[].
+ * Normalized to string[] for the UI via `flattenRegulatoryContext`.
+ */
+const RegulatoryContextEntrySchema = z.object({
+  name: z.string().max(300),
+  jurisdiction: z.string().max(120).optional(),
+  effect: z.string().max(800).optional(),
+  urgency: z.enum(["immediate", "near_term", "long_term"]).optional(),
+});
+
+function flattenRegulatoryContext(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (!entry || typeof entry !== "object") return null;
+      const e = entry as Record<string, unknown>;
+      const name = typeof e.name === "string" ? e.name : "";
+      if (!name) return null;
+      const parts: string[] = [name];
+      if (typeof e.jurisdiction === "string" && e.jurisdiction) parts[0] = `${name} (${e.jurisdiction})`;
+      if (typeof e.effect === "string" && e.effect) parts.push(e.effect);
+      if (typeof e.urgency === "string" && e.urgency) parts.push(`urgency: ${e.urgency.replace("_", " ")}`);
+      return parts.join(" — ");
+    })
+    .filter((s): s is string => typeof s === "string" && s.length > 0);
+}
+
+/** v0.2 matched-trend object entry — has richer metadata than matchedTrendIds. */
+const MatchedTrendEntrySchema = z.object({
+  trendId: z.string().max(100),
+  relevanceScore: z.preprocess(
+    (v) => (typeof v === "number" ? (v > 1 ? v / 100 : v) : (typeof v === "string" ? parseFloat(v) || 0 : 0)),
+    z.number().min(0).max(1)
+  ),
+  velocityChange: z.string().max(100).optional(),
+  explanation: z.string().max(1000).optional(),
+});
+
+/** v0.2 signals that contradict dominant trend directions. */
+const AnomalySignalSchema = z.object({
+  signal: z.string().max(1000),
+  contradicts: z.string().max(500),
+  interpretation: z.string().max(1000),
+});
+
+/** v0.2 data-quality coverage meta. */
+const DataQualitySchema = z.object({
+  signalCount: z.number().min(0).max(10000).optional(),
+  newestSignalAge: z.string().max(100).optional(),
+  coverageGaps: z.array(z.string().max(500)).max(20).optional(),
+  dominantSourceType: z.string().max(50).optional(),
+});
+
+/** v0.2 structured source list. */
+const UsedSourceSchema = z.object({
+  type: z.enum(["signal", "trend", "regulation", "edge", "llm"]),
+  name: z.string().max(300),
+  date: z.string().max(50).optional(),
 });
 
 const ReferenceSchema = z.object({
@@ -68,7 +176,7 @@ const SteepVSchema = z.object({
 });
 
 export const LLMResponseSchema = z.object({
-  synthesis: z.string().min(1).max(10000),
+  synthesis: z.string().min(1).max(12000),
   reasoningChains: z.array(z.string().max(1000)).max(10).default([]),
   steepV: SteepVSchema.optional().nullable(),
   matchedTrendIds: z.array(z.string().max(100)).max(40).default([]),
@@ -76,20 +184,50 @@ export const LLMResponseSchema = z.object({
     .record(z.string().max(100), z.number().min(0).max(1))
     .optional()
     .nullable(),
-  keyInsights: z.array(z.string().max(1000)).max(10).default([]),
-  regulatoryContext: z.array(z.string().max(1000)).max(10).default([]),
+  /** v0.2 structured matched-trend objects (optional, additive). */
+  matchedTrends: z.array(MatchedTrendEntrySchema).max(40).optional(),
+  keyInsights: z.array(z.string().max(1500)).max(10).default([]),
+  /**
+   * regulatoryContext accepts legacy flat strings OR v0.2 objects. Normalized
+   * to string[] via the preprocessor.
+   */
+  regulatoryContext: z.preprocess(
+    (val) => flattenRegulatoryContext(val),
+    z.array(z.string().max(1500)).max(10).default([])
+  ),
+  /** v0.2 alias — rich regulation objects, if the LLM supplied them. */
+  regulatoryContextRich: z.array(RegulatoryContextEntrySchema).max(10).optional(),
   causalAnalysis: z.array(z.string().max(1000)).max(10).default([]),
-  scenarios: z.array(ScenarioSchema).max(5).default([]),
+  /** v0.2 alias — same content as causalAnalysis, enforced by the prompt. */
+  causalChain: z.array(z.string().max(1000)).max(10).optional(),
+  /**
+   * scenarios accepts legacy array form OR v0.2 named-object form. Normalized
+   * to array for the UI.
+   */
+  scenarios: z.preprocess(
+    (val) => normalizeScenarios(val),
+    z.array(ScenarioSchema).max(5).default([])
+  ),
+  /** v0.2 signals that contradict the dominant trend direction. */
+  anomalySignals: z.array(AnomalySignalSchema).max(10).optional(),
   interpretation: z.string().max(3000).optional().nullable(),
   references: z.array(ReferenceSchema).max(20).default([]),
   followUpQuestions: z.array(z.string().max(500)).max(10).default([]),
   newsContext: z.string().max(3000).optional().nullable(),
   decisionFramework: z.string().max(3000).optional().nullable(),
   balancedScorecard: BSCSchema.optional().nullable(),
+  /** v0.2 data-coverage meta rendered as a badge. */
+  dataQuality: DataQualitySchema.optional(),
+  /** v0.2 structured source list for the provenance panel. */
+  usedSources: z.array(UsedSourceSchema).max(40).optional(),
   confidence: z.preprocess(
     (val) => {
-      if (typeof val === "number") return val;
-      if (typeof val === "string") return parseFloat(val) || 0;
+      if (typeof val === "number") return val > 1 ? val / 100 : val;
+      if (typeof val === "string") {
+        const p = parseFloat(val);
+        if (isNaN(p)) return 0;
+        return p > 1 ? p / 100 : p;
+      }
       return 0;
     },
     z.number().min(0).max(1).default(0)
@@ -149,6 +287,19 @@ export function validateLLMResponse(
 
   const data = parsed.data;
 
+  // v0.2 cross-fill: if the LLM supplied matchedTrends (rich objects) but
+  // left matchedTrendIds empty (or vice versa), harmonize them.
+  if (data.matchedTrends && data.matchedTrends.length > 0) {
+    if (data.matchedTrendIds.length === 0) {
+      data.matchedTrendIds = data.matchedTrends.map((mt) => mt.trendId);
+    }
+    if (!data.matchedTrendRelevance) {
+      const rel: Record<string, number> = {};
+      for (const mt of data.matchedTrends) rel[mt.trendId] = mt.relevanceScore;
+      data.matchedTrendRelevance = rel;
+    }
+  }
+
   // Step 2: Validate matchedTrendIds — filter hallucinated IDs
   const originalCount = data.matchedTrendIds.length;
   const droppedIds = data.matchedTrendIds.filter((id) => !validTrendIds.has(id));
@@ -162,8 +313,9 @@ export function validateLLMResponse(
     warnings.push("ALL matchedTrendIds were invalid — LLM did not match any real trends");
   }
 
-  // Step 2b: Filter matchedTrendRelevance to only keep entries for valid matched IDs.
-  // Entries for dropped / hallucinated ids are removed so they cannot re-enter the pipeline.
+  // Step 2b: Filter matchedTrendRelevance + matchedTrends to only keep entries
+  // for valid matched IDs. Entries for dropped / hallucinated ids are removed
+  // so they cannot re-enter the pipeline.
   if (data.matchedTrendRelevance) {
     const validSet = new Set(data.matchedTrendIds);
     const filtered: Record<string, number> = {};
@@ -171,6 +323,20 @@ export function validateLLMResponse(
       if (validSet.has(id)) filtered[id] = score;
     }
     data.matchedTrendRelevance = Object.keys(filtered).length > 0 ? filtered : null;
+  }
+  if (data.matchedTrends && data.matchedTrends.length > 0) {
+    const validSet = new Set(data.matchedTrendIds);
+    data.matchedTrends = data.matchedTrends.filter((mt) => validSet.has(mt.trendId));
+  }
+
+  // Step 2c: v0.2 cross-fill causalChain ↔ causalAnalysis. The prompt asks
+  // the LLM to supply both, but some models skip the alias. Make sure the
+  // UI always has causalAnalysis populated (legacy renderer) and
+  // causalChain is available for newer consumers.
+  if ((!data.causalAnalysis || data.causalAnalysis.length === 0) && data.causalChain && data.causalChain.length > 0) {
+    data.causalAnalysis = data.causalChain;
+  } else if ((!data.causalChain || data.causalChain.length === 0) && data.causalAnalysis.length > 0) {
+    data.causalChain = data.causalAnalysis;
   }
 
   // Step 3: Normalize scenario probabilities
