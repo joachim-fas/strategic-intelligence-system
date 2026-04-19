@@ -14,7 +14,16 @@ interface MonitorData {
     total: number;
     oldestHours: number;
     newestHours: number;
-    bySource: Array<{ source: string; count: number; latest: string; avg_strength: number }>;
+    bySource: Array<{
+      source: string;
+      count: number;
+      latest: string;
+      avg_strength: number;
+      // Welle B Item 3 — per-source anomaly tier from the Welford
+      // baseline. `tier: null` = warming up (<10 samples) OR within
+      // 1.5σ of the baseline mean. `z` null ⇒ same reason.
+      anomaly?: { tier: "low" | "medium" | "high" | null; z: number | null; n: number };
+    }>;
     timeline: Array<{ day: string; count: number }>;
   };
   trends: {
@@ -88,10 +97,48 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
   );
 }
 
-function SourceBar({ name, count, maxCount }: { name: string; count: number; maxCount: number }) {
+function SourceBar({
+  name,
+  count,
+  maxCount,
+  anomaly,
+  de,
+}: {
+  name: string;
+  count: number;
+  maxCount: number;
+  anomaly?: { tier: "low" | "medium" | "high" | null; z: number | null; n: number };
+  de: boolean;
+}) {
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+
+  // Welle B Item 3 — tier → color map. Signed z matters: above-mean
+  // anomalies are green (more signal than usual), below-mean are red
+  // (a source has gone quiet). Matches the Welford anomaly semantic
+  // where both directions are signal-worthy.
+  const tier = anomaly?.tier ?? null;
+  const z = anomaly?.z ?? null;
+  const signPositive = z != null && z >= 0;
+  const tierColor: Record<string, string> = {
+    low:    signPositive ? "#A3C850" : "#E89B5A",
+    medium: signPositive ? "#58A82E" : "#D95738",
+    high:   signPositive ? "#1A9E5A" : "#C4241B",
+  };
+  const tierBg: Record<string, string> = {
+    low:    signPositive ? "rgba(163,200,80,0.18)" : "rgba(232,155,90,0.18)",
+    medium: signPositive ? "rgba(88,168,46,0.22)"  : "rgba(217,87,56,0.20)",
+    high:   signPositive ? "rgba(26,158,90,0.25)"  : "rgba(196,36,27,0.22)",
+  };
+  const tierLabelDe: Record<string, string> = { low: "auffällig", medium: "stark", high: "kritisch" };
+  const tierLabelEn: Record<string, string> = { low: "anomalous", medium: "strong", high: "critical" };
+  const tierTitle = tier
+    ? `z = ${z?.toFixed(2)} (n=${anomaly?.n ?? 0}) · ${de ? tierLabelDe[tier] : tierLabelEn[tier]}`
+    : anomaly && anomaly.n < 10
+    ? de ? `Baseline warming up (n=${anomaly.n})` : `Baseline warming up (n=${anomaly.n})`
+    : undefined;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }} title={tierTitle}>
       <div style={{ width: 120, fontWeight: 600, color: "var(--color-text-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {name}
       </div>
@@ -101,6 +148,21 @@ function SourceBar({ name, count, maxCount }: { name: string; count: number; max
       <div style={{ width: 40, textAlign: "right", color: "var(--color-text-muted)", fontFamily: "var(--volt-font-mono)", fontSize: 11 }}>
         {count}
       </div>
+      {tier && z != null && (
+        <span
+          style={{
+            fontFamily: "var(--volt-font-mono)",
+            fontSize: 9, fontWeight: 700,
+            padding: "1px 6px", borderRadius: 10,
+            background: tierBg[tier],
+            color: tierColor[tier],
+            minWidth: 36, textAlign: "center" as const,
+            flexShrink: 0,
+          }}
+        >
+          {signPositive ? "+" : ""}{z.toFixed(1)}σ
+        </span>
+      )}
     </div>
   );
 }
@@ -404,7 +466,14 @@ export default function MonitorPage() {
                     </div>
                   )}
                   {data.signals.bySource.map((s) => (
-                    <SourceBar key={s.source} name={s.source} count={s.count} maxCount={data.signals.bySource[0]?.count || 1} />
+                    <SourceBar
+                      key={s.source}
+                      name={s.source}
+                      count={s.count}
+                      maxCount={data.signals.bySource[0]?.count || 1}
+                      anomaly={s.anomaly}
+                      de={de}
+                    />
                   ))}
                 </div>
               </div>

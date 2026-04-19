@@ -31,7 +31,7 @@ export async function GET() {
     // ── Signal statistics ──────────────────────────────────────────
     const signalAge = getSignalAge();
 
-    const signalsBySource = d.prepare(`
+    const signalsBySourceRaw = d.prepare(`
       SELECT source, COUNT(*) as count,
         MAX(fetched_at) as latest,
         ROUND(AVG(strength), 2) as avg_strength
@@ -39,7 +39,50 @@ export async function GET() {
       WHERE fetched_at > datetime('now', '-336 hours')
       GROUP BY source
       ORDER BY count DESC
-    `).all() as any[];
+    `).all() as Array<{ source: string; count: number; latest: string; avg_strength: number }>;
+
+    // Welle B Item 3 — attach per-source Welford anomaly tier for
+    // the last pipeline run. `signal_count` baseline is keyed by
+    // (metric, source, weekday, month); we look up today's weekday
+    // + month and read the existing baseline. Everything happens on
+    // the read-only handle so no schema writes leak from GET.
+    const now = new Date();
+    const wd = now.getDay();
+    const mn = now.getMonth() + 1;
+    const signalsBySource = signalsBySourceRaw.map((row) => {
+      try {
+        const key = `signal_count:${row.source}:${wd}:${mn}`;
+        const bl = d.prepare(
+          "SELECT n, mean, m2 FROM baseline_stats WHERE key = ?",
+        ).get(key) as { n: number; mean: number; m2: number } | undefined;
+        // We need the LAST value the pipeline wrote to compute a
+        // z-score — which is what the baseline itself last ingested.
+        // Reconstructing "latest sample" from Welford state isn't
+        // exact; we use the current 14-day count as a proxy. That's
+        // fine for a monitor tile — we want "is current volume
+        // unusual for this weekday/month?" and the 336h-window
+        // count is the closest honest approximation on the read
+        // side without adding a separate table.
+        if (!bl || bl.n < 10) {
+          return { ...row, anomaly: { tier: null as string | null, z: null as number | null, n: bl?.n ?? 0 } };
+        }
+        const variance = bl.m2 / bl.n;
+        const stddev = Math.sqrt(variance);
+        if (stddev === 0) {
+          return { ...row, anomaly: { tier: null, z: null, n: bl.n } };
+        }
+        const z = (row.count - bl.mean) / stddev;
+        const abs = Math.abs(z);
+        const tier =
+          abs >= 3.0 ? "high"
+          : abs >= 2.0 ? "medium"
+          : abs >= 1.5 ? "low"
+          : null;
+        return { ...row, anomaly: { tier, z: Number(z.toFixed(2)), n: bl.n } };
+      } catch {
+        return { ...row, anomaly: { tier: null, z: null, n: 0 } };
+      }
+    });
 
     const signalTimeline = d.prepare(`
       SELECT
