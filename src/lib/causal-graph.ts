@@ -766,6 +766,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Brain-computer interfaces and assistive robotics extend human capability",
+    source: "Neuralink + Synchron FDA clinical trial registrations (2024) + Nature Neuroscience BCI reviews",
+    timestamp: "2026-04-19",
+    confidence: 0.65,
   },
 
   // ── Green Energy ───────────────────────────────────────────────────────
@@ -795,6 +798,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.7,
     description: "Closed-loop product systems normalize repair, lease, and refurbish over buy-new",
     bidirectional: true,
+    source: "EU Right to Repair Directive 2024/1799 + Ellen MacArthur Foundation Consumer Behavior Report",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-circular-economy",
@@ -827,6 +833,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "Billions of edge devices vastly expand the attack surface",
+    source: "ENISA Threat Landscape for IoT 2024 + Mandiant M-Trends Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
 
   // ── Data Economy ───────────────────────────────────────────────────────
@@ -837,6 +846,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.85,
     description: "Data availability is the binding constraint on AI capability gains",
     bidirectional: true,
+    source: "Hoffmann et al. Training Compute-Optimal LLMs (Chinchilla, 2022) + Epoch AI Data & Compute trends",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "macro-data-economy",
@@ -862,6 +874,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.5,
     description: "Telemedicine and remote monitoring extend independent living for aging populations",
+    source: "WHO Global Strategy on Digital Health 2020-2025 + McKinsey Telehealth: A post-pandemic quarter-trillion-dollar reality (2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "macro-digital-health",
@@ -878,6 +893,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Affordable sequencing and CRISPR are the foundation of human enhancement",
+    source: "NIH Genome Sequencing Cost Trends + Nobel Prize 2020 (Charpentier/Doudna CRISPR) citation statement",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "macro-genomics",
@@ -894,6 +912,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.5,
     description: "Access inequality to enhancement technologies risks new forms of biological stratification",
+    source: "Nuffield Council on Bioethics — Genome Editing and Human Reproduction (2018) + Yuval Harari Homo Deus (referenced)",
+    timestamp: "2026-04-19",
+    confidence: 0.55,
   },
 
   // ── Knowledge Culture & Lifelong Learning ──────────────────────────────
@@ -904,6 +925,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.75,
     description: "Continuous learning is now a structural feature of adult life, not just school years",
     bidirectional: true,
+    source: "OECD Skills Outlook 2024 + Eurostat Adult Education Survey",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "mega-knowledge-culture",
@@ -920,6 +944,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.45,
     description: "Distributed work reverses some commuting-driven urban concentration",
+    source: "Ramani/Bloom/Barrero WFH Research (2024) + Brookings Metro Monitor on post-pandemic migration",
+    timestamp: "2026-04-19",
+    confidence: 0.68,
   },
   {
     from: "macro-remote-hybrid",
@@ -936,6 +963,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.6,
     description: "Always-on ambient sensors raise existential privacy and surveillance questions",
+    source: "EFF Surveillance Self-Defense Guide + EDPB Guidelines on Smart Device Data Processing (2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
 
   // ── Autonomous Mobility ────────────────────────────────────────────────
