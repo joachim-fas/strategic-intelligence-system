@@ -23,7 +23,8 @@
     "test:briefing-url": "tsx scripts/briefing-url-test.ts",
     "test:baseline": "tsx scripts/baseline-test.ts",
     "test:cluster-snapshots": "tsx scripts/cluster-snapshots-test.ts",
-    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:api"
+    "test:ai-text": "tsx scripts/ai-text-test.ts",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",
