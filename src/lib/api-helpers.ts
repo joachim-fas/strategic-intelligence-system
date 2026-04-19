@@ -16,8 +16,10 @@
 // FIX: Add cursor-based pagination with limit/offset to all list endpoints.
 
 
-// TODO: API-09 — 3 different SSE parsing implementations (query, canvas, frameworks).
-// Each has different bugs. FIX: Create shared SSE client utility with [DONE] handling + reconnect.
+// API-09 FIX: Shared SSE client lives in src/lib/sse-client.ts;
+// the three former parsers (streamQuery, canvas-briefing,
+// use-framework-analysis) all call `consumeSSE()` now — single
+// protocol implementation, one set of tests.
 
 // TODO: API-19 — No OpenAPI/Swagger documentation for any API route.
 // TODO: API-20 — No API versioning mechanism beyond /api/v1/ prefix.
