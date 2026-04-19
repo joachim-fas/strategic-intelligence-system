@@ -451,7 +451,11 @@ function DetailPanel({
         <ResolveControls detail={detail} de={de} onChanged={onChange} setError={setError} />
       )}
 
-      {/* Positions list */}
+      {/* Positions list — each row carries a lightweight calibration
+          summary for the user (Welle C Item 3). The badge shows
+          the user's average Brier across all resolved forecasts
+          they've staked on, so viewers can weight each position
+          by the historical track record. */}
       {detail.positions.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <div style={{
@@ -464,29 +468,107 @@ function DetailPanel({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {detail.positions.map((p) => (
-              <div key={p.id} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "6px 10px", border: "1px solid var(--color-border)",
-                borderRadius: 6, fontSize: 12,
-              }}>
-                <span style={{ fontFamily: "var(--volt-font-mono)", color: "var(--color-text-muted)", fontSize: 11 }}>
-                  {p.userId.slice(0, 8)}
-                </span>
-                <ConfidenceBadge value={p.yesProbability} size="xs" showLabel={false} />
-                {p.rationale && (
-                  <span style={{ flex: 1, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-                    {p.rationale}
-                  </span>
-                )}
-                <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-text-faint)" }}>
-                  {new Date(p.stakedAt).toLocaleDateString()}
-                </span>
-              </div>
+              <PositionRow key={p.id} position={p} tenantForecastId={detail.id} de={de} />
             ))}
           </div>
         </div>
       )}
     </article>
+  );
+}
+
+// ─── Position row with lazy calibration chip ────────────────────
+function PositionRow({
+  position, de,
+}: {
+  position: ForecastDetail["positions"][number];
+  tenantForecastId: string;
+  de: boolean;
+}) {
+  const [calib, setCalib] = useState<{ meanBrier: number | null; totalResolved: number } | null>(null);
+
+  // Fetch once on mount — the endpoint is tenant-scoped + already
+  // short-cache-friendly, and we only do one call per row.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(
+          `/api/v1/forecasts/calibration/${encodeURIComponent(position.userId)}`,
+          {},
+          4000,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) {
+          setCalib({
+            meanBrier: json.data?.meanBrier ?? null,
+            totalResolved: json.data?.totalResolved ?? 0,
+          });
+        }
+      } catch {
+        /* swallow — calibration chip is nice-to-have */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [position.userId]);
+
+  // Render the calibration chip ONLY when the user has at least
+  // one resolved prediction; showing "0 resolved" on a fresh tenant
+  // would be visual noise.
+  const calibLabel = calib && calib.totalResolved > 0 && calib.meanBrier != null
+    ? `Brier ${calib.meanBrier.toFixed(2)} (${calib.totalResolved})`
+    : null;
+  const calibTooltip = calibLabel && de
+    ? `Durchschnittlicher Brier-Score über ${calib?.totalResolved} aufgelöste Vorhersagen. Niedriger = besser kalibriert (0 = perfekt, 0.25 = immer 50:50).`
+    : calibLabel
+      ? `Mean Brier score across ${calib?.totalResolved} resolved predictions. Lower = better-calibrated (0 = perfect, 0.25 = always 50:50).`
+      : undefined;
+  // Tier the Brier visually: <0.10 is well-calibrated, 0.10–0.25 is
+  // okay, >0.25 is questionable. These thresholds match the
+  // Stanford convention referenced in src/lib/forecasts.ts docs.
+  const calibColor = calib?.meanBrier == null
+    ? "var(--color-text-muted)"
+    : calib.meanBrier < 0.10
+      ? "#1A9E5A"
+      : calib.meanBrier < 0.25
+        ? "#D97706"
+        : "#C4241B";
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "6px 10px", border: "1px solid var(--color-border)",
+      borderRadius: 6, fontSize: 12,
+    }}>
+      <span style={{ fontFamily: "var(--volt-font-mono)", color: "var(--color-text-muted)", fontSize: 11 }}>
+        {position.userId.slice(0, 8)}
+      </span>
+      <ConfidenceBadge value={position.yesProbability} size="xs" showLabel={false} />
+      {position.rationale && (
+        <span style={{ flex: 1, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+          {position.rationale}
+        </span>
+      )}
+      {calibLabel && (
+        <span
+          title={calibTooltip}
+          style={{
+            fontFamily: "var(--volt-font-mono)",
+            fontSize: 9, fontWeight: 700,
+            padding: "1px 6px", borderRadius: 10,
+            background: "var(--color-surface-2, #F5F5F5)",
+            color: calibColor,
+            flexShrink: 0,
+          }}
+        >
+          {calibLabel}
+        </span>
+      )}
+      <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-text-faint)" }}>
+        {new Date(position.stakedAt).toLocaleDateString()}
+      </span>
+    </div>
   );
 }
 
