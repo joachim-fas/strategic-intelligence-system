@@ -135,6 +135,17 @@ export const COMMANDS: CommandDescriptor[] = [
     glyph: "◷",
     run: (ctx) => ctx.navigate("/clusters"),
   },
+  {
+    id: "nav.forecasts",
+    labelDe: "Prognosen",
+    labelEn: "Forecasts",
+    hintDe: "Team-Wahrscheinlichkeits-Einschätzungen (beta)",
+    hintEn: "Team probability estimates (beta)",
+    keywords: ["forecasts", "prognosen", "prediction", "vorhersage", "calibration", "kalibrierung"],
+    category: "nav",
+    glyph: "◨",
+    run: (ctx) => ctx.navigate("/forecasts"),
+  },
 
   // ── Tenant-scoped navigation ────────────────────────────────────────────
   {
