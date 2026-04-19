@@ -180,6 +180,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.9,
     description: "AI capabilities enable new human-machine collaboration models",
+    source: "Microsoft Work Trend Index 2024 + GitHub Copilot productivity studies (2023-2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
 
   // ─── Geopolitics affects everything ────────────────────────
@@ -210,6 +213,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.65,
     description: "Energy independence becomes security imperative",
     bidirectional: true,
+    source: "EU REPowerEU Plan (post-2022 invasion) + IEA Energy Security Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "mega-geopolitical-fracturing",
@@ -278,6 +284,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.9,
     description: "New technologies expand connectivity possibilities",
+    source: "GSMA Mobile Economy Report 2024 + 3GPP 5G-Advanced specifications (Release 18)",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-connectivity",
@@ -295,6 +304,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.9,
     description: "Connectivity infrastructure enables IoT/Edge deployment",
+    source: "IoT Analytics Global IoT Market Forecast 2024 + 3GPP 5G NR specifications",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
 
   // ─── Security creates feedback loops ───────────────────────
@@ -315,6 +327,9 @@ export const TREND_EDGES: TrendEdge[] = [
     strength: 0.7,
     description: "Security enables trusted data exchange",
     bidirectional: true,
+    source: "EU Data Governance Act (2022) + NIST Cybersecurity Framework 2.0",
+    timestamp: "2026-04-19",
+    confidence: 0.8,
   },
 
   // ─── Health innovation chain ───────────────────────────────
@@ -334,6 +349,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.85,
     description: "Biotech advances enable personalized medicine",
+    source: "NIH All of Us Research Program + Genomics England 100,000 Genomes Project",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-health-biotech",
@@ -341,6 +359,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.7,
     description: "Biotech creates human enhancement possibilities",
+    source: "WADA Prohibited List (gene doping) + OECD Biotech Regulatory Frameworks Review",
+    timestamp: "2026-04-19",
+    confidence: 0.7,
   },
 
   // ─── Energy shapes everything ──────────────────────────────
@@ -402,6 +423,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.6,
     description: "New work models enable creator economy growth",
+    source: "Goldman Sachs Creator Economy Report 2023 + SignalFire State of the Creator Economy 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
 
   // ─── Platform economy effects ──────────────────────────────
@@ -437,6 +461,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.8,
     description: "Urban density enables ambient intelligence deployment",
+    source: "ISO 37120 Sustainable Cities indicators + UN Habitat World Cities Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
 
   // ─── Emerging tech connections ─────────────────────────────
@@ -736,6 +763,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.7,
     description: "AI-generated content floods feeds, accelerates the attention scarcity arms race",
+    source: "NewsGuard AI Content Tracker + Europol AI-generated CSAM/deepfake incident reports 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.72,
   },
   {
     from: "macro-generative-ai",
