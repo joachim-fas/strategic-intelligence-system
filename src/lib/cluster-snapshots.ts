@@ -298,6 +298,108 @@ export async function generateClusterDiff(
   });
 }
 
+/**
+ * Forward-looking scenario triplet — SIS's differentiator from
+ * Perigon. Perigon's `/v1/stories/history` is deliberately
+ * retrospective-only (their positioning); SIS adds a parallel
+ * `foresight[]` slot with 2–3 short scenarios drawn from the
+ * current cluster signals.
+ */
+export interface ClusterForesight {
+  /** Short label, ≤ 5 words (e.g. "Regulation tightens", "Supply chain fragments"). */
+  scenario: string;
+  /** 0..1 — how plausible this scenario seems from the signals. */
+  confidence: number;
+  /** Up to 3 drivers pulled from the signals. Each ≤ 10 words. */
+  drivers: string[];
+}
+
+/**
+ * Generate 2–3 forward-looking scenarios from the current cluster
+ * signals. Gated behind `CLUSTER_FORESIGHT_LLM_ENABLED=true` (a
+ * separate flag from the changelog so each can be rolled out
+ * independently) — cost is ~180 extra LLM calls/day in prod.
+ *
+ * Returns:
+ *   - An array of 2–3 ClusterForesight objects on success.
+ *   - `null` if flag unset, no API key, call failed, or the model
+ *     output couldn't be parsed. All failure modes are silent —
+ *     the snapshot still writes with foresight=null.
+ *
+ * Prompt strategy: structured-JSON output. We ask for a strict
+ * shape, parse + validate, and drop malformed entries rather than
+ * crashing on them. Temperature isn't adjustable in the
+ * ai-text helper so we rely on the prompt to constrain output.
+ */
+export async function generateClusterForesight(
+  current: { topic: string; summary: string; signalCount: number },
+  locale: "de" | "en" = "de",
+): Promise<ClusterForesight[] | null> {
+  if (resolveEnv("CLUSTER_FORESIGHT_LLM_ENABLED") !== "true") return null;
+  if (!current.topic || !current.summary || current.summary === "(empty)") return null;
+
+  const isDe = locale === "de";
+  const system = isDe
+    ? [
+        "Du bist ein Strategieanalyst. Gegeben ein Trend-Cluster mit einer Kurzzusammenfassung, formulierst du 2–3 mögliche Zukunftsszenarien der nächsten 12–24 Monate.",
+        "Jedes Szenario hat: einen Titel (max 5 Wörter), eine Konfidenz (0–1 basiert auf Signalstärke), und bis zu 3 Treiber (je max 10 Wörter).",
+        "Antworte AUSSCHLIESSLICH als JSON-Array mit genau dieser Struktur:",
+        `[{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …]`,
+        "Keine Einleitung, kein Markdown, kein Text außerhalb des Arrays.",
+      ].join(" ")
+    : [
+        "You are a strategy analyst. Given a trend cluster with a short summary, formulate 2–3 forward scenarios for the next 12–24 months.",
+        "Each scenario has: a title (≤5 words), a confidence (0–1 based on signal strength), and up to 3 drivers (≤10 words each).",
+        "Respond ONLY as a JSON array with exactly this shape:",
+        `[{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …]`,
+        "No preamble, no markdown, no text outside the array.",
+      ].join(" ");
+
+  const user = isDe
+    ? `Thema: ${current.topic}\nSignalzahl: ${current.signalCount}\nZusammenfassung: ${current.summary}`
+    : `Topic: ${current.topic}\nSignal count: ${current.signalCount}\nSummary: ${current.summary}`;
+
+  const raw = await completeText({
+    system,
+    user,
+    maxTokens: 400, // 3 scenarios × ~120 tokens headroom
+  });
+  if (!raw) return null;
+
+  // Extract the first JSON array in the response. Some models add
+  // a preamble despite the instruction; be forgiving.
+  const match = raw.match(/\[[\s\S]*\]/);
+  if (!match) return null;
+
+  try {
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) return null;
+
+    const valid: ClusterForesight[] = [];
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== "object") continue;
+      const scenario = typeof entry.scenario === "string" ? entry.scenario.trim() : null;
+      const confidence = typeof entry.confidence === "number" ? entry.confidence : null;
+      const driversRaw = Array.isArray(entry.drivers) ? entry.drivers : [];
+      const drivers = driversRaw
+        .filter((d: unknown): d is string => typeof d === "string")
+        .map((d: string) => d.trim())
+        .filter((d: string) => d.length > 0)
+        .slice(0, 3);
+      if (!scenario || confidence == null || Number.isNaN(confidence)) continue;
+      valid.push({
+        scenario: scenario.slice(0, 80), // hard cap protects UI
+        confidence: Math.min(1, Math.max(0, confidence)),
+        drivers,
+      });
+    }
+
+    return valid.length > 0 ? valid.slice(0, 3) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Utility helpers ──────────────────────────────────────────────
 
 function safeJsonArray(raw: string): string[] {

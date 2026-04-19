@@ -34,6 +34,7 @@ import {
   clusterSlug,
   getClusterHistory,
   generateClusterDiff,
+  generateClusterForesight,
   buildSimpleSummary,
 } from "@/lib/cluster-snapshots";
 import { eq, sql } from "drizzle-orm";
@@ -304,6 +305,7 @@ export async function runPipeline(): Promise<PipelineResult> {
       const clusterGroups = groupSignalsByTopic(sanitizedSignals);
       let snapshotCount = 0;
       let diffCount = 0;
+      let foresightCount = 0;
       for (const group of clusterGroups) {
         try {
           // Look up the previous snapshot for diff-generation BEFORE
@@ -313,17 +315,29 @@ export async function runPipeline(): Promise<PipelineResult> {
           const prev = getClusterHistory(slug, 1)[0] ?? null;
 
           const summaryPreview = buildSimpleSummary(group.signals);
-          const changelog = await generateClusterDiff(prev, {
+          const currentShape = {
             topic: group.topic,
             summary: summaryPreview,
             signalCount: group.signals.length,
-          });
+          };
+
+          // Both LLM calls gated behind their own env flags. Running
+          // them in parallel because neither depends on the other's
+          // output, and the pipeline run is already tolerant of slow
+          // LLM calls (per-cluster wrap-try below). `Promise.all` so
+          // the per-cluster latency is max(diff, foresight) not sum.
+          const [changelog, foresight] = await Promise.all([
+            generateClusterDiff(prev, currentShape),
+            generateClusterForesight(currentShape),
+          ]);
           if (changelog) diffCount += 1;
+          if (foresight && foresight.length > 0) foresightCount += 1;
 
           createClusterSnapshot({
             topic: group.topic,
             signals: group.signals,
             changelog,
+            foresight,
           });
           snapshotCount += 1;
         } catch (innerErr) {
@@ -337,7 +351,7 @@ export async function runPipeline(): Promise<PipelineResult> {
           // next run picks up the cadence again.
         }
       }
-      console.log(`[pipeline] cluster_snapshots: wrote ${snapshotCount} rows across ${clusterGroups.length} topics (${diffCount} with LLM changelog)`);
+      console.log(`[pipeline] cluster_snapshots: wrote ${snapshotCount} rows across ${clusterGroups.length} topics (${diffCount} with LLM changelog, ${foresightCount} with foresight)`);
     } catch (err) {
       console.error("[pipeline] cluster snapshot phase failed:", err);
     }
