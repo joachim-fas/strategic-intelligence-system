@@ -1,23 +1,24 @@
 /**
  * /dokumentation/prompts — Live-Ansicht aller SIS-System-Prompts.
  *
- * Liest direkt aus `src/lib/system-prompts-registry.ts` und rendert die
- * Einträge als ausklappbare Sektionen. Die Seite existiert, weil der User
- * ausdrücklich Transparenz über die LLM-Prompts wollte („Das ist für die
- * Entwicklung und für mein Verständnis essenziell"). Die Registry ist die
- * Single Source of Truth — sowohl diese UI als auch SYSTEM_PROMPTS.md im
- * Repo-Root ziehen aus ihr. Die UI ist damit immer synchron mit dem
- * deployten Code.
+ * Liest direkt aus `src/lib/system-prompts-registry.ts` und rendert ALLE
+ * Einträge vollständig als One-Pager. Keine Expand/Collapse-Klicks, kein
+ * Sprach-Toggle, kein Link-zum-Detail — der User wollte expliziert einen
+ * einzelnen Pager, auf dem alles direkt sichtbar ist (2026-04-19).
  *
- * Kein i18n — Developer-Doku, Inhalt ist bilingual (Templates haben DE + EN).
+ * Die Registry ist die Single Source of Truth. Bei jeder Prompt-Änderung
+ * im Code bleibt diese Seite automatisch synchron.
+ *
+ * Sprach-Strategie: Template-EN ist die Code-Wahrheit (so läuft's an den
+ * LLM), wird prominent gerendert. Template-DE ist nur bei wenigen Einträgen
+ * vorhanden (Redaktions-Referenz) — die wird kompakt darunter gezeigt.
  */
 
 "use client";
 
-import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { SYSTEM_PROMPTS, DATE_CONTEXT_TEMPLATE_DE, DATE_CONTEXT_TEMPLATE_EN, groupPromptsByCategory } from "@/lib/system-prompts-registry";
-import { ChevronDown, ChevronRight, FileText, Info } from "lucide-react";
+import { FileText, Info } from "lucide-react";
 
 export default function PromptsDocPage() {
   return (
@@ -38,8 +39,9 @@ export default function PromptsDocPage() {
           </h1>
           <p className="volt-body" style={{ margin: 0, maxWidth: "70ch" }}>
             Vollständige Liste aller LLM-System-Prompts, die SIS aktuell an
-            Claude (primär) oder OpenRouter (Fallback) schickt. Inhalte
-            kommen live aus <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, background: "var(--color-muted)", padding: "1px 6px", borderRadius: 4 }}>src/lib/system-prompts-registry.ts</code>.
+            Claude (primär) oder OpenRouter (Fallback) schickt —
+            <strong> vollständig auf einer Seite, keine Klicks, kein Ausklappen</strong>.
+            Inhalte kommen live aus <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, background: "var(--color-muted)", padding: "1px 6px", borderRadius: 4 }}>src/lib/system-prompts-registry.ts</code>.
             Bei jeder Prompt-Änderung im Code bleibt diese Seite automatisch synchron.
           </p>
         </div>
@@ -127,10 +129,20 @@ export default function PromptsDocPage() {
 
 // ─── Unter-Komponenten ────────────────────────────────────────────
 
+/**
+ * PromptCard — One-Pager-Rendering: alle Meta-Infos + Template-Text
+ * direkt sichtbar, kein Expand/Collapse, kein Sprach-Toggle.
+ *
+ * User-Regel (2026-04-19): "die komplette Doku muss vollständig auf
+ * einem one-pager abgebildet sein". Ergo: der Anker-Link aus der TOC
+ * scrollt einfach zur Karte und der gesamte Inhalt ist bereits da.
+ *
+ * Sprache: EN ist die Code-Wahrheit und steht prominent. DE ist die
+ * seltene Redaktions-Referenz (nur 3 Einträge haben sie) und wird
+ * darunter als kompakte Sekundär-Section gerendert — nicht versteckt,
+ * nur visuell untergeordnet.
+ */
 function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
-  const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState<"de" | "en">("de");
-
   return (
     <article
       id={entry.id}
@@ -141,26 +153,16 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
         overflow: "hidden",
       }}
     >
-      <button
-        onClick={() => setOpen((o) => !o)}
+      {/* Header — rein visuell, kein Button mehr. Scroll-Anker via
+           article#id + TOC-Links übernehmen die Navigation. */}
+      <header
         style={{
-          width: "100%",
           display: "flex", alignItems: "center", gap: 12,
           padding: "14px 18px",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          textAlign: "left" as const,
-          transition: "background 0.12s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--color-page-bg)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
+          borderBottom: "1px solid var(--color-border)",
+          background: "var(--color-page-bg, #FAFAFA)",
         }}
       >
-        {open ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronRight size={16} strokeWidth={2} />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700,
@@ -180,10 +182,7 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
         </div>
         {/* Wiring-Badge: zeigt dem Reviewer sofort, ob der Prompt wirklich
              läuft, ob er nur in einem bestimmten Flag-Modus läuft (opt-in),
-             oder ob er nur als Template für künftiges Routing existiert. Ohne
-             dieses Badge musste man sonst den Code durchlesen um zu
-             verstehen welche Einträge aktiv sind — v0.2 baut viele neue
-             Templates, die noch nicht alle verdrahtet sind. */}
+             oder ob er nur als Template für künftiges Routing existiert. */}
         {entry.wiring && (
           <span style={{
             fontFamily: "var(--font-mono)", fontSize: 9.5,
@@ -224,93 +223,76 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
             {entry.modelConfig.model}
           </span>
         )}
-      </button>
+      </header>
 
-      {open && (
-        <div style={{ padding: "0 18px 18px", borderTop: "1px solid var(--color-border)" }}>
-          <Meta label="Zweck" value={entry.purpose} />
-          <Meta label="Code-Location" value={entry.location} mono />
-          {entry.apiRoute && <Meta label="API-Route" value={entry.apiRoute} mono />}
-          <Meta label="Trigger" value={entry.trigger} />
-          <Meta label="Response-Form" value={entry.responseShape} />
+      {/* Body — immer gerendert, alle Meta-Informationen + beide
+           Template-Sprachen untereinander. */}
+      <div style={{ padding: "18px" }}>
+        <Meta label="Zweck" value={entry.purpose} />
+        <Meta label="Code-Location" value={entry.location} mono />
+        {entry.apiRoute && <Meta label="API-Route" value={entry.apiRoute} mono />}
+        <Meta label="Trigger" value={entry.trigger} />
+        <Meta label="Response-Form" value={entry.responseShape} />
 
-          <div style={{ marginTop: 14 }}>
-            <div style={{
-              fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700,
-              letterSpacing: "0.08em", textTransform: "uppercase",
-              color: "var(--volt-text-faint, #9B9B9B)",
-              marginBottom: 6,
-            }}>
-              Injected Context (zur Laufzeit)
-            </div>
-            <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, lineHeight: 1.7, color: "var(--color-text-primary)" }}>
-              {entry.injectedContext.map((c, i) => (
-                <li key={i}>{c}</li>
-              ))}
-            </ul>
+        <div style={{ marginTop: 14 }}>
+          <div style={{
+            fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            color: "var(--volt-text-faint, #9B9B9B)",
+            marginBottom: 6,
+          }}>
+            Injected Context (zur Laufzeit)
           </div>
-
-          {entry.modelConfig && (
-            <div style={{ marginTop: 14, display: "flex", gap: 14, fontSize: 12, color: "var(--color-text-muted)" }}>
-              <span>
-                <strong style={{ color: "var(--color-text-primary)" }}>max_tokens:</strong>{" "}
-                {entry.modelConfig.maxTokens ?? "default"}
-              </span>
-              {entry.modelConfig.temperature !== undefined && (
-                <span>
-                  <strong style={{ color: "var(--color-text-primary)" }}>temperature:</strong>{" "}
-                  {entry.modelConfig.temperature}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Template mit Sprach-Umschalter */}
-          <div style={{ marginTop: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <div style={{
-                fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700,
-                letterSpacing: "0.08em", textTransform: "uppercase",
-                color: "var(--volt-text-faint, #9B9B9B)",
-              }}>
-                Template
-              </div>
-              {entry.templateEn !== null && (
-                <div style={{ display: "inline-flex", gap: 1, padding: 2, background: "var(--color-muted)", borderRadius: 6 }}>
-                  {(["de", "en"] as const).map((l) => (
-                    <button
-                      key={l}
-                      onClick={() => setLang(l)}
-                      style={{
-                        padding: "3px 10px",
-                        fontSize: 11, fontWeight: 600,
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        background: lang === l ? "var(--card, #fff)" : "transparent",
-                        color: lang === l ? "var(--color-text-heading)" : "var(--color-text-muted)",
-                        boxShadow: lang === l ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                        fontFamily: "var(--font-mono)",
-                        textTransform: "uppercase" as const,
-                      }}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <CodeBlock
-              content={
-                (lang === "de"
-                  ? entry.templateDe ?? entry.templateEn
-                  : entry.templateEn ?? entry.templateDe
-                ) ?? "(no template registered)"
-              }
-            />
-          </div>
+          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, lineHeight: 1.7, color: "var(--color-text-primary)" }}>
+            {entry.injectedContext.length > 0
+              ? entry.injectedContext.map((c, i) => <li key={i}>{c}</li>)
+              : <li style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>— (reine Prompt-Fragment, kein dynamischer Kontext)</li>}
+          </ul>
         </div>
-      )}
+
+        {entry.modelConfig && (
+          <div style={{ marginTop: 14, display: "flex", gap: 14, fontSize: 12, color: "var(--color-text-muted)" }}>
+            <span>
+              <strong style={{ color: "var(--color-text-primary)" }}>max_tokens:</strong>{" "}
+              {entry.modelConfig.maxTokens ?? "default"}
+            </span>
+            {entry.modelConfig.temperature !== undefined && (
+              <span>
+                <strong style={{ color: "var(--color-text-primary)" }}>temperature:</strong>{" "}
+                {entry.modelConfig.temperature}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Template-EN — die Code-Wahrheit, prominent. */}
+        {entry.templateEn && (
+          <div style={{ marginTop: 18 }}>
+            <CodeBlock label="Template · English (im Code aktiv)" content={entry.templateEn} />
+          </div>
+        )}
+
+        {/* Template-DE — nur wenn vorhanden, als redaktionelle Referenz.
+             Kompakter Stil, damit EN visuell dominiert. */}
+        {entry.templateDe && (
+          <div style={{ marginTop: 12 }}>
+            <CodeBlock label="Template · Deutsche Redaktions-Referenz (nicht im Code)" content={entry.templateDe} />
+          </div>
+        )}
+
+        {/* Fallback: wenn weder EN noch DE vorhanden — sehr selten, aber
+             die Registry erlaubt es technisch. */}
+        {!entry.templateEn && !entry.templateDe && (
+          <div style={{
+            marginTop: 18, padding: "10px 12px",
+            fontSize: 12, color: "var(--color-text-muted)",
+            background: "var(--color-muted)", borderRadius: 6,
+            fontStyle: "italic",
+          }}>
+            (Kein Template registriert — reiner Referenz-Eintrag)
+          </div>
+        )}
+      </div>
     </article>
   );
 }
