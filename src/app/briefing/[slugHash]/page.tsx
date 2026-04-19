@@ -21,12 +21,11 @@ import { Suspense, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
 import { briefingHash, parseBriefingSlugHash } from "@/lib/briefing-url";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { BriefingView } from "../BriefingView";
 
 function BriefingSlugHashContent() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const params = useParams<{ slugHash: string }>();
   const raw = typeof params?.slugHash === "string" ? params.slugHash : "";
 
@@ -51,12 +50,10 @@ function BriefingSlugHashContent() {
     return (
       <div style={{ padding: 40, textAlign: "center" }}>
         <h1 style={{ fontSize: 20, marginBottom: 8 }}>
-          {de ? "Briefing nicht gefunden" : "Briefing not found"}
+          {t("briefingRoute.notFoundHeading")}
         </h1>
         <p style={{ color: "var(--color-text-muted)", marginBottom: 16 }}>
-          {de
-            ? "Der URL-Hash passt zu keinem bekannten Briefing. Vielleicht wurde der Inhalt überarbeitet."
-            : "The URL hash doesn't match any known briefing. The content may have been rewritten."}
+          {t("briefingRoute.notFoundBody")}
         </p>
         <a
           href="/briefing"
@@ -67,7 +64,7 @@ function BriefingSlugHashContent() {
             fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
           }}
         >
-          {de ? "← Zu allen Briefings" : "← Back to all briefings"}
+          {t("briefingRoute.backToAll")}
         </a>
       </div>
     );

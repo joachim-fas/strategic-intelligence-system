@@ -1229,6 +1229,28 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  briefingRoute: {
+    notFoundHeading: "Briefing not found",
+    notFoundBody: "The URL hash doesn't match any known briefing. The content may have been rewritten.",
+    backToAll: "← Back to all briefings",
+    noBriefing: "No briefing available",
+  },
+
+  footer: {
+    documentation: "Documentation",
+    components: "Components",
+  },
+
+  graphLightbox: {
+    closeTooltip: "Close (Esc)",
+    fullscreenTooltip: "Fullscreen",
+  },
+
+  causalOrbit: {
+    heading: "Causal Network",
+    chainsLabel: "chains",
+  },
+
   canvasStream: {
     errorTimeout: "Connection failed — timed out",
     // {{detail}} = error message, typically an Error toString
@@ -2586,6 +2608,28 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  briefingRoute: {
+    notFoundHeading: "Briefing nicht gefunden",
+    notFoundBody: "Der URL-Hash passt zu keinem bekannten Briefing. Vielleicht wurde der Inhalt überarbeitet.",
+    backToAll: "← Zu allen Briefings",
+    noBriefing: "Kein Briefing verfügbar",
+  },
+
+  footer: {
+    documentation: "Dokumentation",
+    components: "Komponenten",
+  },
+
+  graphLightbox: {
+    closeTooltip: "Schließen (Esc)",
+    fullscreenTooltip: "Vollbild",
+  },
+
+  causalOrbit: {
+    heading: "Kausalnetz",
+    chainsLabel: "Ketten",
   },
 
   canvasStream: {

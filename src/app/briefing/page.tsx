@@ -21,12 +21,11 @@ import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DEMO_BRIEFINGS } from "@/lib/demo-briefings";
 import { briefingUrl } from "@/lib/briefing-url";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { BriefingView } from "./BriefingView";
 
 function BriefingIndexContent() {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -49,7 +48,7 @@ function BriefingIndexContent() {
   if (!entry) {
     return (
       <div style={{ padding: 40 }}>
-        {de ? "Kein Briefing verfügbar" : "No briefing available"}
+        {t("briefingRoute.noBriefing")}
       </div>
     );
   }

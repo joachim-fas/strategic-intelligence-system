@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 import { usePathname } from "next/navigation";
 
 /**
  * Global footer — compact single-line with secondary nav + legal.
  */
 export function Footer() {
-  const { locale } = useLocale();
+  const { t } = useT();
   const pathname = usePathname();
-  const de = locale === "de";
 
   // Hide footer on canvas page (full-screen workspace)
   if (pathname.startsWith("/canvas")) return null;
@@ -61,11 +60,11 @@ export function Footer() {
           <Link href="/dokumentation" style={linkStyle}
             onMouseEnter={e => { (e.currentTarget).style.color = "var(--color-text-heading, #0A0A0A)"; }}
             onMouseLeave={e => { (e.currentTarget).style.color = "var(--color-text-muted, #6B6B6B)"; }}
-          >{de ? "Dokumentation" : "Documentation"}</Link>
+          >{t("footer.documentation")}</Link>
           <Link href="/komponenten" style={linkStyle}
             onMouseEnter={e => { (e.currentTarget).style.color = "var(--color-text-heading, #0A0A0A)"; }}
             onMouseLeave={e => { (e.currentTarget).style.color = "var(--color-text-muted, #6B6B6B)"; }}
-          >{de ? "Komponenten" : "Components"}</Link>
+          >{t("footer.components")}</Link>
           <Link href="/impressum" style={linkStyle}
             onMouseEnter={e => { (e.currentTarget).style.color = "var(--color-text-heading, #0A0A0A)"; }}
             onMouseLeave={e => { (e.currentTarget).style.color = "var(--color-text-muted, #6B6B6B)"; }}

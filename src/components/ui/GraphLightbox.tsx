@@ -1,7 +1,7 @@
 "use client";
 import React, { ReactNode, useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 // ─── GraphLightbox ────────────────────────────────────────────────────────────
 // Wraps any SVG or chart component to provide a full-screen zoom view.
@@ -30,8 +30,7 @@ export function GraphLightbox({
   style,
   expandable = true,
 }: GraphLightboxProps) {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -107,7 +106,7 @@ export function GraphLightbox({
           )}
           <button
             onClick={() => setOpen(false)}
-            title={de ? "Schließen (Esc)" : "Close (Esc)"}
+            title={t("graphLightbox.closeTooltip")}
             style={{
               marginLeft: "auto",
               background: "none",
@@ -158,7 +157,7 @@ export function GraphLightbox({
         {expandable && (
           <button
             onClick={e => { e.stopPropagation(); setOpen(true); }}
-            title={de ? "Vollbild" : "Fullscreen"}
+            title={t("graphLightbox.fullscreenTooltip")}
             style={{
               position: "absolute",
               top: 6,

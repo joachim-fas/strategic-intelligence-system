@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { Locale } from "@/lib/i18n";
+import { useT } from "@/lib/locale-context";
 
-export function CausalOrbit({ chains, locale, onNodeClick }: {
+export function CausalOrbit({ chains, locale: _locale, onNodeClick }: {
   chains: string[];
   locale: Locale;
   onNodeClick?: (node: string) => void;
 }) {
+  const { t } = useT();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const de = locale === "de";
 
   const parsedChains = chains.map((chain) =>
     chain.split(/\s*[→➜>]\s*/).map((p) => p.trim()).filter(Boolean)
@@ -38,7 +39,7 @@ export function CausalOrbit({ chains, locale, onNodeClick }: {
         letterSpacing: "0.10em", textTransform: "uppercase" as const,
         color: "var(--volt-text-faint, #AAA)", marginBottom: 12,
       }}>
-        {de ? "Kausalnetz" : "Causal Network"} · {parsedChains.length} {de ? "Ketten" : "chains"} · {allNodes.size} Nodes
+        {t("causalOrbit.heading")} · {parsedChains.length} {t("causalOrbit.chainsLabel")} · {allNodes.size} Nodes
       </div>
       <div style={{ display: "flex", gap: 16 }}>
         {/* SVG orbit */}
