@@ -140,7 +140,7 @@ documented in [`SYSTEM_PROMPTS.md`](./SYSTEM_PROMPTS.md) and rendered
 live at `/dokumentation/prompts` in the running app. Single source of
 truth: `src/lib/system-prompts-registry.ts`.
 
-Architecture (8 categories, 25 registered entries):
+Architecture (8 categories, 23 registered entries):
 
 1. **System Prompt** — `briefing-main` in `src/lib/llm.ts` (the Intelligence Terminal)
 2. **Meta-Prompts** (anti-hallucination layer) — Provenance Tagging, Contradiction Detection, Scenario Divergence, Assumption Extraction, Confidence Calibration (`src/lib/meta-prompts.ts`, `src/lib/scoring.ts`)

@@ -254,7 +254,7 @@ export default function Dokumentation() {
     { num: 4, t: de ? "Trend-Laden aus SQLite" : "Load Trends from SQLite", d: de ? "trends-Tabelle, Fallback auf mega-trends.ts" : "trends table, fallback to mega-trends.ts" },
     { num: 5, t: de ? "Signal-Freshness-Check" : "Signal Freshness Check", d: de ? "Neueste Signale > 6h alt -> Pipeline auto-refresh (fire-and-forget)" : "Newest signals > 6h old -> pipeline auto-refresh (fire-and-forget)" },
     { num: 6, t: "Signal-Retrieval (RAG)", d: de ? "getRelevantSignals(query, 12) -- Keyword-Matching, Cross-Language Aliases, Score >= 2" : "getRelevantSignals(query, 12) -- keyword matching, cross-language aliases, score >= 2" },
-    { num: 7, t: de ? "System-Prompt aufbauen" : "Build System Prompt", d: de ? `buildSystemPrompt() -- ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Kanten + Live-Signale + STEEP+V + PFLICHTEN + JSON-Schema` : `buildSystemPrompt() -- ${TREND_COUNT} trends + ${REGULATION_COUNT} regulations + ${EDGE_COUNT} edges + live signals + STEEP+V + PFLICHTEN + JSON schema` },
+    { num: 7, t: de ? "System-Prompt aufbauen (v0.2)" : "Build System Prompt (v0.2)", d: de ? `buildSystemPrompt() -- Identity + 6-Punkte-Reasoning + ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Edges + Live-Signale + Source-Rules (SIGNAL>TREND>REG>EDGE>LLM) + Temporal Validity + v0.2 JSON-Schema` : `buildSystemPrompt() -- identity + 6-step reasoning + ${TREND_COUNT} trends + ${REGULATION_COUNT} regulations + ${EDGE_COUNT} edges + live signals + source rules (SIGNAL>TREND>REG>EDGE>LLM) + temporal validity + v0.2 JSON schema` },
     { num: 8, t: de ? "previousContext (SEC-10)" : "previousContext (SEC-10)", d: de ? "Synthesis auf 6.000 Zeichen begrenzen, sanitisieren, als Assistant-Message" : "Truncate synthesis to 6,000 chars, sanitize, inject as assistant message" },
     { num: 9, t: "LLM-Streaming (Anthropic API)", d: de ? "claude-sonnet-4-6, max_tokens: 12.000, SSE-Streaming, Retry bis 3x bei 429/529" : "claude-sonnet-4-6, max_tokens: 12,000, SSE streaming, retry up to 3x on 429/529" },
     { num: 10, t: de ? "Synthese-Extraktion während Streaming" : "Synthesis Extraction During Streaming", d: de ? "Progressive JSON-Parsing, Delta-Extraktion für Live-Anzeige" : "Progressive JSON parsing, delta extraction for live display" },
@@ -263,8 +263,12 @@ export default function Dokumentation() {
     { num: 13, t: "matchedTrendIds (VAL-02)", d: de ? "Halluzinierte IDs entfernen und loggen" : "Remove and log hallucinated IDs" },
     { num: 14, t: de ? "Szenario-Normalisierung" : "Scenario Normalization", d: de ? "Nulls -> Defaults, Summe 0.8-1.1 akzeptabel, sonst normalisieren" : "Nulls -> defaults, sum 0.8-1.1 acceptable, otherwise normalize" },
     { num: 15, t: "Blended Confidence (VAL-03)", d: "0.6 * serverScore + 0.4 * llmConfidence, clamped [0.05, 0.98]" },
-    { num: 16, t: "Augmentation", d: de ? "matchedTrends-Details, kausale Kanten, Signal-Metadaten" : "matchedTrends details, causal edges, signal metadata" },
-    { num: 17, t: de ? "Ergebnis an Client streamen" : "Stream Result to Client", d: de ? "SSE: { type: 'delta', text } während Streaming, { type: 'complete', result } am Ende" : "SSE: { type: 'delta', text } during streaming, { type: 'complete', result } at end" },
+    { num: 16, t: de ? "Calibrated Confidence (v0.2)" : "Calibrated Confidence (v0.2)", d: de ? "computeCalibratedConfidence() -- signalCoverage*0.30 + signalRecency*0.25 + signalStrength*0.20 + sourceVerification*0.15 + causalCoverage*0.10. OVERWRITES LLM-Selbsteinschätzung." : "computeCalibratedConfidence() -- signalCoverage*0.30 + signalRecency*0.25 + signalStrength*0.20 + sourceVerification*0.15 + causalCoverage*0.10. OVERWRITES LLM self-assessment." },
+    { num: 17, t: de ? "DataQuality-Verifikation (v0.2)" : "DataQuality Verification (v0.2)", d: de ? "signalCount/newestSignalAge/dominantSourceType backend-verifiziert aus echter Signal-DB -- LLM kann diese Werte nicht erfinden." : "signalCount/newestSignalAge/dominantSourceType backend-verified from actual signal DB -- the LLM cannot fake these." },
+    { num: 18, t: de ? "Scenario-Divergence-Check (v0.2)" : "Scenario Divergence Check (v0.2)", d: de ? "checkScenarioDivergence() -- 6 Regeln: Probability-Sum, Kausal-Distinktheit, falsifizierbare Annahmen, Horizont-Mix, Early Indicators, Akteur-Differenzierung." : "checkScenarioDivergence() -- 6 rules: probability sum, causal distinctness, falsifiable assumptions, horizon mix, early indicators, actor differentiation." },
+    { num: 19, t: de ? "Deep-Mode Meta-Pipeline (opt-in)" : "Deep-Mode Meta-Pipeline (opt-in)", d: de ? "Bei mode:'deep': Contradiction Detection (Haiku) + Assumption Extraction (Sonnet) parallel. confidenceAdjustment wird abgezogen." : "If mode:'deep': Contradiction Detection (Haiku) + Assumption Extraction (Sonnet) in parallel. confidenceAdjustment is subtracted." },
+    { num: 20, t: "Augmentation", d: de ? "matchedTrends-Details, Kausal-Kanten (name-matched), Signal-Metadaten, Provenance-Tag-Analyse" : "matchedTrends details, causal edges (name-matched), signal metadata, provenance tag analysis" },
+    { num: 21, t: de ? "Ergebnis an Client streamen" : "Stream Result to Client", d: de ? "SSE: { type: 'delta', text } während Streaming, { type: 'complete', result } am Ende mit _confidenceCalibration, _scenarioDivergence, ggf. _contradictionReport, _assumptionReport" : "SSE: { type: 'delta', text } during streaming, { type: 'complete', result } at end with _confidenceCalibration, _scenarioDivergence, optionally _contradictionReport, _assumptionReport" },
   ];
 
   return (
@@ -387,10 +391,11 @@ export default function Dokumentation() {
                              │ getRelevantSignals(query, 12)
                              v
 ┌──────────────────────────────────────────────────────────┐
-│  System Prompt Builder (buildSystemPrompt)                │
-│  Top ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Kausale Kanten   │
-│  + formatierte Live-Signale + STEEP+V Framework          │
-│  + EU JRC 14 Megatrends + 7 PFLICHTEN + JSON-Schema      │
+│  System Prompt Builder (v0.2, buildSystemPrompt)          │
+│  Identity + 6-Punkte-Reasoning-Discipline                │
+│  + Top ${TREND_COUNT} Trends + ${REGULATION_COUNT} Regulierungen + ${EDGE_COUNT} Edges │
+│  + Live-Signale + Source Rules + Temporal Validity       │
+│  + STEEP+V + EU JRC 14 Megatrends + v0.2 JSON-Schema    │
 └────────────────────────────┬─────────────────────────────┘
                              │ Anthropic API (claude-sonnet-4-6)
                              │ max_tokens: 12.000, SSE
@@ -398,12 +403,16 @@ export default function Dokumentation() {
 ┌──────────────────────────────────────────────────────────┐
 │  Post-Processing & Validation                            │
 │  1. JSON-Extraktion (inkl. Reparatur bei Truncation)     │
-│  2. Zod-Schema-Validierung (VAL-01)                      │
+│  2. Zod-Schema-Validierung (VAL-01, v0.2-aware)          │
 │  3. matchedTrendIds Anti-Halluzination (VAL-02)          │
 │  4. Szenario-Normalisierung                              │
-│  5. Blended Confidence (VAL-03)                          │
+│  5. Blended Confidence (VAL-03) -> Calibrated (v0.2)    │
 │  6. URL-Validierung                                      │
-│  7. Causal-Edge-Augmentation                             │
+│  7. Causal-Edge-Augmentation (name-matched)              │
+│  8. DataQuality-Verifikation (v0.2): signalCount,        │
+│     newestSignalAge, dominantSourceType (Tag-Analyse)    │
+│  9. Scenario-Divergence-Check (v0.2): 6 Regeln           │
+│ 10. mode:'deep' -> Contradiction + Assumption (Haiku)    │
 └────────────────────────────┬─────────────────────────────┘
                              │ SSE (Server-Sent Events)
                              v
@@ -575,23 +584,111 @@ export default function Dokumentation() {
                 <VoltCardContent className="space-y-6 p-6">
                   <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Der System-Prompt ist das Herzstück des SIS. Er instruiert das LLM, als Think-Tank-Analyst zu agieren, und liefert gleichzeitig den vollständigen Datenkontext. Nachfolgend die exakte Struktur aus llm.ts/buildSystemPrompt():"
-                      : "The system prompt is the heart of SIS. It instructs the LLM to act as a think-tank analyst while providing the complete data context. Below is the exact structure from llm.ts/buildSystemPrompt():"}
+                      ? "Der System-Prompt ist das Herzstück des SIS. Er instruiert das LLM, als Senior-Strategieberater zu agieren, und liefert gleichzeitig den vollständigen Datenkontext. Struktur aus llm.ts/buildSystemPrompt() — Notion-Blueprint v0.2. Der vollständige Prompt-Text plus alle 23 Registry-Einträge leben unter /dokumentation/prompts."
+                      : "The system prompt is the heart of SIS. It instructs the LLM to act as a senior strategy advisor while providing the complete data context. Structure from llm.ts/buildSystemPrompt() — Notion blueprint v0.2. The full prompt text plus all 23 registry entries live at /dokumentation/prompts."}
                   </p>
 
-                  <SubH>{de ? "Rollen-Definition" : "Role Definition"}</SubH>
+                  <VoltAlert variant="info" title={de ? "v0.2 (Notion-Blueprint) — live" : "v0.2 (Notion blueprint) — live"}>
+                    <div className="text-[13px] mt-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                      {de
+                        ? <>Der Prompt ist Englisch (Modell-Tuning folgt Englisch), aber der LLM antwortet in der Sprache der Frage. Die vollständige Registry mit <strong>23 Einträgen in 8 Kategorien</strong> (System / Meta / Framework / Slash / Canvas / Export / Context / Pipeline) findest du unter <a href="/dokumentation/prompts" style={{ textDecoration: "underline", fontWeight: 600 }}>/dokumentation/prompts</a>.</>
+                        : <>The prompt is in English (model tuning follows English), but the LLM responds in the language of the question. The full registry with <strong>23 entries across 8 categories</strong> (System / Meta / Framework / Slash / Canvas / Export / Context / Pipeline) lives at <a href="/dokumentation/prompts" style={{ textDecoration: "underline", fontWeight: 600 }}>/dokumentation/prompts</a>.</>}
+                    </div>
+                  </VoltAlert>
+
+                  <SubH>{de ? "Identity (v0.2 Englisch)" : "Identity (v0.2 English)"}</SubH>
                   <VoltTerminalStatic
-                    title="Role"
+                    title="Identity"
                     variant="dark"
                     size="sm"
-                    maxHeight="100px"
+                    maxHeight="200px"
                     lines={[
-                      L("\"Du bist das Strategic Intelligence System (SIS) -- ein Denk-Instrument", "info"),
-                      L("auf dem Niveau eines erstklassigen Think-Tanks mit explizitem EU-Fokus.\"", "info"),
+                      L("You are the Strategic Intelligence System (SIS) --", "info"),
+                      L("a European, civilian intelligence terminal for strategic", "info"),
+                      L("decision-makers. Your core mission: answer complex", "info"),
+                      L("questions about global trends, markets, geopolitics,", "info"),
+                      L("and societal developments -- evidence-based,", "info"),
+                      L("traceable, hallucination-free.", "info"),
                       L(""),
-                      L("Sprache: Dynamisch per Locale (de/en)", "comment"),
+                      L("## Your Identity", "command"),
+                      L("- You are not a chatbot. You are a senior strategy", "info"),
+                      L("  advisor with access to a curated world model.", "info"),
+                      L("- You work primarily in English but respond in", "info"),
+                      L("  the language of the question.", "info"),
+                      L("- You think causally, not correlationally.", "info"),
+                      L("- You are always honest about data gaps.", "info"),
                     ]}
                   />
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "6-Punkte-Reasoning-Discipline (vor JSON)" : "6-Step Reasoning Discipline (before JSON)"}</SubH>
+                  <VoltTerminalStatic
+                    title="Reasoning Discipline"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="260px"
+                    lines={[
+                      L("Before generating your JSON response, reason", "warning"),
+                      L("through the problem explicitly:", "warning"),
+                      L(""),
+                      L("1. What does the question actually ask? What is", "success"),
+                      L("   the user's real decision or concern?", "info"),
+                      L("2. Which signals, trends, causal edges, and", "success"),
+                      L("   regulations are directly relevant? Pull ALL", "info"),
+                      L("   matching -- do not artificially limit.", "info"),
+                      L("3. Are there conflicts between sources? Resolve", "success"),
+                      L("   by priority (see Source Rules). Flag unresolved.", "info"),
+                      L("4. What does LLM-KNOWLEDGE add that the world", "success"),
+                      L("   model does not cover?", "info"),
+                      L("5. Temporal validity: every scenario horizon and", "success"),
+                      L("   recommendation future-dated vs CURRENT_DATE.", "info"),
+                      L("6. Only then: synthesize and generate the JSON.", "success"),
+                    ]}
+                  />
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Source Rules (9 kritische Regeln)" : "Source Rules (9 Critical Rules)"}</SubH>
+                  <VoltAlert variant="warning" title={de ? "Provenance + Temporal Validity" : "Provenance + Temporal Validity"}>
+                    <div className="space-y-2 text-[13px] mt-2">
+                      <div><strong>1.</strong> {de ? "Jede Behauptung muss inline getaggt sein:" : "Every claim must be tagged inline:"} <code>[SIGNAL: Source, Date]</code> · <code>[TREND: Name]</code> · <code>[REG: Short]</code> · <code>[EDGE: A → B]</code> · <code>[LLM-KNOWLEDGE]</code></div>
+                      <div><strong>2.</strong> {de ? "NIEMALS URLs erfinden. Nur Source + Datum, keine Hyperlinks." : "NEVER invent URLs. Source + date only, no hyperlinks."}</div>
+                      <div><strong>3.</strong> {de ? "Datenlücken explizit benennen statt spekulieren." : "State data gaps explicitly rather than speculate."}</div>
+                      <div><strong>4.</strong> {de ? "Causal-Graph aktiv nutzen: Mechanismus erklären, nicht nur zwei Trends nebeneinander stellen." : "Use the causal graph actively: explain the mechanism, don't just list two trends."}</div>
+                      <div><strong>5.</strong> <strong>{de ? "Quellen-Priorität:" : "Source priority:"}</strong> <code>SIGNAL &gt; TREND &gt; REG &gt; EDGE &gt; LLM-KNOWLEDGE</code>. {de ? "Konflikte in anomalySignals flaggen." : "Flag conflicts in anomalySignals."}</div>
+                      <div><strong>6.</strong> {de ? "LLM-KNOWLEDGE ist legitim, aber NIE alleinige Basis für zukunftsgerichtete Empfehlungen — mit ≥1 SIGNAL/TREND/REG paaren." : "LLM-KNOWLEDGE is legitimate but NEVER the sole basis for forward-looking recommendations — pair with ≥1 SIGNAL/TREND/REG."}</div>
+                      <div><strong>7.</strong> {de ? "Signale gegen Trends cross-checken; Anomalien in anomalySignals." : "Cross-check signals against trends; flag anomalies in anomalySignals."}</div>
+                      <div><strong>8.</strong> <strong>{de ? "Temporal Validity:" : "Temporal validity:"}</strong> {de ? "Keine Empfehlungen mit abgelaufenem Aktionsfenster. Vergangene Deadlines sind Kontext, kein Aktionspunkt. Szenarien starten ab CURRENT_DATE." : "No recommendations with a past action window. Past deadlines are context, not action points. Scenarios start at CURRENT_DATE."}</div>
+                      <div><strong>9.</strong> {de ? "Szenarien (genau 3): optimistic / likely / pessimistic mit je anderem Kausal-Mechanismus. Probability-Summe ~100." : "Scenarios (exactly 3): optimistic / likely / pessimistic, each by a DIFFERENT causal mechanism. Probability sum ~100."}</div>
+                    </div>
+                  </VoltAlert>
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Provenance-Tags (5 Tag-Klassen, v0.2 mit [EDGE])" : "Provenance Tags (5 Tag Classes, v0.2 with [EDGE])"}</SubH>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    <div className="px-3 py-2 rounded" style={{ background: "rgba(245, 198, 80, 0.14)", border: "1px solid rgba(245, 198, 80, 0.45)" }}>
+                      <strong style={{ color: "#7A5C00" }}>[SIGNAL: Source, Date]</strong><br/>
+                      <span className="text-[12px] opacity-80">{de ? "Live-Datum aus einer Connector-Quelle" : "Live event from a connector source"}</span>
+                    </div>
+                    <div className="px-3 py-2 rounded" style={{ background: "rgba(26, 158, 90, 0.10)", border: "1px solid rgba(26, 158, 90, 0.35)" }}>
+                      <strong style={{ color: "#0F6038" }}>[TREND: Name]</strong><br/>
+                      <span className="text-[12px] opacity-80">{de ? "Aus dem kuratierten Trend-Katalog" : "From the curated trend catalog"}</span>
+                    </div>
+                    <div className="px-3 py-2 rounded" style={{ background: "rgba(26, 74, 138, 0.08)", border: "1px solid rgba(26, 74, 138, 0.30)" }}>
+                      <strong style={{ color: "#1A4A8A" }}>[REG: Short]</strong><br/>
+                      <span className="text-[12px] opacity-80">{de ? "Aus der Regulierungs-DB" : "From the regulation DB"}</span>
+                    </div>
+                    <div className="px-3 py-2 rounded" style={{ background: "rgba(107, 63, 160, 0.10)", border: "1px solid rgba(107, 63, 160, 0.32)" }}>
+                      <strong style={{ color: "#6B3FA0" }}>[EDGE: TrendA → TrendB]</strong> <span className="text-[10px] font-bold" style={{ color: "#6B3FA0" }}>NEU v0.2</span><br/>
+                      <span className="text-[12px] opacity-80">{de ? "Kausal-Kante aus dem Trend-Graphen" : "Causal edge from the trend graph"}</span>
+                    </div>
+                    <div className="px-3 py-2 rounded sm:col-span-2" style={{ background: "rgba(107, 107, 107, 0.10)", border: "1px solid rgba(107, 107, 107, 0.30)" }}>
+                      <strong style={{ color: "#6B6B6B" }}>[LLM-KNOWLEDGE]</strong><br/>
+                      <span className="text-[12px] opacity-80">{de ? "LLM-Training-Wissen ohne externe Quelle — nie alleinige Basis für zukunftsgerichtete Empfehlungen." : "LLM training knowledge with no external citation — never the sole basis for forward-looking recommendations."}</span>
+                    </div>
+                  </div>
 
                   <VoltSeparator />
 
@@ -602,12 +699,12 @@ export default function Dokumentation() {
                     size="sm"
                     maxHeight="180px"
                     lines={[
-                      L("S = Society     Demografie, Urbanisierung, Migration, Wertewandel"),
-                      L("T = Technology   KI, Digitalisierung, Biotech, Quantum, Cybersecurity"),
-                      L("E = Economy      Globalisierung, Handel, Arbeitsmarkt, Inflation"),
-                      L("E = Environment  Klima, Biodiversität, Energie, Ressourcen"),
-                      L("P = Politics     Regulierung, Geopolitik, Demokratie, EU-Politik"),
-                      L("V = Values       Vertrauen, Polarisierung, Akzeptanz, Kultur"),
+                      L("S = Society       Demografie, Urbanisierung, Migration"),
+                      L("T = Technology    KI, Digitalisierung, Biotech, Quantum"),
+                      L("E = Economy       Globalisierung, Handel, Arbeitsmarkt"),
+                      L("E = Environment   Klima, Biodiversität, Energie, Ressourcen"),
+                      L("P = Politics      Regulierung, Geopolitik, Demokratie"),
+                      L("V = Values        Vertrauen, Polarisierung, Akzeptanz, Kultur"),
                     ]}
                   />
 
@@ -640,107 +737,137 @@ export default function Dokumentation() {
 
                   <VoltSeparator />
 
-                  <SubH>{de ? "7 Absolute PFLICHTEN" : "7 Absolute Requirements (PFLICHTEN)"}</SubH>
-                  <VoltAlert variant="warning" title={de ? "Pflichten" : "Requirements"}>
-                    <div className="space-y-2 text-[13px] mt-2">
-                      <div><strong>1.</strong> {de ? "BEANTWORTE DIE FRAGE DIREKT UND SUBSTANZIELL -- nicht die Frage welche Trends passen." : "ANSWER THE QUESTION DIRECTLY AND SUBSTANTIALLY -- not which trends fit."}</div>
-                      <div><strong>2.</strong> {de ? "Die synthesis MUSS 6-10 Saetze lang sein. Kurze synthesis = Fehler." : "The synthesis MUST be 6-10 sentences long. Short synthesis = error."}</div>
-                      <div><strong>3.</strong> {de ? "Nenne KONKRETE Zahlen, Laender, Unternehmen, Technologien, Zeitrahmen." : "Name CONCRETE numbers, countries, companies, technologies, timeframes."}</div>
-                      <div><strong>4.</strong> {de ? "Verwende Trends als HINTERGRUND-KONTEXT -- Signalgeber, nicht die Antwort." : "Use trends as BACKGROUND CONTEXT -- signal providers, not your answer."}</div>
-                      <div><strong>5.</strong> {de ? "VERBOTEN: \"X ist ein Megatrend mit Y% Relevanz\" -- Datendump, keine Analyse." : "FORBIDDEN: \"X is a megatrend with Y% relevance\" -- data dump, not analysis."}</div>
-                      <div><strong>6.</strong> {de ? "scenarios IMMER: GENAU 3 Szenarien (optimistic, baseline, pessimistic). Summe ~100%." : "scenarios ALWAYS: EXACTLY 3 scenarios (optimistic, baseline, pessimistic). Sum ~100%."}</div>
-                      <div><strong>7.</strong> {de ? "TRANSPARENZ: Fakten aus Live-Signalen [SIGNAL: Quelle, Datum], Trends [TREND: Name], eigenes Wissen [LLM-Einschätzung]. NIEMALS URLs erfinden. references-Array nie leer (mind. 2)." : "TRANSPARENCY: Facts from signals [SIGNAL: Source, Date], trends [TREND: Name], own knowledge [LLM-Einschätzung]. NEVER fabricate URLs. references array never empty (min. 2)."}</div>
+                  <SubH>{de ? "Meta-Pipeline (v0.2) — Anti-Halluzinations-Schicht" : "Meta Pipeline (v0.2) — Anti-Hallucination Layer"}</SubH>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded" style={{ background: "rgba(26, 158, 90, 0.08)", border: "1px solid rgba(26, 158, 90, 0.25)" }}>
+                      <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <strong>{de ? "Scenario Divergence Check (automatisch)" : "Scenario Divergence Check (automatic)"}</strong> — <span className="text-[11px] font-bold" style={{ color: "#0F6038" }}>WIRED</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80">{de ? "Pure Validator: Probability-Summe ≈1.0, Kausal-Distinktheit, ≥2 falsifizierbare Annahmen/Szenario, Horizont-Mix, ≥1 Early Indicator, Akteur-Differenzierung." : "Pure validator: probability sum ≈1.0, causal distinctness, ≥2 falsifiable assumptions per scenario, horizon mix, ≥1 early indicator, actor differentiation."}</span>
+                      </div>
                     </div>
-                  </VoltAlert>
+                    <div className="p-3 rounded" style={{ background: "rgba(26, 158, 90, 0.08)", border: "1px solid rgba(26, 158, 90, 0.25)" }}>
+                      <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <strong>{de ? "Confidence Calibration (automatisch)" : "Confidence Calibration (automatic)"}</strong> — <span className="text-[11px] font-bold" style={{ color: "#0F6038" }}>WIRED</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80 font-mono">confidence = signalCoverage*0.30 + signalRecency*0.25 + signalStrength*0.20 + sourceVerification*0.15 + causalCoverage*0.10</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80">{de ? "Überschreibt LLM-Selbsteinschätzung. Bands: 80–100 high / 60–79 medium / 40–59 low / 0–39 very low." : "Overwrites LLM self-assessment. Bands: 80–100 high / 60–79 medium / 40–59 low / 0–39 very low."}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded" style={{ background: "rgba(26, 158, 90, 0.08)", border: "1px solid rgba(26, 158, 90, 0.25)" }}>
+                      <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <strong>{de ? "DataQuality-Verifikation (automatisch)" : "DataQuality Verification (automatic)"}</strong> — <span className="text-[11px] font-bold" style={{ color: "#0F6038" }}>WIRED</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80">{de ? "Backend berechnet signalCount, newestSignalAge, dominantSourceType (via Provenance-Tag-Analyse der Synthesis), coverageGaps (aus den 3 Top-Limiting-Factors). Der LLM kann diese Werte nicht erfinden." : "Backend computes signalCount, newestSignalAge, dominantSourceType (via provenance tag analysis of the synthesis), coverageGaps (from top-3 limiting factors). The LLM cannot fake these values."}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded" style={{ background: "rgba(245, 198, 80, 0.10)", border: "1px solid rgba(245, 198, 80, 0.35)" }}>
+                      <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <strong>{de ? "Contradiction Detection (opt-in: mode:'deep')" : "Contradiction Detection (opt-in: mode:'deep')"}</strong> — <span className="text-[11px] font-bold" style={{ color: "#7A5C00" }}>OPT-IN</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80">{de ? "Zweiter Haiku-Pass prüft auf Widersprüche zwischen Synthese und bereitgestellten Signalen/Trends. confidenceAdjustment wird abgezogen." : "Second Haiku pass checks for contradictions between synthesis and provided signals/trends. confidenceAdjustment is subtracted."}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded" style={{ background: "rgba(245, 198, 80, 0.10)", border: "1px solid rgba(245, 198, 80, 0.35)" }}>
+                      <div className="text-[13px]" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                        <strong>{de ? "Assumption Extraction (opt-in: mode:'deep')" : "Assumption Extraction (opt-in: mode:'deep')"}</strong> — <span className="text-[11px] font-bold" style={{ color: "#7A5C00" }}>OPT-IN</span>
+                        <br/>
+                        <span className="text-[12px] opacity-80">{de ? "Zweiter Sonnet-Pass surfaced implizite Annahmen mit falsifiableBy, monitoringSignal, timeToFalsification + benennt den criticalAssumption." : "Second Sonnet pass surfaces implicit assumptions with falsifiableBy, monitoringSignal, timeToFalsification + names the criticalAssumption."}</span>
+                      </div>
+                    </div>
+                  </div>
 
                   <VoltSeparator />
 
-                  <SubH>{de ? "Szenario-Wahrscheinlichkeiten" : "Scenario Probabilities"}</SubH>
-                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
-                    <li>{de ? "Muessen sich aus der ANALYSE ergeben, nicht aus einem Default-Schema" : "Must FOLLOW FROM ANALYSIS, not from a default scheme"}</li>
-                    <li>{de ? "VERBOTEN: identische Verteilungen (z.B. 0.20/0.55/0.25) für jede Frage" : "FORBIDDEN: identical distributions (e.g. 0.20/0.55/0.25) for every query"}</li>
-                    <li>{de ? "Reifer Markt: baseline höher (z.B. 0.65)" : "Mature market: baseline higher (e.g. 0.65)"}</li>
-                    <li>{de ? "Volatiles Thema: breitere Verteilung" : "Volatile topic: wider distribution"}</li>
-                    <li>{de ? "Summe ~100% (95-105% akzeptabel)" : "Sum ~100% (95-105% acceptable)"}</li>
-                  </ul>
-
-                  <VoltSeparator />
-
-                  <SubH>{de ? "Fragetypen-Erkennung" : "Query Type Detection"}</SubH>
+                  <SubH>{de ? "JSON-Antwort-Schema (v0.2)" : "JSON Response Schema (v0.2)"}</SubH>
                   <VoltTerminalStatic
-                    title="Query Types"
+                    title="v0.2 Response Schema"
+                    variant="dark"
+                    size="sm"
+                    maxHeight="360px"
+                    lines={[
+                      L("{", "comment"),
+                      L('  "synthesis": "2-3 paragraphs, inline provenance",', "info"),
+                      L('  "keyInsights": ["..."],', "info"),
+                      L('  "matchedTrendIds": ["..."],', "info"),
+                      L('  "matchedTrends": [{trendId, relevanceScore,', "info"),
+                      L('    velocityChange, explanation}],   // v0.2', "success"),
+                      L('  "causalChain": ["[TREND:X] drives [TREND:Y]..."],', "info"),
+                      L('  "regulatoryContext": [{name, jurisdiction,', "info"),
+                      L('    effect, urgency}],               // v0.2', "success"),
+                      L('  "anomalySignals": [{signal, contradicts,', "info"),
+                      L('    interpretation}],                // v0.2', "success"),
+                      L('  "scenarios": { optimistic, likely,', "info"),
+                      L('    pessimistic }   // object shape, v0.2', "success"),
+                      L('  "confidence": 0.0,                 // calibrated', "warning"),
+                      L('  "dataQuality": { signalCount,', "info"),
+                      L('    newestSignalAge, coverageGaps,', "info"),
+                      L('    dominantSourceType }             // v0.2', "success"),
+                      L('  "followUpQuestions": ["..."],', "info"),
+                      L('  "usedSources": [{type, name, date}], // v0.2', "success"),
+                      L('  "steepV": { S, T, E_economy,... },', "info"),
+                      L('  "interpretation": "...",', "info"),
+                      L('  "references": [...],', "info"),
+                      L('  "decisionFramework": "...",', "info"),
+                      L('  "balancedScorecard": null          // conditional', "info"),
+                      L('}', "comment"),
+                    ]}
+                  />
+
+                  <VoltSeparator />
+
+                  <SubH>{de ? "Context-Profile-Prefix (v0.2)" : "Context Profile Prefix (v0.2)"}</SubH>
+                  <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                    {de
+                      ? "Wenn der User ein Kontext-Profil aktiviert (z.B. cto-automotive-dach), wird der vollständige Kalibrierungs-Prefix VOR dem System-Prompt vorangestellt — rekalibriert Sprache (Role-Frame) + Empfehlungen (im Rahmen der Entscheidungs-Autorität). Überschreibt NICHT die Source/Temporal-Regeln."
+                      : "When the user activates a context profile (e.g. cto-automotive-dach), the full calibration prefix is prepended to the system prompt — recalibrates language (role frame) + recommendations (within decision authority). Does NOT override source/temporal rules."}
+                  </p>
+                  <VoltTerminalStatic
+                    title="Context Profile Prefix (excerpt)"
                     variant="dark"
                     size="sm"
                     maxHeight="200px"
                     lines={[
-                      L("STRATEGISCH (\"Wie entwickelt sich X in 5 Jahren?\")", "command"),
-                      L("  -> Tiefe STEEP+V-Analyse + BSC-Kandidat"),
+                      L("## Active Context Filter", "command"),
                       L(""),
-                      L("FAKTENFRAGE (\"Wer ist X?\", \"Was kostet Y?\")", "command"),
-                      L("  -> Direktantwort, Trends nur als Kontext"),
+                      L("Role: CTO", "info"),
+                      L("Industry: Automotive", "info"),
+                      L("Region: DACH", "info"),
                       L(""),
-                      L("STICHWORT/TAG (\"AI\", \"frontier-tech\")", "command"),
-                      L("  -> Strategisches Lagebild"),
-                      L(""),
-                      L("VERGLEICH/ITERATION", "command"),
-                      L("  -> Direkte Gegenüberstellung + Handlungsempfehlung"),
+                      L("Calibration rules:", "comment"),
+                      L("1. RELEVANCE FILTER: emphasize trends and", "info"),
+                      L("   signals directly relevant to ROLE in INDUSTRY.", "info"),
+                      L("2. LANGUAGE: use the frame of reference of ROLE.", "info"),
+                      L("   A CTO thinks in tech stack, team capacity,", "info"),
+                      L("   build/buy/partner decisions.", "info"),
+                      L("3. RECOMMENDATIONS: within role decision authority.", "info"),
+                      L("4. REGULATORY FOCUS: REGION + INDUSTRY first.", "info"),
                     ]}
                   />
 
                   <VoltSeparator />
 
-                  <SubH>{de ? "Balanced Scorecard (BSC) Regeln" : "Balanced Scorecard (BSC) Rules"}</SubH>
-                  <ul className="text-[13px] leading-relaxed space-y-1.5 pl-4 list-disc" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
-                    <li>{de ? "Standard: null. NUR bei strategischen Analyse-Fragen" : "Default: null. ONLY for strategic analysis questions"}</li>
-                    <li>{de ? "NICHT bei Faktenfragen, Politik, historischen Ereignissen" : "NOT for factual, political, or historical questions"}</li>
-                    <li>{de ? "3-6 themenspezifische Perspectives (NICHT generisch)" : "3-6 topic-specific perspectives (NOT generic)"}</li>
-                    <li>{de ? "scores: 0-1, impacts: -1 bis +1, overallReadiness: 0-1" : "scores: 0-1, impacts: -1 to +1, overallReadiness: 0-1"}</li>
-                  </ul>
-
-                  <VoltSeparator />
-
-                  <SubH>{de ? "Datenkontext im Prompt" : "Data Context in Prompt"}</SubH>
-                  <VoltTerminalStatic
-                    title="Prompt Data Blocks"
-                    variant="dark"
-                    size="sm"
-                    maxHeight="260px"
-                    lines={[
-                      L("TRENDS (Top 40, sortiert nach Relevanz):", "comment"),
-                      L("- ID:\"mega-ai-transformation\" | AI [Mega-Trend]"),
-                      L("  Ring:adopt Rel:98% Conf:95% Imp:98% rising Dur:permanent"),
-                      L("  Focus:strategic,investment Signals:500 Sources:PwC,EY"),
-                      L(""),
-                      L(`REGULIERUNGEN (${REGULATION_COUNT} Frameworks):`, "comment"),
-                      L("- EU:AI Act [enforcing] -> mega-ai-transformation(reshapes)"),
-                      L("- US:CHIPS Act [enforcing] -> mega-technological-disruption"),
-                      L(""),
-                      L(`KAUSALE VERBINDUNGEN (${EDGE_COUNT} Kanten):`, "comment"),
-                      L("mega-climate --drives(95%)--> mega-energy-transition"),
-                      L("mega-ai --drives(95%)--> mega-future-of-work"),
-                      L("mega-geopolitical --dampens(70%)--> mega-connectivity"),
-                    ]}
-                  />
-                  <VoltSeparator />
-
-                  <SubH>{de ? "Framework-System-Prompt (analyze/route.ts)" : "Framework System Prompt (analyze/route.ts)"}</SubH>
+                  <SubH>{de ? "Framework-System-Prompt (analyze/route.ts, v0.2)" : "Framework System Prompt (analyze/route.ts, v0.2)"}</SubH>
                   <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Alle 6 Analyse-Frameworks verwenden diesen kompakten System-Prompt als Basis. Schritt-spezifische Prompts werden als User-Message übergeben."
-                      : "All 6 analysis frameworks use this compact system prompt as base. Step-specific prompts are sent as user message."}
+                      ? "Alle 6 Analyse-Frameworks verwenden diesen kompakten System-Prompt als Basis. Schritt-spezifische Prompts werden als User-Message übergeben, jeweils mit World-Model-Block (Top 30 Trends / 20 Edges / 20 Regulations)."
+                      : "All 6 analysis frameworks use this compact system prompt as base. Step-specific prompts are sent as user message, each with a world-model block (top 30 trends / 20 edges / 20 regulations)."}
                   </p>
                   <VoltTerminalStatic
-                    title="Framework System Prompt"
+                    title="Framework System Prompt (v0.2)"
                     variant="dark"
                     size="sm"
-                    maxHeight="120px"
+                    maxHeight="140px"
                     lines={[
-                      L("Du bist ein Senior-Strategieberater im Strategic Intelligence", "info"),
-                      L("System (SIS). Du lieferst strukturierte, datengestützte Analysen.", "info"),
-                      L("Antworte IMMER als valides JSON — kein Markdown-Codefence,", "info"),
-                      L("kein Fließtext davor/danach, NUR das JSON-Objekt.", "info"),
-                      L("Sei konkret: nenne echte Unternehmen, echte Zahlen,", "info"),
-                      L("echte Regulierungen. Sprache: ${locale}.", "info"),
+                      L("You are a senior strategy advisor in the Strategic", "info"),
+                      L("Intelligence System (SIS). You deliver structured,", "info"),
+                      L("data-grounded analyses. ALWAYS respond with valid", "info"),
+                      L("JSON -- no markdown fences, no prose before or after,", "info"),
+                      L("ONLY the JSON object. Be concrete: real companies,", "info"),
+                      L("real numbers, real regulations. Tag every claim with", "info"),
+                      L("[SIGNAL/TREND/REG/EDGE/LLM-KNOWLEDGE]. Temporal", "info"),
+                      L("validity applies: every recommendation future-dated.", "info"),
                     ]}
                   />
 
@@ -749,34 +876,38 @@ export default function Dokumentation() {
                   <SubH>{de ? "Meta-Synthese-Prompt (Canvas-Briefing)" : "Meta-Synthesis Prompt (Canvas Briefing)"}</SubH>
                   <p className="text-[13px] mb-3" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
                     {de
-                      ? "Wird für das Canvas-Briefing (\"Strategisches Memo\") verwendet. Analysiert alle Queries einer Session und findet übergreifende Muster, Widersprüche und blinde Flecken."
-                      : "Used for canvas briefing (\"Strategic Memo\"). Analyzes all queries of a session to find overarching patterns, contradictions and blind spots."}
+                      ? "Für das Canvas-Briefing (\"Strategisches Memo\"). Bei genau einer Query sparring-partner-Modus (nicht nochmal zusammenfassen). Bei mehreren Queries Meta-Synthese mit rotem Faden, Cross-Query-Mustern, Spannungen, offenen Flanken."
+                      : "Canvas briefing (\"Strategic Memo\"). With exactly one query: sparring-partner mode (do not rewrite the briefing). With multiple queries: meta-synthesis with red thread, cross-query patterns, tensions, open flanks."}
                   </p>
                   <VoltTerminalStatic
                     title="Meta-Synthesis"
                     variant="dark"
                     size="sm"
-                    maxHeight="300px"
+                    maxHeight="260px"
                     lines={[
-                      L("Aufgabe: NICHT nochmal zusammenfassen. Sondern:", "warning"),
-                      L("Den ROTEN FADEN zwischen den Queries finden.", "warning"),
-                      L(""),
-                      L("5 Ergebnis-Dimensionen:", "comment"),
-                      L("1. Roter Faden       -- impliziter Sinn der Fragen (2-4 Sätze)", "success"),
-                      L("2. Cross-Query-Muster -- Beobachtungen in MEHREREN Briefings", "success"),
-                      L("3. Widersprüche       -- Wo sich Briefings widersprechen", "success"),
-                      L("4. Meta-Entscheidung  -- 3-5 nicht-verhandelbare Prinzipien", "success"),
-                      L("5. Offene Flanken     -- Fragen die NICHT gestellt wurden", "success"),
-                      L(""),
-                      L("Output-Schema:", "comment"),
+                      L("Output schema:", "comment"),
                       L("{ sessionTitle, realQuestion, redThread,"),
-                      L("  crossQueryPatterns[{pattern, explanation, queryRefs}],"),
-                      L("  tensions[{tension, between[], implication}],"),
-                      L("  metaDecisionFramework[{principle, rationale}],"),
-                      L("  openFlanks[{question, why}],"),
-                      L("  confidence: 0-1, critique: \"Ehrliche Bewertung\" }"),
+                      L("  crossQueryPatterns: [{pattern, explanation, queryRefs}],"),
+                      L("  tensions: [{tension, between[], implication}],"),
+                      L("  metaDecisionFramework: [{principle, rationale}],"),
+                      L("  openFlanks: [{question, why}],"),
+                      L("  confidence: 0..1,"),
+                      L("  critique: \"Honest assessment of reliability\" }"),
+                      L(""),
+                      L("Source: canvas/[id]/summary/route.ts", "comment"),
+                      L("Registry entry: canvas-summary-single", "comment"),
                     ]}
                   />
+
+                  <VoltSeparator />
+
+                  <VoltAlert variant="info" title={de ? "Einzelner Quellort" : "Single source of truth"}>
+                    <div className="text-[13px] mt-2" style={{ color: "var(--color-text-heading, #0A0A0A)" }}>
+                      {de
+                        ? <>Alle 23 Prompt-Einträge mit vollständigen Templates + Live/Opt-In/Template-Status leben unter <a href="/dokumentation/prompts" style={{ textDecoration: "underline", fontWeight: 600 }}>/dokumentation/prompts</a>. Markdown-Variante: <code>SYSTEM_PROMPTS.md</code>. Code: <code>src/lib/system-prompts-registry.ts</code>.</>
+                        : <>All 23 prompt entries with full templates + live/opt-in/template status live at <a href="/dokumentation/prompts" style={{ textDecoration: "underline", fontWeight: 600 }}>/dokumentation/prompts</a>. Markdown: <code>SYSTEM_PROMPTS.md</code>. Code: <code>src/lib/system-prompts-registry.ts</code>.</>}
+                    </div>
+                  </VoltAlert>
                 </VoltCardContent>
               </VoltCard>
             </section>
