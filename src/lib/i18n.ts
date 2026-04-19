@@ -1229,6 +1229,12 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  methodikPage: {
+    backToCockpitFull: "Back to Knowledge Cockpit",
+    backToCockpit: "Back to Cockpit",
+    footerBody: "Open questions, objections, or methodology suggestions? Transparency debt is your leverage — tell us.",
+  },
+
   trendDetail: {
     loading: "Loading trend details...",
     notFound: "Trend not found",
@@ -2570,6 +2576,12 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  methodikPage: {
+    backToCockpitFull: "Zurück zum Knowledge Cockpit",
+    backToCockpit: "Zurück zum Cockpit",
+    footerBody: "Offene Fragen, Einwände oder Verbesserungsvorschläge zur Methodik? Die Transparenz-Schuld ist dein Hebel — sag es uns.",
   },
 
   trendDetail: {

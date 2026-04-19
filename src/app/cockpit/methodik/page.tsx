@@ -13,11 +13,12 @@
  */
 
 import { AppHeader } from "@/components/AppHeader";
-import { useLocale } from "@/lib/locale-context";
+import { useLocale, useT } from "@/lib/locale-context";
 import { MethodikContent } from "@/components/verstehen/MethodikContent";
 
 export default function MethodikPage() {
   const { locale } = useLocale();
+  const { t } = useT();
   const de = locale === "de";
 
   return (
@@ -44,7 +45,7 @@ export default function MethodikPage() {
             onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--volt-text-muted, #6B6B6B)"; }}
           >
             <span style={{ fontSize: 14 }}>←</span>
-            <span>{de ? "Zurück zum Knowledge Cockpit" : "Back to Knowledge Cockpit"}</span>
+            <span>{t("methodikPage.backToCockpitFull")}</span>
           </a>
         </div>
       </div>
@@ -71,9 +72,7 @@ export default function MethodikPage() {
             fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
             maxWidth: 560,
           }}>
-            {de
-              ? "Offene Fragen, Einwände oder Verbesserungsvorschläge zur Methodik? Die Transparenz-Schuld ist dein Hebel — sag es uns."
-              : "Open questions, objections, or methodology suggestions? Transparency debt is your leverage — tell us."}
+            {t("methodikPage.footerBody")}
           </div>
           <a
             href="/cockpit"
@@ -89,7 +88,7 @@ export default function MethodikPage() {
               border: "none",
             }}
           >
-            {de ? "Zurück zum Cockpit" : "Back to Cockpit"} →
+            {t("methodikPage.backToCockpit")} →
           </a>
         </div>
       </div>
