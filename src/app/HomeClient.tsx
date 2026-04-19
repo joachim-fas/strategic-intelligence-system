@@ -2052,62 +2052,18 @@ export default function HomeClient() {
         {/* Results — Phase 1+2: Session Bar + Active Node rendering. Only rendered when there is content, so the empty-state gradient command line can claim the full flex space. Bottom padding clears the fixed SignalTicker. */}
         {!isFirstVisit && (
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 60px", maxWidth: 960, margin: "0 auto", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Audit finding A1-H1 (18.04.2026): in-session users had no
-               visible input to fire another query. The only entry point
-               was a follow-up button inside the briefing card, which is
-               not always the next question the user wants to ask. This
-               compact command line sits at the top of the session view
-               and shares the same inputRef / query / handleSubmit state
-               as the hero. Keeps Enter-to-submit and focus behaviour
-               consistent with the empty-state input. */}
-          {!isAnalyzing && (
-            <div
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 10px 8px 18px",
-                marginBottom: 4,
-                borderRadius: "var(--volt-radius-lg, 12px)",
-                border: inputFocused ? "1.5px solid var(--volt-text, #0A0A0A)" : "1px solid var(--volt-border, #E8E8E8)",
-                background: "var(--volt-surface-raised, #fff)",
-                boxShadow: inputFocused ? "0 4px 16px rgba(228,255,151,0.3)" : "0 1px 3px rgba(0,0,0,0.03)",
-                transition: "border-color 150ms ease, box-shadow 150ms ease",
-              }}
-              onClick={() => inputRef.current?.focus()}
-            >
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => setInputFocused(false)}
-                placeholder={locale === "de" ? "Nächste Frage …" : "Next question …"}
-                style={{
-                  flex: 1, border: "none", outline: "none", background: "transparent",
-                  color: "var(--volt-text, #0A0A0A)",
-                  fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)", fontSize: 14,
-                  lineHeight: 1.5, resize: "none", overflow: "hidden", padding: "5px 0",
-                }}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              {query && (
-                <button
-                  onClick={() => handleSubmit()}
-                  style={{
-                    fontSize: 12, fontWeight: 600, height: 30, padding: "0 14px",
-                    borderRadius: "var(--volt-radius-md, 8px)", flexShrink: 0,
-                    background: "var(--volt-lime, #E4FF97)", color: "#0A0A0A",
-                    border: "none", cursor: "pointer",
-                    fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
-                  }}
-                >
-                  {locale === "de" ? "Analysieren →" : "Analyze →"}
-                </button>
-              )}
-            </div>
-          )}
+          {/*
+            Kein Command-Line-Feld über der Antwort (User-Regel, 2026-04-19).
+            Der frühere A1-H1-Fix vom 18.04. hatte hier ein "Nächste Frage …"-
+            Textfeld eingefügt — das widerspricht der älteren Design-Regel
+            "keine Command-Line über einer Antwort". Follow-up-Einstiege
+            leben jetzt:
+              1. Unten im Briefing: die EigenerGedanke-Komponente
+              2. In der Canvas-Toolbar: Command-Line (nächste Frage)
+              3. Auf der Home-Seite: wenn der User zurück zum Empty-State
+                 scrollt (Briefing entfernen), erscheint die Hero-Eingabe
+                 wieder.
+          */}
 
           {/* Session Bar removed: the step-pill bar (with Zusammenfassung /
                Canvas shortcuts) was intentionally dropped from the briefing
@@ -2143,19 +2099,26 @@ export default function HomeClient() {
                     activeProjectIdRef.current = pid;
                   }}
                   onFollowUp={(q) => {
-                    // Audit finding A1-H4 (18.04.2026): clicking a
-                    // follow-up used to auto-submit the LLM call with
-                    // no confirmation — one accidental click fired a
-                    // new briefing. Now we just pre-fill the top
-                    // command line and focus it; the user presses
-                    // Enter (or clicks Analysieren) to actually fire
-                    // the query. Gives a cancel opportunity.
-                    setQuery(q);
-                    setTimeout(() => {
-                      inputRef.current?.focus();
-                      inputRef.current?.setSelectionRange(q.length, q.length);
-                      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }, 50);
+                    // Follow-ups feuern direkt gegen den LLM, mit dem
+                    // aktuellen Briefing als `prevCtx` — so bleibt der
+                    // Gedankenfaden erhalten und syncToCanvasDb erkennt
+                    // die Query als Follow-up (isFollowUp = true) und
+                    // hängt das Ergebnis ans SELBE Projekt statt ein
+                    // neues anzulegen.
+                    //
+                    // Früher (A1-H4 vom 18.04.2026) wurde der Query nur
+                    // in eine Top-Command-Line vorgefüllt und der User
+                    // musste Enter drücken. Diese Command-Line wurde
+                    // am 19.04.2026 auf User-Wunsch entfernt ("keine
+                    // Command-Line über einer Antwort"). Der explizite
+                    // Klick auf einen Follow-up-Button ist bewusste
+                    // Intent — kein versehentlicher Tastendruck — also
+                    // ist direktes Auslösen hier sicherer als ein
+                    // toter Klick, der nur State setzt und nichts tut.
+                    void handleSubmit(q, {
+                      query: activeEntry.query,
+                      synthesis: activeEntry.briefing?.synthesis ?? "",
+                    });
                   }}
                 />
               </div>

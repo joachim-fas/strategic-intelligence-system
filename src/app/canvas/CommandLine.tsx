@@ -105,12 +105,10 @@ export function CommandLine({
               value={value}
               focused={focused}
               color="#E4FF97"
-              // The command-line bar has a near-opaque white background
-              // (rgba(255,255,255,0.96)). Using solid white as the
-              // invert-glyph colour makes the underlying glyph appear to
-              // vanish into the bar behind the cursor block — exact DOS
-              // feel on a light surface.
-              invertGlyphColor="#FFFFFF"
+              // Glyph behält seine normale Textfarbe (Default des
+              // BlockCursors = computed color des Inputs). Der lime
+              // Block ist reiner Highlight-Hintergrund; der Buchstabe
+              // bleibt lesbar, ohne negativ zu werden.
             />
           </div>
           <button onClick={submit} style={{ flexShrink: 0, padding: "6px 16px", borderRadius: 8, background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>

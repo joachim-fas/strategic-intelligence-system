@@ -8,10 +8,11 @@ import { AppHeader } from "@/components/AppHeader";
 import { useLocale, useT } from "@/lib/locale-context";
 import { FrameworkMeta } from "@/types/frameworks";
 import BlockCursor from "@/components/common/BlockCursor";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 
 interface FrameworkShellProps {
   meta: FrameworkMeta;
-  children: (props: { topic: string; locale: string; de: boolean }) => React.ReactNode;
+  children: (props: { topic: string; locale: string; de: boolean; projectId?: string | null }) => React.ReactNode;
 }
 
 export function FrameworkShell({ meta, children }: FrameworkShellProps) {
@@ -21,6 +22,7 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
   const [topic, setTopic] = useState("");
   const [activeTopic, setActiveTopic] = useState("");
   const [topicFocused, setTopicFocused] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -28,8 +30,71 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
   const name = de ? meta.name.de : meta.name.en;
   const subtitle = de ? meta.subtitle.de : meta.subtitle.en;
 
-  const handleSubmit = () => {
-    if (topic.trim()) setActiveTopic(topic.trim());
+  /**
+   * User-Regel (2026-04-19): jede Eingabe in einem Framework soll sofort
+   * ein Projekt anlegen, das auch persistiert wird — damit der Framework-
+   * Lauf in der Projekt-Liste erscheint und später in der Zusammenfassung
+   * aufgefunden werden kann.
+   *
+   * Der Projekt-Name kombiniert Framework-Name + Topic (80 Zeichen cap,
+   * analog zur Home-Logik in HomeClient.syncToCanvasDb). Der erste Call
+   * feuert POST /api/v1/canvas; die Folge-Writes (Step-Ergebnisse) können
+   * später in `project_queries` landen — das übernimmt die Framework-
+   * Analyse-Schicht eigenständig, sobald sie die `projectId` kennt.
+   *
+   * Fail-safe: wenn die Projekt-Anlage fehlschlägt (Netzwerk, 500), läuft
+   * das Framework trotzdem weiter mit `projectId = null`. Der User sieht
+   * das Framework-Ergebnis, nur ohne Persistenz. Kein Blocking.
+   */
+  const handleSubmit = async () => {
+    const trimmed = topic.trim();
+    if (!trimmed) return;
+    setActiveTopic(trimmed);
+
+    // Nur beim ersten Submit ein neues Projekt anlegen — weitere
+    // Submits auf derselben Seite (z.B. User ändert Topic und drückt
+    // nochmal Enter) verwenden das bestehende Projekt wieder.
+    if (!projectId) {
+      try {
+        const projName = `${name}: ${trimmed}`.slice(0, 80);
+        const res = await fetchWithTimeout("/api/v1/canvas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: projName }),
+        }, 30_000);
+        if (res.ok) {
+          const json = await res.json();
+          const pid = (json?.data?.canvas ?? json?.canvas)?.id;
+          if (pid) {
+            setProjectId(pid);
+            // First Query-Row: das Topic selbst + welches Framework läuft.
+            // Die step-spezifischen Ergebnisse werden später dort abgelegt
+            // wo die Step-Komponenten sitzen (useFrameworkAnalysis).
+            fetchWithTimeout(`/api/v1/projects/${pid}/queries`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query: trimmed,
+                result: {
+                  synthesis: `Framework: ${name} — Topic: ${trimmed}`,
+                  framework: meta.id,
+                  frameworkName: name,
+                  topic: trimmed,
+                  createdAt: new Date().toISOString(),
+                },
+                locale,
+              }),
+            }, 60_000).catch((e) => {
+              console.warn("[framework] Topic-Query-Persist fehlgeschlagen", e);
+            });
+          }
+        } else {
+          console.warn("[framework] Projekt-Anlage fehlgeschlagen", res.status);
+        }
+      } catch (err) {
+        console.warn("[framework] Projekt-Anlage Fehler", err);
+      }
+    }
   };
 
   return (
@@ -120,17 +185,17 @@ export function FrameworkShell({ meta, children }: FrameworkShellProps) {
                 }}
               />
               {/*
-                Per-framework accent. The invertGlyphColor is the INPUT's
-                own background (not the card wrapper behind it) so that
-                the ghost-glyph inside the cursor matches what the letter
-                would look like on the input surface.
+                Per-framework accent as cursor fill. The glyph under the
+                cursor keeps its original text colour (default of
+                BlockCursor) so it stays readable on top of the lime /
+                pastel highlight block — no invert, no colour jump as
+                the cursor blinks.
               */}
               <BlockCursor
                 targetRef={inputRef}
                 value={topic}
                 focused={topicFocused}
                 color={meta.color.accent}
-                invertGlyphColor="var(--background, #FFFFFF)"
               />
             </div>
             <button

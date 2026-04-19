@@ -13,21 +13,21 @@
  *      textarea.
  *   3. Drawing a `<div>` at that position as an opaque colored block.
  *
- * ## Invert-glyph (DOS/terminal inversion, 2026-04)
+ * ## Glyph-over-highlight (2026-04)
  *
- * Classic terminals render the block cursor with the character that lives
- * under it shown in the BACKGROUND colour — the glyph is visible through
- * the block "negatively", and flashes back to its normal colour every
- * half-cycle as the cursor blinks. Without this, a wide block cursor
- * simply covers the next character and you can't read what you're about
- * to overwrite.
+ * When the cursor block sits over a character, the character stays
+ * readable THROUGH the block — same text colour as the rest of the
+ * input (default: the input's own `color`), painted ON TOP of the
+ * cursor's fill. Visually the effect is "text-marker highlight":
+ * a lime rectangle behind an unchanged glyph. Cursor blinks → the
+ * whole block (fill + glyph copy) flashes out every half-cycle and
+ * the normal underlying glyph shines through, so the typist never
+ * loses sight of the character they're about to overwrite.
  *
- * We copy the target's computed font properties into the cursor block, put
- * the next character inside as a `<span>` painted in `invertGlyphColor`
- * (default: the input's background — `var(--background, #FFFFFF)`), and
- * let the same `sis-blink` animation flash the whole block (background +
- * inverted glyph) in sync. Cursor ON → lime block with ghost-white glyph.
- * Cursor OFF → the original black glyph reappears at its normal position.
+ * (An earlier iteration painted the glyph in the input's BACKGROUND
+ * colour to mimic classic DOS inversion — white-on-lime. The project
+ * owner rejected that: at SIS we want the glyph to keep its original
+ * colour. Same-colour copy it is.)
  *
  * The component renders absolute-positioned children into its nearest
  * positioned ancestor, so the CALLER must wrap the target in a
@@ -51,16 +51,13 @@ export interface BlockCursorProps {
    *  on white surfaces. */
   color?: string;
   /**
-   * Colour of the glyph shown INSIDE the cursor block (the "inverted"
-   * character that shines through the cursor). Default:
-   * `var(--background, #FFFFFF)` — the typical white page background.
-   *
-   * For dark / pastel framework inputs the caller can override with the
-   * input's actual background colour so the invert effect stays visually
-   * coherent (e.g. a pastel-tinted input keeps its card colour showing
-   * through the cursor block).
+   * Colour of the glyph shown INSIDE the cursor block. Defaults to the
+   * input's OWN computed `color` — i.e. the character under the cursor
+   * stays its original colour while the lime block highlights behind
+   * it. Callers only override when they want a non-standard tint (e.g.
+   * a brighter on-dark variant).
    */
-  invertGlyphColor?: string;
+  glyphColor?: string;
   /** Minimum cursor width in px — used at end-of-input or over zero-width
    *  characters so the cursor stays visibly clickable. */
   minWidth?: number;
@@ -85,10 +82,14 @@ const MIRROR_COPY_PROPS = [
 ] as const;
 
 /**
- * Font properties we mirror onto the cursor's invert-glyph span. Pulled
+ * Font properties we mirror onto the cursor's highlight-glyph span. Pulled
  * into a narrower set than MIRROR_COPY_PROPS because the mirror cares
  * about BOX metrics (padding, border) while the glyph inside the cursor
- * is a one-character centered span that only needs TEXT metrics.
+ * is a one-character centered span that only needs TEXT metrics. The
+ * `color` field captures the input's own text colour so we can paint
+ * the highlight-glyph copy in exactly the same shade — making the
+ * original character appear untouched even while the lime block flashes
+ * behind it.
  */
 interface CursorFont {
   fontFamily: string;
@@ -99,6 +100,7 @@ interface CursorFont {
   letterSpacing: string;
   lineHeight: string;
   textTransform: string;
+  color: string;
 }
 
 export default function BlockCursor({
@@ -106,7 +108,7 @@ export default function BlockCursor({
   value,
   focused,
   color = "#E4FF97",
-  invertGlyphColor = "var(--background, #FFFFFF)",
+  glyphColor,
   minWidth = 9,
   hidden = false,
 }: BlockCursorProps) {
@@ -208,6 +210,10 @@ export default function BlockCursor({
       letterSpacing: cs.letterSpacing,
       lineHeight: cs.lineHeight,
       textTransform: cs.textTransform,
+      // Capture the input's own text colour so the glyph drawn inside
+      // the cursor block keeps the original shade (black on light
+      // themes). No "inverted" look — the block is just a highlight.
+      color: cs.color,
     });
   }, [focused, value, selStart, hidden, targetRef, minWidth]);
 
@@ -228,22 +234,24 @@ export default function BlockCursor({
             width: rect.width,
             height: rect.height,
             background: color,
-            // Inline-flex so the invert-glyph centers inside the block.
-            // `overflow: hidden` keeps a too-wide glyph from escaping
-            // (can happen with oversized italic or ligature chars).
+            // Inline-flex so the highlight-glyph sits exactly where the
+            // underlying character does. `overflow: hidden` keeps a
+            // too-wide glyph from escaping (oversized italics, ligatures).
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             overflow: "hidden",
             pointerEvents: "none",
-            // The blink cycles the WHOLE block — background AND invert
-            // glyph together. Cursor ON: both visible (block + ghost
-            // glyph through it). Cursor OFF: both gone, the normal
-            // underlying glyph at the input's own layer shows through.
+            // The blink cycles the WHOLE block — highlight fill AND
+            // glyph copy together. Cursor ON: lime highlight with the
+            // character visible in its original colour on top. Cursor
+            // OFF: block disappears, the input's own glyph layer
+            // remains — so the character never "pops" position or
+            // colour during the blink.
             animation: "sis-blink 1s steps(1, end) infinite",
             zIndex: 2,
-            // Font metrics mirror exactly so the invert-glyph sits at
-            // the SAME position it would have had as a regular
+            // Font metrics mirror exactly so the highlight-glyph sits
+            // at the SAME position it would have had as a regular
             // character. Without this the glyph can drift by a subpixel
             // on different font stacks and the user sees a ghosting
             // effect when the cursor blinks off.
@@ -260,10 +268,13 @@ export default function BlockCursor({
           {glyph && (
             <span
               style={{
-                color: invertGlyphColor,
+                // Default: the input's own text colour (captured via
+                // getComputedStyle). Override with `glyphColor` only
+                // when the caller explicitly wants a different tint.
+                color: glyphColor ?? font?.color ?? "currentColor",
                 // The glyph inherits all font properties from the block
-                // so we don't re-declare them. Whitespace: no char ->
-                // no span -> no ghost artifact.
+                // so we don't re-declare them. Whitespace → no span →
+                // no ghost artifact.
                 userSelect: "none",
               }}
             >
