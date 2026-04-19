@@ -15,6 +15,29 @@ import { getTrendSources, getTotalSourceCount } from "./trend-sources";
 import { autoClassify } from "./classify";
 import { Locale } from "./i18n";
 
+/**
+ * Aktuelles Datum als Prompt-Block. Alle SIS-System-Prompts müssen diesen
+ * Block einbauen — sonst nimmt der LLM sein Training-Cutoff (typischerweise
+ * ~2024) stillschweigend als „jetzt" an und formuliert Prognosen für
+ * Zeiträume, die in Wahrheit längst Vergangenheit sind.
+ *
+ * Beispiel für einen Fehler den dieser Helper verhindert: ein User stellt
+ * im April 2026 eine Frage zum Ukraine-Krieg und bekommt die Antwort
+ * „Kriegsende vor Ende 2025 ist möglich" — als wäre 2025 noch in der
+ * Zukunft.
+ */
+export function buildDateContext(locale: Locale): string {
+  const now = new Date();
+  const dateDe = now.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  const dateEn = now.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  const isoDate = now.toISOString().slice(0, 10);
+  return locale === "de"
+    ? `═══ ZEITLICHER KONTEXT ═══
+Heute ist ${dateDe} (ISO: ${isoDate}). Alles vor diesem Datum ist Vergangenheit und wird im Präteritum/Perfekt behandelt. Formuliere Prognosen NUR für Zeiträume, die nach diesem Datum beginnen. Prüfe bei jeder Zeitangabe, ob sie in der Vergangenheit oder Zukunft liegt.`
+    : `═══ TEMPORAL CONTEXT ═══
+Today is ${dateEn} (ISO: ${isoDate}). Everything before this date is past and must be phrased in past tense. Forecasts may only cover time periods starting after this date. Verify every date reference against the current date before writing.`;
+}
+
 interface LLMBriefingRequest {
   query: string;
   trends: TrendDot[];
@@ -104,7 +127,14 @@ export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignal
 
   const lang = locale === "de" ? "Antworte auf Deutsch." : "Respond in English.";
 
+  // Aktuelles Datum — verhindert, dass der LLM sein Training-Cutoff als
+  // „jetzt" behandelt und Prognosen für längst vergangene Zeiträume stellt
+  // (z.B. „Kriegsende vor Ende 2025" im April 2026).
+  const dateContext = buildDateContext(locale);
+
   return `Du bist das Strategic Intelligence System (SIS) — ein Denk-Instrument auf dem Niveau eines erstklassigen Think-Tanks mit explizitem EU-Fokus. ${lang}
+
+${dateContext}
 
 ⚠️ KRITISCH: Deine GESAMTE Antwort MUSS ein EINZIGES JSON-Objekt sein. Kein Text vor { oder nach }. Kein Markdown. Nur reines JSON. Die genaue Struktur kommt weiter unten.
 

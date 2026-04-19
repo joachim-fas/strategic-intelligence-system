@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
 import { requireTenantContext } from "@/lib/api-helpers";
+import { buildDateContext } from "@/lib/llm";
 
 /** Repair truncated JSON by closing open structures. */
 function tryRepairJSON(text: string): any | null {
@@ -811,7 +812,13 @@ export async function POST(req: Request) {
   const safeContext = sanitizeForPrompt(contextText);
   const userPrompt = promptBuilder(safeTopic, step as string, safeContext, locale || "de");
 
-  const systemPrompt = `Du bist ein Senior-Strategieberater im Strategic Intelligence System (SIS). Du lieferst strukturierte, datengestützte Analysen. Antworte IMMER als valides JSON — kein Markdown-Codefence, kein Fließtext davor/danach, NUR das JSON-Objekt. Sei konkret: nenne echte Unternehmen, echte Zahlen, echte Regulierungen. Sprache: ${locale === "de" ? "Deutsch" : "English"}.`;
+  // Datum-Kontext verhindert, dass Framework-Analysen (z.B. Pre-Mortem,
+  // War-Gaming) mit einem stillschweigenden Training-Cutoff-„heute"
+  // Zukunftsprognosen aus der Vergangenheit ziehen.
+  const dateBlock = buildDateContext((locale === "en" ? "en" : "de") as "de" | "en");
+  const systemPrompt = `${dateBlock}
+
+Du bist ein Senior-Strategieberater im Strategic Intelligence System (SIS). Du lieferst strukturierte, datengestützte Analysen. Antworte IMMER als valides JSON — kein Markdown-Codefence, kein Fließtext davor/danach, NUR das JSON-Objekt. Sei konkret: nenne echte Unternehmen, echte Zahlen, echte Regulierungen. Sprache: ${locale === "de" ? "Deutsch" : "English"}.`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

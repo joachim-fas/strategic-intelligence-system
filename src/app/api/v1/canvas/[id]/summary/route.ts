@@ -16,6 +16,7 @@ import type { Database as DatabaseType } from "better-sqlite3";
 import { getSqliteHandle } from "@/db";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
+import { buildDateContext } from "@/lib/llm";
 import { requireTenantContext } from "@/lib/api-helpers";
 
 // Single shared DB handle — previously this file opened a fresh
@@ -261,8 +262,13 @@ function buildSingleQueryReviewPrompt(
   locale: string,
 ): { system: string; user: string } {
   const de = locale === "de";
-  const system = de
-    ? `Du bist ein Senior-Stratege im SIS. Dieses Projekt enthaelt bisher GENAU EINE Analyse. Deine Aufgabe: keinen zweiten Briefing-Durchlauf schreiben — sondern die bestehende Analyse als strategischer Sparring-Partner auseinandernehmen.
+  // Datum mitgeben, damit „openFlanks" / „Folgefragen" nicht in vergangenen
+  // Zeiträumen formuliert werden.
+  const dateBlock = buildDateContext(de ? "de" : "en");
+  const system = (de
+    ? `${dateBlock}
+
+Du bist ein Senior-Stratege im SIS. Dieses Projekt enthaelt bisher GENAU EINE Analyse. Deine Aufgabe: keinen zweiten Briefing-Durchlauf schreiben — sondern die bestehende Analyse als strategischer Sparring-Partner auseinandernehmen.
 
 Liefere in EXAKT dem Schema unten:
 
@@ -277,7 +283,9 @@ Liefere in EXAKT dem Schema unten:
 - critique: 1-2 Saetze, ehrlich zur Tiefe und Belastbarkeit dieser einen Analyse.
 
 Antworte ausschliesslich als valides JSON — kein Markdown, kein Vorwort. Sprache: Deutsch.`
-    : `You are a Senior Strategist in SIS. This project contains EXACTLY ONE analysis so far. Your job: do not rewrite the briefing — take it apart as a strategic sparring partner.
+    : `${dateBlock}
+
+You are a Senior Strategist in SIS. This project contains EXACTLY ONE analysis so far. Your job: do not rewrite the briefing — take it apart as a strategic sparring partner.
 
 Deliver EXACTLY this schema:
 
@@ -291,7 +299,7 @@ Deliver EXACTLY this schema:
 - confidence: realistic 0..1.
 - critique: 1-2 honest sentences on the depth / reliability of this single analysis.
 
-Respond only as valid JSON — no markdown, no preamble. Language: English.`;
+Respond only as valid JSON — no markdown, no preamble. Language: English.`);
 
   const bodyParts: string[] = [`<query index="0">`, `  <question>${query.query}</question>`];
   if (query.synthesis) bodyParts.push(`  <synthesis>${query.synthesis}</synthesis>`);

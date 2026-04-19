@@ -45,6 +45,7 @@ import { getSqliteHandle } from "@/db";
 import type { RawSignal } from "@/connectors/types";
 import { completeText } from "./ai-text";
 import { resolveEnv } from "./env";
+import { buildDateContext } from "./llm";
 
 export interface ClusterSnapshot {
   id: string;
@@ -353,7 +354,10 @@ export async function generateClusterForesight(
   if (!current.topic || !current.summary || current.summary === "(empty)") return null;
 
   const isDe = locale === "de";
-  const system = isDe
+  // Datum-Kontext: „12–24 Monate" müssen relativ zu heute sein, nicht
+  // relativ zum LLM-Training-Cutoff.
+  const dateBlock = buildDateContext(locale);
+  const system = (isDe
     ? [
         "Du bist ein Strategieanalyst. Gegeben ein Trend-Cluster mit einer Kurzzusammenfassung, formulierst du 2–3 mögliche Zukunftsszenarien der nächsten 12–24 Monate.",
         "Jedes Szenario hat: einen Titel (max 5 Wörter), eine Konfidenz (0–1 basiert auf Signalstärke), und bis zu 3 Treiber (je max 10 Wörter).",
@@ -367,7 +371,8 @@ export async function generateClusterForesight(
         "Respond ONLY as a JSON array with exactly this shape:",
         `[{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …]`,
         "No preamble, no markdown, no text outside the array.",
-      ].join(" ");
+      ].join(" ")
+  ) + "\n\n" + dateBlock;
 
   const user = isDe
     ? `Thema: ${current.topic}\nSignalzahl: ${current.signalCount}\nZusammenfassung: ${current.summary}`
