@@ -4,12 +4,14 @@ import { useState } from "react";
 import { Pencil, X, ArrowRight } from "lucide-react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { Locale } from "@/lib/i18n";
+import { useT } from "@/lib/locale-context";
 
 export function EigenerGedanke({ locale, context, onSubmit }: {
   locale: Locale;
   context: { query: string; synthesis: string; scenarios?: any[]; causalChain?: string[] };
   onSubmit: (query: string) => void;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const de = locale === "de";
@@ -42,7 +44,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
 
   if (!open) {
     return (
-      <Tooltip content={de ? "Eigene These gegen die Analyse stresstesten" : "Stress-test your own thesis against the analysis"} placement="top">
+      <Tooltip content={t("ownThought.openTooltip")} placement="top">
         <button
           onClick={() => setOpen(true)}
           style={{
@@ -62,7 +64,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
         >
           <Pencil size={13} color="var(--volt-text-faint, #BDBDBD)" strokeWidth={2} />
           <span style={{ fontSize: 12, color: "var(--volt-text-faint, #9B9B9B)", fontFamily: "var(--font-ui)" }}>
-            {de ? "Eigenen Gedanken einbringen…" : "Add your own thought…"}
+            {t("ownThought.openButton")}
           </span>
         </button>
       </Tooltip>
@@ -73,15 +75,15 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
     <div style={{ border: "1px solid var(--volt-lime, #E4FF97)", borderRadius: 8, overflow: "hidden", background: "var(--volt-surface-raised, #FDFFF5)", fontFamily: "var(--font-ui)" }}>
       <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--volt-lime, #E4FF97)", display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "var(--volt-text, #0A0A0A)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-          {de ? "Eigener Gedanke" : "Your thought"}
+          {t("ownThought.heading")}
         </span>
         <span style={{ fontSize: 11, color: "var(--volt-text-muted, #6B6B6B)", fontWeight: 400, fontFamily: "var(--font-ui)" }}>
-          {de ? "— wird kritisch gegen die Analyse geprüft" : "— critically tested against the analysis"}
+          {t("ownThought.subheading")}
         </span>
-        <Tooltip content={de ? "Schließen" : "Close"} placement="top">
+        <Tooltip content={t("ownThought.close")} placement="top">
           <button
             onClick={() => setOpen(false)}
-            aria-label={de ? "Schließen" : "Close"}
+            aria-label={t("ownThought.close")}
             style={{
               marginLeft: "auto", background: "none", border: "none", cursor: "pointer",
               color: "var(--volt-text-faint, #9B9B9B)",
@@ -96,9 +98,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === "Enter" && e.metaKey) handleSubmit(); }}
-        placeholder={de
-          ? "Deine These, Hypothese oder Einschätzung… (⌘↵ zum Absenden)"
-          : "Your thesis, hypothesis, or perspective… (⌘↵ to submit)"}
+        placeholder={t("ownThought.placeholder")}
         style={{
           width: "100%", border: "none", outline: "none", resize: "none",
           padding: "12px", fontSize: 14, lineHeight: 1.6, color: "var(--volt-text, #0A0A0A)",
@@ -115,7 +115,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
             fontFamily: "var(--font-ui)",
           }}
         >
-          {de ? "Abbrechen" : "Cancel"}
+          {t("ownThought.cancel")}
         </button>
         <button
           onClick={handleSubmit}
@@ -130,7 +130,7 @@ Critically evaluate my thought: Where is it right, where is it wrong? What data 
             border: "none", cursor: text.trim() ? "pointer" : "default", transition: "all 0.15s",
           }}
         >
-          {de ? "Einbringen" : "Submit"}
+          {t("ownThought.submit")}
           <ArrowRight size={13} strokeWidth={2.25} />
         </button>
       </div>

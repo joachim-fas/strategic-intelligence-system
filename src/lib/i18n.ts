@@ -1229,6 +1229,17 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  ownThought: {
+    openTooltip: "Stress-test your own thesis against the analysis",
+    openButton: "Add your own thought…",
+    heading: "Your thought",
+    subheading: "— critically tested against the analysis",
+    close: "Close",
+    placeholder: "Your thesis, hypothesis, or perspective… (⌘↵ to submit)",
+    cancel: "Cancel",
+    submit: "Submit",
+  },
+
   frameworkShell: {
     breadcrumbHome: "SIS",
     breadcrumbFrameworks: "Frameworks",
@@ -2514,6 +2525,17 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  ownThought: {
+    openTooltip: "Eigene These gegen die Analyse stresstesten",
+    openButton: "Eigenen Gedanken einbringen…",
+    heading: "Eigener Gedanke",
+    subheading: "— wird kritisch gegen die Analyse geprüft",
+    close: "Schließen",
+    placeholder: "Deine These, Hypothese oder Einschätzung… (⌘↵ zum Absenden)",
+    cancel: "Abbrechen",
+    submit: "Einbringen",
   },
 
   frameworkShell: {
