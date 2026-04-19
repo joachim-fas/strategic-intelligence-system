@@ -1229,6 +1229,16 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  canvasStream: {
+    errorTimeout: "Connection failed — timed out",
+    // {{detail}} = error message, typically an Error toString
+    errorFailed: "Connection failed: {{detail}}",
+    errorMidStream: "Connection dropped mid-response",
+    errorIncomplete: "Response incomplete — server ended stream without a final event",
+    errorNoResponse: "No response received",
+    errorGeneric: "Error",
+  },
+
   methodikPage: {
     backToCockpitFull: "Back to Knowledge Cockpit",
     backToCockpit: "Back to Cockpit",
@@ -2576,6 +2586,15 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  canvasStream: {
+    errorTimeout: "Verbindung fehlgeschlagen — Zeit überschritten",
+    errorFailed: "Verbindung fehlgeschlagen: {{detail}}",
+    errorMidStream: "Verbindung während der Antwort unterbrochen",
+    errorIncomplete: "Antwort unvollständig — Server beendete den Stream ohne Abschluss",
+    errorNoResponse: "Keine Antwort erhalten",
+    errorGeneric: "Fehler",
   },
 
   methodikPage: {

@@ -29,6 +29,7 @@
 
 import type { QueryResult } from "@/types";
 import { consumeSSE } from "@/lib/sse-client";
+import { t as translate, type Locale } from "@/lib/i18n";
 
 export function extractSynthesisDelta(acc: string, sent: number): string {
   const keyIdx = acc.indexOf('"synthesis"');
@@ -83,17 +84,17 @@ const RECONNECT_BACKOFFS_MS = [500, 1500, 4500] as const;
 
 // Small locale-aware string helper. `streamQuery` takes `locale` as a bare
 // string (not the i18n `Locale` type) so that the stream layer stays
-// independent of the dictionary — it only needs to pass locale through to the
-// API and pick between DE/EN for the three error surfaces below.
+// independent of React context — we route through the pure `translate()`
+// function with a narrowed locale cast for the six error surfaces below.
 function errMsg(locale: string, key: "timeout" | "failed" | "httpStatus" | "midStream" | "incomplete" | "noResponse", detail?: string | number): string {
-  const de = locale === "de";
+  const loc = (locale === "de" ? "de" : "en") as Locale;
   switch (key) {
-    case "timeout":    return de ? "Verbindung fehlgeschlagen — Zeit überschritten" : "Connection failed — timed out";
-    case "failed":     return de ? `Verbindung fehlgeschlagen: ${detail}` : `Connection failed: ${detail}`;
+    case "timeout":    return translate(loc, "canvasStream.errorTimeout");
+    case "failed":     return translate(loc, "canvasStream.errorFailed", { detail: String(detail ?? "") });
     case "httpStatus": return `HTTP ${detail}`;
-    case "midStream":  return de ? "Verbindung während der Antwort unterbrochen" : "Connection dropped mid-response";
-    case "incomplete": return de ? "Antwort unvollständig — Server beendete den Stream ohne Abschluss" : "Response incomplete — server ended stream without a final event";
-    case "noResponse": return de ? "Keine Antwort erhalten" : "No response received";
+    case "midStream":  return translate(loc, "canvasStream.errorMidStream");
+    case "incomplete": return translate(loc, "canvasStream.errorIncomplete");
+    case "noResponse": return translate(loc, "canvasStream.errorNoResponse");
   }
 }
 
@@ -193,7 +194,7 @@ export async function streamQuery(
           final = evt.result as QueryResult;
         } else if (evt.type === "error") {
           errored = true;
-          onError((typeof evt.error === "string" ? evt.error : null) ?? (locale === "de" ? "Fehler" : "Error"));
+          onError((typeof evt.error === "string" ? evt.error : null) ?? translate((locale === "de" ? "de" : "en") as Locale, "canvasStream.errorGeneric"));
         }
       },
     });
