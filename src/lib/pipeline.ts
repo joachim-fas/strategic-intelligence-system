@@ -29,7 +29,13 @@ import { megaTrends } from "@/lib/mega-trends";
 import { sanitizeConnectorResponse } from "@/lib/api-utils";
 import { storeSignals, pruneOldSignals } from "@/lib/signals";
 import { updateBaseline, baselineKeyForDate } from "@/lib/baseline";
-import { createClusterSnapshot } from "@/lib/cluster-snapshots";
+import {
+  createClusterSnapshot,
+  clusterSlug,
+  getClusterHistory,
+  generateClusterDiff,
+  buildSimpleSummary,
+} from "@/lib/cluster-snapshots";
 import { eq, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -289,17 +295,35 @@ export async function runPipeline(): Promise<PipelineResult> {
     // Write one cluster_snapshots row per topic-group per pipeline run.
     // Enables a Perigon-style `/v1/stories/history`-equivalent endpoint
     // so analysts can trace how a cluster has evolved over time. The
-    // `changelog` + `foresight` fields stay null for now; a Welle-C
-    // follow-up wires them to the AI router. Wrapped per-cluster so a
-    // single malformed group doesn't take out the whole phase.
+    // LLM changelog is gated behind CLUSTER_DIFF_LLM_ENABLED so the
+    // operator opts in explicitly (pipeline cadence would otherwise
+    // mean ~180 LLM calls/day at prod 4h cadence × 30 clusters).
+    // Wrapped per-cluster so a single malformed group doesn't take
+    // out the whole phase.
     try {
       const clusterGroups = groupSignalsByTopic(sanitizedSignals);
       let snapshotCount = 0;
+      let diffCount = 0;
       for (const group of clusterGroups) {
         try {
+          // Look up the previous snapshot for diff-generation BEFORE
+          // writing the new one — otherwise getClusterHistory(1)
+          // would return the row we just wrote.
+          const slug = clusterSlug(group.topic);
+          const prev = getClusterHistory(slug, 1)[0] ?? null;
+
+          const summaryPreview = buildSimpleSummary(group.signals);
+          const changelog = await generateClusterDiff(prev, {
+            topic: group.topic,
+            summary: summaryPreview,
+            signalCount: group.signals.length,
+          });
+          if (changelog) diffCount += 1;
+
           createClusterSnapshot({
             topic: group.topic,
             signals: group.signals,
+            changelog,
           });
           snapshotCount += 1;
         } catch (innerErr) {
@@ -313,7 +337,7 @@ export async function runPipeline(): Promise<PipelineResult> {
           // next run picks up the cadence again.
         }
       }
-      console.log(`[pipeline] cluster_snapshots: wrote ${snapshotCount} rows across ${clusterGroups.length} topics`);
+      console.log(`[pipeline] cluster_snapshots: wrote ${snapshotCount} rows across ${clusterGroups.length} topics (${diffCount} with LLM changelog)`);
     } catch (err) {
       console.error("[pipeline] cluster snapshot phase failed:", err);
     }

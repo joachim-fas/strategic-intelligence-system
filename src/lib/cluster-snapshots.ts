@@ -43,6 +43,8 @@
 
 import { getSqliteHandle } from "@/db";
 import type { RawSignal } from "@/connectors/types";
+import { completeText } from "./ai-text";
+import { resolveEnv } from "./env";
 
 export interface ClusterSnapshot {
   id: string;
@@ -74,8 +76,12 @@ export function clusterSlug(topic: string): string {
  * dumb — the point is to have SOMETHING human-readable in the
  * snapshot so the LLM-diff step has input to work with. A real
  * summary (via LLM) is a follow-up.
+ *
+ * Exported so pipeline-phase-2d can preview the same summary that
+ * will be persisted, feeding it into `generateClusterDiff` before
+ * the snapshot row is written.
  */
-function buildSimpleSummary(signals: RawSignal[], maxItems = 3): string {
+export function buildSimpleSummary(signals: RawSignal[], maxItems = 3): string {
   if (signals.length === 0) return "(empty)";
   const titles = signals
     .map((s) => (s.sourceTitle ?? "").trim())
@@ -248,36 +254,48 @@ export function listClusters(): Array<{
 }
 
 /**
- * Hook for future LLM-driven changelog generation. Takes the previous
- * and current snapshot and should return a one-line diff that names
- * the specific change (new signals, dropped signals, framing shift).
+ * Generate a one-line LLM changelog comparing the previous snapshot
+ * to the current one. Gated behind `CLUSTER_DIFF_LLM_ENABLED=true`
+ * so the feature is opt-in — pipeline runs every 4 h in prod and
+ * ~30 clusters per run would be ~180 LLM calls/day otherwise, which
+ * is cost the operator should agree to explicitly.
  *
- * Currently a stub that returns `null` — shipping the data layer
- * without coupling to prompt iteration. Wire up the Anthropic call
- * under an env flag in a follow-up (Welle C item 1 uses the same
- * LLM-router hook, so this will live there).
+ * Behaviour:
+ *   - Returns `null` if the flag isn't set, if no ANTHROPIC_API_KEY
+ *     is configured, or the LLM call fails / times out. All failure
+ *     modes are silent — snapshots still write with changelog=null
+ *     and the feature just degrades to the base history view.
+ *   - Short-circuits to `null` on the first snapshot (no prior
+ *     state to diff against) and when summaries are byte-identical
+ *     (no change worth describing).
  *
- * The signature is stable: when the real implementation lands,
- * existing callers of `createClusterSnapshot` don't change.
+ * Prompt strategy: deliberately minimal + opinionated. Ask for a
+ * single sentence, ≤30 words, name-concrete changes only. No
+ * preamble, no bullet list, no quoted material. Locale-aware so
+ * multilingual consumers don't need to translate client-side.
  */
 export async function generateClusterDiff(
-  _previous: ClusterSnapshot | null,
-  _current: { topic: string; summary: string; signalCount: number },
+  previous: ClusterSnapshot | null,
+  current: { topic: string; summary: string; signalCount: number },
+  locale: "de" | "en" = "de",
 ): Promise<string | null> {
-  // Intentionally null — see the doc comment above for the rollout
-  // plan. A real implementation would:
-  //   1. Short-circuit if `previous == null` (first snapshot ever).
-  //   2. Short-circuit if summaries are byte-identical (no change).
-  //   3. Call the AI router with a prompt like:
-  //        "Du analysierst die Entwicklung eines Trend-Clusters.
-  //         Beschreibe in einem Satz (<=30 Wörter), was sich zwischen
-  //         den beiden Snapshots unterschieden hat. Vermeide
-  //         Umschreibungen; nenne konkrete Akteure, Zahlen oder neue
-  //         Themen, falls vorhanden. Sprache: {locale}."
-  //   4. Cap output length and strip whitespace.
-  //   5. Return null on API failure so callers fall back to the
-  //      stored raw summaries.
-  return null;
+  if (resolveEnv("CLUSTER_DIFF_LLM_ENABLED") !== "true") return null;
+  if (!previous) return null;
+  if (previous.summary === current.summary) return null;
+
+  const isDe = locale === "de";
+  const system = isDe
+    ? "Du vergleichst zwei Kurz-Zusammenfassungen desselben Trend-Clusters und beschreibst in EINEM Satz (<=30 Wörter), was sich verändert hat. Nenne konkrete Akteure, Zahlen oder neue Themen. Keine Anrede, keine Wiederholung des Input, keine Anführungszeichen."
+    : "Compare two short summaries of the same trend cluster and describe the change in ONE sentence (<=30 words). Name concrete actors, numbers, or new topics. No preamble, no paraphrasing, no quoted material.";
+  const user = isDe
+    ? `Thema: ${current.topic}\nZuvor (Signalzahl ${previous.signalCount}): ${previous.summary}\nJetzt (Signalzahl ${current.signalCount}): ${current.summary}`
+    : `Topic: ${current.topic}\nBefore (${previous.signalCount} signals): ${previous.summary}\nNow (${current.signalCount} signals): ${current.summary}`;
+
+  return completeText({
+    system,
+    user,
+    maxTokens: 100, // one sentence ≤ 30 words ≈ 60 tokens with headroom
+  });
 }
 
 // ─── Utility helpers ──────────────────────────────────────────────
