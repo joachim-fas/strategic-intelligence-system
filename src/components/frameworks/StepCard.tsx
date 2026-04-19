@@ -2,6 +2,7 @@
 
 import React from "react";
 import { StepResult } from "@/lib/use-framework-analysis";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 interface StepCardProps {
   stepId: string;
@@ -18,6 +19,9 @@ interface StepCardProps {
 
 export function StepCard({ stepId, title, description, accentColor, borderColor, result, onRun, disabled, children, de }: StepCardProps) {
   const status = result?.status || "idle";
+  // Local translator — component receives `de` as prop.
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey, vars?: Record<string, string | number>) => translate(locale, key, vars);
 
   return (
     <div style={{
@@ -53,7 +57,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
           <button
             onClick={onRun}
             disabled={disabled}
-            aria-label={de ? `${title} starten` : `Run ${title}`}
+            aria-label={tl("stepCard.startAriaLabel", { title })}
             style={{
               fontSize: 12, fontWeight: 600,
               padding: "6px 14px", borderRadius: 8,
@@ -65,7 +69,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
               transition: "all 0.15s",
             }}
           >
-            {de ? "Starten" : "Run"} →
+            {tl("stepCard.startLabel")} →
           </button>
         )}
 
@@ -75,7 +79,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
             fontFamily: "var(--font-mono)",
             textTransform: "uppercase", letterSpacing: "0.08em",
           }}>
-            ✓ {de ? "Fertig" : "Done"}
+            ✓ {tl("stepCard.doneLabel")}
           </span>
         )}
       </div>
@@ -101,7 +105,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
           <span className="animate-pulse" style={{ marginRight: 6 }}>●</span>
           {result?.rawText && result.rawText.length > 0
             ? result.rawText.slice(-400)
-            : (de ? "Modell antwortet…" : "Waiting for response…")}
+            : tl("stepCard.waitingForResponse")}
         </div>
       )}
 
@@ -113,7 +117,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span aria-hidden="true">&#x26A0;</span>
-          <span>{result?.error || (de ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut." : "Data could not be loaded. Please try again.")}</span>
+          <span>{result?.error || tl("stepCard.loadFailedDefault")}</span>
           <button
             onClick={onRun}
             style={{
@@ -124,7 +128,7 @@ export function StepCard({ stepId, title, description, accentColor, borderColor,
               cursor: "pointer",
             }}
           >
-            {de ? "Erneut" : "Retry"}
+            {tl("stepCard.retryLabel")}
           </button>
         </div>
       )}

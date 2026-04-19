@@ -37,7 +37,7 @@ interface SourcesStatus {
 }
 
 export function DataGapHint({ compact = false }: { compact?: boolean }) {
-  const { de } = useT();
+  const { t } = useT();
   const [data, setData] = useState<SourcesStatus | null>(null);
   const [error, setError] = useState(false);
 
@@ -66,19 +66,13 @@ export function DataGapHint({ compact = false }: { compact?: boolean }) {
   // are actually that many items in that bucket — so the line stays
   // honest and doesn't list "0 silent" when silence is not a concern.
   const parts: string[] = [];
-  if (data.needsKey > 0) {
-    parts.push(de ? `${data.needsKey} ohne API-Key` : `${data.needsKey} missing API key`);
-  }
-  if (data.stale > 0) {
-    parts.push(de ? `${data.stale} veraltet` : `${data.stale} stale`);
-  }
-  if (data.inactive > 0) {
-    parts.push(de ? `${data.inactive} stumm` : `${data.inactive} silent`);
-  }
+  if (data.needsKey > 0) parts.push(t("gapHint.missingKey", { n: data.needsKey }));
+  if (data.stale > 0) parts.push(t("gapHint.stale", { n: data.stale }));
+  if (data.inactive > 0) parts.push(t("gapHint.silent", { n: data.inactive }));
 
   const summary = parts.join(" · ");
-  const prefixLabel = de ? "Datenlücken" : "Data gaps";
-  const actionLabel = de ? "Monitor öffnen →" : "Open monitor →";
+  const prefixLabel = t("gapHint.prefixLabel");
+  const actionLabel = t("gapHint.actionLabel");
 
   if (compact) {
     // Inline single-line variant for empty-state cards that can't

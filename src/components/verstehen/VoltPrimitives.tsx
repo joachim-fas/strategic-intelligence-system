@@ -487,7 +487,10 @@ export function VoltTrendCard({
           color: "var(--muted-foreground, #6B6B6B)",
         }}
       >
-        <span>{signalCount} {de ? "sig." : "sig."}</span>
+        {/* "sig." is identical DE + EN — previous ternary was a
+             no-op and just noise. `de` prop kept so the caller
+             API doesn't change. */}
+        <span>{signalCount} sig.</span>
         <ConfidenceBadge value={score} size="xs" showLabel={false} />
       </div>
     </button>

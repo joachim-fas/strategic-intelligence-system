@@ -1129,6 +1129,23 @@ const en = {
     axisObserved: "Observed",
     axisPredicted: "Predicted",
   },
+
+  gapHint: {
+    prefixLabel: "Data gaps",
+    actionLabel: "Open monitor →",
+    missingKey: "{{n}} missing API key",
+    stale: "{{n}} stale",
+    silent: "{{n}} silent",
+  },
+
+  stepCard: {
+    startAriaLabel: "Run {{title}}",
+    startLabel: "Run",
+    doneLabel: "Done",
+    waitingForResponse: "Waiting for response…",
+    loadFailedDefault: "Data could not be loaded. Please try again.",
+    retryLabel: "Retry",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2069,6 +2086,23 @@ const de: Dictionary = {
     meanBrier: "Ø Brier",
     axisObserved: "Beobachtet",
     axisPredicted: "Vorhergesagt",
+  },
+
+  gapHint: {
+    prefixLabel: "Datenlücken",
+    actionLabel: "Monitor öffnen →",
+    missingKey: "{{n}} ohne API-Key",
+    stale: "{{n}} veraltet",
+    silent: "{{n}} stumm",
+  },
+
+  stepCard: {
+    startAriaLabel: "{{title}} starten",
+    startLabel: "Starten",
+    doneLabel: "Fertig",
+    waitingForResponse: "Modell antwortet…",
+    loadFailedDefault: "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    retryLabel: "Erneut",
   },
 };
 
