@@ -21,6 +21,7 @@ import { useT } from "@/lib/locale-context";
 import { useTenant } from "@/lib/tenant-context";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
+import { CalibrationCurve, type CalibrationBucketDto } from "@/components/ui/CalibrationCurve";
 import type {
   Forecast,
   ForecastDetail,
@@ -477,7 +478,7 @@ function DetailPanel({
   );
 }
 
-// ─── Position row with lazy calibration chip ────────────────────
+// ─── Position row with lazy calibration chip + expandable curve ─
 function PositionRow({
   position, de,
 }: {
@@ -485,7 +486,12 @@ function PositionRow({
   tenantForecastId: string;
   de: boolean;
 }) {
-  const [calib, setCalib] = useState<{ meanBrier: number | null; totalResolved: number } | null>(null);
+  const [calib, setCalib] = useState<{
+    meanBrier: number | null;
+    totalResolved: number;
+    buckets: CalibrationBucketDto[];
+  } | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   // Fetch once on mount — the endpoint is tenant-scoped + already
   // short-cache-friendly, and we only do one call per row.
@@ -504,6 +510,7 @@ function PositionRow({
           setCalib({
             meanBrier: json.data?.meanBrier ?? null,
             totalResolved: json.data?.totalResolved ?? 0,
+            buckets: json.data?.buckets ?? [],
           });
         }
       } catch {
@@ -516,13 +523,14 @@ function PositionRow({
   // Render the calibration chip ONLY when the user has at least
   // one resolved prediction; showing "0 resolved" on a fresh tenant
   // would be visual noise.
-  const calibLabel = calib && calib.totalResolved > 0 && calib.meanBrier != null
-    ? `Brier ${calib.meanBrier.toFixed(2)} (${calib.totalResolved})`
+  const hasCalib = calib && calib.totalResolved > 0 && calib.meanBrier != null;
+  const calibLabel = hasCalib
+    ? `Brier ${calib!.meanBrier!.toFixed(2)} (${calib!.totalResolved})`
     : null;
   const calibTooltip = calibLabel && de
-    ? `Durchschnittlicher Brier-Score über ${calib?.totalResolved} aufgelöste Vorhersagen. Niedriger = besser kalibriert (0 = perfekt, 0.25 = immer 50:50).`
+    ? `Durchschnittlicher Brier-Score über ${calib?.totalResolved} aufgelöste Vorhersagen. Klick für Kalibrierungs-Kurve.`
     : calibLabel
-      ? `Mean Brier score across ${calib?.totalResolved} resolved predictions. Lower = better-calibrated (0 = perfect, 0.25 = always 50:50).`
+      ? `Mean Brier across ${calib?.totalResolved} resolved predictions. Click to see the calibration curve.`
       : undefined;
   // Tier the Brier visually: <0.10 is well-calibrated, 0.10–0.25 is
   // okay, >0.25 is questionable. These thresholds match the
@@ -536,39 +544,65 @@ function PositionRow({
         : "#C4241B";
 
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "6px 10px", border: "1px solid var(--color-border)",
-      borderRadius: 6, fontSize: 12,
-    }}>
-      <span style={{ fontFamily: "var(--volt-font-mono)", color: "var(--color-text-muted)", fontSize: 11 }}>
-        {position.userId.slice(0, 8)}
-      </span>
-      <ConfidenceBadge value={position.yesProbability} size="xs" showLabel={false} />
-      {position.rationale && (
-        <span style={{ flex: 1, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-          {position.rationale}
+    <>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "6px 10px", border: "1px solid var(--color-border)",
+        borderRadius: expanded ? "6px 6px 0 0" : 6,
+        borderBottom: expanded ? "none" : undefined,
+        fontSize: 12,
+      }}>
+        <span style={{ fontFamily: "var(--volt-font-mono)", color: "var(--color-text-muted)", fontSize: 11 }}>
+          {position.userId.slice(0, 8)}
         </span>
-      )}
-      {calibLabel && (
-        <span
-          title={calibTooltip}
-          style={{
-            fontFamily: "var(--volt-font-mono)",
-            fontSize: 9, fontWeight: 700,
-            padding: "1px 6px", borderRadius: 10,
-            background: "var(--color-surface-2, #F5F5F5)",
-            color: calibColor,
-            flexShrink: 0,
-          }}
-        >
-          {calibLabel}
+        <ConfidenceBadge value={position.yesProbability} size="xs" showLabel={false} />
+        {position.rationale && (
+          <span style={{ flex: 1, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+            {position.rationale}
+          </span>
+        )}
+        {calibLabel && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            title={calibTooltip}
+            style={{
+              fontFamily: "var(--volt-font-mono)",
+              fontSize: 9, fontWeight: 700,
+              padding: "1px 6px", borderRadius: 10,
+              background: expanded ? "var(--volt-lime, #E4FF97)" : "var(--color-surface-2, #F5F5F5)",
+              color: calibColor,
+              flexShrink: 0,
+              border: "1px solid var(--color-border)",
+              cursor: "pointer",
+            }}
+          >
+            {calibLabel} {expanded ? "▴" : "▾"}
+          </button>
+        )}
+        <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-text-faint)" }}>
+          {new Date(position.stakedAt).toLocaleDateString()}
         </span>
+      </div>
+      {expanded && calib && (
+        <div style={{
+          border: "1px solid var(--color-border)",
+          borderTop: "none",
+          borderRadius: "0 0 6px 6px",
+          padding: "12px 14px",
+          background: "var(--color-surface-2, #FAFAFA)",
+          display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap",
+        }}>
+          <CalibrationCurve
+            buckets={calib.buckets}
+            totalResolved={calib.totalResolved}
+            meanBrier={calib.meanBrier}
+            de={de}
+            size={220}
+          />
+        </div>
       )}
-      <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--color-text-faint)" }}>
-        {new Date(position.stakedAt).toLocaleDateString()}
-      </span>
-    </div>
+    </>
   );
 }
 
