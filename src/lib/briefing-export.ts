@@ -96,6 +96,22 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
     lines.push("");
   }
 
+  // v0.2 Anomaly Signals — signals that contradict the dominant trend direction
+  if (b.anomalySignals && Array.isArray(b.anomalySignals) && b.anomalySignals.length > 0) {
+    const anomalyHeader = locale === "de" ? "Anomalien im Signalbild" : "Anomaly Signals";
+    lines.push(`## ${anomalyHeader}`);
+    for (const a of b.anomalySignals) {
+      if (!a || typeof a !== "object") continue;
+      const sig = a.signal || "";
+      const contr = a.contradicts || "";
+      const interp = a.interpretation || "";
+      lines.push(`- **${sig}**`);
+      if (contr) lines.push(`  - ${locale === "de" ? "Widerspricht" : "Contradicts"}: ${contr}`);
+      if (interp) lines.push(`  - ${locale === "de" ? "Interpretation" : "Interpretation"}: ${interp}`);
+    }
+    lines.push("");
+  }
+
   // References
   if (b.references?.length > 0) {
     lines.push(`## ${t("summary.sectionReferences")}`);
@@ -103,6 +119,46 @@ export function briefingToMarkdown(entry: HistoryEntry, locale: Locale): string 
       lines.push(`- [${ref.title}](${ref.url})`);
     }
     lines.push("");
+  }
+
+  // v0.2 Used Sources — structured source list if the LLM provided one
+  if (b.usedSources && Array.isArray(b.usedSources) && b.usedSources.length > 0) {
+    const sourcesHeader = locale === "de" ? "Quellen-Basis (strukturiert)" : "Sources Used (structured)";
+    lines.push(`## ${sourcesHeader}`);
+    for (const s of b.usedSources) {
+      if (!s || typeof s !== "object") continue;
+      const type = (s.type || "").toUpperCase();
+      const name = s.name || "";
+      const date = s.date ? ` · ${s.date}` : "";
+      lines.push(`- [${type}] ${name}${date}`);
+    }
+    lines.push("");
+  }
+
+  // v0.2 Data Quality — signal coverage snapshot for the briefing
+  if (b.dataQuality && typeof b.dataQuality === "object") {
+    const q = b.dataQuality;
+    const quality: string[] = [];
+    if (typeof q.signalCount === "number") {
+      quality.push(`${q.signalCount} ${locale === "de" ? "Signale" : "signals"}`);
+    }
+    if (q.newestSignalAge) {
+      quality.push(`${locale === "de" ? "neuestes" : "newest"}: ${q.newestSignalAge}`);
+    }
+    if (q.dominantSourceType) {
+      quality.push(`${locale === "de" ? "Basis" : "basis"}: ${q.dominantSourceType}`);
+    }
+    if (quality.length > 0) {
+      const dataQualityHeader = locale === "de" ? "Datenlage" : "Data Quality";
+      lines.push(`## ${dataQualityHeader}`);
+      lines.push(`_${quality.join(" · ")}_`);
+      if (Array.isArray(q.coverageGaps) && q.coverageGaps.length > 0) {
+        lines.push("");
+        lines.push(locale === "de" ? "**Abdeckungs-Lücken:**" : "**Coverage gaps:**");
+        for (const g of q.coverageGaps) lines.push(`- ${g}`);
+      }
+      lines.push("");
+    }
   }
 
   // Balanced Scorecard

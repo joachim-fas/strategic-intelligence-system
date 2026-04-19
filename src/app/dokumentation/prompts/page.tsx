@@ -178,6 +178,42 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
             {entry.name}
           </div>
         </div>
+        {/* Wiring-Badge: zeigt dem Reviewer sofort, ob der Prompt wirklich
+             läuft, ob er nur in einem bestimmten Flag-Modus läuft (opt-in),
+             oder ob er nur als Template für künftiges Routing existiert. Ohne
+             dieses Badge musste man sonst den Code durchlesen um zu
+             verstehen welche Einträge aktiv sind — v0.2 baut viele neue
+             Templates, die noch nicht alle verdrahtet sind. */}
+        {entry.wiring && (
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 9.5,
+            padding: "2px 7px", borderRadius: 6,
+            background:
+              entry.wiring === "wired"
+                ? "rgba(26, 158, 90, 0.12)"
+                : entry.wiring === "opt-in"
+                  ? "rgba(245, 198, 80, 0.18)"
+                  : "rgba(107, 107, 107, 0.10)",
+            color:
+              entry.wiring === "wired"
+                ? "#0F6038"
+                : entry.wiring === "opt-in"
+                  ? "#7A5C00"
+                  : "#6B6B6B",
+            border: `1px solid ${
+              entry.wiring === "wired"
+                ? "rgba(26, 158, 90, 0.30)"
+                : entry.wiring === "opt-in"
+                  ? "rgba(245, 198, 80, 0.45)"
+                  : "rgba(107, 107, 107, 0.25)"
+            }`,
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase" as const,
+          }}>
+            {entry.wiring === "wired" ? "live" : entry.wiring === "opt-in" ? "opt-in" : "template"}
+          </span>
+        )}
         {entry.modelConfig?.model && (
           <span style={{
             fontFamily: "var(--font-mono)", fontSize: 10,
@@ -194,6 +230,7 @@ function PromptCard({ entry }: { entry: (typeof SYSTEM_PROMPTS)[number] }) {
         <div style={{ padding: "0 18px 18px", borderTop: "1px solid var(--color-border)" }}>
           <Meta label="Zweck" value={entry.purpose} />
           <Meta label="Code-Location" value={entry.location} mono />
+          {entry.apiRoute && <Meta label="API-Route" value={entry.apiRoute} mono />}
           <Meta label="Trigger" value={entry.trigger} />
           <Meta label="Response-Form" value={entry.responseShape} />
 

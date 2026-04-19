@@ -61,7 +61,7 @@ Source: `buildDateContext()` in `src/lib/llm.ts`.
 
 - **File:** `src/lib/llm.ts` → `buildSystemPrompt(trends, locale, liveSignalsContext?)`
 - **Model:** `claude-sonnet-4-6` (primary), `max_tokens: 12000`
-- **Called:** Every request to `/api/v1/query`
+- **API route:** `POST /api/v1/query` — **wired**
 - **Status:** v0.2 Draft
 
 Full English template: see registry entry `briefing-main` in `src/lib/system-prompts-registry.ts`.
@@ -77,6 +77,21 @@ Core structure:
 7. **Response contract** — strict JSON combining v0.2 fields and legacy aliases
 
 Output JSON includes both v0.2 (`matchedTrends[]` objects, `causalChain`, `anomalySignals`, `dataQuality`, `usedSources`, scenarios as named object) AND legacy fields (`matchedTrendIds`, `causalAnalysis`, legacy scenario array, `interpretation`, `references`, `steepV`, `balancedScorecard`) for UI backward compatibility.
+
+### Runtime augmentation (v0.2 backend pipeline)
+
+Every `/api/v1/query` response is augmented by three backend passes AFTER the LLM returns its JSON:
+
+- **`dataQuality`** — overrides whatever the LLM guessed. Computed from the actual signal set: `signalCount` (integer), `newestSignalAge` ("12m" / "6h" / "3d"), `dominantSourceType` ("signals" / "trends" / "llm-knowledge" / "mixed") derived from inline provenance tags in the synthesis, `coverageGaps` (translated from the top-3 limiting factors of the calibrated confidence).
+- **`_confidenceCalibration`** — the Notion v0.2 weighted formula is executed in `src/lib/scoring.ts → computeCalibratedConfidence()` and OVERWRITES the LLM-self-reported confidence. Exposed on the complete event as `{ score, band, limitingFactors, inputs }`.
+- **`_scenarioDivergence`** — pure validator from `src/lib/meta-prompts.ts → checkScenarioDivergence()`. Checks probability sum ≈ 1.0, causal distinctness, falsifiable assumptions, horizon mix, early-indicator presence, actor differentiation. Emitted with verdict + finding list.
+
+Optional (`mode: 'deep'`):
+
+- **`_contradictionReport`** — second-pass Haiku call (`runContradictionCheck`). Surfaces claims that contradict the provided signals; `confidenceAdjustment` is subtracted from the calibrated confidence.
+- **`_assumptionReport`** — parallel Sonnet call (`runAssumptionExtraction`). Extracts the implicit foundational assumptions with falsifiability + monitoring signals.
+
+Deep mode adds ~3-6 s per query. Callers opt in via `{ mode: "deep" }` in the request body.
 
 ---
 
@@ -94,25 +109,26 @@ Operate on the OUTPUT of the system prompt. Second-pass calls or pure validators
 
 - **File:** `src/lib/meta-prompts.ts` → `buildContradictionCheckPrompt()`, `runContradictionCheck()`
 - **Model:** `claude-haiku-4-5`, `max_tokens: 2000`
-- **Type:** Optional second-pass, only in `mode: 'deep'`
-- **Purpose:** Detects claims that CONTRADICT the provided signals/trends/edges — does not regrade whether an assessment is "correct". Returns `{ contradictions[], structuralIssues[], overallVerdict, confidenceAdjustment }`.
+- **Wiring:** `opt-in` — second-pass call when `POST /api/v1/query` has `{ mode: "deep" }` in the body
+- **Purpose:** Detects claims that CONTRADICT the provided signals/trends/edges — does not regrade whether an assessment is "correct". Returns `{ contradictions[], structuralIssues[], overallVerdict, confidenceAdjustment }`. When `confidenceAdjustment > 0`, the backend subtracts it from the calibrated confidence before sending the complete event.
 
 ### 2.3 Scenario Divergence Check
 
 - **File:** `src/lib/meta-prompts.ts` → `checkScenarioDivergence()`
-- **Type:** Pure validator (no LLM call)
-- **Purpose:** Enforces the six Notion rules: probability sum ≈ 1.0, causal distinctness, ≥2 falsifiable assumptions per scenario, mixed horizons, ≥1 early indicator per scenario, actor differentiation.
+- **Wiring:** `wired` — runs on every `POST /api/v1/query` after validation
+- **Purpose:** Enforces the six Notion rules: probability sum ≈ 1.0, causal distinctness, ≥2 falsifiable assumptions per scenario, mixed horizons, ≥1 early indicator per scenario, actor differentiation. Emitted as `_scenarioDivergence` on the complete event.
 
 ### 2.4 Assumption Extraction
 
 - **File:** `src/lib/meta-prompts.ts` → `buildAssumptionExtractionPrompt()`, `runAssumptionExtraction()`
 - **Model:** `claude-sonnet-4-5`, `max_tokens: 3000`
-- **Type:** Optional meta-step after briefing/framework
-- **Purpose:** Surfaces implicit foundational assumptions together with `falsifiableBy`, `monitoringSignal`, `timeToFalsification` per assumption. Names the single `criticalAssumption` whose failure breaks everything.
+- **Wiring:** `opt-in` — parallel to Contradiction Detection when `mode: "deep"`
+- **Purpose:** Surfaces implicit foundational assumptions together with `falsifiableBy`, `monitoringSignal`, `timeToFalsification` per assumption. Names the single `criticalAssumption` whose failure breaks everything. Emitted as `_assumptionReport` on the complete event.
 
 ### 2.5 Confidence Calibration
 
 - **File:** `src/lib/scoring.ts` → `computeCalibratedConfidence()`
+- **Wiring:** `wired` — runs on every `POST /api/v1/query` and OVERWRITES the LLM's self-reported confidence
 - **Type:** Algorithmic (no LLM call)
 - **Formula:**
 
@@ -133,6 +149,7 @@ Bands: 80–100 high / 60–79 medium / 40–59 low / 0–39 very low. Stored de
 ## 3. Framework Prompts (6 × 3–5 steps)
 
 - **File:** `src/app/api/v1/frameworks/analyze/route.ts` → `FRAMEWORK_PROMPTS[frameworkId](topic, step, context, locale, worldModel)`
+- **API route:** `POST /api/v1/frameworks/analyze` — **wired**
 - **Model:** `claude-sonnet-4-5` → `claude-haiku-4-5` → `claude-sonnet-4-6` (fallback chain)
 - **World model:** Injected into every step via `buildWorldModelBlock()` (top 30 trends, 20 edges, 20 regulations)
 
@@ -198,6 +215,14 @@ Other slash commands (`/signal`, `/compare`, `/explain`, `/history`, `/context`,
 
 `CANVAS_DERIVED_NODE_PROMPT_EN` — generates a new node from N selected source nodes by derivation type (SYNTHESIS / IMPLICATION / CONTRADICTION / ACTION / QUESTION). Must be traceable: explain why the derivation follows.
 
+- **API route:** `POST /api/v1/canvas/derive-node` — **wired**
+- **Request:** `{ sourceNodes: [{title, content, type?}], derivationType: "SYNTHESIS"|"IMPLICATION"|"CONTRADICTION"|"ACTION"|"QUESTION", worldModelContext?, locale? }`
+- **Response:** `{ type, title, content, derivationLogic, worldModelAlignment, confidence, _derivationType, _modelUsed }`
+
+### 5.1 + 5.2 (templates — no route yet)
+
+Node Generation (5.1) and Workflow Step (5.2) remain as source-of-truth templates in `canvas-prompts.ts`; they are NOT wired into a route yet. The UI keeps using `computeDerivedNodes` in `src/app/canvas/derivation.ts` for the in-canvas derivation path.
+
 ---
 
 ## 6. Export & Briefing Prompts
@@ -208,9 +233,27 @@ Other slash commands (`/signal`, `/compare`, `/explain`, `/history`, `/context`,
 
 `EXECUTIVE_SUMMARY_PROMPT_EN` — polishes a full briefing into a C-level executive summary (max 250 words, first sentence = most important finding, `(Confidence: X%)` appended to heading, concrete recommendation at the end).
 
+- **API route:** `POST /api/v1/export/executive-summary` — **wired**
+- **Request:** `{ briefing: object, locale?: "de"|"en" }`
+- **Response:** `{ markdown: string, wordCount: number, modelUsed: string }`
+
 ### 6.2 Shareable Briefing
 
 `SHAREABLE_BRIEFING_PROMPT_EN` — email/Slack-formatted short briefing: core finding, top 3 insights, one-liner scenarios, data note.
+
+- **API route:** `POST /api/v1/export/shareable-briefing` — **wired**
+- **Request:** `{ briefing: object, locale?: "de"|"en" }`
+- **Response:** `{ text: string, modelUsed: string }`
+
+### Deterministic Markdown export
+
+Independent of the LLM-backed polishers, `briefingToMarkdown(entry, locale)` in `src/lib/briefing-export.ts` now also renders the v0.2 fields when present:
+
+- **Anomaly Signals** section with signal / contradicts / interpretation per entry
+- **Sources Used** structured list from `usedSources` (type, name, date)
+- **Data Quality** footer line with signalCount, newestSignalAge, dominantSourceType + coverage gaps
+
+The deterministic export preserves every detail; the LLM polishers compress for a specific audience.
 
 ---
 
@@ -220,7 +263,8 @@ Other slash commands (`/signal`, `/compare`, `/explain`, `/history`, `/context`,
 
 Prepended to the system prompt when a context profile is active. Calibrates LANGUAGE and RECOMMENDATIONS to the user's decision frame (CTO thinks in tech stack, CFO in EBITDA, Policy Maker in coalition feasibility). Does NOT override source / temporal rules.
 
-Currently: a short `[Context: role / industry / region]` tag is attached at the user-message tail (`src/app/api/v1/query/route.ts`). The full prefix is published here as editorial source of truth for future wiring.
+- **API route:** `POST /api/v1/query` (when `contextProfile` is set in the body) — **wired**
+- **Belt-and-suspenders:** the full prefix is prepended to the system prompt AND a short `[Kontext: role / industry / region]` tag is attached to the user message, so the model sees the calibration from both ends.
 
 ---
 
@@ -247,21 +291,46 @@ Currently: a short `[Context: role / industry / region]` tag is attached at the 
 
 ## Versioning
 
-| Area | Version | Status |
-|---|---|---|
-| System Prompt | v0.2 | Draft |
-| Meta-Prompts (5) | v0.2 | Draft |
-| Framework-Prompts (6) | v0.2 | Draft |
-| Slash-Commands | v0.2 | Draft |
-| Canvas-Prompts (3) | v0.2 | Draft |
-| Export-Prompts (2) | v0.2 | Draft |
-| Context Profile Prefix | v0.2 | Draft |
-| Canvas Summary (single-query) | v0.1.1 | Production |
-| Cluster-Diff | v0.1 | Production |
-| Cluster-Foresight | v0.1 | Production |
+| Area | Version | Status | Wiring |
+|---|---|---|---|
+| System Prompt | v0.2 | Draft | **wired** |
+| Meta: Provenance Tagging | v0.2 | Draft | **wired** (inline in system prompt) |
+| Meta: Contradiction Detection | v0.2 | Draft | `opt-in` (`mode:'deep'`) |
+| Meta: Scenario Divergence | v0.2 | Draft | **wired** (post-validate) |
+| Meta: Assumption Extraction | v0.2 | Draft | `opt-in` (`mode:'deep'`) |
+| Meta: Confidence Calibration | v0.2 | Draft | **wired** (overwrites LLM confidence) |
+| Framework Market Analysis | v0.2 | Draft | **wired** |
+| Framework War-Gaming | v0.2 | Draft | **wired** |
+| Framework Pre-Mortem | v0.2 | Draft | **wired** |
+| Framework Post-Mortem | v0.2 | Draft | **wired** |
+| Framework Trend Deep-Dive | v0.2 | Draft | **wired** |
+| Framework Stakeholder | v0.2 | Draft | **wired** |
+| Slash `/trend` | v0.2 | Draft | **wired** (via `expandSlashCommand`) |
+| Slash `/scenario` | v0.2 | Draft | **wired** (via `expandSlashCommand`) |
+| Canvas Node Generation | v0.2 | Draft | `template` |
+| Canvas Workflow Step | v0.2 | Draft | `template` |
+| Canvas Derived Node | v0.2 | Draft | **wired** (`/api/v1/canvas/derive-node`) |
+| Export Executive Summary | v0.2 | Draft | **wired** (`/api/v1/export/executive-summary`) |
+| Export Shareable Briefing | v0.2 | Draft | **wired** (`/api/v1/export/shareable-briefing`) |
+| Context Profile Prefix | v0.2 | Draft | **wired** (in `query/route.ts`) |
+| Canvas Summary (single-query) | v0.1.1 | Production | **wired** |
+| Cluster-Diff | v0.1 | Production | **wired** (pipeline phase 2d) |
+| Cluster-Foresight | v0.1 | Production | **wired** (pipeline phase 2d) |
 
 Status lifecycle: Draft → In Review → Production → Deprecated.
+Wiring: `wired` = runs on every request · `opt-in` = only under specific flags · `template` = editorial source, no route yet.
 
 ---
 
-*Created: 2026-04-19 (v0.2 Notion-blueprint integration) · Single source of truth: `src/lib/system-prompts-registry.ts`.*
+## Backend augmentation side-effects (v0.2)
+
+The new prompt architecture has downstream effects on everything that consumes the briefing response shape:
+
+- **`BriefingResult.tsx`** renders new blocks when present: an **Anomaly Signals** expandable section, a **Data Quality** meta line (signalCount · newestSignalAge · dominantSourceType · coverage gaps), and lifts the regulatory-context rendering into the InlineProvenance parser so `[SIGNAL/TREND/REG/EDGE]` tags are rendered inside the regulation text too.
+- **`briefingToMarkdown`** exports the same three additions so download / copy stays consistent with the UI.
+- **Confidence band** shown on the response comes from the calibrated formula, not the LLM — low bands now surface the concrete limiting factors in "Lücken"/"gaps".
+- **Deep-mode requests** attach `_contradictionReport` and `_assumptionReport` to the complete event; UIs that want to surface those findings can read them from the final JSON.
+
+---
+
+*Created: 2026-04-19 (v0.2 Notion-blueprint integration) · Updated: 2026-04-19 (backend wiring + routes) · Single source of truth: `src/lib/system-prompts-registry.ts`.*

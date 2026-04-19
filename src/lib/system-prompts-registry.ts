@@ -95,6 +95,17 @@ export interface PromptEntry {
   status?: "draft" | "in_review" | "production" | "deprecated";
   /** v0.2 revision tag */
   version?: string;
+  /**
+   * Ist der Prompt tatsächlich in einer produktiven Route verdrahtet oder
+   * lebt er nur als Template (Source-of-Truth für späteres Wiring)?
+   *
+   *  - `"wired"`    — wird zur Laufzeit ausgeführt (Haupt-Pfad)
+   *  - `"opt-in"`   — wird nur unter bestimmten Flags ausgeführt (z.B. mode:'deep')
+   *  - `"template"` — nur Template, noch keine Route
+   */
+  wiring?: "wired" | "opt-in" | "template";
+  /** Wenn der Prompt über eine API-Route erreichbar ist, hier der Pfad. */
+  apiRoute?: string;
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -212,6 +223,8 @@ export const SYSTEM_PROMPTS: PromptEntry[] = [
     modelConfig: { model: "claude-sonnet-4-6", maxTokens: 12000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/query",
     templateEn: BRIEFING_MAIN_TEMPLATE_EN,
     templateDe: null,
   },
@@ -232,6 +245,7 @@ export const SYSTEM_PROMPTS: PromptEntry[] = [
     modelConfig: undefined,
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
     templateEn: PROVENANCE_TAGGING_PROMPT_EN,
     templateDe: null,
   },
@@ -242,14 +256,16 @@ export const SYSTEM_PROMPTS: PromptEntry[] = [
     category: "meta",
     purpose:
       "Second-pass fact-checker. Given the original query, used signals/trends, and the synthesis output, detects claims that contradict the provided data. Optional — runs on deep-mode queries.",
-    location: "src/lib/meta-prompts.ts → buildContradictionCheckPrompt()",
-    trigger: "Optional second-pass call when query mode = 'deep'.",
+    location: "src/lib/meta-prompts.ts → buildContradictionCheckPrompt() · query/route.ts post-validate",
+    trigger: "Second-pass Haiku call when `mode: 'deep'` is passed to POST /api/v1/query. Runs in parallel with Assumption Extraction.",
     responseShape:
-      "JSON: { contradictions[], structuralIssues[], overallVerdict: clean|has_minor_issues|has_major_issues, confidenceAdjustment: 0-20 }",
+      "JSON: { contradictions[], structuralIssues[], overallVerdict: clean|has_minor_issues|has_major_issues, confidenceAdjustment: 0-20 }. When present, confidenceAdjustment is subtracted from the calibrated confidence.",
     injectedContext: ["Original query", "Used signals", "Matched trends", "Full synthesis output"],
     modelConfig: { model: "claude-haiku-4-5", maxTokens: 2000 },
     status: "draft",
     version: "v0.2",
+    wiring: "opt-in",
+    apiRoute: "POST /api/v1/query (mode:'deep')",
     templateEn: buildContradictionCheckPrompt({
       query: "QUERY",
       signalsUsed: "SIGNALS_USED",
@@ -265,14 +281,15 @@ export const SYSTEM_PROMPTS: PromptEntry[] = [
     category: "meta",
     purpose:
       "Pure validator (no LLM call). Runs after every briefing with 3 scenarios to enforce: probability sum ~100, distinct causal mechanisms, falsifiable assumptions (≥2 per scenario), mixed horizons, early indicators, actor differentiation.",
-    location: "src/lib/meta-prompts.ts → checkScenarioDivergence()",
-    trigger: "Automatic inline validation after JSON parse of every briefing response.",
+    location: "src/lib/meta-prompts.ts → checkScenarioDivergence() · invoked in query/route.ts",
+    trigger: "Automatic inline validation after JSON parse of every briefing response. Result emitted as `_scenarioDivergence` on the complete event.",
     responseShape:
       "Validator report: { findings[], probabilitySum, verdict: clean|has_minor_issues|has_major_issues }",
     injectedContext: ["Scenario array from briefing response"],
     modelConfig: undefined,
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
     templateEn: `Scenario Quality Rules (validator, not a prompt)
 
 Three scenarios (optimistic / likely / pessimistic) MUST differ substantially. Enforced rules:
@@ -293,14 +310,16 @@ Three scenarios (optimistic / likely / pessimistic) MUST differ substantially. E
     category: "meta",
     purpose:
       "Optional finisher after high-stakes briefings or framework runs. Surfaces the implicit foundational assumptions together with what would falsify them and what signal type SIS should watch.",
-    location: "src/lib/meta-prompts.ts → buildAssumptionExtractionPrompt()",
-    trigger: "Optional meta-step on user request (e.g. 'What assumptions is this resting on?').",
+    location: "src/lib/meta-prompts.ts → buildAssumptionExtractionPrompt() · query/route.ts post-validate",
+    trigger: "Second-pass Sonnet call when `mode: 'deep'` is passed to POST /api/v1/query. Runs in parallel with Contradiction Detection.",
     responseShape:
-      "JSON: { assumptions[] (assumption, type, currentEvidence, evidenceSource, falsifiableBy, monitoringSignal, timeToFalsification), criticalAssumption, assumptionCluster }",
-    injectedContext: ["Synthesis or framework output", "Optional: relevant trends + edges"],
+      "JSON: { assumptions[] (assumption, type, currentEvidence, evidenceSource, falsifiableBy, monitoringSignal, timeToFalsification), criticalAssumption, assumptionCluster }. Emitted as `_assumptionReport` on the complete event.",
+    injectedContext: ["Synthesis or framework output", "Matched-trend summary as world-model hint"],
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 3000 },
     status: "draft",
     version: "v0.2",
+    wiring: "opt-in",
+    apiRoute: "POST /api/v1/query (mode:'deep')",
     templateEn: buildAssumptionExtractionPrompt({
       synthesis: "SYNTHESIS_OR_FRAMEWORK_OUTPUT",
       worldModelContext: "RELEVANT_TRENDS_AND_EDGES",
@@ -313,14 +332,15 @@ Three scenarios (optimistic / likely / pessimistic) MUST differ substantially. E
     name: "Meta: Confidence Calibration",
     category: "meta",
     purpose:
-      "Replaces the LLM-self-reported confidence with a deterministic weighted composite: signalCoverage*0.30 + signalRecency*0.25 + signalStrength*0.20 + sourceVerification*0.15 + causalCoverage*0.10.",
-    location: "src/lib/scoring.ts → computeCalibratedConfidence()",
-    trigger: "Automatic post-parse on every briefing response.",
+      "Replaces the LLM-self-reported confidence with a deterministic weighted composite: signalCoverage*0.30 + signalRecency*0.25 + signalStrength*0.20 + sourceVerification*0.15 + causalCoverage*0.10. The backend also verifies `dataQuality` (signalCount, newestSignalAge, dominantSourceType) against the actual signal set — the LLM cannot lie about these.",
+    location: "src/lib/scoring.ts → computeCalibratedConfidence() · invoked in query/route.ts",
+    trigger: "Automatic post-parse on every briefing response. Overrides the LLM's self-reported confidence. Limiting factors emitted as `_confidenceCalibration.limitingFactors` and translated into `dataQuality.coverageGaps`.",
     responseShape: "score: 0-100, band: high|medium|low|very_low, limitingFactors[] (top 3 missing contributors)",
     injectedContext: ["signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage — all [0, 1]"],
     modelConfig: undefined,
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
     templateEn: `Confidence Calibration (algorithmic, not a prompt)
 
 confidence = (
@@ -357,6 +377,8 @@ Stored decay: 3% per day (exponential). Report the 3 highest-weight limiting fac
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=marktanalyse)",
     templateEn: `You are a senior market analyst with access to the Strategic Intelligence System.
 Analyze the market for: TOPIC
 
@@ -388,6 +410,8 @@ Real numbers or flagged [LLM-KNOWLEDGE] with a year. Output: metrics / players /
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=war-gaming)",
     templateEn: `You are an experienced war-gaming facilitator and competitive intelligence analyst.
 
 Step 1 (actors): profile top actors — real goals vs communicated goals, resources, likely next move.
@@ -411,6 +435,8 @@ Step 4 (red-team): attack the user's strategy as hard as possible. Blind spots >
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=pre-mortem)",
     templateEn: `You are a risk analyst looking back from the future. Imagine: 18 months from now, the initiative on TOPIC has failed.
 
 Step 1 (risks): inventory all plausible causes, including blind spots. Use rising trends as a lens. Use causal edges to trace chains.
@@ -433,6 +459,8 @@ Step 3 (mitigation): early-warning signals tied to concrete SIS connectors, thre
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=post-mortem)",
     templateEn: `You are analyzing the past event TOPIC for a post-mortem.
 
 Step 1 (timeline): reconstruct objectively. Separate predictable from surprising. Name missed signals.
@@ -455,6 +483,8 @@ Step 3 (lessons): actionable lessons. World-model updates — which trends re-as
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=trend-deep-dive)",
     templateEn: `You are a senior trend analyst. Analyze TOPIC in maximum depth.
 
 Step 1 (definition): not symptoms — causes. Metrics, sCurvePosition, key actors.
@@ -479,6 +509,8 @@ Step 5 (actions): ring classification (adopt/trial/assess/hold), immediate + sho
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=stakeholder)",
     templateEn: `You are a stakeholder analyst. Topic: TOPIC
 
 Step 1 (inventory): real actors with primary + secondary interests, power, stance, recent activity.
@@ -511,6 +543,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 2000 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/query (via expandSlashCommand) · dedicated compact route pending",
     templateEn: TREND_SHORTFORM_PROMPT_EN,
     templateDe: null,
   },
@@ -530,6 +564,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 2500 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/query (via expandSlashCommand) · dedicated compact route pending",
     templateEn: SCENARIO_INSTANT_PROMPT_EN,
     templateDe: null,
   },
@@ -552,6 +588,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 6000 },
     status: "draft",
     version: "v0.2",
+    wiring: "template",
+    apiRoute: "(not wired yet — template available for future route)",
     templateEn: CANVAS_NODE_GENERATION_PROMPT_EN,
     templateDe: null,
   },
@@ -570,6 +608,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-haiku-4-5", maxTokens: 600 },
     status: "draft",
     version: "v0.2",
+    wiring: "template",
+    apiRoute: "(not wired yet — template available for future route)",
     templateEn: CANVAS_WORKFLOW_STEP_PROMPT_EN,
     templateDe: null,
   },
@@ -589,6 +629,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 1500 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/canvas/derive-node",
     templateEn: CANVAS_DERIVED_NODE_PROMPT_EN,
     templateDe: null,
   },
@@ -611,6 +653,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 1500 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/export/executive-summary",
     templateEn: EXECUTIVE_SUMMARY_PROMPT_EN,
     templateDe: null,
   },
@@ -630,6 +674,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-haiku-4-5", maxTokens: 1200 },
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/export/shareable-briefing",
     templateEn: SHAREABLE_BRIEFING_PROMPT_EN,
     templateDe: null,
   },
@@ -643,14 +689,16 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     category: "context",
     purpose:
       "Prepended to the main system prompt when a context profile is active. Calibrates LANGUAGE (role frame) and RECOMMENDATIONS (within role decision authority). Does NOT override source/temporal rules.",
-    location: "src/lib/context-profiles.ts → buildContextProfilePrefix()",
+    location: "src/lib/context-profiles.ts → buildContextProfilePrefix() · invoked in query/route.ts",
     trigger:
-      "User activates a context profile (e.g. cto-automotive-dach). Currently attached as short [Context: role / industry / region] tag at the user-message tail; full prefix is source-of-truth for future wiring.",
+      "User activates a context profile (e.g. cto-automotive-dach). The full prefix is prepended to the system prompt AND a short [Kontext: …] tag is appended to the user message so the model sees the calibration from both ends.",
     responseShape: "N/A — prompt fragment, not a callable prompt.",
     injectedContext: ["role", "industry", "region", "orgSize", "trendWeights"],
     modelConfig: undefined,
     status: "draft",
     version: "v0.2",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/query (when contextProfile is in body)",
     templateEn: CONTEXT_PROFILE_PREFIX_TEMPLATE_EN,
     templateDe: null,
   },
@@ -672,6 +720,8 @@ Step 4 (engagement): per-stakeholder tailored approach, weekly plan, trigger to 
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 3000 },
     status: "production",
     version: "v0.1.1",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/canvas/[id]/summary",
     templateEn: `[TEMPORAL CONTEXT]
 
 You are a Senior Strategist in SIS. This project contains EXACTLY ONE analysis so far. Your job: do not rewrite the briefing — take it apart as a strategic sparring partner.
@@ -721,6 +771,8 @@ Antworte ausschließlich als valides JSON — kein Markdown, kein Vorwort.`,
     modelConfig: { model: "claude-haiku-4-5", maxTokens: 100 },
     status: "production",
     version: "v0.1",
+    wiring: "wired",
+    apiRoute: "Pipeline phase 2d (background, CLUSTER_DIFF_LLM_ENABLED=true)",
     templateEn:
       "Compare two short summaries of the same trend cluster and describe the change in ONE sentence (≤30 words). Name concrete actors, numbers, or new topics. No preamble, no paraphrasing, no quoted material.",
     templateDe:
@@ -741,6 +793,8 @@ Antworte ausschließlich als valides JSON — kein Markdown, kein Vorwort.`,
     modelConfig: { model: "claude-haiku-4-5", maxTokens: 400 },
     status: "production",
     version: "v0.1",
+    wiring: "wired",
+    apiRoute: "Pipeline phase 2d (background, CLUSTER_FORESIGHT_LLM_ENABLED=true)",
     templateEn: `You are a strategy analyst. Given a trend cluster with a short summary, formulate 2–3 forward scenarios for the next 12–24 months. Each scenario has: a title (≤5 words), a confidence (0–1 based on signal strength), and up to 3 drivers (≤10 words each). Respond ONLY as a JSON array with exactly this shape: [{"scenario":"…","confidence":0.XX,"drivers":["…","…"]}, …] No preamble, no markdown, no text outside the array.
 
 [TEMPORAL CONTEXT]`,

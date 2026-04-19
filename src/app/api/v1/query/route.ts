@@ -255,8 +255,13 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { query: rawQuery, locale, contextProfile, previousContext } = body;
+  const { query: rawQuery, locale, contextProfile, previousContext, mode } = body;
   // previousContext: { query: string, synthesis: string } — from the preceding briefing
+  // mode: "quick" (default) | "deep" — deep runs the meta-pipeline (contradiction
+  //       detection + assumption extraction) as a second pass against Haiku.
+  //       Adds ~3-6s to the response but surfaces hallucinations and implicit
+  //       assumptions the user can challenge.
+  const queryMode: "quick" | "deep" = mode === "deep" ? "deep" : "quick";
 
   // ── Input validation ───────────────────────────────────────────────────
   if (!rawQuery || typeof rawQuery !== "string") {
@@ -288,6 +293,7 @@ export async function POST(req: Request) {
 
   const { buildSystemPrompt } = await import("@/lib/llm");
   const { getRelevantSignals, formatSignalsForPrompt, getSignalAge } = await import("@/lib/signals");
+  const { buildContextProfilePrefix } = await import("@/lib/context-profiles");
 
   const trends = loadTrendsFromDB();
 
@@ -311,19 +317,35 @@ export async function POST(req: Request) {
 
   emitActivity({ type: "query", phase: "signals", message: `${relevantSignals.length} Signale aus ${uniqueSources} Quellen geladen`, meta: { signals: relevantSignals.length, sources: uniqueSources } });
 
-  const systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined);
+  let systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined);
 
   // SEC-08: Sanitize contextProfile fields — prevent prompt injection via role/industry/region
+  const sanitizeField = (v: unknown): string => {
+    if (typeof v !== "string") return "";
+    return v.slice(0, 100).replace(/[\n\r]/g, " ").replace(/<\/?[a-zA-Z][^>]*>/g, "").replace(/\b(system|assistant|human)\s*:/gi, "").trim();
+  };
+
   let userMessage = query;
   if (contextProfile) {
-    const sanitizeField = (v: unknown): string => {
-      if (typeof v !== "string") return "";
-      return v.slice(0, 100).replace(/[\n\r]/g, " ").replace(/<\/?[a-zA-Z][^>]*>/g, "").replace(/\b(system|assistant|human)\s*:/gi, "").trim();
-    };
     const role = sanitizeField(contextProfile.role);
     const industry = sanitizeField(contextProfile.industry);
     const region = sanitizeField(contextProfile.region);
+    const orgSize = sanitizeField((contextProfile as { orgSize?: unknown }).orgSize);
+    // Notion v0.2 Section 7: prepend the full context profile prefix to the
+    // system prompt so language, recommendations, and regulatory focus are
+    // calibrated from the very first token. The short [Kontext: …] tag on
+    // the user message stays as a reinforcement — the model sees the
+    // profile twice, which strengthens the recalibration without costing
+    // much token budget.
     if (role || industry || region) {
+      const profilePrefix = buildContextProfilePrefix({
+        role: role || undefined,
+        industry: industry || undefined,
+        region: region || undefined,
+        orgSize: orgSize || undefined,
+        trendWeights: (contextProfile as { trendWeights?: Record<string, number> }).trendWeights,
+      } as any);
+      systemPrompt = `${profilePrefix}\n\n${systemPrompt}`;
       userMessage += `\n\n[Kontext: ${role} / ${industry} / ${region}]`;
     }
   }
@@ -743,12 +765,232 @@ export async function POST(req: Request) {
               return true;
             });
 
-          // API-03 + VAL-01: Final result with validation metadata
+          // ═════════════════════════════════════════════════════════════
+          // Notion v0.2 — Backend-verified augmentation
+          //
+          // What follows replaces the LLM's self-reported dataQuality
+          // and confidence with values measured against real signal +
+          // edge-graph coverage. Three blocks, in this order because
+          // they depend on each other:
+          //
+          //   (A) dataQuality — computed from the signal set we just
+          //       passed to the model. The LLM CANNOT lie about
+          //       signalCount, newestSignalAge, or dominantSourceType;
+          //       those are observed server-side.
+          //
+          //   (B) Calibrated confidence — the Notion v0.2 weighted
+          //       formula (signalCoverage 30 / signalRecency 25 /
+          //       signalStrength 20 / sourceVerification 15 /
+          //       causalCoverage 10). Replaces the LLM's guess with a
+          //       deterministic composite and reports the three limiting
+          //       factors so users know WHY confidence dropped.
+          //
+          //   (C) Meta-pipeline — scenario-divergence validator always;
+          //       contradiction check + assumption extraction only in
+          //       mode:'deep' because they add 3-6s per second-pass.
+          // ═════════════════════════════════════════════════════════════
+
+          const { computeCalibratedConfidence, recencyFromHours } = await import("@/lib/scoring");
+          const { checkScenarioDivergence } = await import("@/lib/meta-prompts");
+
+          // (A) Backend-verified dataQuality ─────────────────────────
+          const newestSignalHours = relevantSignals.length > 0
+            ? Math.min(
+                ...relevantSignals
+                  .map((s: any) => (Date.now() - new Date(s.fetched_at).getTime()) / (1000 * 3600))
+                  .filter((h) => Number.isFinite(h) && h >= 0),
+              )
+            : null;
+
+          const newestSignalAge = newestSignalHours == null
+            ? (validLocale === "de" ? "keine Signale" : "no signals")
+            : newestSignalHours < 1 ? `${Math.round(newestSignalHours * 60)}m`
+              : newestSignalHours < 48 ? `${Math.round(newestSignalHours)}h`
+              : `${Math.round(newestSignalHours / 24)}d`;
+
+          // Count provenance tags in synthesis to measure how much of the
+          // answer is actually sourced vs. how much is LLM self-narration.
+          const tagRegex = {
+            signal: /\[SIGNAL:/gi,
+            trend: /\[TREND:/gi,
+            reg: /\[REG:/gi,
+            edge: /\[EDGE:/gi,
+            llm: /\[LLM-(KNOWLEDGE|Einsch\u00e4tzung|Einschaetzung|Assessment)\]/gi,
+          };
+          const tagCounts = {
+            signal: (validated.synthesis.match(tagRegex.signal) || []).length,
+            trend: (validated.synthesis.match(tagRegex.trend) || []).length,
+            reg: (validated.synthesis.match(tagRegex.reg) || []).length,
+            edge: (validated.synthesis.match(tagRegex.edge) || []).length,
+            llm: (validated.synthesis.match(tagRegex.llm) || []).length,
+          };
+          const verifiableTags = tagCounts.signal + tagCounts.trend + tagCounts.reg + tagCounts.edge;
+          const totalTags = verifiableTags + tagCounts.llm;
+          const sourceVerification = totalTags === 0
+            ? 0.3  // LLM ignored tagging — treat as mostly unverified
+            : verifiableTags / totalTags;
+
+          const dominantSourceType: "signals" | "trends" | "llm-knowledge" | "mixed" =
+            tagCounts.signal >= Math.max(tagCounts.trend, tagCounts.reg, tagCounts.llm) && tagCounts.signal > 0
+              ? "signals"
+              : tagCounts.trend >= Math.max(tagCounts.reg, tagCounts.llm) && tagCounts.trend > 0
+                ? "trends"
+                : tagCounts.llm > verifiableTags
+                  ? "llm-knowledge"
+                  : "mixed";
+
+          // (B) Calibrated confidence ─────────────────────────────────
+          // Load the number of active connectors so signalCoverage is not
+          // hardcoded. Falls back to 10 on connector-loading failure.
+          let activeConnectorCount = 10;
+          try {
+            const { connectors } = await import("@/connectors/index");
+            activeConnectorCount = Array.isArray(connectors) && connectors.length > 0 ? connectors.length : 10;
+          } catch {/* keep 10 */}
+
+          const signalCoverage = Math.min(1, uniqueSourcesVal / activeConnectorCount);
+          const signalRecency = recencyFromHours(newestSignalHours ?? undefined);
+          const signalStrength = relevantSignals.length > 0
+            ? relevantSignals.reduce((acc: number, s: any) => acc + (typeof s.strength === "number" ? s.strength : 0.5), 0) / relevantSignals.length
+            : 0;
+          // causalCoverage: how much of the theoretically possible
+          // "pairs of matched trends" is covered by explicit edges?
+          // With N matched trends, there are N*(N-1)/2 possible pairs.
+          // If the edge graph covers most of them the analysis is more
+          // likely grounded in known causal structure, not ad-hoc.
+          const possiblePairs = Math.max(1, (matchedTrends.length * (matchedTrends.length - 1)) / 2);
+          const causalCoverage = Math.min(1, matchedEdges.length / possiblePairs);
+
+          const calibrated = computeCalibratedConfidence({
+            signalCoverage,
+            signalRecency,
+            signalStrength,
+            sourceVerification,
+            causalCoverage,
+          });
+
+          // Overwrite the LLM's self-assessed confidence with the
+          // calibrated score. The old computeBlendedConfidence path above
+          // already wrote a value — we intentionally overwrite because
+          // the calibrated formula is the one described in Notion v0.2
+          // and in the system prompt itself, so the UI's "Konfidenz X%"
+          // badge must match what the prompt told the model to compute.
+          validated.confidence = calibrated.score / 100;
+
+          // Translate the three limiting factors into user-visible gap
+          // descriptions. These replace whatever the LLM put in
+          // `dataQuality.coverageGaps` — we want the server's view, not
+          // the model's guess.
+          const GAP_LABELS: Record<string, { de: string; en: string }> = {
+            signalCoverage: {
+              de: "Signal-Abdeckung dünn (wenige Connectors lieferten Treffer)",
+              en: "Thin signal coverage (few connectors matched this query)",
+            },
+            signalRecency: {
+              de: "Signale sind älter als 24h",
+              en: "Signals older than 24h",
+            },
+            signalStrength: {
+              de: "Durchschnittliche Signal-Stärke niedrig",
+              en: "Low average signal strength",
+            },
+            sourceVerification: {
+              de: "Wenige Behauptungen mit verifizierbarem Quellen-Tag",
+              en: "Few claims carry verifiable source tags",
+            },
+            causalCoverage: {
+              de: "Kausal-Graph deckt die Trend-Konstellation dünn ab",
+              en: "Causal graph sparsely covers the trend pairs",
+            },
+          };
+          const backendCoverageGaps = calibrated.limitingFactors
+            .filter((f) => f.missing > 0.05)
+            .map((f) => (GAP_LABELS[f.factor]?.[validLocale as "de" | "en"]) || f.factor);
+
+          const backendDataQuality = {
+            signalCount: relevantSignals.length,
+            newestSignalAge,
+            coverageGaps: backendCoverageGaps,
+            dominantSourceType,
+          };
+
+          // (C) Meta-pipeline ─────────────────────────────────────────
+          const scenarioDivergence = checkScenarioDivergence(
+            (validated.scenarios || []).map((s: any) => ({
+              type: s.type,
+              title: s.title || s.name,
+              name: s.name,
+              description: s.description,
+              probability: s.probability,
+              horizon: s.horizon,
+              keyAssumptions: s.keyAssumptions,
+              earlyIndicators: s.earlyIndicators,
+              keyDrivers: s.keyDrivers,
+            })),
+          );
+
+          // Optional deep-mode: Haiku-second-pass for contradictions +
+          // a Sonnet call for assumption extraction. Run in parallel to
+          // minimise latency. Errors are swallowed — the base briefing
+          // always comes back even if the meta-calls fail.
+          let contradictionReport: any = null;
+          let assumptionReport: any = null;
+          if (queryMode === "deep") {
+            emitActivity({ type: "query", phase: "meta", message: "Deep-Mode: Widerspruchs-Check + Annahmen-Extraktion laufen…" });
+            const { runContradictionCheck, runAssumptionExtraction } = await import("@/lib/meta-prompts");
+            const trendsMatchedText = matchedTrends.map((t: any) => `${t.name} (${t.id})`).join(", ") || "(none)";
+            const synthesisSnapshot = JSON.stringify({
+              synthesis: validated.synthesis,
+              keyInsights: validated.keyInsights,
+              scenarios: validated.scenarios,
+              causalAnalysis: validated.causalAnalysis,
+              confidence: validated.confidence,
+            });
+            const worldModelHint = matchedTrends
+              .map((t: any) => `- ${t.name} [${t.category}] rel=${(t.relevance * 100).toFixed(0)}%`)
+              .join("\n");
+            const [cr, ar] = await Promise.all([
+              runContradictionCheck({
+                query,
+                signalsUsed: liveSignalsContext || "(none)",
+                trendsMatched: trendsMatchedText,
+                synthesisOutput: synthesisSnapshot,
+                locale: validLocale,
+              }).catch((e) => { console.warn("[query] contradiction check failed:", e); return null; }),
+              runAssumptionExtraction({
+                synthesis: validated.synthesis,
+                worldModelContext: worldModelHint,
+                locale: validLocale,
+              }).catch((e) => { console.warn("[query] assumption extraction failed:", e); return null; }),
+            ]);
+            contradictionReport = cr;
+            assumptionReport = ar;
+
+            // Apply confidence penalty when contradictions flagged.
+            if (cr && typeof cr.confidenceAdjustment === "number" && cr.confidenceAdjustment > 0) {
+              const penalty = Math.min(cr.confidenceAdjustment, 40) / 100;
+              validated.confidence = Math.max(0.05, validated.confidence - penalty);
+            }
+          }
+
+          // API-03 + VAL-01 + v0.2: Final result with full meta metadata
           const finalResult = {
             ...validated,
+            // v0.2: backend-verified dataQuality overrides whatever the LLM guessed
+            dataQuality: backendDataQuality,
             usedSignals: signalsMeta,
             matchedTrends,
             matchedEdges,
+            _confidenceCalibration: {
+              score: calibrated.score,
+              band: calibrated.band,
+              limitingFactors: calibrated.limitingFactors,
+              inputs: { signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage },
+            },
+            _scenarioDivergence: scenarioDivergence,
+            _mode: queryMode,
+            ...(contradictionReport ? { _contradictionReport: contradictionReport } : {}),
+            ...(assumptionReport ? { _assumptionReport: assumptionReport } : {}),
             ...(wasRepaired ? { _repaired: true } : {}),
             ...(qualityWarnings.length > 0 ? { _dataQualityWarnings: qualityWarnings } : {}),
             ...(warnings.length > 0 ? { _validationWarnings: warnings } : {}),
@@ -756,8 +998,8 @@ export async function POST(req: Request) {
           send({ type: "complete", result: finalResult });
           emitActivity({
             type: "query", phase: "complete",
-            message: `Abfrage abgeschlossen — ${(validated.confidence * 100).toFixed(0)}% Konfidenz, ${matchedTrends.length} Trends`,
-            meta: { confidence: validated.confidence, trends: matchedTrends.length, signals: relevantSignals.length, repaired: wasRepaired },
+            message: `Abfrage abgeschlossen — ${calibrated.score}% Konfidenz (${calibrated.band}), ${matchedTrends.length} Trends${queryMode === "deep" ? ", Deep-Mode" : ""}`,
+            meta: { confidence: validated.confidence, band: calibrated.band, trends: matchedTrends.length, signals: relevantSignals.length, repaired: wasRepaired, mode: queryMode },
           });
         } catch (parseErr) {
           console.error("[query] Post-processing error:", parseErr);

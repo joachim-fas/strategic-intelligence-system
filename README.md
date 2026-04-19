@@ -133,24 +133,49 @@ Grouped as:
 - **Health**: `/api/v1/health` (unauthenticated liveness probe for
   monitoring/k8s).
 
-## System-Prompts
+## System-Prompts (v0.2 Notion Blueprint)
 
 All LLM system prompts SIS sends to Anthropic / OpenRouter are
 documented in [`SYSTEM_PROMPTS.md`](./SYSTEM_PROMPTS.md) and rendered
 live at `/dokumentation/prompts` in the running app. Single source of
 truth: `src/lib/system-prompts-registry.ts`.
 
-Prompts inventoried:
-- `briefing-main` — the main query-to-briefing prompt
-- `framework-analyze` — Pre-Mortem, War-Gaming, Stakeholder, etc.
-- `canvas-summary-single` — strategic sparring summary for 1-analysis projects
-- `cluster-diff` — pipeline changelog (flag-gated)
-- `cluster-foresight` — pipeline forward scenarios (flag-gated)
+Architecture (8 categories, 25 registered entries):
+
+1. **System Prompt** — `briefing-main` in `src/lib/llm.ts` (the Intelligence Terminal)
+2. **Meta-Prompts** (anti-hallucination layer) — Provenance Tagging, Contradiction Detection, Scenario Divergence, Assumption Extraction, Confidence Calibration (`src/lib/meta-prompts.ts`, `src/lib/scoring.ts`)
+3. **Framework-Prompts** — 6 frameworks × 3-5 steps each (`src/app/api/v1/frameworks/analyze/route.ts`)
+4. **Slash-Command-Prompts** — `/trend`, `/scenario` + expander for the rest (`src/lib/slash-prompts.ts`)
+5. **Canvas-Prompts** — Node Generation, Workflow Step, Derived Node (`src/lib/canvas-prompts.ts`)
+6. **Export-Prompts** — Executive Summary, Shareable Briefing (`src/lib/briefing-export.ts`)
+7. **Context Profile Prefix** — `src/lib/context-profiles.ts`
+8. **Pipeline / Summary** — Canvas Summary (single-query), Cluster-Diff, Cluster-Foresight
+
+Backend augmentation on every query:
+
+- **Data-quality verification** — `signalCount`, `newestSignalAge`, `dominantSourceType`, coverage gaps are computed server-side from the actual signal set. The LLM cannot lie about these.
+- **Calibrated confidence** — the Notion v0.2 weighted formula (`signalCoverage 30 / signalRecency 25 / signalStrength 20 / sourceVerification 15 / causalCoverage 10`) OVERWRITES the LLM-self-reported confidence. Top 3 limiting factors are reported.
+- **Scenario divergence validator** — runs on every 3-scenario response. Checks probability sum, causal distinctness, falsifiable assumptions, horizon mix, early indicators, actor differentiation.
+
+Opt-in deep-mode (`POST /api/v1/query` with `{ mode: "deep" }`):
+
+- **Contradiction Detection** — second-pass Haiku against the provided signals + trends
+- **Assumption Extraction** — surfaces implicit assumptions with falsifiability + monitoring signals
+
+Dedicated routes (all wired, all tenant-guarded + rate-limited):
+
+- `POST /api/v1/query` — main briefing (streaming SSE)
+- `POST /api/v1/frameworks/analyze` — 6 × N-step framework pipeline (streaming SSE)
+- `POST /api/v1/canvas/derive-node` — derive a Canvas node from N source nodes
+- `POST /api/v1/export/executive-summary` — C-level executive summary polish
+- `POST /api/v1/export/shareable-briefing` — email/Slack short briefing
 
 Every prompt includes a temporal-context block (current date) injected
 via `buildDateContext()` in `src/lib/llm.ts` — prevents the LLM from
 treating its training cutoff as "now" and producing past-as-future
-forecasts.
+forecasts. Provenance tags `[SIGNAL/TREND/REG/EDGE/LLM-KNOWLEDGE]` are
+rendered as coloured pills in `InlineProvenance.tsx`; the `[EDGE: A → B]`
+tag is new in v0.2 and renders violet with a git-branch icon.
 
 ## Tests
 
