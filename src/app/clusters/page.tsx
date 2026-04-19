@@ -54,7 +54,7 @@ interface HistoryPayload {
 }
 
 function ClustersInner() {
-  const { de } = useT();
+  const { t } = useT();
   const router = useRouter();
   const params = useSearchParams();
   const urlClusterId = params.get("id");
@@ -155,29 +155,27 @@ function ClustersInner() {
           textTransform: "uppercase", color: "var(--color-text-faint)",
           marginBottom: 6,
         }}>
-          {de ? "Cluster-Historie" : "Cluster History"}
+          {t("clusters.caption")}
         </div>
         <h1 style={{
           fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
           fontSize: 26, fontWeight: 700, letterSpacing: "-0.015em",
           margin: 0,
         }}>
-          {de ? "Wie sich Cluster entwickeln" : "How clusters evolve"}
+          {t("clusters.heading")}
         </h1>
         <p style={{
           fontSize: 13, color: "var(--color-text-muted)",
           margin: "6px 0 0", maxWidth: 680, lineHeight: 1.55,
         }}>
-          {de
-            ? "Jede Pipeline-Ausführung speichert einen Snapshot pro Thema-Cluster. Optional werden LLM-Diff und Vorausschau befüllt — aktivierbar über CLUSTER_DIFF_LLM_ENABLED / CLUSTER_FORESIGHT_LLM_ENABLED."
-            : "Every pipeline run writes a snapshot per topic cluster. Optional LLM changelog and foresight are filled when CLUSTER_DIFF_LLM_ENABLED / CLUSTER_FORESIGHT_LLM_ENABLED are set."}
+          {t("clusters.body")}
         </p>
       </div>
 
       {/* Empty state */}
       {catalogError && (
         <div style={{ padding: 16, color: "var(--volt-negative-text)" }}>
-          {de ? "Katalog konnte nicht geladen werden." : "Could not load catalog."}
+          {t("clusters.catalogLoadFailed")}
         </div>
       )}
       {emptyCatalog && (
@@ -190,9 +188,7 @@ function ClustersInner() {
         }}>
           <span style={{ fontSize: 28, opacity: 0.4 }}>◷</span>
           <span>
-            {de
-              ? "Noch keine Cluster-Snapshots. Die Pipeline muss mindestens einmal mit aktiven Connectors laufen."
-              : "No cluster snapshots yet. The pipeline must run at least once with active connectors."}
+            {t("clusters.emptyCatalog")}
           </span>
           <DataGapHint compact />
         </div>
@@ -222,7 +218,7 @@ function ClustersInner() {
               textTransform: "uppercase" as const,
               color: "var(--color-text-faint)",
             }}>
-              {catalog.length} {de ? "Cluster" : "clusters"}
+              {catalog.length} {t("clusters.clustersLabel")}
             </div>
             {catalog.map((c) => {
               const active = c.clusterId === selected;
@@ -248,7 +244,7 @@ function ClustersInner() {
                     fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
                     letterSpacing: "0.02em",
                   }}>
-                    {c.snapshotCount} {de ? "Snapshots" : "snapshots"} · {c.latestSignalCount} {de ? "Signale" : "signals"}
+                    {c.snapshotCount} {t("clusters.snapshotsLabel")} · {c.latestSignalCount} {t("clusters.signalsLabel")}
                   </div>
                 </button>
               );
@@ -266,7 +262,7 @@ function ClustersInner() {
                   {selectedCatalogEntry.topic}
                 </h2>
                 <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
-                  {de ? "Zuletzt aktualisiert" : "Last updated"}:{" "}
+                  {t("clusters.lastUpdated")}:{" "}
                   {new Date(selectedCatalogEntry.latestAt).toLocaleString()}
                 </div>
               </div>
@@ -274,18 +270,18 @@ function ClustersInner() {
 
             {historyLoading && (
               <div style={{ padding: 14, color: "var(--color-text-muted)", fontSize: 13 }}>
-                {de ? "Lade Historie…" : "Loading history…"}
+                {t("clusters.loadingHistory")}
               </div>
             )}
             {historyError && (
               <div style={{ padding: 14, color: "var(--volt-negative-text)" }}>
-                {de ? "Fehler:" : "Error:"} {historyError}
+                {t("clusters.errorLabel")} {historyError}
               </div>
             )}
 
             {history && history.snapshots.length === 0 && !historyLoading && (
               <div style={{ padding: 14, fontSize: 13, color: "var(--color-text-muted)" }}>
-                {de ? "Keine Snapshots für diesen Cluster." : "No snapshots for this cluster."}
+                {t("clusters.noSnapshotsForCluster")}
               </div>
             )}
 
@@ -317,11 +313,11 @@ function ClustersInner() {
                         fontWeight: 700,
                         letterSpacing: "0.04em",
                       }}>
-                        {i === 0 ? (de ? "AKTUELL" : "LATEST") : `#${history.snapshots.length - i}`}
+                        {i === 0 ? t("clusters.latestBadge") : `#${history.snapshots.length - i}`}
                       </span>
                       <span>{new Date(s.triggeredAt).toLocaleString()}</span>
                       <span style={{ marginLeft: "auto" }}>
-                        {s.signalCount} {de ? "Signale" : "signals"}
+                        {s.signalCount} {t("clusters.signalsLabel")}
                       </span>
                     </header>
 
@@ -342,7 +338,7 @@ function ClustersInner() {
                           textTransform: "uppercase" as const, marginRight: 6,
                           color: "#4A5F00",
                         }}>
-                          {de ? "Änderung" : "Change"}
+                          {t("clusters.changeBadge")}
                         </span>
                         {s.changelog}
                       </div>
@@ -363,7 +359,7 @@ function ClustersInner() {
                           color: "var(--color-text-faint)",
                           marginBottom: 6,
                         }}>
-                          {de ? "Vorausschau" : "Foresight"}
+                          {t("clusters.foresightBadge")}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {s.foresight.map((f, k) => (

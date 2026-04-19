@@ -1172,6 +1172,24 @@ const en = {
     saveJson: "Save as .json",
     outroHint: "Use in Notion, Obsidian, Word…",
   },
+
+  clusters: {
+    caption: "Cluster History",
+    heading: "How clusters evolve",
+    body: "Every pipeline run writes a snapshot per topic cluster. Optional LLM changelog and foresight are filled when CLUSTER_DIFF_LLM_ENABLED / CLUSTER_FORESIGHT_LLM_ENABLED are set.",
+    catalogLoadFailed: "Could not load catalog.",
+    emptyCatalog: "No cluster snapshots yet. The pipeline must run at least once with active connectors.",
+    clustersLabel: "clusters",
+    snapshotsLabel: "snapshots",
+    signalsLabel: "signals",
+    lastUpdated: "Last updated",
+    loadingHistory: "Loading history…",
+    errorLabel: "Error:",
+    noSnapshotsForCluster: "No snapshots for this cluster.",
+    latestBadge: "LATEST",
+    changeBadge: "Change",
+    foresightBadge: "Foresight",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2154,6 +2172,24 @@ const de: Dictionary = {
     saveMarkdown: "Als .md speichern",
     saveJson: "Als .json speichern",
     outroHint: "Weiterverarbeiten in Notion, Obsidian, Word…",
+  },
+
+  clusters: {
+    caption: "Cluster-Historie",
+    heading: "Wie sich Cluster entwickeln",
+    body: "Jede Pipeline-Ausführung speichert einen Snapshot pro Thema-Cluster. Optional werden LLM-Diff und Vorausschau befüllt — aktivierbar über CLUSTER_DIFF_LLM_ENABLED / CLUSTER_FORESIGHT_LLM_ENABLED.",
+    catalogLoadFailed: "Katalog konnte nicht geladen werden.",
+    emptyCatalog: "Noch keine Cluster-Snapshots. Die Pipeline muss mindestens einmal mit aktiven Connectors laufen.",
+    clustersLabel: "Cluster",
+    snapshotsLabel: "Snapshots",
+    signalsLabel: "Signale",
+    lastUpdated: "Zuletzt aktualisiert",
+    loadingHistory: "Lade Historie…",
+    errorLabel: "Fehler:",
+    noSnapshotsForCluster: "Keine Snapshots für diesen Cluster.",
+    latestBadge: "AKTUELL",
+    changeBadge: "Änderung",
+    foresightBadge: "Vorausschau",
   },
 };
 
