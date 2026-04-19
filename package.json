@@ -22,7 +22,8 @@
     "test:stream": "tsx scripts/stream-query-retry-test.ts",
     "test:briefing-url": "tsx scripts/briefing-url-test.ts",
     "test:baseline": "tsx scripts/baseline-test.ts",
-    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:api"
+    "test:cluster-snapshots": "tsx scripts/cluster-snapshots-test.ts",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",

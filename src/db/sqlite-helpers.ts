@@ -140,6 +140,25 @@ export function ensureMultiTenantSchema(db: Database.Database): void {
     m2 REAL NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
+
+  // ── Cluster snapshots (Welle B Item 2 — Perigon-inspired history) ──
+  // Time-series of topic clusters: one row per (cluster × pipeline run).
+  // Helpers in src/lib/cluster-snapshots.ts; read route at
+  // /api/v1/clusters/[id]/history. `changelog` and `foresight` are
+  // nullable hooks that a future LLM-router step fills in.
+  db.exec(`CREATE TABLE IF NOT EXISTS cluster_snapshots (
+    id TEXT PRIMARY KEY,
+    cluster_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    triggered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    signal_count INTEGER NOT NULL,
+    signal_ids TEXT NOT NULL DEFAULT '[]',
+    summary TEXT NOT NULL DEFAULT '',
+    changelog TEXT,
+    foresight TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS cluster_snapshots_cluster_time
+    ON cluster_snapshots(cluster_id, triggered_at DESC)`);
 }
 
 /**

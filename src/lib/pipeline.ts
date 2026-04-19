@@ -29,6 +29,7 @@ import { megaTrends } from "@/lib/mega-trends";
 import { sanitizeConnectorResponse } from "@/lib/api-utils";
 import { storeSignals, pruneOldSignals } from "@/lib/signals";
 import { updateBaseline, baselineKeyForDate } from "@/lib/baseline";
+import { createClusterSnapshot } from "@/lib/cluster-snapshots";
 import { eq, sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -282,6 +283,39 @@ export async function runPipeline(): Promise<PipelineResult> {
       }
     } catch (err) {
       console.error("[pipeline] baseline phase failed:", err);
+    }
+
+    // Phase 2d (Welle B Item 2 — Cluster snapshots):
+    // Write one cluster_snapshots row per topic-group per pipeline run.
+    // Enables a Perigon-style `/v1/stories/history`-equivalent endpoint
+    // so analysts can trace how a cluster has evolved over time. The
+    // `changelog` + `foresight` fields stay null for now; a Welle-C
+    // follow-up wires them to the AI router. Wrapped per-cluster so a
+    // single malformed group doesn't take out the whole phase.
+    try {
+      const clusterGroups = groupSignalsByTopic(sanitizedSignals);
+      let snapshotCount = 0;
+      for (const group of clusterGroups) {
+        try {
+          createClusterSnapshot({
+            topic: group.topic,
+            signals: group.signals,
+          });
+          snapshotCount += 1;
+        } catch (innerErr) {
+          console.error(
+            `[pipeline] cluster snapshot failed for topic "${group.topic}":`,
+            innerErr,
+          );
+          // Not added to errors[] — snapshot history is observational
+          // metadata, not on the critical path. A missing snapshot
+          // means the history endpoint returns one fewer row; the
+          // next run picks up the cadence again.
+        }
+      }
+      console.log(`[pipeline] cluster_snapshots: wrote ${snapshotCount} rows across ${clusterGroups.length} topics`);
+    } catch (err) {
+      console.error("[pipeline] cluster snapshot phase failed:", err);
     }
 
     const durationMs = Date.now() - start;

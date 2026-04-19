@@ -293,6 +293,26 @@ const statements = [
     m2 REAL NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+
+  // ─── Cluster snapshots (Welle B Item 2 — Perigon-inspired) ───────────────
+  // Time-series history of topic clusters. One row per (cluster, pipeline run).
+  // Helpers in src/lib/cluster-snapshots.ts; read surface in
+  // /api/v1/clusters/[id]/history. `changelog` and `foresight` are nullable
+  // hooks for a future LLM-backed diff + foresight step — SIS's forward-
+  // looking slot that Perigon's equivalent endpoint deliberately lacks.
+  `CREATE TABLE IF NOT EXISTS cluster_snapshots (
+    id TEXT PRIMARY KEY,
+    cluster_id TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    triggered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    signal_count INTEGER NOT NULL,
+    signal_ids TEXT NOT NULL DEFAULT '[]',
+    summary TEXT NOT NULL DEFAULT '',
+    changelog TEXT,
+    foresight TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS cluster_snapshots_cluster_time
+    ON cluster_snapshots(cluster_id, triggered_at DESC)`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);
