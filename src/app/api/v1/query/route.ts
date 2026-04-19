@@ -937,7 +937,10 @@ export async function POST(req: Request) {
           let assumptionReport: any = null;
           if (queryMode === "deep") {
             emitActivity({ type: "query", phase: "meta", message: "Deep-Mode: Widerspruchs-Check + Annahmen-Extraktion laufen…" });
-            const { runContradictionCheck, runAssumptionExtraction } = await import("@/lib/meta-prompts");
+            // NB: runX lebt in der Server-only `meta-prompts-runtime` —
+            // siehe Kommentar in `meta-prompts.ts`. Die Registry-Client-
+            // Seite würde sonst Node's `fs` aus env.ts ins Bundle ziehen.
+            const { runContradictionCheck, runAssumptionExtraction } = await import("@/lib/meta-prompts-runtime");
             const trendsMatchedText = matchedTrends.map((t: any) => `${t.name} (${t.id})`).join(", ") || "(none)";
             const synthesisSnapshot = JSON.stringify({
               synthesis: validated.synthesis,

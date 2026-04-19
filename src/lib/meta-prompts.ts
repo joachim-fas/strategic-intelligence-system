@@ -21,7 +21,14 @@
  * contradiction check).
  */
 
-import { resolveEnv } from "./env";
+// IMPORTANT: this module stays CLIENT-SAFE. No `./env`, no Node
+// built-ins — `system-prompts-registry.ts` pulls it into the docs page
+// which is "use client". The two runner functions
+// (`runContradictionCheck`, `runAssumptionExtraction`) that DO need
+// `resolveEnv` were moved to `./meta-prompts-runtime.ts`. Next's
+// client bundler statically follows every reachable module, including
+// `await import()` paths, so we can't hide a top-level env import
+// behind a dynamic call — it has to sit in a separate file.
 import { Locale } from "./i18n";
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -114,45 +121,9 @@ If no contradictions: { "contradictions": [], "structuralIssues": [], "overallVe
 Do NOT judge whether assessments are correct — only whether they contradict the PROVIDED data.`;
 }
 
-/**
- * Run the contradiction check against Claude Haiku. Returns null if the
- * API key is missing, the HTTP call fails, or the output can't be parsed
- * — callers should treat null as "check skipped" and not a verdict.
- */
-export async function runContradictionCheck(
-  input: ContradictionCheckInput,
-): Promise<ContradictionReport | null> {
-  const apiKey = resolveEnv("ANTHROPIC_API_KEY");
-  if (!apiKey) return null;
-
-  const prompt = buildContradictionCheckPrompt(input);
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 2000,
-        system: "You are a precise, structural fact-checker. Return only valid JSON.",
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data.content?.[0]?.text;
-    if (!text) return null;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as ContradictionReport;
-  } catch {
-    return null;
-  }
-}
+// Runner moved to `./meta-prompts-runtime.ts` — see comment at the top
+// of this file. Import `runContradictionCheck` from that module on the
+// server side; here we only export the prompt builder + types.
 
 /* ───────────────────────────────────────────────────────────────────────────
  * 2.3 Scenario Divergence Check (pure validator — no LLM call)
@@ -356,38 +327,8 @@ Return JSON only — no prose, no markdown fences:
 Focus on: causal assumptions ("if X then Y"), market assumptions, regulatory assumptions, actor-behavior assumptions. Maximum 6 assumptions. Prioritize by consequence of being wrong.`;
 }
 
-export async function runAssumptionExtraction(
-  input: AssumptionExtractionInput,
-): Promise<AssumptionReport | null> {
-  const apiKey = resolveEnv("ANTHROPIC_API_KEY");
-  if (!apiKey) return null;
-  const prompt = buildAssumptionExtractionPrompt(input);
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 3000,
-        system: "You are a precise analyst surfacing implicit assumptions. Return only valid JSON.",
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = data.content?.[0]?.text;
-    if (!text) return null;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as AssumptionReport;
-  } catch {
-    return null;
-  }
-}
+// Runner moved to `./meta-prompts-runtime.ts` — import
+// `runAssumptionExtraction` from that module on the server side.
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Provenance Tagging Rule (2.1) — published as a prompt fragment so it
