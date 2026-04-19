@@ -107,6 +107,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.75,
     description: "Climate awareness changes consumer behavior",
+    source: "Pew Research Climate Opinion Tracker 2024 + Eurobarometer Climate Change Survey 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.8,
   },
   {
     from: "mega-climate-sustainability",
@@ -114,6 +117,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.6,
     description: "Climate impacts disproportionately affect vulnerable populations",
+    source: "World Bank Groundswell Report 2021 + IPCC AR6 WG II Ch 8 (Poverty, Livelihoods)",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
 
   // ─── AI transforms work and society ────────────────────────
@@ -164,6 +170,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "AI disrupts education and knowledge creation",
+    source: "UNESCO Global Education Monitoring Report 2024 + OECD PISA Digital Learning Framework",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-ai-transformation",
@@ -547,6 +556,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "Values-driven consumers reject consumption-as-identity, demand ethical brands",
+    source: "Edelman Trust Barometer 2024 + NielsenIQ Global Consumer Outlook 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.75,
   },
   {
     from: "mega-identity-values",
@@ -591,6 +603,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "Cloud-first architectures expand the attack surface and shift security models to zero-trust",
+    source: "NIST SP 800-207 Zero Trust Architecture + CISA Zero Trust Maturity Model 2.0",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "macro-cloud-native",
@@ -645,6 +660,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.55,
     description: "Quantum simulation accelerates drug discovery and protein folding research",
+    source: "Google Quantum AI 2024 benchmark papers + Roche/Cambridge Quantum pharma collaboration announcements",
+    timestamp: "2026-04-19",
+    confidence: 0.6,
   },
 
   // ── Spatial Computing & XR ─────────────────────────────────────────────
@@ -693,6 +711,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Generative tools fundamentally change how knowledge is created, edited, and validated",
+    source: "Stanford AI Index Report 2024 (education impact chapter) + UNESCO AI Ethics Recommendations 2023",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "macro-generative-ai",
@@ -707,6 +728,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.7,
     description: "Deepfakes and synthetic media erode the baseline of verifiable truth",
+    source: "DeepMedia Synthetic Media Report 2024 + NIST Guidance on AI-Generated Content Watermarking (2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.8,
   },
 
   // ── AI Agents — second connection ──────────────────────────────────────
@@ -716,6 +740,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.9,
     description: "Autonomous agents reshape job roles, productivity, and what 'work' even means",
+    source: "MIT Sloan Management Review — Generative AI and Workforce Productivity (2024) + Brynjolfsson/Li/Raymond (NBER 2023)",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-ai-agents",
@@ -748,6 +775,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "dampens",
     strength: 0.55,
     description: "Domestic renewables reduce dependence on fossil-exporting petrostates",
+    source: "IEA Energy Security Report 2024 + IRENA Geopolitics of the Energy Transformation",
+    timestamp: "2026-04-19",
+    confidence: 0.78,
   },
   {
     from: "macro-green-energy",
