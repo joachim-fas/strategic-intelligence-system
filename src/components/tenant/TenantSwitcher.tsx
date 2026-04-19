@@ -21,7 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTenant, type TenantMembership, type TenantRole } from "@/lib/tenant-context";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 const ROLE_BADGE_COLOR: Record<TenantRole, string> = {
   owner: "#0F6038",
@@ -49,7 +49,7 @@ function roleLabel(role: TenantRole, de: boolean): string {
 
 export function TenantSwitcher() {
   const { activeTenantId, memberships, role, isSystemAdmin, switchTenant } = useTenant();
-  const { locale } = useLocale();
+  const { t, locale } = useT();
   const de = locale === "de";
 
   const [open, setOpen] = useState(false);
@@ -100,7 +100,7 @@ export function TenantSwitcher() {
           background: "transparent",
           border: "1px solid var(--color-border, #E8E8E8)",
         }}
-        title={de ? "Aktueller Mandant" : "Current tenant"}
+        title={t("tenant.currentTenant")}
       >
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: ROLE_BADGE_COLOR[role ?? "member"] }} />
         <span style={{ letterSpacing: "0.02em" }}>{active.name}</span>
@@ -115,7 +115,7 @@ export function TenantSwitcher() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={de ? "Mandant wechseln" : "Switch tenant"}
+        aria-label={t("tenant.switchTenant")}
         style={{
           display: "inline-flex", alignItems: "center", gap: 8,
           padding: "4px 10px", borderRadius: 8,
@@ -145,7 +145,7 @@ export function TenantSwitcher() {
           style={{ width: 5, height: 5, borderRadius: "50%", background: ROLE_BADGE_COLOR[role ?? "member"], flexShrink: 0 }}
         />
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "0.02em" }}>
-          {active?.name ?? (de ? "Mandant" : "Tenant")}
+          {active?.name ?? t("tenant.tenantFallback")}
         </span>
         <span style={{ fontSize: 9, color: "var(--color-text-faint, #AAA)" }}>▾</span>
       </button>
@@ -175,7 +175,7 @@ export function TenantSwitcher() {
               color: "var(--color-text-faint, #AAA)",
             }}
           >
-            {de ? "Aktiver Mandant" : "Active tenant"}
+            {t("tenant.activeTenantHeading")}
           </div>
           <div style={{ maxHeight: 300, overflowY: "auto" }}>
             {memberships.map((m) => {
@@ -266,7 +266,7 @@ export function TenantSwitcher() {
               onClick={() => setOpen(false)}
               style={footerLinkStyle}
             >
-              {de ? "Einstellungen" : "Settings"}
+              {t("tenant.settingsMenuItem")}
             </Link>
           )}
           {canManage && (
@@ -275,7 +275,7 @@ export function TenantSwitcher() {
               onClick={() => setOpen(false)}
               style={footerLinkStyle}
             >
-              {de ? "Mandanten verwalten →" : "Manage tenants →"}
+              {t("tenant.manageTenants")}
             </Link>
           )}
         </div>

@@ -473,6 +473,11 @@ const en = {
     switchTenant: "Switch tenant",
     currentTenant: "Current tenant",
     noMembership: "You are not a member of any tenant yet.",
+    // Extra keys for the header dropdown (Welle-B-era tenant switcher)
+    tenantFallback: "Tenant",
+    activeTenantHeading: "Active tenant",
+    settingsMenuItem: "Settings",
+    manageTenants: "Manage tenants →",
   },
 
   sessions: {
@@ -1458,6 +1463,10 @@ const de: Dictionary = {
     switchTenant: "Mandant wechseln",
     currentTenant: "Aktueller Mandant",
     noMembership: "Du bist noch kein Mitglied eines Mandanten.",
+    tenantFallback: "Mandant",
+    activeTenantHeading: "Aktiver Mandant",
+    settingsMenuItem: "Einstellungen",
+    manageTenants: "Mandanten verwalten →",
   },
 
   sessions: {
