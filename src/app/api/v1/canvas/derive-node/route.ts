@@ -29,10 +29,9 @@
  * context-menu action without going through the full briefing pipeline.
  */
 
-import { NextResponse } from "next/server";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
-import { requireTenantContext } from "@/lib/api-helpers";
+import { requireTenantContext, apiSuccess, apiError } from "@/lib/api-helpers";
 import { buildDateContext } from "@/lib/llm";
 import { CANVAS_DERIVED_NODE_PROMPT_EN } from "@/lib/canvas-prompts";
 
@@ -74,12 +73,12 @@ export async function POST(req: Request) {
 
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey || apiKey.length < 10) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return apiError("Service temporarily unavailable", 503, "SERVICE_UNAVAILABLE");
   }
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return apiError("Invalid JSON body", 400, "BAD_REQUEST");
   }
 
   const { sourceNodes, derivationType, worldModelContext, locale } = body as {
@@ -90,17 +89,18 @@ export async function POST(req: Request) {
   };
 
   if (!Array.isArray(sourceNodes) || sourceNodes.length === 0) {
-    return NextResponse.json({ error: "sourceNodes must be a non-empty array" }, { status: 400 });
+    return apiError("sourceNodes must be a non-empty array", 400, "BAD_REQUEST");
   }
   if (sourceNodes.length > 20) {
-    return NextResponse.json({ error: "sourceNodes must not exceed 20 entries" }, { status: 422 });
+    return apiError("sourceNodes must not exceed 20 entries", 422, "VALIDATION_ERROR");
   }
 
   const type = typeof derivationType === "string" ? derivationType.toUpperCase() : "";
   if (!VALID_DERIVATIONS.includes(type as DerivationType)) {
-    return NextResponse.json(
-      { error: `derivationType must be one of: ${VALID_DERIVATIONS.join(", ")}` },
-      { status: 422 },
+    return apiError(
+      `derivationType must be one of: ${VALID_DERIVATIONS.join(", ")}`,
+      422,
+      "VALIDATION_ERROR",
     );
   }
 
@@ -156,7 +156,7 @@ You are the Strategic Intelligence System (SIS) Canvas assistant. You derive new
         if (res.status === 529 || res.status >= 500) continue;
         const errText = await res.text();
         console.error(`[canvas/derive-node] Anthropic ${res.status}:`, errText.slice(0, 200));
-        return NextResponse.json({ error: "Upstream model error" }, { status: 502 });
+        return apiError("Upstream model error", 502, "UPSTREAM_ERROR");
       }
 
       const data = await res.json();
@@ -165,7 +165,7 @@ You are the Strategic Intelligence System (SIS) Canvas assistant. You derive new
       const parsed = extractJSON(text);
       if (!parsed) continue;
 
-      return NextResponse.json({
+      return apiSuccess({
         ...parsed,
         _derivationType: type,
         _modelUsed: model,
@@ -176,8 +176,9 @@ You are the Strategic Intelligence System (SIS) Canvas assistant. You derive new
     }
   }
 
-  return NextResponse.json(
-    { error: "All fallback models returned empty / invalid output. Please try again." },
-    { status: 502 },
+  return apiError(
+    "All fallback models returned empty / invalid output. Please try again.",
+    502,
+    "UPSTREAM_EMPTY",
   );
 }

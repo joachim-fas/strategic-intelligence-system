@@ -24,10 +24,9 @@
  * so the frontend can render it directly or trigger a download.
  */
 
-import { NextResponse } from "next/server";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
-import { requireTenantContext } from "@/lib/api-helpers";
+import { requireTenantContext, apiSuccess, apiError } from "@/lib/api-helpers";
 import { buildDateContext } from "@/lib/llm";
 import { EXECUTIVE_SUMMARY_PROMPT_EN } from "@/lib/briefing-export";
 
@@ -42,17 +41,17 @@ export async function POST(req: Request) {
 
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey || apiKey.length < 10) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return apiError("Service temporarily unavailable", 503, "SERVICE_UNAVAILABLE");
   }
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return apiError("Invalid JSON body", 400, "BAD_REQUEST");
   }
 
   const { briefing, locale } = body as { briefing?: unknown; locale?: unknown };
   if (!briefing || typeof briefing !== "object") {
-    return NextResponse.json({ error: "briefing must be an object" }, { status: 400 });
+    return apiError("briefing must be an object", 400, "BAD_REQUEST");
   }
 
   const validLocale: "de" | "en" = locale === "en" ? "en" : "de";
@@ -101,7 +100,7 @@ You are the SIS Executive Summary writer. You compress strategic briefings for C
         if (res.status === 529 || res.status >= 500) continue;
         const errText = await res.text();
         console.error(`[export/exec] Anthropic ${res.status}:`, errText.slice(0, 200));
-        return NextResponse.json({ error: "Upstream model error" }, { status: 502 });
+        return apiError("Upstream model error", 502, "UPSTREAM_ERROR");
       }
 
       const data = await res.json();
@@ -111,15 +110,16 @@ You are the SIS Executive Summary writer. You compress strategic briefings for C
       const markdown = text.trim();
       const wordCount = markdown.split(/\s+/).filter(Boolean).length;
 
-      return NextResponse.json({ markdown, wordCount, modelUsed: model });
+      return apiSuccess({ markdown, wordCount, modelUsed: model });
     } catch (err) {
       console.error(`[export/exec] model=${model} failed:`, err);
       continue;
     }
   }
 
-  return NextResponse.json(
-    { error: "All fallback models returned empty output. Please try again." },
-    { status: 502 },
+  return apiError(
+    "All fallback models returned empty output. Please try again.",
+    502,
+    "UPSTREAM_EMPTY",
   );
 }

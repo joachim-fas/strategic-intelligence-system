@@ -20,10 +20,9 @@
  * structured richness when Haiku drops quality.
  */
 
-import { NextResponse } from "next/server";
 import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { resolveEnv } from "@/lib/env";
-import { requireTenantContext } from "@/lib/api-helpers";
+import { requireTenantContext, apiSuccess, apiError } from "@/lib/api-helpers";
 import { buildDateContext } from "@/lib/llm";
 import { SHAREABLE_BRIEFING_PROMPT_EN } from "@/lib/briefing-export";
 
@@ -38,17 +37,17 @@ export async function POST(req: Request) {
 
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey || apiKey.length < 10) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return apiError("Service temporarily unavailable", 503, "SERVICE_UNAVAILABLE");
   }
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return apiError("Invalid JSON body", 400, "BAD_REQUEST");
   }
 
   const { briefing, locale } = body as { briefing?: unknown; locale?: unknown };
   if (!briefing || typeof briefing !== "object") {
-    return NextResponse.json({ error: "briefing must be an object" }, { status: 400 });
+    return apiError("briefing must be an object", 400, "BAD_REQUEST");
   }
 
   const validLocale: "de" | "en" = locale === "en" ? "en" : "de";
@@ -88,22 +87,23 @@ You are the SIS Shareable-Briefing writer. You produce short plain-text snippets
         if (res.status === 529 || res.status >= 500) continue;
         const errText = await res.text();
         console.error(`[export/share] Anthropic ${res.status}:`, errText.slice(0, 200));
-        return NextResponse.json({ error: "Upstream model error" }, { status: 502 });
+        return apiError("Upstream model error", 502, "UPSTREAM_ERROR");
       }
 
       const data = await res.json();
       const text: string | undefined = data.content?.[0]?.text;
       if (!text || text.trim().length < 30) continue;
 
-      return NextResponse.json({ text: text.trim(), modelUsed: model });
+      return apiSuccess({ text: text.trim(), modelUsed: model });
     } catch (err) {
       console.error(`[export/share] model=${model} failed:`, err);
       continue;
     }
   }
 
-  return NextResponse.json(
-    { error: "All fallback models returned empty output. Please try again." },
-    { status: 502 },
+  return apiError(
+    "All fallback models returned empty output. Please try again.",
+    502,
+    "UPSTREAM_EMPTY",
   );
 }
