@@ -206,6 +206,12 @@ function isNoiseSignal(
  *  4. Keyword overlap ratio check (30% minimum)
  *  5. Over-fetches 3x from SQL then post-filters to requested limit
  */
+/**
+ * Synchron-Variante für Legacy-Aufrufer. Der Notion-Plan P1-1 (#13)
+ * führt später eine semantische Ebene ein (`getRelevantSignalsAsync`)
+ * mit sqlite-vec + Embeddings. Bis dahin rufen alle Call-Sites das
+ * bestehende Keyword-basierte getRelevantSignals().
+ */
 export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const d = db();
 
