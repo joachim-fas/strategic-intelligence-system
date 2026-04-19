@@ -1229,6 +1229,19 @@ const en = {
     resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
   },
 
+  derivedCard: {
+    badgeInsight: "INSIGHT",
+    badgeDecision: "DECISION",
+    badgeFollowup: "FOLLOW-UP",
+    insightTip: "Insight: Key finding derived from the analysis",
+    decisionTip: "Decision: Concrete action option with decision framework",
+    followupTip: "Follow-up: Further analysis building on these results",
+    scenarioOptimisticTip: "Optimistic scenario: Best realistic outcome",
+    scenarioBaselineTip: "Baseline scenario: Most likely outcome",
+    scenarioPessimisticTip: "Pessimistic scenario: Worst realistic outcome",
+    scenarioWildcardTip: "Wildcard scenario: Unlikely but high-impact possibility",
+  },
+
   ownThought: {
     openTooltip: "Stress-test your own thesis against the analysis",
     openButton: "Add your own thought…",
@@ -2525,6 +2538,19 @@ const de: Dictionary = {
     waitingFor: "Wartet auf",
     allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
     resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
+  },
+
+  derivedCard: {
+    badgeInsight: "ERKENNTNIS",
+    badgeDecision: "EMPFEHLUNG",
+    badgeFollowup: "FOLGEFRAGE",
+    insightTip: "Erkenntnis: Wichtige Schlussfolgerung aus der Analyse",
+    decisionTip: "Empfehlung: Konkrete Handlungsoption mit Entscheidungsrahmen",
+    followupTip: "Folgefrage: Weiterführende Analyse auf Basis dieser Ergebnisse",
+    scenarioOptimisticTip: "Optimistisches Szenario: Beste realistische Entwicklung",
+    scenarioBaselineTip: "Basisszenario: Wahrscheinlichstes Outcome",
+    scenarioPessimisticTip: "Pessimistisches Szenario: Ungünstigste realistische Entwicklung",
+    scenarioWildcardTip: "Wildcard-Szenario: Unwahrscheinlich, aber wirkungsmächtig",
   },
 
   ownThought: {

@@ -12,6 +12,7 @@
 
 import React, { useMemo } from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useT } from "@/lib/locale-context";
 import { CardActionsMenu } from "../CardActionsMenu";
 import { FormattedText } from "../FormattedText";
 import { DERIVED_W, NODE_STATUS_META, SCEN } from "../constants";
@@ -36,24 +37,27 @@ export function DerivedNodeCard({
   onFollowUp,
   onAddTag, onSetStatus,
 }: DerivedNodeCardProps) {
+  const { t } = useT();
   const type = node.nodeType;
   const isScenario = type === "scenario";
   const isFollowup = type === "followup";
   const scenCfg = isScenario && node.colorKey ? SCEN[node.colorKey] ?? SCEN.baseline : null;
 
   const cfg = useMemo(() => {
-    if (type === "insight")  return { accent: "#6B7A00", accentText: "#6B7A00", bg: "var(--color-lime-light)", badge: de ? "ERKENNTNIS" : "INSIGHT", badgeTip: de ? "Erkenntnis: Wichtige Schlussfolgerung aus der Analyse" : "Insight: Key finding derived from the analysis" };
-    if (type === "decision") return { accent: "#1A9E5A", accentText: "#1A9E5A", bg: "var(--signal-positive-light)", badge: de ? "EMPFEHLUNG" : "DECISION", badgeTip: de ? "Empfehlung: Konkrete Handlungsoption mit Entscheidungsrahmen" : "Decision: Concrete action option with decision framework" };
-    if (type === "followup") return { accent: "rgba(0,0,0,0.10)", accentText: "var(--color-text-muted)", bg: "var(--color-surface)", badge: de ? "FOLGEFRAGE" : "FOLLOW-UP", badgeTip: de ? "Folgefrage: Weiterführende Analyse auf Basis dieser Ergebnisse" : "Follow-up: Further analysis building on these results" };
+    if (type === "insight")  return { accent: "#6B7A00", accentText: "#6B7A00", bg: "var(--color-lime-light)", badge: t("derivedCard.badgeInsight"), badgeTip: t("derivedCard.insightTip") };
+    if (type === "decision") return { accent: "#1A9E5A", accentText: "#1A9E5A", bg: "var(--signal-positive-light)", badge: t("derivedCard.badgeDecision"), badgeTip: t("derivedCard.decisionTip") };
+    if (type === "followup") return { accent: "rgba(0,0,0,0.10)", accentText: "var(--color-text-muted)", bg: "var(--color-surface)", badge: t("derivedCard.badgeFollowup"), badgeTip: t("derivedCard.followupTip") };
     const scen = SCEN[node.colorKey ?? "baseline"] ?? SCEN.baseline;
     const scenTips: Record<string, string> = {
-      optimistic: de ? "Optimistisches Szenario: Beste realistische Entwicklung" : "Optimistic scenario: Best realistic outcome",
-      baseline:   de ? "Basisszenario: Wahrscheinlichstes Outcome" : "Baseline scenario: Most likely outcome",
-      pessimistic: de ? "Pessimistisches Szenario: Ungünstigste realistische Entwicklung" : "Pessimistic scenario: Worst realistic outcome",
-      wildcard:   de ? "Wildcard-Szenario: Unwahrscheinlich, aber wirkungsmächtig" : "Wildcard scenario: Unlikely but high-impact possibility",
+      optimistic:  t("derivedCard.scenarioOptimisticTip"),
+      baseline:    t("derivedCard.scenarioBaselineTip"),
+      pessimistic: t("derivedCard.scenarioPessimisticTip"),
+      wildcard:    t("derivedCard.scenarioWildcardTip"),
     };
+    // SCEN is a bilingual label table — data-field lookup (label / labelEn)
+    // picks the localised scenario badge text (OPTIMISTIC, BASELINE, …).
     return { accent: scen.color, accentText: scen.color, bg: scen.bg, badge: de ? scen.label.toUpperCase() : scen.labelEn.toUpperCase(), badgeTip: scenTips[node.colorKey ?? "baseline"] ?? "" };
-  }, [type, node.colorKey, de]);
+  }, [type, node.colorKey, de, t]);
 
   const accentColorForStatus = node.nodeStatus && node.nodeStatus !== "open" ? NODE_STATUS_META[node.nodeStatus].color : null;
 
