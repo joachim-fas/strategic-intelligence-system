@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 export function TagInlineInput({
   nodeId,
@@ -18,6 +19,8 @@ export function TagInlineInput({
   onAddTag: (id: string, tag: string) => void;
 }) {
   const [value, setValue] = useState("");
+  const locale: Locale = de ? "de" : "en";
+  const tl = (key: TranslationKey) => translate(locale, key);
   return (
     <div style={{ display: "flex", gap: 4 }}>
       <input
@@ -29,7 +32,7 @@ export function TagInlineInput({
             setValue("");
           }
         }}
-        placeholder={de ? "Neuen Tag eingeben…" : "Add new tag…"}
+        placeholder={tl("tagInput.placeholderAdd")}
         style={{
           flex: 1,
           fontSize: 12,
@@ -60,7 +63,7 @@ export function TagInlineInput({
           fontWeight: 600,
         }}
       >
-        {de ? "Hinzufügen" : "Add"}
+        {tl("tagInput.addButton")}
       </button>
     </div>
   );

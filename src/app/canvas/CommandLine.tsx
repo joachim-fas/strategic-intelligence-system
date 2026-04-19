@@ -13,6 +13,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
 export function CommandLine({
   onSubmit, onClose, locale, prefill, contextLabel,
@@ -25,7 +26,7 @@ export function CommandLine({
 }) {
   const [value, setValue] = useState(prefill ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
-  const de = locale === "de";
+  const tl = (key: TranslationKey) => translate(locale as Locale, key);
 
   useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
   useEffect(() => { setValue(prefill ?? ""); }, [prefill]);
@@ -38,11 +39,11 @@ export function CommandLine({
   };
 
   const SLASH_COMMANDS = [
-    { cmd: '/trend', desc: de ? 'Trend analysieren' : 'Analyze trend' },
-    { cmd: '/scenario', desc: de ? 'Szenarien entwickeln' : 'Develop scenarios' },
-    { cmd: '/signal', desc: de ? 'Schwache Signale finden' : 'Find weak signals' },
-    { cmd: '/clear', desc: de ? 'Canvas leeren' : 'Clear canvas' },
-    { cmd: '/export', desc: de ? 'Als Markdown exportieren' : 'Export as Markdown' },
+    { cmd: '/trend',    desc: tl('commandLine.slashTrend')    },
+    { cmd: '/scenario', desc: tl('commandLine.slashScenario') },
+    { cmd: '/signal',   desc: tl('commandLine.slashSignal')   },
+    { cmd: '/clear',    desc: tl('commandLine.slashClear')    },
+    { cmd: '/export',   desc: tl('commandLine.slashExport')   },
   ];
   const showSlashHints = value.startsWith('/') && value.length < 12;
   const filteredSlash = showSlashHints
@@ -53,13 +54,13 @@ export function CommandLine({
     <div onPointerDown={e => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       {contextLabel && (
         <div style={{ fontSize: 11, color: "var(--color-text-muted)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 20, padding: "3px 12px", maxWidth: 460, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          ↳ {de ? "Folge-Analyse:" : "Follow-up on:"} <em>{contextLabel}</em>
+          ↳ {tl("commandLine.followUpOn")} <em>{contextLabel}</em>
         </div>
       )}
       <div style={{ position: "relative", width: 520, maxWidth: "90vw" }}>
         {showSlashHints && filteredSlash.length > 0 && (
           <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6, background: 'var(--color-surface, rgba(255,255,255,0.98))', border: '1px solid var(--color-border, #ddd)', borderRadius: 10, padding: '8px 10px', fontSize: 12, zIndex: 1000, boxShadow: '0 4px 16px rgba(0,0,0,0.10)' }}>
-            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{de ? 'Befehle' : 'Commands'}:</div>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tl('commandLine.slashHintsHeading')}:</div>
             {filteredSlash.map(c => (
               <div key={c.cmd}
                 onClick={() => { setValue(c.cmd + ' '); inputRef.current?.focus(); }}
@@ -80,16 +81,16 @@ export function CommandLine({
             value={value}
             onChange={e => setValue(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
-            placeholder={de ? "Frage, Thema oder /befehl…" : "Question, topic or /command…"}
+            placeholder={tl("commandLine.placeholder")}
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 15, color: "var(--color-text-primary)", fontFamily: "inherit" }}
           />
           <button onClick={submit} style={{ flexShrink: 0, padding: "6px 16px", borderRadius: 8, background: "#E4FF97", border: "1px solid rgba(0,0,0,0.1)", color: "#0A0A0A", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {de ? "Analysieren" : "Analyze"} ↵
+            {tl("commandLine.analyze")} ↵
           </button>
         </div>
       </div>
       <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-        Esc {de ? "schließen" : "to close"} · ↵ {de ? "ausführen" : "to run"} · / {de ? "Befehle" : "commands"}
+        Esc {tl("commandLine.footerEsc")} · ↵ {tl("commandLine.footerRun")} · / {tl("commandLine.footerCommands")}
       </div>
     </div>
   );

@@ -1214,6 +1214,27 @@ const en = {
     tagPlaceholder: "Enter tag…",
     delete: "Delete",
   },
+
+  commandLine: {
+    followUpOn: "Follow-up on:",
+    placeholder: "Question, topic or /command…",
+    analyze: "Analyze",
+    footerEsc: "to close",
+    footerRun: "to run",
+    footerCommands: "commands",
+    slashTrend: "Analyze trend",
+    slashScenario: "Develop scenarios",
+    slashSignal: "Find weak signals",
+    slashClear: "Clear canvas",
+    slashExport: "Export as Markdown",
+    slashHintsHeading: "Commands",
+  },
+
+  tagInput: {
+    placeholderAdd: "Add new tag…",
+    placeholderNew: "New tag…",
+    addButton: "Add",
+  },
 } as const;
 
 // German dictionary — same shape, different strings. TypeScript enforces
@@ -2238,6 +2259,27 @@ const de: Dictionary = {
     addTag: "Tag hinzufügen",
     tagPlaceholder: "Tag eingeben…",
     delete: "Löschen",
+  },
+
+  commandLine: {
+    followUpOn: "Folge-Analyse:",
+    placeholder: "Frage, Thema oder /befehl…",
+    analyze: "Analysieren",
+    footerEsc: "schließen",
+    footerRun: "ausführen",
+    footerCommands: "Befehle",
+    slashTrend: "Trend analysieren",
+    slashScenario: "Szenarien entwickeln",
+    slashSignal: "Schwache Signale finden",
+    slashClear: "Canvas leeren",
+    slashExport: "Als Markdown exportieren",
+    slashHintsHeading: "Befehle",
+  },
+
+  tagInput: {
+    placeholderAdd: "Neuen Tag eingeben…",
+    placeholderNew: "Neuer Tag…",
+    addButton: "Hinzufügen",
   },
 };
 
