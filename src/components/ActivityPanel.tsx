@@ -19,7 +19,7 @@ import {
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useActivityStream } from "@/lib/use-activity-stream";
 import type { ActivityEvent } from "@/lib/use-activity-stream";
-import { useLocale } from "@/lib/locale-context";
+import { useLocale, useT } from "@/lib/locale-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { connectors } from "@/connectors";
 import { freshnessTier, FRESHNESS_COLOR } from "@/lib/freshness";
@@ -96,6 +96,7 @@ function formatMeta(v: unknown): string {
 export function ActivityPanel() {
   const { locale } = useLocale();
   const de = locale === "de";
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const { events, connected, clearEvents } = useActivityStream(open);
   const [monitorData, setMonitorData] = useState<MonitorData | null>(null);
@@ -222,7 +223,7 @@ export function ActivityPanel() {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Tooltip content={de ? "Vollständiger Monitor" : "Full monitor view"} placement="bottom">
+            <Tooltip content={t("activityPanel.fullMonitorTooltip")} placement="bottom">
               <Link
                 href="/monitor"
                 onClick={() => setOpen(false)}
@@ -238,14 +239,14 @@ export function ActivityPanel() {
                 onMouseEnter={(e) => { (e.currentTarget).style.background = "rgba(228,255,151,0.5)"; }}
                 onMouseLeave={(e) => { (e.currentTarget).style.background = "transparent"; }}
               >
-                {de ? "Detail" : "Detail"}
+                Detail
                 <ArrowRight size={11} strokeWidth={2} />
               </Link>
             </Tooltip>
-            <Tooltip content={de ? "Schließen" : "Close"} placement="bottom">
+            <Tooltip content={t("activityPanel.close")} placement="bottom">
               <button
                 onClick={() => setOpen(false)}
-                aria-label={de ? "Schließen" : "Close"}
+                aria-label={t("activityPanel.close")}
                 style={{
                   width: 28, height: 28, borderRadius: 6, border: "none",
                   background: "transparent", cursor: "pointer",
@@ -270,7 +271,7 @@ export function ActivityPanel() {
           flexShrink: 0,
         }}>
           {/* Signal Freshness */}
-          <KPICard label={de ? "Signal-Frische" : "Signal Freshness"}>
+          <KPICard label={t("activityPanel.kpiFreshness")}>
             {newestHours !== null ? (
               <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                 <span style={{
@@ -290,7 +291,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* Source Coverage */}
-          <KPICard label={de ? "Quellen-Abdeckung" : "Source Coverage"}>
+          <KPICard label={t("activityPanel.kpiSourceCoverage")}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
               <span style={{
                 fontSize: 20, fontWeight: 700,
@@ -318,7 +319,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* Last Query Confidence */}
-          <KPICard label={de ? "Letzte Konfidenz" : "Last Confidence"}>
+          <KPICard label={t("activityPanel.kpiLastConfidence")}>
             {lastConfidence !== null ? (
               <span style={{
                 fontSize: 20, fontWeight: 700,
@@ -333,7 +334,7 @@ export function ActivityPanel() {
           </KPICard>
 
           {/* DB / System */}
-          <KPICard label={de ? "Datenbank" : "Database"}>
+          <KPICard label={t("activityPanel.kpiDatabase")}>
             {monitorData ? (
               <div>
                 <span style={{
@@ -365,7 +366,7 @@ export function ActivityPanel() {
             color: "var(--color-text-heading, #0A0A0A)",
             textTransform: "uppercase", letterSpacing: "0.05em",
           }}>
-            {de ? "Live-Aktivität" : "Live Activity"}
+            {t("activityPanel.liveActivityHeading")}
             {events.length > 0 && (
               <span style={{
                 marginLeft: 8, fontSize: 10, fontWeight: 500,
@@ -384,7 +385,7 @@ export function ActivityPanel() {
                 cursor: "pointer", padding: "2px 6px",
               }}
             >
-              {de ? "Löschen" : "Clear"}
+              {t("activityPanel.clearButton")}
             </button>
           )}
         </div>
@@ -405,9 +406,9 @@ export function ActivityPanel() {
               <div style={{ marginBottom: 8, opacity: 0.3, display: "flex", justifyContent: "center" }}>
                 <ActivityIcon size={28} strokeWidth={1.75} />
               </div>
-              <div>{de ? "Warte auf Aktivität…" : "Waiting for activity…"}</div>
+              <div>{t("activityPanel.emptyTitle")}</div>
               <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
-                {de ? "Starte eine Abfrage oder Pipeline" : "Start a query or pipeline"}
+                {t("activityPanel.emptyHint")}
               </div>
             </div>
           ) : (
@@ -423,14 +424,14 @@ export function ActivityPanel() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
-          <span>{de ? "Ctrl+M zum Umschalten" : "Ctrl+M to toggle"}</span>
+          <span>{t("activityPanel.footerShortcut")}</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{
               display: "inline-block", width: 6, height: 6, borderRadius: "50%",
               background: connected ? "#1A9E5A" : "#C8C8C8",
               boxShadow: connected ? "0 0 4px rgba(26,158,90,0.5)" : "none",
             }} />
-            {connected ? (de ? "Verbunden" : "Connected") : (de ? "Getrennt" : "Disconnected")}
+            {connected ? t("activityPanel.connected") : t("activityPanel.disconnected")}
           </span>
         </div>
       </aside>

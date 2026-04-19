@@ -1160,6 +1160,27 @@ const en = {
     activityAriaLabel: "Open Activity Monitor",
   },
 
+  activityPanel: {
+    // Header actions
+    fullMonitorTooltip: "Full monitor view",
+    close: "Close",
+    // KPI tiles
+    kpiFreshness: "Signal Freshness",
+    kpiSourceCoverage: "Source Coverage",
+    kpiLastConfidence: "Last Confidence",
+    kpiDatabase: "Database",
+    // Live-feed header + actions
+    liveActivityHeading: "Live Activity",
+    clearButton: "Clear",
+    // Empty state
+    emptyTitle: "Waiting for activity…",
+    emptyHint: "Start a query or pipeline",
+    // Footer
+    footerShortcut: "Ctrl+M to toggle",
+    connected: "Connected",
+    disconnected: "Disconnected",
+  },
+
   briefingExport: {
     copiedTooltip: "Copied to clipboard",
     exportTooltip: "Export briefing (Markdown, JSON)",
@@ -2264,6 +2285,22 @@ const de: Dictionary = {
     mainNavAriaLabel: "Hauptnavigation",
     activityTooltip: "Activity Monitor (Ctrl+M)",
     activityAriaLabel: "Activity Monitor öffnen",
+  },
+
+  activityPanel: {
+    fullMonitorTooltip: "Vollständiger Monitor",
+    close: "Schließen",
+    kpiFreshness: "Signal-Frische",
+    kpiSourceCoverage: "Quellen-Abdeckung",
+    kpiLastConfidence: "Letzte Konfidenz",
+    kpiDatabase: "Datenbank",
+    liveActivityHeading: "Live-Aktivität",
+    clearButton: "Löschen",
+    emptyTitle: "Warte auf Aktivität…",
+    emptyHint: "Starte eine Abfrage oder Pipeline",
+    footerShortcut: "Ctrl+M zum Umschalten",
+    connected: "Verbunden",
+    disconnected: "Getrennt",
   },
 
   briefingExport: {
