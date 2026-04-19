@@ -124,6 +124,17 @@ export const COMMANDS: CommandDescriptor[] = [
     glyph: "◉",
     run: (ctx) => ctx.navigate("/monitor"),
   },
+  {
+    id: "nav.clusters",
+    labelDe: "Cluster-Historie",
+    labelEn: "Cluster History",
+    hintDe: "Wie sich Themen-Cluster über Zeit entwickeln",
+    hintEn: "How topic clusters evolve over time",
+    keywords: ["cluster", "history", "historie", "snapshots", "foresight", "vorausschau"],
+    category: "nav",
+    glyph: "◷",
+    run: (ctx) => ctx.navigate("/clusters"),
+  },
 
   // ── Tenant-scoped navigation ────────────────────────────────────────────
   {
