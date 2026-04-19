@@ -60,6 +60,7 @@ import {
   VoltDropdownMenuLabel,
 } from "@/components/volt/VoltDropdownMenu";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { consumeSSE } from "@/lib/sse-client";
 import { useLocale } from "@/lib/locale-context";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
@@ -1053,24 +1054,17 @@ export default function CanvasPage() {
         }),
       });
       if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split("\n"); buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const evt = JSON.parse(line.slice(6).trim());
-            if (evt.type === "complete" && evt.result?.synthesis) {
-              setBriefingText(evt.result.synthesis);
-            }
-          } catch {}
-        }
-      }
+      // Shared SSE client — see src/lib/sse-client.ts (API-09). The
+      // briefing modal only cares about the `complete` event; delta
+      // text isn't streamed here (we buffer and set once at the end).
+      await consumeSSE(res, {
+        onEvent(evt) {
+          if (evt.type === "complete") {
+            const result = (evt as { result?: { synthesis?: string } }).result;
+            if (result?.synthesis) setBriefingText(result.synthesis);
+          }
+        },
+      });
     } catch (e) {
       setBriefingText(String(e));
     } finally {

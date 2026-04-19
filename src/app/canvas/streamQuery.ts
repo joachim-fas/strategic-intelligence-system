@@ -28,6 +28,7 @@
 "use client";
 
 import type { QueryResult } from "@/types";
+import { consumeSSE } from "@/lib/sse-client";
 
 export function extractSynthesisDelta(acc: string, sent: number): string {
   const keyIdx = acc.indexOf('"synthesis"');
@@ -169,48 +170,46 @@ export async function streamQuery(
 
   // ── Phase 2: read the stream. Mid-stream errors do NOT retry — we'd
   // overwrite partial synthesis the user already sees.
-  const reader = res.body!.getReader();
-  const dec = new TextDecoder();
-  let buf = "", acc = "", sent = 0;
+  // Shared SSE client — see src/lib/sse-client.ts (API-09).
+  let acc = "", sent = 0;
   let final: QueryResult | null = null;
   let lastPhase = 0;
-  let gotAnyData = false;
+  let errored = false;
 
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      gotAnyData = true;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n"); buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const json = line.slice(6).trim();
-        if (!json) continue;
-        try {
-          const evt = JSON.parse(json);
-          if (evt.type === "delta" && evt.text) {
-            acc += evt.text;
-            const delta = extractSynthesisDelta(acc, sent);
-            if (delta) { sent += delta.length; onChunk(delta); }
-            if (onPhase) {
-              const phase = detectStreamingPhase(acc);
-              if (phase !== lastPhase) { lastPhase = phase; onPhase(phase); }
-            }
-          } else if (evt.type === "complete" && evt.result) {
-            final = evt.result;
-          } else if (evt.type === "error") { onError(evt.error || (locale === "de" ? "Fehler" : "Error")); return; }
-        } catch {}
-      }
-    }
+    const outcome = await consumeSSE(res, {
+      signal,
+      onEvent(evt) {
+        if (errored) return;
+        if (evt.type === "delta" && typeof evt.text === "string") {
+          acc += evt.text;
+          const delta = extractSynthesisDelta(acc, sent);
+          if (delta) { sent += delta.length; onChunk(delta); }
+          if (onPhase) {
+            const phase = detectStreamingPhase(acc);
+            if (phase !== lastPhase) { lastPhase = phase; onPhase(phase); }
+          }
+        } else if (evt.type === "complete" && evt.result) {
+          final = evt.result as QueryResult;
+        } else if (evt.type === "error") {
+          errored = true;
+          onError((typeof evt.error === "string" ? evt.error : null) ?? (locale === "de" ? "Fehler" : "Error"));
+        }
+      },
+    });
+    if (errored) return;
+    if (outcome.aborted) return;
+
+    if (final) onComplete(final);
+    else onError(outcome.gotAnyData ? errMsg(locale, "incomplete") : errMsg(locale, "noResponse"));
   } catch (e) {
     if (signal?.aborted || (e instanceof Error && e.name === "AbortError")) return;
     // Mid-stream drop. Don't retry — see class comment. Surface a clear
     // message so the QueryNodeCard can show the right error state.
-    onError(gotAnyData ? errMsg(locale, "midStream") : errMsg(locale, "failed", String(e)));
+    // `consumeSSE` returns `gotAnyData` on success but when it throws we
+    // don't have that information — err on the safe side and report
+    // the mid-stream message (user sees partial content either way).
+    onError(errMsg(locale, "midStream"));
     return;
   }
-
-  if (final) onComplete(final);
-  else onError(gotAnyData ? errMsg(locale, "incomplete") : errMsg(locale, "noResponse"));
 }

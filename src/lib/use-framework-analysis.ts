@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { FrameworkId } from "@/types/frameworks";
+import { consumeSSE } from "@/lib/sse-client";
 
 export interface StepResult {
   status: "idle" | "running" | "done" | "error";
@@ -47,49 +48,40 @@ export function useFrameworkAnalysis(frameworkId: FrameworkId) {
         return;
       }
 
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
+      // Shared SSE client — see src/lib/sse-client.ts (API-09). This
+      // was previously a bespoke parser that split on "\n\n"
+      // (spec-correct) but shared no code with the other two SSE
+      // consumers. Now they all use consumeSSE.
       let fullText = "";
-      let lineBuffer = "";
       let result: any = null;
       let gotComplete = false;
       let gotError = false;
       let errorMsg = "";
       let modelUsed: string | undefined;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        lineBuffer += decoder.decode(value, { stream: true });
-        const lines = lineBuffer.split("\n\n");
-        lineBuffer = lines.pop() ?? "";
-        for (const chunk of lines) {
-          const line = chunk.trim();
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6).trim());
-            if (event.type === "delta" && event.text) {
-              fullText += event.text;
-              setSteps(prev => ({
-                ...prev,
-                [stepId]: { ...prev[stepId], rawText: fullText, status: "running" },
-              }));
-            } else if (event.type === "status") {
-              setSteps(prev => ({
-                ...prev,
-                [stepId]: { ...prev[stepId], statusMessage: event.message, status: "running" },
-              }));
-            } else if (event.type === "complete") {
-              result = event.result;
-              modelUsed = event.modelUsed;
-              gotComplete = true;
-            } else if (event.type === "error") {
-              gotError = true;
-              errorMsg = event.error || "Unknown error";
-            }
-          } catch {}
-        }
-      }
+      await consumeSSE(res, {
+        onEvent(event) {
+          if (event.type === "delta" && typeof event.text === "string") {
+            fullText += event.text;
+            setSteps(prev => ({
+              ...prev,
+              [stepId]: { ...prev[stepId], rawText: fullText, status: "running" },
+            }));
+          } else if (event.type === "status") {
+            setSteps(prev => ({
+              ...prev,
+              [stepId]: { ...prev[stepId], statusMessage: event.message as string, status: "running" },
+            }));
+          } else if (event.type === "complete") {
+            result = (event as { result?: unknown }).result;
+            modelUsed = (event as { modelUsed?: string }).modelUsed;
+            gotComplete = true;
+          } else if (event.type === "error") {
+            gotError = true;
+            errorMsg = (event.error as string) || "Unknown error";
+          }
+        },
+      });
 
       if (gotError) {
         setSteps(prev => ({
