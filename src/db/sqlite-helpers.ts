@@ -159,6 +159,43 @@ export function ensureMultiTenantSchema(db: Database.Database): void {
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS cluster_snapshots_cluster_time
     ON cluster_snapshots(cluster_id, triggered_at DESC)`);
+
+  // ── Forecasts (Welle C Item 2 — Manifold-inspired, trimmed) ──
+  // Tenant-scoped binary prediction-market-lite. Schema duplicated
+  // in migrate-sqlite.ts (fresh DB path); both must stay in sync.
+  // Feature-flagged at the route layer via FORECASTS_ENABLED — the
+  // table exists always so flipping the flag has no migration cost.
+  db.exec(`CREATE TABLE IF NOT EXISTS forecasts (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    question TEXT NOT NULL,
+    description TEXT,
+    state TEXT NOT NULL DEFAULT 'OPEN' CHECK(state IN ('DRAFT','OPEN','CLOSED','PENDING_RESOLUTION','RESOLVED','CANCELLED')),
+    close_at TEXT,
+    resolved_at TEXT,
+    resolution TEXT CHECK(resolution IS NULL OR resolution IN ('YES','NO','PARTIAL','CANCEL')),
+    resolution_rationale TEXT,
+    resolved_by TEXT,
+    resolution_approver TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS forecasts_tenant_updated
+    ON forecasts(tenant_id, updated_at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS forecasts_tenant_state
+    ON forecasts(tenant_id, state)`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS forecast_positions (
+    id TEXT PRIMARY KEY,
+    forecast_id TEXT NOT NULL REFERENCES forecasts(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    yes_probability REAL NOT NULL CHECK(yes_probability >= 0 AND yes_probability <= 1),
+    rationale TEXT,
+    staked_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS forecast_positions_unique
+    ON forecast_positions(forecast_id, user_id)`);
 }
 
 /**

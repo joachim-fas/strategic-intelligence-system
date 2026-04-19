@@ -313,6 +313,44 @@ const statements = [
   )`,
   `CREATE INDEX IF NOT EXISTS cluster_snapshots_cluster_time
     ON cluster_snapshots(cluster_id, triggered_at DESC)`,
+
+  // ─── Forecasts (Welle C Item 2 — Manifold-inspired, trimmed) ─────────────
+  // Tenant-scoped BINARY prediction markets for strategy teams. No AMM,
+  // no mana, no leagues — just confidence capture + state-machine +
+  // peer-signoff resolution. See src/lib/forecasts.ts for the full
+  // rationale. Feature-flagged via FORECASTS_ENABLED at the route layer;
+  // the table is always present so flipping the flag is side-effect-free.
+  `CREATE TABLE IF NOT EXISTS forecasts (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    question TEXT NOT NULL,
+    description TEXT,
+    state TEXT NOT NULL DEFAULT 'OPEN' CHECK(state IN ('DRAFT','OPEN','CLOSED','PENDING_RESOLUTION','RESOLVED','CANCELLED')),
+    close_at TEXT,
+    resolved_at TEXT,
+    resolution TEXT CHECK(resolution IS NULL OR resolution IN ('YES','NO','PARTIAL','CANCEL')),
+    resolution_rationale TEXT,
+    resolved_by TEXT,
+    resolution_approver TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS forecasts_tenant_updated
+    ON forecasts(tenant_id, updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS forecasts_tenant_state
+    ON forecasts(tenant_id, state)`,
+
+  `CREATE TABLE IF NOT EXISTS forecast_positions (
+    id TEXT PRIMARY KEY,
+    forecast_id TEXT NOT NULL REFERENCES forecasts(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    yes_probability REAL NOT NULL CHECK(yes_probability >= 0 AND yes_probability <= 1),
+    rationale TEXT,
+    staked_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS forecast_positions_unique
+    ON forecast_positions(forecast_id, user_id)`,
 ];
 
 console.log("Initialising SQLite database at:", dbPath);

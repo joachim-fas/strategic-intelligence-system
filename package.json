@@ -25,7 +25,8 @@
     "test:cluster-snapshots": "tsx scripts/cluster-snapshots-test.ts",
     "test:ai-text": "tsx scripts/ai-text-test.ts",
     "test:foresight-parser": "tsx scripts/foresight-parser-test.ts",
-    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:api"
+    "test:forecasts": "tsx scripts/forecasts-test.ts",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:forecasts && npm run test:api"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.7.0",
