@@ -19,7 +19,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { useLocale } from "@/lib/locale-context";
+import { useLocale, useT } from "@/lib/locale-context";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { AppHeader } from "@/components/AppHeader";
@@ -84,6 +84,7 @@ const TABS: { key: Tab; labelDe: string; labelEn: string }[] = [
 
 export default function CockpitClient() {
   const { locale } = useLocale();
+  const { t } = useT();
   const de = locale === "de";
   const activeTenantId = useActiveTenantId();
 
@@ -287,13 +288,13 @@ export default function CockpitClient() {
             marginBottom: 12,
             display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
           }}>
-            <span>{trends.length} {de ? "Trends" : "Trends"}</span>
+            <span>{trends.length} {t("cockpit.trendsStatLabel")}</span>
             <span style={{ opacity: 0.4 }}>·</span>
-            <span>{activeEdges} {de ? "Kausal-Edges" : "Causal edges"}</span>
+            <span>{activeEdges} {t("cockpit.causalEdgesStatLabel")}</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span>{sourcesLabel}</span>
             <span style={{ opacity: 0.4 }}>·</span>
-            <span>{adoptCount} {de ? "Adopt-Ring" : "Adopt ring"}</span>
+            <span>{adoptCount} {t("cockpit.adoptRingStatLabel")}</span>
           </div>
 
           {/* Title + Methodik link */}
@@ -337,7 +338,7 @@ export default function CockpitClient() {
                 fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
                 textTransform: "uppercase",
               }}>
-                {de ? "Methodik" : "Methodology"}
+                {t("cockpit.methodologyLink")}
               </span>
               <span>→</span>
             </a>
@@ -350,9 +351,7 @@ export default function CockpitClient() {
             margin: "0 0 18px", maxWidth: 720,
             fontFamily: "var(--volt-font-ui, 'DM Sans', sans-serif)",
           }}>
-            {de
-              ? "Die Daten-Landschaft, gegen die du deine strategischen Fragen stellst — Trends, Kausalnetz, Live-Signale und Quellen in einem System."
-              : "The data landscape you run your strategic questions against — trends, causal network, live signals, and sources in one system."}
+            {t("cockpit.heroSubtitle")}
           </p>
 
           {/* Stale-data banner — shown when live_signals is older than 24h or
@@ -384,16 +383,12 @@ export default function CockpitClient() {
                 }}
               />
               <strong style={{ fontWeight: 700 }}>
-                {de ? "Signale veraltet" : "Signals are stale"}
+                {t("cockpit.staleBannerTitle")}
               </strong>
               <span style={{ color: "#7C2D12", opacity: 0.85 }}>
                 {freshness.signalCount === 0
-                  ? (de
-                    ? "Keine Live-Signale in der Datenbank. Starte die Pipeline mit `npm run signals:pump`."
-                    : "No live signals in the database. Run `npm run signals:pump` to seed.")
-                  : (de
-                    ? `Letztes Signal vor ${Math.round(freshness.newestAgeHours)} Std. Pipeline mit "npm run signals:pump" nachziehen oder Cron prüfen.`
-                    : `Last signal ${Math.round(freshness.newestAgeHours)}h ago. Trigger pipeline via "npm run signals:pump" or check cron.`)}
+                  ? t("cockpit.staleBannerEmpty")
+                  : t("cockpit.staleBannerLastSignal", { h: String(Math.round(freshness.newestAgeHours)) })}
               </span>
             </div>
           )}
@@ -419,7 +414,7 @@ export default function CockpitClient() {
           {/* UX-15 / EDGE-20: Loading indicator and error state for trend data */}
           {trendsLoading && (activeTab === "radar" || activeTab === "trends" || activeTab === "netzwerk") && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--volt-text-muted, #6B6B6B)", fontSize: 13 }}>
-              {de ? "Trends laden\u2026" : "Loading trends\u2026"}
+              {t("cockpit.trendsLoading")}
             </div>
           )}
           {trendsError && (activeTab === "radar" || activeTab === "trends" || activeTab === "netzwerk") && (
@@ -433,9 +428,7 @@ export default function CockpitClient() {
               display: "flex", flexDirection: "column", gap: 12,
             }}>
               <span>
-                {de
-                  ? "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut."
-                  : "Data could not be loaded. Please try again."}
+                {t("cockpit.dataLoadError")}
               </span>
               <button
                 onClick={loadTrends}
@@ -449,7 +442,7 @@ export default function CockpitClient() {
                   cursor: "pointer",
                 }}
               >
-                {de ? "Erneut versuchen" : "Retry"}
+                {t("cockpit.retryButton")}
               </button>
             </div>
           )}
@@ -568,7 +561,7 @@ export default function CockpitClient() {
                 onMouseEnter={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--signal-positive, #1A9E5A) 10%, transparent)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "color-mix(in srgb, var(--signal-positive, #1A9E5A) 5%, transparent)"; }}
               >
-                ⊞ {de ? "Im Canvas analysieren" : "Analyze in Canvas"}
+                ⊞ {t("cockpit.analyzeInCanvasButton")}
               </button>
             </div>
           </div>

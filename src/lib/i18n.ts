@@ -344,6 +344,20 @@ const en = {
     manualOverride: "Manual override",
     pin: "Pin",
     scores: "Scores",
+    // CockpitClient hero stats line + subtitle + stale-banner + actions
+    trendsStatLabel: "Trends",
+    causalEdgesStatLabel: "Causal edges",
+    adoptRingStatLabel: "Adopt ring",
+    methodologyLink: "Methodology",
+    heroSubtitle: "The data landscape you run your strategic questions against — trends, causal network, live signals, and sources in one system.",
+    staleBannerTitle: "Signals are stale",
+    staleBannerEmpty: "No live signals in the database. Run `npm run signals:pump` to seed.",
+    // {{h}} = hours since last signal
+    staleBannerLastSignal: "Last signal {{h}}h ago. Trigger pipeline via \"npm run signals:pump\" or check cron.",
+    trendsLoading: "Loading trends…",
+    dataLoadError: "Data could not be loaded. Please try again.",
+    retryButton: "Retry",
+    analyzeInCanvasButton: "Analyze in Canvas",
   },
 
   admin: {
@@ -1629,6 +1643,18 @@ const de: Dictionary = {
     manualOverride: "Manuell überschrieben",
     pin: "Anheften",
     scores: "Bewertungen",
+    trendsStatLabel: "Trends",
+    causalEdgesStatLabel: "Kausal-Edges",
+    adoptRingStatLabel: "Adopt-Ring",
+    methodologyLink: "Methodik",
+    heroSubtitle: "Die Daten-Landschaft, gegen die du deine strategischen Fragen stellst — Trends, Kausalnetz, Live-Signale und Quellen in einem System.",
+    staleBannerTitle: "Signale veraltet",
+    staleBannerEmpty: "Keine Live-Signale in der Datenbank. Starte die Pipeline mit `npm run signals:pump`.",
+    staleBannerLastSignal: "Letztes Signal vor {{h}} Std. Pipeline mit \"npm run signals:pump\" nachziehen oder Cron prüfen.",
+    trendsLoading: "Trends laden…",
+    dataLoadError: "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    retryButton: "Erneut versuchen",
+    analyzeInCanvasButton: "Im Canvas analysieren",
   },
 
   admin: {
