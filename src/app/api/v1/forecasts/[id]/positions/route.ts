@@ -23,6 +23,7 @@ import {
   CACHE_HEADERS,
   requireTenantRole,
 } from "@/lib/api-helpers";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { recordPosition, forecastsEnabled } from "@/lib/forecasts";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,11 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  // Positions are upserts (one per user per forecast) — 30/min is
+  // generous for a human-driven slider but catches automation.
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(`POST:${clientIp}`, 30, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantRole(request, "member");

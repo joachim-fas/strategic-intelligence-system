@@ -23,6 +23,7 @@ import {
   CACHE_HEADERS,
   requireTenantRole,
 } from "@/lib/api-helpers";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import {
   proposeResolution,
   approveResolution,
@@ -53,6 +54,12 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  // Resolutions are rare, so the budget is deliberately stricter
+  // than positions (1 proposal + 1 approval per forecast lifecycle
+  // — 10/min per IP is far past the human ceiling).
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(`POST:${clientIp}`, 10, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantRole(request, "admin");

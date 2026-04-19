@@ -23,6 +23,7 @@ import {
   requireTenantContext,
   requireTenantRole,
 } from "@/lib/api-helpers";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import {
   createForecast,
   listForecasts,
@@ -39,6 +40,9 @@ const FEATURE_404 = () =>
   );
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantContext(request);
@@ -66,6 +70,11 @@ const CreateBody = z.object({
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
+  // Mutation budget deliberately stricter than reads — creating
+  // 20 forecasts/min per IP is already past the human ceiling.
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(`POST:${clientIp}`, 20, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantRole(request, "member");

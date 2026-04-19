@@ -16,6 +16,7 @@ import {
   CACHE_HEADERS,
   requireTenantContext,
 } from "@/lib/api-helpers";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import { getForecastDetail, forecastsEnabled } from "@/lib/forecasts";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,9 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantContext(request);

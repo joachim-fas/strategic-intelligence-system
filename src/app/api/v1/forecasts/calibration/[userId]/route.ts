@@ -18,6 +18,7 @@ import {
   CACHE_HEADERS,
   requireTenantContext,
 } from "@/lib/api-helpers";
+import { checkRateLimit, tooManyRequests } from "@/lib/api-utils";
 import {
   getCalibrationSummary,
   forecastsEnabled,
@@ -35,6 +36,11 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
+  // The /forecasts detail panel calls this once per position on
+  // mount, so the limit matches the list endpoint (60/min).
+  const clientIp = request.headers.get("x-forwarded-for") || "unknown";
+  if (!checkRateLimit(clientIp, 60, 60_000)) return tooManyRequests();
+
   if (!forecastsEnabled()) return FEATURE_404();
 
   const ctx = await requireTenantContext(request);
