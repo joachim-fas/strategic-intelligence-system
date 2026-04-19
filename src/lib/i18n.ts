@@ -1261,6 +1261,137 @@ const en = {
     errorGeneric: "Error",
   },
 
+  canvasPage: {
+    // Error / confirm dialogs
+    errTimeout: "Request timed out.",
+    errLoadProjects: "Failed to load projects: {{err}}",
+    errCreateProject: "Failed to create project: {{err}}",
+    errLoadProject: "Failed to load project: {{err}}",
+    errRename: "Rename failed: {{err}}",
+    errDelete: "Delete failed: {{err}}",
+    errProjectGone: "Project no longer exists.",
+    confirmSwitchUnsaved: "Unsaved changes. Switch anyway?",
+    confirmDeleteProject: "Delete project permanently?",
+    confirmClearCanvas: "Clear entire canvas? This action cannot be undone.",
+    newProjectPlaceholder: "New project",
+
+    // Header / project chrome
+    tooltipClickRename: "Click to rename",
+    untitledProject: "Untitled",
+    noProject: "No project",
+    openProjectList: "Open project list",
+    saveSaving: "↑ Saving…",
+    saveSaved: "✓ Saved",
+    saveError: "! Save error",
+    createNewProject: "Create new project",
+    noProjectsYet: "No projects yet",
+    deleteProject: "Delete project",
+    projOpCreating: "Creating project…",
+    projOpDeleting: "Deleting project…",
+    projOpLoading: "Loading project…",
+
+    // View mode descriptions
+    viewTimeline: "Timeline",
+    viewCanvasDesc: "Free-form card layout for thinking and analysis",
+    viewBoardDesc: "Structured column view by node type",
+    viewTimelineDesc: "Chronological view of all analyses",
+    viewOrbitDesc: "Orbit: Network & Evidence chains",
+
+    // Summary / briefing buttons
+    summaryActive: "Summary: project results as briefing",
+    summaryInactive: "No active project — go to projects",
+    summaryButton: "Summary",
+    briefingMemoTooltip: "Generate strategic memo from all analyses",
+
+    // Toolbar — add / arrange / group
+    addCardTooltip: "Add new card (query, note, idea, list)",
+    addButton: "Add",
+    arrangeTooltip: "Sort and arrange cards",
+    arrangeButton: "Arrange",
+    arrangeLayoutHeading: "Layout",
+    sortModeTree: "Tree (Default)",
+    sortModeTime: "By Time",
+    sortModeType: "By Type",
+    sortModeStatus: "By Status",
+    groupsHeading: "Groups",
+    groupsHint: "⇧ Shift + click 2+ cards, then \"Group\"",
+    newGroupLabel: "New Group",
+    // {{n}} = number of selected cards
+    groupNCards: "Group {{n}} cards",
+    removeGroup: "Remove group",
+    removeAllGroups: "Remove all groups",
+    groupSelectedTooltip: "Group selected cards",
+    groupButton: "Group",
+
+    // Stats / analyses labels
+    analysesLabel: "analyses",
+    exportInsights: "Insights",
+    exportScenarios: "Scenarios",
+    exportDecisions: "Decisions",
+    statsQueries: "queries",
+    statsCards: "cards",
+    statsLinks: "links",
+    relationsLabel: "relations",
+    edgesLabel: "edges",
+    derivationLabel: "Derivation",
+    networkLabel: "Network",
+    thoughtHistory: "Thought History",
+
+    // Connection / tag filter
+    connLineTooltip: "Connection lines: auto → show → hide",
+    clearTagFilter: "Clear tag filter",
+
+    // Workflow / templates
+    workflowSystem: "Workflow System",
+    pipelineTemplates: "Pipeline Templates",
+    topicLabel: "Topic",
+    topicPlaceholder: "Enter topic … (Enter to start, Esc to cancel)",
+    cancel: "Cancel",
+
+    // What's inside panel
+    whatsInside: "What's inside",
+    statsNodeTypes: "Node Types",
+    statsNodeTypesHint: "Query, Insight, Scenario…",
+    statsEdgeStyles: "Edge Styles",
+    statsStatusStates: "Status States",
+    statsStatusStatesHint: "Idle · Running · Done · Error…",
+    statsViews: "Views",
+
+    // Node status (shared heading)
+    nodeStatusHeading: "Node Status",
+
+    // Canvas viewport controls
+    addNodeAria: "Add new node",
+    zoomPanHint: "Scroll = zoom · Drag background = pan",
+    zoomOut: "Zoom out",
+    zoomReset: "Reset",
+    zoomIn: "Zoom in",
+
+    // Status pill (node)
+    statusLabel: "Status",
+    statusDone: "Done",
+    statusRunning: "Running",
+    statusError: "Error",
+    statusIdle: "Idle",
+
+    // Delete card confirm
+    deleteCardConfirm: "Delete card?",
+    deleteCardHint: "cannot be undone · press Enter to confirm",
+    deleteButton: "Delete",
+
+    // Briefing modal
+    strategicBriefing: "Strategic Briefing",
+    briefingSubtitle: "generated from canvas",
+    briefingGenerating: "Generating briefing…",
+    copyButton: "Copy",
+
+    // Suggestion topics (line 4045 array)
+    suggestion1: "AI Agents 2025",
+    suggestion2: "How is the world of work changing?",
+    suggestion3: "DORA for Financial Service Providers",
+    suggestion4: "Quantum Computing 2027",
+  },
+
   methodikPage: {
     backToCockpitFull: "Back to Knowledge Cockpit",
     backToCockpit: "Back to Cockpit",
@@ -2639,6 +2770,121 @@ const de: Dictionary = {
     errorIncomplete: "Antwort unvollständig — Server beendete den Stream ohne Abschluss",
     errorNoResponse: "Keine Antwort erhalten",
     errorGeneric: "Fehler",
+  },
+
+  canvasPage: {
+    errTimeout: "Zeitlimit überschritten.",
+    errLoadProjects: "Projekte laden fehlgeschlagen: {{err}}",
+    errCreateProject: "Projekt erstellen fehlgeschlagen: {{err}}",
+    errLoadProject: "Projekt laden fehlgeschlagen: {{err}}",
+    errRename: "Umbenennen fehlgeschlagen: {{err}}",
+    errDelete: "Löschen fehlgeschlagen: {{err}}",
+    errProjectGone: "Projekt existiert nicht mehr.",
+    confirmSwitchUnsaved: "Ungespeicherte Änderungen. Trotzdem wechseln?",
+    confirmDeleteProject: "Projekt unwiderruflich löschen?",
+    confirmClearCanvas: "Gesamtes Canvas löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    newProjectPlaceholder: "Neues Projekt",
+
+    tooltipClickRename: "Klicken zum Umbenennen",
+    untitledProject: "Unbenanntes Projekt",
+    noProject: "Kein Projekt",
+    openProjectList: "Projektliste öffnen",
+    saveSaving: "↑ Speichert…",
+    saveSaved: "✓ Gespeichert",
+    saveError: "! Fehler beim Speichern",
+    createNewProject: "Neues Projekt erstellen",
+    noProjectsYet: "Noch keine Projekte",
+    deleteProject: "Projekt löschen",
+    projOpCreating: "Erstelle Projekt…",
+    projOpDeleting: "Lösche Projekt…",
+    projOpLoading: "Lade Projekt…",
+
+    viewTimeline: "Zeitlinie",
+    viewCanvasDesc: "Freie Karten-Ansicht zum Denken und Analysieren",
+    viewBoardDesc: "Strukturierte Spalten-Ansicht nach Node-Typ",
+    viewTimelineDesc: "Chronologische Ansicht aller Analysen",
+    viewOrbitDesc: "Orbit: Netzwerk & Evidenzketten",
+
+    summaryActive: "Zusammenfassung: Ergebnisse des Projekts als Briefing",
+    summaryInactive: "Kein aktives Projekt — zur Projektliste",
+    summaryButton: "Zusammenfassung",
+    briefingMemoTooltip: "Strategisches Memo aus allen Analysen generieren",
+
+    addCardTooltip: "Neue Karte hinzufügen (Abfrage, Notiz, Idee, Liste)",
+    addButton: "Neu",
+    arrangeTooltip: "Karten sortieren und anordnen",
+    arrangeButton: "Ordnen",
+    arrangeLayoutHeading: "Anordnen",
+    sortModeTree: "Baum (Standard)",
+    sortModeTime: "Zeitlich",
+    sortModeType: "Nach Typ",
+    sortModeStatus: "Nach Status",
+    groupsHeading: "Gruppen",
+    groupsHint: "⇧ Shift + Klick auf 2+ Karten, dann „Gruppieren\"",
+    newGroupLabel: "Neue Gruppe",
+    groupNCards: "{{n}} Karten gruppieren",
+    removeGroup: "Gruppe auflösen",
+    removeAllGroups: "Alle Gruppen auflösen",
+    groupSelectedTooltip: "Ausgewählte Karten gruppieren",
+    groupButton: "Gruppieren",
+
+    analysesLabel: "Analysen",
+    exportInsights: "Erkenntnisse",
+    exportScenarios: "Szenarien",
+    exportDecisions: "Empfehlungen",
+    statsQueries: "Abfragen",
+    statsCards: "Karten",
+    statsLinks: "Verb.",
+    relationsLabel: "Beziehungen",
+    edgesLabel: "Kanten",
+    derivationLabel: "Ableitung",
+    networkLabel: "Netzwerk",
+    thoughtHistory: "Gedankenverlauf",
+
+    connLineTooltip: "Verbindungslinien: auto → ein → aus",
+    clearTagFilter: "Tag-Filter aufheben",
+
+    workflowSystem: "Workflow-System",
+    pipelineTemplates: "Pipeline-Templates",
+    topicLabel: "Thema",
+    topicPlaceholder: "Thema eingeben … (Enter zum Starten, Esc zum Abbrechen)",
+    cancel: "Abbrechen",
+
+    whatsInside: "Was drin ist",
+    statsNodeTypes: "Node-Typen",
+    statsNodeTypesHint: "Query, Insight, Scenario…",
+    statsEdgeStyles: "Edge-Stile",
+    statsStatusStates: "Status-Zustände",
+    statsStatusStatesHint: "Idle · Running · Done · Error…",
+    statsViews: "Ansichten",
+
+    nodeStatusHeading: "Node-Status",
+
+    addNodeAria: "Neuen Knoten hinzufügen",
+    zoomPanHint: "Scrollen = Zoom · Hintergrund ziehen = Pan",
+    zoomOut: "Verkleinern",
+    zoomReset: "Zurücksetzen",
+    zoomIn: "Vergrößern",
+
+    statusLabel: "Status",
+    statusDone: "Fertig",
+    statusRunning: "Läuft",
+    statusError: "Fehler",
+    statusIdle: "Offen",
+
+    deleteCardConfirm: "Karte löschen?",
+    deleteCardHint: "nicht rückgängig machbar · Enter zum Bestätigen",
+    deleteButton: "Löschen",
+
+    strategicBriefing: "Strategisches Briefing",
+    briefingSubtitle: "generiert aus Canvas",
+    briefingGenerating: "Generiere Briefing…",
+    copyButton: "Kopieren",
+
+    suggestion1: "AI Agents 2025",
+    suggestion2: "Wie verändert sich die Arbeitswelt?",
+    suggestion3: "DORA für Finanzdienstleister",
+    suggestion4: "Quanten-Computing 2027",
   },
 
   methodikPage: {

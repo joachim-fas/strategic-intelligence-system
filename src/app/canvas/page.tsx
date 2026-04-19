@@ -61,7 +61,7 @@ import {
 } from "@/components/volt/VoltDropdownMenu";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { consumeSSE } from "@/lib/sse-client";
-import { useLocale } from "@/lib/locale-context";
+import { useLocale, useT } from "@/lib/locale-context";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import {
@@ -247,6 +247,7 @@ export default function CanvasPage() {
   const [panY, setPanY] = useState(0);
   const [zoom, setZoom] = useState(1);
   const { locale } = useLocale();
+  const { t } = useT();
   // Tenant-Scope fuer Client-localStorage. Der Hook ist SSR-hydratisiert, aber
   // wir spiegeln in einen Ref, damit Callbacks (onSave, loadProject, delete,
   // Init-Effect) den aktuellen Tenant sehen, ohne bei jedem Rerender neu
@@ -436,12 +437,12 @@ export default function CanvasPage() {
       setProjects((json.data ?? json).canvases ?? []);
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+        showProjectError(t("canvasPage.errTimeout"));
       } else {
-        showProjectError(de ? `Projekte laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load projects: ${(e as Error).message}`);
+        showProjectError(t("canvasPage.errLoadProjects", { err: String((e as Error).message) }));
       }
     }
-  }, [de, showProjectError]);
+  }, [t, showProjectError]);
 
   const saveCanvasToDb = useCallback(async (id: string) => {
     setSaveStatus("saving");
@@ -493,7 +494,7 @@ export default function CanvasPage() {
     const now = new Date();
     const stamp = now.toLocaleDateString(de ? "de-DE" : "en-US", { day: "2-digit", month: "2-digit" })
       + " " + now.toLocaleTimeString(de ? "de-DE" : "en-US", { hour: "2-digit", minute: "2-digit" });
-    const placeholder = `${de ? "Neues Projekt" : "New project"} · ${stamp}`;
+    const placeholder = `${t("canvasPage.newProjectPlaceholder")} · ${stamp}`;
     setProjectOp("creating");
     try {
       const res = await fetchWithTimeout("/api/v1/canvas", {
@@ -523,17 +524,17 @@ export default function CanvasPage() {
       setShowTemplatePicker(true);
       setTemplateTopic("");
     } catch (e) {
-      showProjectError(de ? `Projekt erstellen fehlgeschlagen: ${(e as Error).message}` : `Failed to create project: ${(e as Error).message}`);
+      showProjectError(t("canvasPage.errCreateProject", { err: String((e as Error).message) }));
     } finally {
       setProjectOp(null);
     }
-  }, [de, loadProjects, showProjectError]);
+  }, [de, t, loadProjects, showProjectError]);
 
   const loadProject = useCallback(async (id: string) => {
     // FIXED: DAT-07 — Check for unsaved changes before switching projects
     if (dbSaveTimerRef.current && projectIdRef.current && projectIdRef.current !== id) {
       const confirmSwitch = window.confirm(
-        de ? "Ungespeicherte Änderungen. Trotzdem wechseln?" : "Unsaved changes. Switch anyway?"
+        t("canvasPage.confirmSwitchUnsaved")
       );
       if (!confirmSwitch) return;
       // FIXED: DAT-06 — Flush pending save before project switch
@@ -559,7 +560,7 @@ export default function CanvasPage() {
         setProjects(prev => prev.filter(p => p.id !== id));
         // Clear stale ?project= from URL so reload doesn't retry a dead ID
         try { window.history.replaceState(null, "", "/canvas"); } catch {}
-        showProjectError(de ? "Projekt existiert nicht mehr." : "Project no longer exists.");
+        showProjectError(t("canvasPage.errProjectGone"));
         setProjectOp(null);
         return;
       }
@@ -609,11 +610,11 @@ export default function CanvasPage() {
       }
       setProjectDropdownOpen(false);
     } catch (e) {
-      showProjectError(de ? `Projekt laden fehlgeschlagen: ${(e as Error).message}` : `Failed to load project: ${(e as Error).message}`);
+      showProjectError(t("canvasPage.errLoadProject", { err: String((e as Error).message) }));
     } finally {
       setProjectOp(null);
     }
-  }, [de, showProjectError]);
+  }, [de, t, showProjectError]);
 
   const saveProjectName = useCallback(async () => {
     setEditingName(false);
@@ -628,15 +629,15 @@ export default function CanvasPage() {
       setProjects(prev => prev.map(p => p.id === projectId ? { ...p, name: projectName.trim() } : p));
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+        showProjectError(t("canvasPage.errTimeout"));
       } else {
-        showProjectError(de ? `Umbenennen fehlgeschlagen: ${(e as Error).message}` : `Rename failed: ${(e as Error).message}`);
+        showProjectError(t("canvasPage.errRename", { err: String((e as Error).message) }));
       }
     }
-  }, [projectId, projectName, de, showProjectError]);
+  }, [projectId, projectName, t, showProjectError]);
 
   const deleteProject = useCallback(async (id: string) => {
-    if (!window.confirm(de ? "Projekt unwiderruflich löschen?" : "Delete project permanently?")) return;
+    if (!window.confirm(t("canvasPage.confirmDeleteProject"))) return;
     setProjectOp("deleting");
     try {
       const res = await fetchWithTimeout(`/api/v1/canvas/${id}`, { method: "DELETE" });
@@ -654,14 +655,14 @@ export default function CanvasPage() {
       }
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") {
-        showProjectError(de ? "Zeitlimit überschritten." : "Request timed out.");
+        showProjectError(t("canvasPage.errTimeout"));
       } else {
-        showProjectError(de ? `Löschen fehlgeschlagen: ${(e as Error).message}` : `Delete failed: ${(e as Error).message}`);
+        showProjectError(t("canvasPage.errDelete", { err: String((e as Error).message) }));
       }
     } finally {
       setProjectOp(null);
     }
-  }, [de, projectId, showProjectError]);
+  }, [t, projectId, showProjectError]);
 
   // ── Init ──────────────────────────────────────────────────────────────────
   // Gate Init auf `activeTenantId`: ohne aktiven Tenant koennen wir die
@@ -963,7 +964,7 @@ export default function CanvasPage() {
     const doneQs = nodes.filter(n => n.nodeType === "query" && (n as QueryNode).synthesis) as QueryNode[];
     const lines: string[] = [
       `# SIS Canvas Export`,
-      `_${new Date().toLocaleString("de-DE")} · ${projectName || "Canvas"} · ${doneQs.length} ${de ? "Analysen" : "analyses"}_`,
+      `_${new Date().toLocaleString("de-DE")} · ${projectName || "Canvas"} · ${doneQs.length} ${t("canvasPage.analysesLabel")}_`,
       "", "---", "",
     ];
     doneQs.forEach((q, idx) => {
@@ -972,13 +973,13 @@ export default function CanvasPage() {
       // Insights
       const insights = nodes.filter(n => n.parentId === q.id && n.nodeType === "insight") as DerivedNode[];
       if (insights.length) {
-        lines.push(`### ${de ? "Erkenntnisse" : "Insights"}`, "");
+        lines.push(`### ${t("canvasPage.exportInsights")}`, "");
         insights.forEach(ins => lines.push(`- ${ins.content}`, ""));
       }
       // Scenarios
       const scenarios = nodes.filter(n => n.parentId === q.id && n.nodeType === "scenario") as DerivedNode[];
       if (scenarios.length) {
-        lines.push(`### ${de ? "Szenarien" : "Scenarios"}`, "");
+        lines.push(`### ${t("canvasPage.exportScenarios")}`, "");
         scenarios.forEach(sc => {
           const prob = sc.probability != null ? ` (${Math.round(sc.probability * 100)}%)` : "";
           lines.push(`- **${sc.label || sc.content.slice(0, 60)}**${prob}: ${sc.content}`, "");
@@ -987,7 +988,7 @@ export default function CanvasPage() {
       // Decisions
       const decisions = nodes.filter(n => n.parentId === q.id && n.nodeType === "decision") as DerivedNode[];
       if (decisions.length) {
-        lines.push(`### ${de ? "Empfehlungen" : "Decisions"}`, "");
+        lines.push(`### ${t("canvasPage.exportDecisions")}`, "");
         decisions.forEach(dec => lines.push(`- ${dec.content}`, ""));
       }
       lines.push("---", "");
@@ -1366,7 +1367,7 @@ export default function CanvasPage() {
 
     // ── Slash commands ───────────────────────────────────────────────────
     if (lower === "/clear") {
-      if (!window.confirm(de ? 'Gesamtes Canvas löschen? Diese Aktion kann nicht rückgängig gemacht werden.' : 'Clear entire canvas? This action cannot be undone.')) {
+      if (!window.confirm(t("canvasPage.confirmClearCanvas"))) {
         setCmdVisible(false); setCmdPrefill(""); setCmdParentId(null);
         return;
       }
@@ -1825,7 +1826,7 @@ export default function CanvasPage() {
   }, [getNextQueryPos, triggerFileUpload]);
 
   const clearCanvas = useCallback(() => {
-    if (!window.confirm(de ? "Gesamtes Canvas löschen? Diese Aktion kann nicht rückgängig gemacht werden." : "Clear entire canvas? This action cannot be undone.")) return;
+    if (!window.confirm(t("canvasPage.confirmClearCanvas"))) return;
     pushHistory();
     setNodes([]); setConnections([]);
     setPanX(0); setPanY(0); setZoom(1);
@@ -2186,12 +2187,12 @@ export default function CanvasPage() {
           ) : projectId ? (
             <span
               onClick={() => setEditingName(true)}
-              title={de ? "Klicken zum Umbenennen" : "Click to rename"}
+              title={t("canvasPage.tooltipClickRename")}
               style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)", cursor: "text", padding: "2px 4px", borderRadius: 4, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            >{projectName || (de ? "Unbenanntes Projekt" : "Untitled")}</span>
+            >{projectName || t("canvasPage.untitledProject")}</span>
           ) : (
             <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              {de ? "Kein Projekt" : "No project"}
+              {t("canvasPage.noProject")}
             </span>
           )}
 
@@ -2199,7 +2200,7 @@ export default function CanvasPage() {
                so the button matches the rest of the app's icon set. */}
           <button
             onClick={() => setProjectDropdownOpen(o => !o)}
-            aria-label={de ? "Projektliste öffnen" : "Open project list"}
+            aria-label={t("canvasPage.openProjectList")}
             aria-expanded={projectDropdownOpen}
             style={{ padding: "3px 5px", background: "transparent", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", color: "var(--color-text-muted)", transition: "all 0.12s", lineHeight: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"}
@@ -2209,9 +2210,9 @@ export default function CanvasPage() {
           {/* Save status */}
           {projectId && saveStatus && (
             <span style={{ fontSize: 10, color: saveStatus === "saved" ? "#1A9E5A" : saveStatus === "error" ? "#E8402A" : "var(--color-text-muted)", minWidth: 80, transition: "opacity 0.5s" }}>
-              {saveStatus === "saving" ? (de ? "↑ Speichert…" : "↑ Saving…")
-                : saveStatus === "saved" ? (de ? "✓ Gespeichert" : "✓ Saved")
-                : (de ? "! Fehler beim Speichern" : "! Save error")}
+              {saveStatus === "saving" ? t("canvasPage.saveSaving")
+                : saveStatus === "saved" ? t("canvasPage.saveSaved")
+                : t("canvasPage.saveError")}
             </span>
           )}
 
@@ -2238,11 +2239,11 @@ export default function CanvasPage() {
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; }}
               >
                 <Plus size={14} strokeWidth={2} style={{ color: "#1A9E5A", flexShrink: 0 }} />
-                {de ? "Neues Projekt erstellen" : "Create new project"}
+                {t("canvasPage.createNewProject")}
               </button>
               {projects.length === 0 ? (
                 <div style={{ padding: "16px 16px", fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
-                  {de ? "Noch keine Projekte" : "No projects yet"}
+                  {t("canvasPage.noProjectsYet")}
                 </div>
               ) : (
                 projects.map((p, i) => (
@@ -2279,7 +2280,7 @@ export default function CanvasPage() {
                     <button
                       onPointerDown={e => e.stopPropagation()}
                       onClick={e => { e.stopPropagation(); deleteProject(p.id); }}
-                      aria-label={de ? "Projekt löschen" : "Delete project"}
+                      aria-label={t("canvasPage.deleteProject")}
                       style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: "2px 5px", color: "var(--color-text-muted)", borderRadius: 4, opacity: 0.6, display: "inline-flex", alignItems: "center" }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; (e.currentTarget as HTMLElement).style.opacity = "1"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; (e.currentTarget as HTMLElement).style.opacity = "0.6"; }}
@@ -2315,12 +2316,12 @@ export default function CanvasPage() {
                 timeline: <Clock className="w-3.5 h-3.5" />,
                 orbit: <Hexagon className="w-3.5 h-3.5" />,
               };
-              const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: de ? "Zeitlinie" : "Timeline", orbit: "Orbit" };
+              const labels: Record<ViewMode, string> = { canvas: "Canvas", board: "Board", timeline: t("canvasPage.viewTimeline"), orbit: "Orbit" };
               const tips: Record<ViewMode, string> = {
-                canvas: de ? "Freie Karten-Ansicht zum Denken und Analysieren" : "Free-form card layout for thinking and analysis",
-                board: de ? "Strukturierte Spalten-Ansicht nach Node-Typ" : "Structured column view by node type",
-                timeline: de ? "Chronologische Ansicht aller Analysen" : "Chronological view of all analyses",
-                orbit: de ? "Orbit: Netzwerk & Evidenzketten" : "Orbit: Network & Evidence chains",
+                canvas: t("canvasPage.viewCanvasDesc"),
+                board: t("canvasPage.viewBoardDesc"),
+                timeline: t("canvasPage.viewTimelineDesc"),
+                orbit: t("canvasPage.viewOrbitDesc"),
               };
               const isActive = viewMode === mode;
               return (
@@ -2360,8 +2361,8 @@ export default function CanvasPage() {
           <Tooltip
             content={
               projectId
-                ? (de ? "Zusammenfassung: Ergebnisse des Projekts als Briefing" : "Summary: project results as briefing")
-                : (de ? "Kein aktives Projekt — zur Projektliste" : "No active project — go to projects")
+                ? t("canvasPage.summaryActive")
+                : t("canvasPage.summaryInactive")
             }
             placement="bottom"
           >
@@ -2385,7 +2386,7 @@ export default function CanvasPage() {
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = projectId ? "var(--color-text-secondary)" : "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
             >
               <VIconSparkles size={12} />
-              <span>{de ? "Zusammenfassung" : "Summary"}</span>
+              <span>{t("canvasPage.summaryButton")}</span>
             </button>
           </Tooltip>
         </div>
@@ -2396,35 +2397,35 @@ export default function CanvasPage() {
           {/* + Add node */}
           <button
             onClick={() => { setIterateCtx(null); setNodePickerVisible(true); }}
-            title={de ? "Neue Karte hinzufügen (Abfrage, Notiz, Idee, Liste)" : "Add new card (query, note, idea, list)"}
+            title={t("canvasPage.addCardTooltip")}
             style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-secondary)", cursor: "pointer", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 5 }}
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = "var(--color-text-secondary)"; el.style.borderColor = "var(--color-border)"; }}
           >
             <span style={{ fontSize: 15, fontWeight: 300, lineHeight: 1 }}>+</span>
-            {de ? "Neu" : "Add"}
+            {t("canvasPage.addButton")}
           </button>
 
           {/* Sort/Arrange dropdown */}
           {nodes.length > 1 && (
             <div style={{ position: "relative" }}>
               <button onClick={() => setSortMenuOpen(v => !v)}
-                title={de ? "Karten sortieren und anordnen" : "Sort and arrange cards"}
+                title={t("canvasPage.arrangeTooltip")}
                 style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: "1px solid var(--color-border)", background: sortMenuOpen ? "var(--color-page-bg)" : "transparent", color: sortMenuOpen ? "var(--color-text-heading)" : "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.3)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-heading)"; }}
                 onMouseLeave={e => { if (!sortMenuOpen) { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; } }}
-              ><LayoutGrid className="w-3 h-3 inline-block mr-1 -mt-px" /> {de ? "Ordnen" : "Arrange"} ▾</button>
+              ><LayoutGrid className="w-3 h-3 inline-block mr-1 -mt-px" /> {t("canvasPage.arrangeButton")} ▾</button>
               {sortMenuOpen && (
                 <>
                   <div style={{ position: "fixed", inset: 0, zIndex: 299 }} onClick={() => setSortMenuOpen(false)} />
                   <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 160, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, padding: "4px 0", fontFamily: "var(--font-ui)" }}>
                     {/* ── Layout modes ── */}
-                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{de ? "Anordnen" : "Layout"}</div>
+                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{t("canvasPage.arrangeLayoutHeading")}</div>
                     {([
-                      { mode: "tree" as SortMode, icon: <TreePine className="w-3.5 h-3.5" />, label: de ? "Baum (Standard)" : "Tree (Default)" },
-                      { mode: "time" as SortMode, icon: <Clock className="w-3.5 h-3.5" />, label: de ? "Zeitlich" : "By Time" },
-                      { mode: "type" as SortMode, icon: <Layers className="w-3.5 h-3.5" />, label: de ? "Nach Typ" : "By Type" },
-                      { mode: "status" as SortMode, icon: <Tag className="w-3.5 h-3.5" />, label: de ? "Nach Status" : "By Status" },
+                      { mode: "tree" as SortMode, icon: <TreePine className="w-3.5 h-3.5" />, label: t("canvasPage.sortModeTree") },
+                      { mode: "time" as SortMode, icon: <Clock className="w-3.5 h-3.5" />, label: t("canvasPage.sortModeTime") },
+                      { mode: "type" as SortMode, icon: <Layers className="w-3.5 h-3.5" />, label: t("canvasPage.sortModeType") },
+                      { mode: "status" as SortMode, icon: <Tag className="w-3.5 h-3.5" />, label: t("canvasPage.sortModeStatus") },
                     ] as const).map(item => (
                       <button key={item.mode}
                         onClick={() => { reorganizeCanvas(item.mode); setSortMenuOpen(false); }}
@@ -2439,12 +2440,12 @@ export default function CanvasPage() {
 
                     {/* ── Gruppen-Sektion ── */}
                     <div style={{ height: 1, background: "var(--color-border)", margin: "6px 0" }} />
-                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{de ? "Gruppen" : "Groups"}</div>
+                    <div style={{ padding: "2px 14px 4px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-muted)" }}>{t("canvasPage.groupsHeading")}</div>
 
                     {/* Hinweis auf Multi-Select */}
                     {multiSelectedIds.size < 2 && (
                       <div style={{ padding: "4px 14px 6px", fontSize: 10, color: "var(--color-text-muted)", lineHeight: 1.4 }}>
-                        {de ? `⇧ Shift + Klick auf 2+ Karten, dann „Gruppieren"` : `⇧ Shift + click 2+ cards, then "Group"`}
+                        {t("canvasPage.groupsHint")}
                       </div>
                     )}
 
@@ -2462,7 +2463,7 @@ export default function CanvasPage() {
                           const newGroup: CanvasGroup = {
                             id: `ug-${Date.now()}`,
                             nodeIds: ids,
-                            label: de ? "Neue Gruppe" : "New Group",
+                            label: t("canvasPage.newGroupLabel"),
                             color: colors[userGroups.length % colors.length],
                             bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...gNodes.map(n => n.x + getNodeWidth(n))) - Math.min(...xs) + PAD * 2, h: Math.max(...gNodes.map(n => n.y + getNodeHeight(n))) - Math.min(...ys) + PAD * 2 },
                           };
@@ -2476,7 +2477,7 @@ export default function CanvasPage() {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#2563EB0C"; }}
                       >
                         <Group className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>{de ? `${multiSelectedIds.size} Karten gruppieren` : `Group ${multiSelectedIds.size} cards`}</span>
+                        <span>{t("canvasPage.groupNCards", { n: multiSelectedIds.size })}</span>
                       </button>
                     )}
 
@@ -2493,7 +2494,7 @@ export default function CanvasPage() {
                               {isUser && (
                                 <button
                                   onClick={() => { setUserGroups(prev => prev.filter(ug => ug.id !== g.id)); }}
-                                  title={de ? "Gruppe auflösen" : "Remove group"}
+                                  title={t("canvasPage.removeGroup")}
                                   style={{ fontSize: 9, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
                                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; }}
                                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
@@ -2516,7 +2517,7 @@ export default function CanvasPage() {
                           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                         >
                           <Trash2 className="w-3 h-3 flex-shrink-0" />
-                          <span>{de ? "Alle Gruppen auflösen" : "Remove all groups"}</span>
+                          <span>{t("canvasPage.removeAllGroups")}</span>
                         </button>
                       </>
                     )}
@@ -2528,7 +2529,7 @@ export default function CanvasPage() {
 
           {/* Briefing button (icon-only with tooltip) */}
           {nodes.length >= 2 && (
-            <Tooltip content={de ? "Strategisches Memo aus allen Analysen generieren" : "Generate strategic memo from all analyses"} placement="bottom">
+            <Tooltip content={t("canvasPage.briefingMemoTooltip")} placement="bottom">
               <button
                 onClick={generateBriefing}
                 disabled={briefingLoading}
@@ -2582,8 +2583,8 @@ export default function CanvasPage() {
 
         {/* LEFT: Stats */}
         <span style={{ fontSize: 11, color: "var(--color-text-muted)", flexShrink: 0 }}>
-          {queryNodes.length} {de ? "Abfragen" : "queries"} · {nodes.length - queryNodes.length} {de ? "Karten" : "cards"}
-          {connections.length > 0 && ` · ${connections.length} ${de ? "Verb." : "links"}`}
+          {queryNodes.length} {t("canvasPage.statsQueries")} · {nodes.length - queryNodes.length} {t("canvasPage.statsCards")}
+          {connections.length > 0 && ` · ${connections.length} ${t("canvasPage.statsLinks")}`}
         </span>
 
         {/* RIGHT: Layer toggles + Tag filters + Gruppieren */}
@@ -2632,7 +2633,7 @@ export default function CanvasPage() {
             return (
               <button
                 onClick={() => setConnVisMode(prev => prev === "auto" ? "show" : prev === "show" ? "hide" : "auto")}
-                title={de ? "Verbindungslinien: auto → ein → aus" : "Connection lines: auto → show → hide"}
+                title={t("canvasPage.connLineTooltip")}
                 style={{
                   fontSize: 10, padding: "1px 8px 1px 7px", borderRadius: 20,
                   border: isHide
@@ -2693,7 +2694,7 @@ export default function CanvasPage() {
               {activeTagFilter && (
                 <button onClick={() => setActiveTagFilter(null)}
                   style={{ fontSize: 9, padding: "1px 5px", borderRadius: 10, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer", transition: "all 0.12s" }}
-                  title={de ? "Tag-Filter aufheben" : "Clear tag filter"}
+                  title={t("canvasPage.clearTagFilter")}
                 >✕</button>
               )}
             </div>
@@ -2713,7 +2714,7 @@ export default function CanvasPage() {
                 const newGroup: CanvasGroup = {
                   id: `ug-${Date.now()}`,
                   nodeIds: ids,
-                  label: de ? "Neue Gruppe" : "New Group",
+                  label: t("canvasPage.newGroupLabel"),
                   color: colors[userGroups.length % colors.length],
                   bounds: { x: Math.min(...xs) - PAD, y: Math.min(...ys) - PAD, w: Math.max(...xs) + 460 - Math.min(...xs) + PAD * 2, h: Math.max(...ys) + 200 - Math.min(...ys) + PAD * 2 },
                 };
@@ -2721,12 +2722,12 @@ export default function CanvasPage() {
                 setMultiSelectedIds(new Set());
                 setEditingGroupId(newGroup.id);
               }}
-              title={de ? "Ausgewählte Karten gruppieren" : "Group selected cards"}
+              title={t("canvasPage.groupSelectedTooltip")}
               style={{ fontSize: 10, fontWeight: 600, padding: "1px 8px", borderRadius: 6, border: "1px solid #2563EB40", background: "#2563EB14", color: "#2563EB", cursor: "pointer", transition: "all 0.12s" }}
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB"; el.style.color = "#fff"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#2563EB14"; el.style.color = "#2563EB"; }}
             >
-              <Group className="w-3 h-3 inline-block mr-0.5 -mt-px" /> {de ? "Gruppieren" : "Group"} ({multiSelectedIds.size})
+              <Group className="w-3 h-3 inline-block mr-0.5 -mt-px" /> {t("canvasPage.groupButton")} ({multiSelectedIds.size})
             </button>
           )}
         </div>
@@ -2779,9 +2780,9 @@ export default function CanvasPage() {
           <div style={{ textAlign: "center" }}>
             <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}><RefreshCw size={20} style={{ animation: "spin 1s linear infinite", color: "var(--color-text-muted)" }} /></div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-heading)" }}>
-              {projectOp === "creating" ? (de ? "Erstelle Projekt…" : "Creating project…") :
-               projectOp === "deleting" ? (de ? "Lösche Projekt…" : "Deleting project…") :
-               (de ? "Lade Projekt…" : "Loading project…")}
+              {projectOp === "creating" ? t("canvasPage.projOpCreating") :
+               projectOp === "deleting" ? t("canvasPage.projOpDeleting") :
+               t("canvasPage.projOpLoading")}
             </div>
           </div>
           <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -2821,7 +2822,7 @@ export default function CanvasPage() {
                     color: "var(--muted-foreground, #6B6B6B)",
                     marginBottom: 6,
                   }}>
-                    {de ? "Workflow-System" : "Workflow System"}
+                    {t("canvasPage.workflowSystem")}
                   </div>
                   <h2 style={{
                     fontFamily: "var(--font-display)",
@@ -2882,7 +2883,7 @@ export default function CanvasPage() {
                 alignItems: "center",
                 justifyContent: "space-between",
               }}>
-                <span>{de ? "Pipeline-Templates" : "Pipeline Templates"}</span>
+                <span>{t("canvasPage.pipelineTemplates")}</span>
                 <span style={{ opacity: 0.7 }}>({TEMPLATES.length})</span>
               </div>
 
@@ -2905,7 +2906,7 @@ export default function CanvasPage() {
                     color: "var(--muted-foreground)",
                     marginBottom: 6,
                   }}>
-                    {(de ? pendingTemplate.labelDe : pendingTemplate.labelEn)} — {de ? "Thema" : "Topic"}
+                    {(de ? pendingTemplate.labelDe : pendingTemplate.labelEn)} — {t("canvasPage.topicLabel")}
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input
@@ -2946,7 +2947,7 @@ export default function CanvasPage() {
                           setShowTemplatePicker(false);
                         }
                       }}
-                      placeholder={de ? "Thema eingeben … (Enter zum Starten, Esc zum Abbrechen)" : "Enter topic … (Enter to start, Esc to cancel)"}
+                      placeholder={t("canvasPage.topicPlaceholder")}
                       style={{
                         flex: 1, border: "1px solid var(--color-border)", borderRadius: 8,
                         padding: "9px 12px", fontSize: 14, outline: "none",
@@ -2962,7 +2963,7 @@ export default function CanvasPage() {
                         color: "var(--muted-foreground)", cursor: "pointer",
                         fontFamily: "var(--font-ui)",
                       }}
-                    >{de ? "Abbrechen" : "Cancel"}</button>
+                    >{t("canvasPage.cancel")}</button>
                   </div>
                 </div>
               )}
@@ -3086,7 +3087,7 @@ export default function CanvasPage() {
                 color: "var(--muted-foreground)",
                 marginBottom: 12,
               }}>
-                {de ? "Was drin ist" : "What's inside"}
+                {t("canvasPage.whatsInside")}
               </div>
               <div style={{
                 display: "grid",
@@ -3095,10 +3096,10 @@ export default function CanvasPage() {
                 marginBottom: 20,
               }}>
                 {[
-                  { label: de ? "Node-Typen" : "Node Types", value: "12", hint: de ? "Query, Insight, Scenario…" : "Query, Insight, Scenario…" },
-                  { label: de ? "Edge-Stile" : "Edge Styles", value: "4", hint: "Bezier · Step · Straight · Smooth" },
-                  { label: de ? "Status-Zustände" : "Status States", value: "6", hint: de ? "Idle · Running · Done · Error…" : "Idle · Running · Done · Error…" },
-                  { label: de ? "Ansichten" : "Views", value: "4", hint: "Canvas · Board · Timeline · Orbit" },
+                  { label: t("canvasPage.statsNodeTypes"), value: "12", hint: t("canvasPage.statsNodeTypesHint") },
+                  { label: t("canvasPage.statsEdgeStyles"), value: "4", hint: "Bezier · Step · Straight · Smooth" },
+                  { label: t("canvasPage.statsStatusStates"), value: "6", hint: t("canvasPage.statsStatusStatesHint") },
+                  { label: t("canvasPage.statsViews"), value: "4", hint: "Canvas · Board · Timeline · Orbit" },
                 ].map((item, i) => (
                   <div key={i} style={{
                     padding: "12px 14px",
@@ -3150,7 +3151,7 @@ export default function CanvasPage() {
                 color: "var(--muted-foreground)",
                 marginBottom: 10,
               }}>
-                {de ? "Node-Status" : "Node Status"}
+                {t("canvasPage.nodeStatusHeading")}
               </div>
               <div style={{
                 display: "flex",
@@ -3158,12 +3159,12 @@ export default function CanvasPage() {
                 gap: 8,
               }}>
                 {[
-                  { dot: "#9CA3AF", label: de ? "Idle" : "Idle" },
-                  { dot: "var(--volt-lime, #E4FF97)", label: de ? "Running" : "Running" },
-                  { dot: "#1A9E5A", label: de ? "Success" : "Success" },
-                  { dot: "#E8402A", label: de ? "Error" : "Error" },
-                  { dot: "#F5A623", label: de ? "Warning" : "Warning" },
-                  { dot: "#D1D5DB", label: de ? "Disabled" : "Disabled" },
+                  { dot: "#9CA3AF", label: "Idle" },
+                  { dot: "var(--volt-lime, #E4FF97)", label: "Running" },
+                  { dot: "#1A9E5A", label: "Success" },
+                  { dot: "#E8402A", label: "Error" },
+                  { dot: "#F5A623", label: "Warning" },
+                  { dot: "#D1D5DB", label: "Disabled" },
                 ].map((s, i) => (
                   <span key={i} style={{
                     display: "inline-flex",
@@ -3484,12 +3485,12 @@ export default function CanvasPage() {
                           lineHeight: 1.2,
                           fontFamily: "var(--font-code, 'JetBrains Mono'), monospace",
                         }}
-                        title={de ? "Klicken zum Umbenennen" : "Click to rename"}
+                        title={t("canvasPage.tooltipClickRename")}
                       >{g.label}</span>
                     )}
                     <button
                       onClick={() => setUserGroups(prev => prev.filter(gg => gg.id !== g.id))}
-                      title={de ? "Gruppe auflösen" : "Remove group"}
+                      title={t("canvasPage.removeGroup")}
                       style={{ fontSize: 10, color: `${g.color}88`, background: "none", border: "none", cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#E8402A"; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = `${g.color}88`; }}
@@ -3808,7 +3809,7 @@ export default function CanvasPage() {
                           return (
                             <div style={{ marginTop: 4 }}>
                               <div style={{ fontSize: 10, color: EDGE_STYLE.drives.color, fontWeight: 600, marginBottom: 2 }}>
-                                {edges.length} {de ? "Beziehungen" : "relations"}
+                                {edges.length} {t("canvasPage.relationsLabel")}
                               </div>
                               {topTrends.length > 0 && (
                                 <div style={{ fontSize: 10, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
@@ -3846,7 +3847,7 @@ export default function CanvasPage() {
         {viewMode === "timeline" && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto", padding: "24px 32px" }}>
             <div className="section-label" style={{ marginBottom: 20 }}>
-              {de ? "Gedankenverlauf" : "Thought History"}
+              {t("canvasPage.thoughtHistory")}
             </div>
             {[...nodes].sort((a,b) => a.createdAt - b.createdAt).map((n, i) => {
               const color = NODE_MINIMAP_COLOR[n.nodeType] ?? "#888";
@@ -3877,7 +3878,7 @@ export default function CanvasPage() {
                       )}
                       {n.nodeType === "causalgraph" && ((n as DerivedNode).causalEdges?.length ?? 0) > 0 && (
                         <span style={{ fontSize: 8, padding: "0 5px", borderRadius: 3, background: `${EDGE_STYLE.drives.color}14`, color: EDGE_STYLE.drives.color, fontWeight: 600, fontFamily: "var(--font-code, monospace)" }}>
-                          {(n as DerivedNode).causalEdges!.length} {de ? "Kanten" : "edges"}
+                          {(n as DerivedNode).causalEdges!.length} {t("canvasPage.edgesLabel")}
                         </span>
                       )}
                       {(n as any).nodeStatus && (n as any).nodeStatus !== "open" && (
@@ -3920,8 +3921,8 @@ export default function CanvasPage() {
               const isAct = orbitSubMode === mode;
               const Icon = mode === "ableitung" ? GitBranch : Hexagon;
               const label = mode === "ableitung"
-                ? (de ? "Ableitung" : "Derivation")
-                : (de ? "Netzwerk" : "Network");
+                ? t("canvasPage.derivationLabel")
+                : t("canvasPage.networkLabel");
               return (
                 <button key={mode} onClick={() => setOrbitSubMode(mode)}
                   style={{
@@ -4042,9 +4043,12 @@ export default function CanvasPage() {
                 : "Ask a question — the answer appears as a node, flanked by insights, scenarios and recommendations as individual cards."}
             </p>
             <div style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 560 }}>
-              {(de ? ["AI Agents 2025", "Wie verändert sich die Arbeitswelt?", "DORA für Finanzdienstleister", "Quanten-Computing 2027"]
-                   : ["AI Agents 2025", "Future of work", "DORA regulation", "Quantum computing outlook"]
-              ).map(s => (
+              {[
+                t("canvasPage.suggestion1"),
+                t("canvasPage.suggestion2"),
+                t("canvasPage.suggestion3"),
+                t("canvasPage.suggestion4"),
+              ].map(s => (
                 <button key={s}
                   onPointerDown={e => e.stopPropagation()}
                   onClick={() => submitQuery(s)}
@@ -4079,7 +4083,7 @@ export default function CanvasPage() {
             <div
               role="dialog"
               aria-modal="true"
-              aria-label={de ? "Neuen Knoten hinzufügen" : "Add new node"}
+              aria-label={t("canvasPage.addNodeAria")}
               style={nodePickerPos
                 ? { position: "absolute", left: nodePickerPos.x, top: nodePickerPos.y, transform: "translate(-50%, -100%) translateY(-16px)", zIndex: 50 }
                 : { position: "absolute", bottom: 84, left: "50%", transform: "translateX(-50%)", zIndex: 50 }
@@ -4093,7 +4097,7 @@ export default function CanvasPage() {
         {/* ── Hints bottom-right ──────────────────────────────────── */}
         {viewMode === "canvas" && (
           <div style={{ position: "absolute", bottom: 14, right: 18, fontSize: 10, color: "var(--color-text-muted)", textAlign: "right", pointerEvents: "none", lineHeight: 1.6 }}>
-            <div>{de ? "Scrollen = Zoom · Hintergrund ziehen = Pan" : "Scroll = zoom · Drag background = pan"}</div>
+            <div>{t("canvasPage.zoomPanHint")}</div>
           </div>
         )}
 
@@ -4126,7 +4130,7 @@ export default function CanvasPage() {
           }}>
             <button
               onClick={() => setZoom(prev => Math.max(0.2, prev * 0.85))}
-              title={de ? "Verkleinern" : "Zoom out"}
+              title={t("canvasPage.zoomOut")}
               style={{
                 width: 32, height: 32, borderRadius: 7, border: "none",
                 background: "transparent", cursor: "pointer",
@@ -4139,7 +4143,7 @@ export default function CanvasPage() {
             >−</button>
             <button
               onClick={() => { setZoom(1); setPanX(0); setPanY(0); }}
-              title={de ? "Zurücksetzen" : "Reset"}
+              title={t("canvasPage.zoomReset")}
               style={{
                 minWidth: 56, height: 32, borderRadius: 7, border: "none",
                 background: "transparent", cursor: "pointer",
@@ -4155,7 +4159,7 @@ export default function CanvasPage() {
             >{Math.round(zoom * 100)}%</button>
             <button
               onClick={() => setZoom(prev => Math.min(2.5, prev * 1.18))}
-              title={de ? "Vergrößern" : "Zoom in"}
+              title={t("canvasPage.zoomIn")}
               style={{
                 width: 32, height: 32, borderRadius: 7, border: "none",
                 background: "transparent", cursor: "pointer",
@@ -4202,13 +4206,13 @@ export default function CanvasPage() {
               textTransform: "uppercase" as const, color: "var(--muted-foreground)",
               marginRight: 2, flexShrink: 0,
             }}>
-              {de ? "Status" : "Status"}
+              {t("canvasPage.statusLabel")}
             </span>
             {[
-              { dot: "#1A9E5A", label: de ? "Fertig" : "Done" },
-              { dot: "#F5A623", label: de ? "Läuft" : "Running" },
-              { dot: "#E8402A", label: de ? "Fehler" : "Error" },
-              { dot: "#9CA3AF", label: de ? "Offen" : "Idle" },
+              { dot: "#1A9E5A", label: t("canvasPage.statusDone") },
+              { dot: "#F5A623", label: t("canvasPage.statusRunning") },
+              { dot: "#E8402A", label: t("canvasPage.statusError") },
+              { dot: "#9CA3AF", label: t("canvasPage.statusIdle") },
             ].map((s, i) => (
               <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
@@ -4301,9 +4305,9 @@ export default function CanvasPage() {
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
             }}>🗑</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p id="sis-delete-confirm-title" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>{de ? "Karte löschen?" : "Delete card?"}</p>
+              <p id="sis-delete-confirm-title" style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-heading)", margin: 0, letterSpacing: "-0.01em" }}>{t("canvasPage.deleteCardConfirm")}</p>
               <p id="sis-delete-confirm-desc" style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {label} · {de ? "nicht rückgängig machbar · Enter zum Bestätigen" : "cannot be undone · press Enter to confirm"}
+                {label} · {t("canvasPage.deleteCardHint")}
               </p>
             </div>
             <button
@@ -4311,11 +4315,11 @@ export default function CanvasPage() {
               style={{ background: "var(--signal-negative-light, #FDEEE9)", border: "1.5px solid var(--signal-negative-border, #F4A090)", color: "var(--signal-negative-text, #A01A08)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
               onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E8402A"; el.style.color = "#fff"; el.style.borderColor = "#E8402A"; }}
               onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "var(--signal-negative-light, #FDEEE9)"; el.style.color = "var(--signal-negative-text, #A01A08)"; el.style.borderColor = "var(--signal-negative-border, #F4A090)"; }}
-            >{de ? "Löschen" : "Delete"}</button>
+            >{t("canvasPage.deleteButton")}</button>
             <button
               onClick={() => setDeleteConfirmId(null)}
               style={{ background: "transparent", border: "1.5px solid var(--color-border)", color: "var(--color-text-secondary)", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
-            >{de ? "Abbrechen" : "Cancel"}</button>
+            >{t("canvasPage.cancel")}</button>
           </div>
         );
       })()}
@@ -4327,7 +4331,7 @@ export default function CanvasPage() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label={de ? "Briefing" : "Briefing"}
+            aria-label="Briefing"
             style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
             width: "min(680px, 92vw)", maxHeight: "80vh",
@@ -4340,13 +4344,13 @@ export default function CanvasPage() {
             display: "flex", flexDirection: "column", overflow: "hidden",
           }}>
             <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)" }}>{de ? "Strategisches Briefing" : "Strategic Briefing"}</span>
-              <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: 4 }}>{de ? "generiert aus Canvas" : "generated from canvas"}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-heading)" }}>{t("canvasPage.strategicBriefing")}</span>
+              <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: 4 }}>{t("canvasPage.briefingSubtitle")}</span>
               <button onClick={() => setBriefingOpen(false)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--color-text-muted)", padding: "2px 6px" }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
               {briefingLoading && !briefingText && (
-                <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{de ? "Generiere Briefing…" : "Generating briefing…"}</div>
+                <div style={{ color: "var(--color-text-muted)", fontSize: 13 }}>{t("canvasPage.briefingGenerating")}</div>
               )}
               {briefingText && (
                 <p style={{ fontSize: 14, lineHeight: 1.75, color: "var(--color-text-primary)", margin: 0, whiteSpace: "pre-wrap" }}>{briefingText}</p>
@@ -4357,7 +4361,7 @@ export default function CanvasPage() {
                 <button
                   onClick={() => { navigator.clipboard.writeText(briefingText); }}
                   style={{ fontSize: 12, padding: "5px 14px", borderRadius: 8, border: "1px solid var(--color-border)", background: "transparent", cursor: "pointer", color: "var(--color-text-secondary)" }}
-                >{de ? "Kopieren" : "Copy"}</button>
+                >{t("canvasPage.copyButton")}</button>
               </div>
             )}
           </div>
