@@ -38,20 +38,24 @@ const STATE_COLOR: Record<ForecastState, string> = {
   CANCELLED:         "#737373",
 };
 
-function stateLabel(state: ForecastState, de: boolean): string {
-  const map: Record<ForecastState, [string, string]> = {
-    DRAFT:              ["Entwurf",       "Draft"],
-    OPEN:               ["Offen",         "Open"],
-    CLOSED:             ["Geschlossen",   "Closed"],
-    PENDING_RESOLUTION: ["Auflösung läuft","Pending resolution"],
-    RESOLVED:           ["Aufgelöst",     "Resolved"],
-    CANCELLED:          ["Abgebrochen",   "Cancelled"],
-  };
-  return de ? map[state][0] : map[state][1];
+// Map a ForecastState enum to its i18n key. The translator is
+// passed in because stateLabel is called from sub-components; a
+// bound `t` from useT() gets the right strict-typed behaviour.
+type Translator = (key: Parameters<ReturnType<typeof useT>["t"]>[0]) => string;
+
+function stateLabel(state: ForecastState, t: Translator): string {
+  switch (state) {
+    case "DRAFT":              return t("forecasts.stateDraft");
+    case "OPEN":               return t("forecasts.stateOpen");
+    case "CLOSED":             return t("forecasts.stateClosed");
+    case "PENDING_RESOLUTION": return t("forecasts.statePending");
+    case "RESOLVED":           return t("forecasts.stateResolved");
+    case "CANCELLED":          return t("forecasts.stateCancelled");
+  }
 }
 
 function ForecastsInner() {
-  const { de } = useT();
+  const { t } = useT();
   const { role } = useTenant();
   const router = useRouter();
   const params = useSearchParams();
@@ -146,12 +150,10 @@ function ForecastsInner() {
       <div style={{ maxWidth: 680, margin: "80px auto", padding: 24, textAlign: "center" as const }}>
         <div style={{ fontSize: 40, opacity: 0.3, marginBottom: 16 }}>◧</div>
         <h1 style={{ fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)", fontSize: 20, margin: "0 0 8px" }}>
-          {de ? "Forecasts noch nicht aktiviert" : "Forecasts not yet enabled"}
+          {t("forecasts.featureOffHeading")}
         </h1>
         <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-          {de
-            ? "Dieses Feature steht hinter der ENV-Variable FORECASTS_ENABLED. Setze sie auf 'true' und starte den Server neu, um Prognosen für dein Team zu aktivieren."
-            : "This feature is gated behind the FORECASTS_ENABLED env variable. Set it to 'true' and restart the server to activate team forecasts."}
+          {t("forecasts.featureOffBody")}
         </p>
       </div>
     );
@@ -170,22 +172,20 @@ function ForecastsInner() {
           textTransform: "uppercase" as const, color: "var(--color-text-faint)",
           marginBottom: 4,
         }}>
-          {de ? "Prognosen" : "Forecasts"}
+          {t("forecasts.caption")}
         </div>
         <h1 style={{
           fontFamily: "var(--volt-font-display, 'Space Grotesk', sans-serif)",
           fontSize: 26, fontWeight: 700, letterSpacing: "-0.015em",
           margin: 0,
         }}>
-          {de ? "Was glaubt das Team?" : "What does the team believe?"}
+          {t("forecasts.heading")}
         </h1>
         <p style={{
           fontSize: 13, color: "var(--color-text-muted)",
           margin: "6px 0 0", maxWidth: 680, lineHeight: 1.55,
         }}>
-          {de
-            ? "Jede Frage sammelt individuelle Wahrscheinlichkeits-Einschätzungen der Team-Mitglieder. Auflösung erfordert zwei Unterschriften (Vorschlag + Bestätigung)."
-            : "Each question collects individual probability estimates from team members. Resolution requires two signers (proposer + approver)."}
+          {t("forecasts.body")}
         </p>
       </div>
 
@@ -218,12 +218,13 @@ function ForecastsInner() {
               textTransform: "uppercase" as const,
               color: "var(--color-text-muted)",
             }}>
-              {de ? "Team-Kalibrierung" : "Team Calibration"}
+              {t("forecasts.leaderboardHeading")}
             </span>
             <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-              {de
-                ? `${leaderboard.length} ${leaderboard.length === 1 ? "Nutzer" : "Nutzer"} mit ≥3 aufgelösten Prognosen`
-                : `${leaderboard.length} user${leaderboard.length === 1 ? "" : "s"} with ≥3 resolved predictions`}
+              {t(
+                leaderboard.length === 1 ? "forecasts.leaderboardSubtitleOne" : "forecasts.leaderboardSubtitleMany",
+                { n: leaderboard.length },
+              )}
             </span>
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--color-text-muted)" }}>
               {lbOpen ? "▴" : "▾"}
@@ -235,8 +236,8 @@ function ForecastsInner() {
                 <thead>
                   <tr style={{ color: "var(--color-text-muted)" }}>
                     <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 600 }}>#</th>
-                    <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 600 }}>{de ? "Nutzer" : "User"}</th>
-                    <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>{de ? "Vorhersagen" : "Predictions"}</th>
+                    <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 600 }}>{t("forecasts.leaderboardUserCol")}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>{t("forecasts.leaderboardPredictionsCol")}</th>
                     <th style={{ textAlign: "right", padding: "4px 8px", fontWeight: 600 }}>Ø Brier</th>
                   </tr>
                 </thead>
@@ -268,9 +269,7 @@ function ForecastsInner() {
                 fontSize: 10, color: "var(--color-text-faint)",
                 marginTop: 6, fontFamily: "var(--volt-font-mono)",
               }}>
-                {de
-                  ? "Niedriger = besser kalibriert. Grün <0.10 / Amber <0.25 / Rot >0.25."
-                  : "Lower = better-calibrated. Green <0.10 / Amber <0.25 / Red >0.25."}
+                {t("forecasts.leaderboardLegend")}
               </div>
             </div>
           )}
@@ -289,13 +288,12 @@ function ForecastsInner() {
             marginBottom: 20,
           }}
         >
-          {de ? "+ Neue Prognose" : "+ New forecast"}
+          {t("forecasts.newForecastButton")}
         </button>
       )}
 
       {createOpen && (
         <CreateForm
-          de={de}
           onCancel={() => setCreateOpen(false)}
           onCreated={(f) => {
             setCreateOpen(false);
@@ -306,14 +304,14 @@ function ForecastsInner() {
       )}
 
       {/* Two-pane layout */}
-      {listLoading && <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{de ? "Lade…" : "Loading…"}</div>}
+      {listLoading && <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{t("forecasts.loading")}</div>}
       {!listLoading && list.length === 0 && !createOpen && (
         <div style={{
           padding: "32px 24px", textAlign: "center" as const,
           border: "1px dashed var(--color-border)", borderRadius: 10,
           color: "var(--color-text-muted)", fontSize: 13,
         }}>
-          {de ? "Noch keine Prognosen. Leg die erste an, um zu starten." : "No forecasts yet. Create the first one to get started."}
+          {t("forecasts.emptyList")}
         </div>
       )}
 
@@ -350,7 +348,7 @@ function ForecastsInner() {
                       background: `${STATE_COLOR[f.state]}22`,
                       color: STATE_COLOR[f.state],
                     }}>
-                      {stateLabel(f.state, de)}
+                      {stateLabel(f.state, t)}
                     </span>
                   </div>
                 </button>
@@ -361,14 +359,13 @@ function ForecastsInner() {
           <section>
             {detailLoading && (
               <div style={{ padding: 14, color: "var(--color-text-muted)", fontSize: 13 }}>
-                {de ? "Lade Details…" : "Loading details…"}
+                {t("forecasts.loadingDetails")}
               </div>
             )}
             {detail && !detailLoading && (
               <DetailPanel
                 key={detail.id}
                 detail={detail}
-                de={de}
                 canResolve={canResolve}
                 canStake={canCreate}
                 onChange={() => {
@@ -398,12 +395,12 @@ function ForecastsInner() {
 
 // ─── Create form ────────────────────────────────────────────────
 function CreateForm({
-  de, onCancel, onCreated,
+  onCancel, onCreated,
 }: {
-  de: boolean;
   onCancel: () => void;
   onCreated: (f: Forecast) => void;
 }) {
+  const { t } = useT();
   const [question, setQuestion] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -439,12 +436,12 @@ function CreateForm({
       display: "flex", flexDirection: "column", gap: 10,
     }}>
       <div style={{ fontSize: 13, fontWeight: 600 }}>
-        {de ? "Neue Prognose" : "New forecast"}
+        {t("forecasts.newForecastHeading")}
       </div>
       <input
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
-        placeholder={de ? "Frage (max 500 Zeichen)" : "Question (max 500 chars)"}
+        placeholder={t("forecasts.questionPlaceholder")}
         required
         maxLength={500}
         style={{ padding: "8px 10px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
@@ -452,7 +449,7 @@ function CreateForm({
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder={de ? "Beschreibung (optional)" : "Description (optional)"}
+        placeholder={t("forecasts.descriptionPlaceholder")}
         rows={3}
         maxLength={4000}
         style={{ padding: "8px 10px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13, fontFamily: "inherit", resize: "vertical" as const }}
@@ -464,13 +461,13 @@ function CreateForm({
           background: "var(--volt-lime, #E4FF97)", cursor: busy ? "wait" : "pointer",
           fontWeight: 600, fontSize: 12, opacity: busy || !question.trim() ? 0.6 : 1,
         }}>
-          {busy ? (de ? "Speichere…" : "Saving…") : (de ? "Anlegen" : "Create")}
+          {busy ? t("forecasts.createSaving") : t("forecasts.createSubmit")}
         </button>
         <button type="button" onClick={onCancel} style={{
           padding: "6px 12px", borderRadius: 6, border: "1px solid var(--color-border)",
           background: "transparent", cursor: "pointer", fontSize: 12,
         }}>
-          {de ? "Abbrechen" : "Cancel"}
+          {t("forecasts.cancel")}
         </button>
       </div>
     </form>
@@ -479,15 +476,15 @@ function CreateForm({
 
 // ─── Detail panel ───────────────────────────────────────────────
 function DetailPanel({
-  detail, de, canResolve, canStake, onChange, setError,
+  detail, canResolve, canStake, onChange, setError,
 }: {
   detail: ForecastDetail;
-  de: boolean;
   canResolve: boolean;
   canStake: boolean;
   onChange: () => void;
   setError: (msg: string | null) => void;
 }) {
+  const { t } = useT();
   return (
     <article style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 18 }}>
       <header style={{ marginBottom: 14 }}>
@@ -498,7 +495,7 @@ function DetailPanel({
             textTransform: "uppercase" as const,
             padding: "1px 7px", borderRadius: 10,
             background: `${STATE_COLOR[detail.state]}22`, color: STATE_COLOR[detail.state],
-          }}>{stateLabel(detail.state, de)}</span>
+          }}>{stateLabel(detail.state, t)}</span>
         </div>
         <h2 style={{ fontFamily: "var(--volt-font-display)", fontSize: 20, fontWeight: 700, margin: 0, lineHeight: 1.25 }}>
           {detail.question}
@@ -518,11 +515,11 @@ function DetailPanel({
           display: "flex", alignItems: "center", gap: 12,
         }}>
           <span style={{ fontSize: 12, fontWeight: 600 }}>
-            {de ? "Team-Konsens" : "Team consensus"}
+            {t("forecasts.teamConsensus")}
           </span>
           <ConfidenceBadge value={detail.derivedYesProbability} size="sm" showLabel={false} />
           <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>
-            {de ? `aus ${detail.positions.length} Einschätzungen` : `from ${detail.positions.length} positions`}
+            {t("forecasts.positionCountPrefix")}{detail.positions.length}{t("forecasts.positionCountSuffix")}
           </span>
         </div>
       )}
@@ -536,8 +533,8 @@ function DetailPanel({
         }}>
           <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
             {detail.state === "RESOLVED"
-              ? (de ? "Aufgelöst als" : "Resolved as")
-              : (de ? "Vorgeschlagen als" : "Proposed as")}
+              ? t("forecasts.resolvedAs")
+              : t("forecasts.proposedAs")}
             {" "}{detail.resolution}
           </div>
           {detail.resolutionRationale && (
@@ -550,12 +547,12 @@ function DetailPanel({
 
       {/* Stake form */}
       {detail.state === "OPEN" && canStake && (
-        <StakeForm detail={detail} de={de} onStaked={onChange} setError={setError} />
+        <StakeForm detail={detail} onStaked={onChange} setError={setError} />
       )}
 
       {/* Resolve controls */}
       {canResolve && (detail.state === "OPEN" || detail.state === "CLOSED" || detail.state === "PENDING_RESOLUTION") && (
-        <ResolveControls detail={detail} de={de} onChanged={onChange} setError={setError} />
+        <ResolveControls detail={detail} onChanged={onChange} setError={setError} />
       )}
 
       {/* Positions list — each row carries a lightweight calibration
@@ -571,11 +568,11 @@ function DetailPanel({
             textTransform: "uppercase" as const, color: "var(--color-text-faint)",
             marginBottom: 6,
           }}>
-            {de ? "Einschätzungen" : "Positions"}
+            {t("forecasts.positions")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {detail.positions.map((p) => (
-              <PositionRow key={p.id} position={p} tenantForecastId={detail.id} de={de} />
+              <PositionRow key={p.id} position={p} tenantForecastId={detail.id} />
             ))}
           </div>
         </div>
@@ -586,12 +583,12 @@ function DetailPanel({
 
 // ─── Position row with lazy calibration chip + expandable curve ─
 function PositionRow({
-  position, de,
+  position,
 }: {
   position: ForecastDetail["positions"][number];
   tenantForecastId: string;
-  de: boolean;
 }) {
+  const { t, de } = useT();
   const [calib, setCalib] = useState<{
     meanBrier: number | null;
     totalResolved: number;
@@ -633,11 +630,9 @@ function PositionRow({
   const calibLabel = hasCalib
     ? `Brier ${calib!.meanBrier!.toFixed(2)} (${calib!.totalResolved})`
     : null;
-  const calibTooltip = calibLabel && de
-    ? `Durchschnittlicher Brier-Score über ${calib?.totalResolved} aufgelöste Vorhersagen. Klick für Kalibrierungs-Kurve.`
-    : calibLabel
-      ? `Mean Brier across ${calib?.totalResolved} resolved predictions. Click to see the calibration curve.`
-      : undefined;
+  const calibTooltip = calibLabel
+    ? t("forecasts.calibrationChipTooltip", { count: String(calib?.totalResolved ?? 0) })
+    : undefined;
   // Tier the Brier visually: <0.10 is well-calibrated, 0.10–0.25 is
   // okay, >0.25 is questionable. These thresholds match the
   // Stanford convention referenced in src/lib/forecasts.ts docs.
@@ -714,13 +709,13 @@ function PositionRow({
 
 // ─── Stake form ─────────────────────────────────────────────────
 function StakeForm({
-  detail, de, onStaked, setError,
+  detail, onStaked, setError,
 }: {
   detail: ForecastDetail;
-  de: boolean;
   onStaked: () => void;
   setError: (msg: string | null) => void;
 }) {
+  const { t } = useT();
   const [prob, setProb] = useState(50);
   const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
@@ -760,7 +755,7 @@ function StakeForm({
       display: "flex", flexDirection: "column", gap: 8,
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" as const, color: "var(--color-text-muted)" }}>
-        {de ? "Deine Einschätzung" : "Your estimate"}
+        {t("forecasts.yourEstimate")}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <input
@@ -777,7 +772,7 @@ function StakeForm({
       <input
         value={rationale}
         onChange={(e) => setRationale(e.target.value)}
-        placeholder={de ? "Begründung (optional)" : "Rationale (optional)"}
+        placeholder={t("forecasts.rationalePlaceholder")}
         maxLength={2000}
         style={{ padding: "6px 10px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }}
       />
@@ -786,7 +781,7 @@ function StakeForm({
         background: "var(--volt-lime, #E4FF97)", cursor: busy ? "wait" : "pointer",
         fontWeight: 600, fontSize: 12, alignSelf: "flex-start" as const,
       }}>
-        {busy ? (de ? "Speichere…" : "Saving…") : (de ? "Einschätzung speichern" : "Stake")}
+        {busy ? t("forecasts.stakeSaving") : t("forecasts.stakeSubmit")}
       </button>
     </form>
   );
@@ -794,13 +789,13 @@ function StakeForm({
 
 // ─── Resolve controls ───────────────────────────────────────────
 function ResolveControls({
-  detail, de, onChanged, setError,
+  detail, onChanged, setError,
 }: {
   detail: ForecastDetail;
-  de: boolean;
   onChanged: () => void;
   setError: (msg: string | null) => void;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const [resolution, setResolution] = useState<ForecastResolution>("YES");
   const [rationale, setRationale] = useState("");
@@ -860,9 +855,7 @@ function ResolveControls({
         display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
       }}>
         <span style={{ fontSize: 12 }}>
-          {de
-            ? "Warte auf zweite Unterschrift (Vorschlag kann nicht vom selben Nutzer bestätigt werden)."
-            : "Awaiting second signer (proposer cannot self-approve)."}
+          {t("forecasts.pendingSigSecondSignerHint")}
         </span>
         <button type="button" onClick={approve} disabled={busy} style={{
           marginLeft: "auto", padding: "6px 12px", borderRadius: 6,
@@ -870,7 +863,7 @@ function ResolveControls({
           background: "rgba(139,92,246,0.15)", cursor: busy ? "wait" : "pointer",
           fontWeight: 600, fontSize: 12,
         }}>
-          {busy ? (de ? "Bestätige…" : "Approving…") : (de ? "Bestätigen" : "Approve")}
+          {busy ? t("forecasts.resolveApproving") : t("forecasts.resolveApprove")}
         </button>
       </div>
     );
@@ -883,7 +876,7 @@ function ResolveControls({
           padding: "6px 12px", borderRadius: 6, border: "1px solid var(--color-border)",
           background: "transparent", cursor: "pointer", fontSize: 12,
         }}>
-          {de ? "Auflösung vorschlagen" : "Propose resolution"}
+          {t("forecasts.resolvePropose")}
         </button>
       ) : (
         <div style={{
@@ -908,7 +901,7 @@ function ResolveControls({
           <input
             value={rationale}
             onChange={(e) => setRationale(e.target.value)}
-            placeholder={de ? "Begründung (Pflicht)" : "Rationale (required)"}
+            placeholder={t("forecasts.resolveRationalePlaceholder")}
             maxLength={2000}
             style={{ padding: "6px 10px", border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }}
           />
@@ -918,13 +911,13 @@ function ResolveControls({
               background: "var(--volt-lime, #E4FF97)", cursor: busy || !rationale.trim() ? "wait" : "pointer",
               fontWeight: 600, fontSize: 12, opacity: busy || !rationale.trim() ? 0.6 : 1,
             }}>
-              {busy ? (de ? "Speichere…" : "Saving…") : (de ? "Vorschlag abgeben" : "Submit proposal")}
+              {busy ? t("forecasts.resolveSaving") : t("forecasts.resolveSubmit")}
             </button>
             <button type="button" onClick={() => setOpen(false)} style={{
               padding: "6px 12px", borderRadius: 6, border: "1px solid var(--color-border)",
               background: "transparent", cursor: "pointer", fontSize: 12,
             }}>
-              {de ? "Abbrechen" : "Cancel"}
+              {t("forecasts.cancel")}
             </button>
           </div>
         </div>
