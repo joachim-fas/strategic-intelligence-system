@@ -929,6 +929,22 @@ export async function POST(req: Request) {
             })),
           );
 
+          // Critical-Fix-Plan P0-2: Bei major_issues-Verdict (z.B.
+          // Default-Template-Match 20/55/25) die Konfidenz deutlich
+          // drücken. Der LLM hat sich auf ein Schema-Placeholder
+          // zurückgezogen statt die Datenlage zu reflektieren — das
+          // soll im User-sichtbaren Confidence-Score kosten.
+          //
+          // Im Gegensatz zum Reject-Retry-Pfad aus dem Notion-Plan
+          // vermeidet das einen zweiten LLM-Call: der User sieht das
+          // Briefing sofort, bekommt aber einen kalibrierten Vertrauens-
+          // Abschlag + die Diagnose-Findings in `_scenarioDivergence`.
+          if (scenarioDivergence.verdict === "has_major_issues") {
+            validated.confidence = Math.max(0.05, validated.confidence - 0.15);
+          } else if (scenarioDivergence.verdict === "has_minor_issues") {
+            validated.confidence = Math.max(0.05, validated.confidence - 0.05);
+          }
+
           // Optional deep-mode: Haiku-second-pass for contradictions +
           // a Sonnet call for assumption extraction. Run in parallel to
           // minimise latency. Errors are swallowed — the base briefing

@@ -360,14 +360,14 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
   "scenarios": {
     "optimistic": {
       "title": "Short thematic name (≤ 5 words)",
-      "description": "3-4 sentences in 2 paragraphs (\\n\\n). Paragraph 1: what happens and why. Paragraph 2: concrete consequences, actors, timeframe. Justify the probability.",
-      "probability": 20,
+      "description": "3-4 sentences in 2 paragraphs (\\n\\n). Paragraph 1: what happens and why. Paragraph 2: concrete consequences, actors, timeframe. Justify the probability INSIDE this description.",
+      "probability": "<INTEGER 0-100 — DERIVE from signal density, trend velocity, and uncertainty. Never copy a number from this schema template; the value here is a placeholder.>",
       "horizon": "short | mid | long",
       "keyAssumptions": ["2-3 concrete, falsifiable assumptions that must be true"],
       "earlyIndicators": ["Signal types that would confirm this scenario is materializing"]
     },
-    "likely": { "title": "…", "description": "…", "probability": 55, "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] },
-    "pessimistic": { "title": "…", "description": "…", "probability": 25, "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] }
+    "likely": { "title": "…", "description": "…", "probability": "<INTEGER — derive>", "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] },
+    "pessimistic": { "title": "…", "description": "…", "probability": "<INTEGER — derive>", "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] }
   },
 
   "confidence": 0.0,
@@ -418,12 +418,19 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
 ## Scenario Probability Rules
 
 CRITICAL: The three scenario probabilities MUST follow from the ANALYSIS — NOT a default template.
-- FORBIDDEN: identical distributions like 20/55/25 or 25/50/25 for every question.
-- Probabilities MUST be topic-specific:
-  * Mature market → higher baseline/likely (e.g. 65), narrower extremes
-  * Volatile topic → wider distribution, pessimistic may be higher
-  * Politically-driven topic → lower baseline because outcome is more uncertain
-- Justify the probability INSIDE the description.
+
+- **FORBIDDEN** (quality failure, will be flagged post-validate):
+  * Any distribution matching exactly 20/55/25, 25/50/25, 30/40/30, or 33/34/33.
+  * Any distribution that is identical across consecutive queries.
+  * Any "safe middle" distribution without explicit justification in the description.
+
+- Probabilities MUST be topic-specific and data-derived:
+  * Mature market with strong signal coverage → baseline higher (e.g. 62 or 68), narrower extremes
+  * Volatile politically-driven topic → wider distribution, pessimistic may exceed baseline (e.g. 18/32/50)
+  * Breakthrough technology with rising velocity → optimistic may exceed baseline (e.g. 45/38/17)
+  * Stagnating domain → pessimistic dominates (e.g. 10/25/65)
+
+- Each probability must be justified INSIDE the corresponding description (one sentence naming the specific signal or trend that drove the estimate).
 - Sum must be ~100 (95-105 acceptable due to rounding).
 
 ## Scenario Divergence (self-check before emitting)

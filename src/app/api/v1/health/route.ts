@@ -36,6 +36,14 @@ export const revalidate = 0;
 
 interface HealthPayload {
   ok: boolean;
+  /**
+   * Critical-Fix-Plan P0-4 (Notion 2026-04-20): Top-level Label für
+   * Monitoring-Tools. "fresh" = Cron läuft, Signale jünger als Toleranz.
+   * "stale" = mindestens zwei aufeinanderfolgende Cron-Misses. Triggert
+   * keine 5xx — das bleibt bei DB-Unreachable — aber Monitoring soll hier
+   * bei "stale" eine Low-Severity-Alarmierung auslösen.
+   */
+  staleness: "fresh" | "stale" | "unknown";
   uptimeMs: number;
   timestamp: string;
   db: {
@@ -51,12 +59,24 @@ interface HealthPayload {
     ok: boolean;
     newestSignalAgeHours: number | null;
     signalsLast72h: number | null;
+    /** ISO-Timestamp des neuesten live_signal — de-facto "last pipeline run". */
+    lastSignalAt: string | null;
+    /** Gesamtzahl live_signals (nicht nur letzte 72h). */
+    totalSignals: number | null;
   };
   app: {
     env: string;
     nodeVersion: string;
   };
 }
+
+/**
+ * Staleness-Schwelle: Cron läuft alle 4h (vercel.json). Zwischen zwei
+ * Läufen sind Signale maximal ~4h alt — zur Toleranz eines einzelnen
+ * verpassten Cron-Runs setzen wir die Grenze auf 6h. Zwei aufeinander-
+ * folgende Misses (8-12h) lösen dann "stale" aus.
+ */
+const STALENESS_THRESHOLD_HOURS = 6;
 
 // Process-level start used for `uptimeMs`. Captured once per cold-start.
 const PROCESS_START = Date.now();
@@ -65,6 +85,7 @@ export async function GET() {
   const dialect = (process.env.DATABASE_URL ?? "").startsWith("postgres") ? "postgres" : "sqlite";
   const payload: HealthPayload = {
     ok: true,
+    staleness: "unknown",
     uptimeMs: Date.now() - PROCESS_START,
     timestamp: new Date().toISOString(),
     db: {
@@ -76,6 +97,8 @@ export async function GET() {
       ok: false,
       newestSignalAgeHours: null,
       signalsLast72h: null,
+      lastSignalAt: null,
+      totalSignals: null,
     },
     app: {
       env: process.env.NODE_ENV ?? "unknown",
@@ -93,19 +116,26 @@ export async function GET() {
         const tenants = d.prepare("SELECT COUNT(*) AS n FROM tenants").get() as { n: number } | undefined;
         const radars = d.prepare("SELECT COUNT(*) AS n FROM radars").get() as { n: number } | undefined;
         const signals = d.prepare("SELECT COUNT(*) AS n FROM live_signals WHERE fetched_at > datetime('now','-72 hours')").get() as { n: number } | undefined;
+        const total = d.prepare("SELECT COUNT(*) AS n FROM live_signals").get() as { n: number } | undefined;
         const newest = d.prepare("SELECT MAX(fetched_at) AS t FROM live_signals").get() as { t: string | null } | undefined;
 
         payload.db.ok = true;
         payload.db.tables.tenants = tenants?.n ?? 0;
         payload.db.tables.radars = radars?.n ?? 0;
         payload.db.tables.liveSignals = signals?.n ?? 0;
+        payload.pipeline.totalSignals = total?.n ?? 0;
 
         if (newest?.t) {
           const ageMs = Date.now() - new Date(newest.t).getTime();
           const ageHours = ageMs / 3_600_000;
           payload.pipeline.newestSignalAgeHours = Number(ageHours.toFixed(2));
           payload.pipeline.signalsLast72h = signals?.n ?? 0;
-          payload.pipeline.ok = ageHours <= 6;
+          payload.pipeline.lastSignalAt = new Date(newest.t).toISOString();
+          payload.pipeline.ok = ageHours <= STALENESS_THRESHOLD_HOURS;
+          payload.staleness = ageHours <= STALENESS_THRESHOLD_HOURS ? "fresh" : "stale";
+        } else {
+          // Keine Signale überhaupt → Pipeline hat noch nie gelaufen.
+          payload.staleness = "stale";
         }
       } finally {
         d.close();

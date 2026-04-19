@@ -193,6 +193,36 @@ export function checkScenarioDivergence(scenarios: ScenarioForCheck[]): Scenario
     });
   }
 
+  // Rule 1c: Critical-Fix-Plan P0-2 (Notion 2026-04-20) — erkenne
+  // Standard-Templates die der LLM gern aus dem JSON-Schema abkupfert.
+  // 20/55/25 und Konsorten sind Heuristik-Verdacht: Der LLM hat eine
+  // Default-Verteilung gewählt statt die Datenlage zu reflektieren.
+  //
+  // Werte in der Registry sind auf 0.0-1.0 normiert (der Validator
+  // skaliert von LLM-0-100 auf 0-1), deshalb vergleichen wir hier
+  // gegen die normierten Paare.
+  const DEFAULT_FALLBACK_DISTRIBUTIONS: Array<[number, number, number]> = [
+    [0.20, 0.55, 0.25],
+    [0.25, 0.50, 0.25],
+    [0.30, 0.40, 0.30],
+    [0.33, 0.34, 0.33],
+    [0.25, 0.55, 0.20],
+  ];
+  // Toleranz: 2 Prozentpunkte pro Szenario (LLM rundet manchmal).
+  const matchesDefault = DEFAULT_FALLBACK_DISTRIBUTIONS.some((tmpl) =>
+    tmpl.every((tv, i) => Math.abs((probs[i] ?? 0) - tv) < 0.02),
+  );
+  if (matchesDefault) {
+    findings.push({
+      rule: "probability_sum",
+      severity: "major",
+      message:
+        "Scenario probabilities match a known default template " +
+        "(e.g. 20/55/25) — LLM likely fell back to schema placeholder " +
+        "instead of deriving from signals. Confidence should be penalized.",
+    });
+  }
+
   // Rule 2: causal distinctness — heuristic on description/keyDrivers
   // overlap. If two scenarios share ≥ 60% of their keyDrivers or their
   // descriptions open with the same phrase, the LLM likely only varied

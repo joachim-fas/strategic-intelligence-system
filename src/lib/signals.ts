@@ -125,27 +125,72 @@ const NOISE_SOURCE_TOPICS: Record<string, Set<string>> = {
   ]),
 };
 
+/**
+ * Globale Noise-Patterns — Tokens die in JEDER Source als Noise gelten,
+ * es sei denn die User-Query geht exakt über dieses Thema.
+ *
+ * Critical-Fix-Plan (P0-1, Notion 2026-04-20): News/GDELT-Connectors
+ * können unabhängig vom Polymarket-Pfad Celebrity- oder Sport-Stories
+ * als strategische Signale reinschleusen (z.B. ein GDELT-Tone-Event
+ * zu "Hollywood Strike" tagged unter "economy"). Prediction-Markets
+ * werden schon über NOISE_SOURCE_TOPICS gefiltert; hier fangen wir
+ * die Restmenge ab.
+ *
+ * Konservativ gewählt: nur Marken/Entitäten die EINDEUTIG Unterhaltung/
+ * Sport sind. Mehrdeutige Begriffe (fashion, food, travel) bewusst NICHT
+ * drin — die können strategisch relevant sein ("fashion industry layoffs",
+ * "food supply chain", "travel regulation").
+ */
+const GLOBAL_NOISE_PATTERNS: RegExp[] = [
+  // Marken-Sportligen
+  /\b(nfl|nba|mlb|nhl|ufc|premier league|champions league|bundesliga|serie a|la liga|world cup|formula\s*1|\bf1\b|wimbledon|super bowl)\b/i,
+  // Entertainment-Industrie-Events
+  /\b(oscars?|grammy|golden globe|cannes film|venice film|bafta|emmy)\b/i,
+  // Celebrity-Leitmarken (eindeutig Personality-Clickbait)
+  /\b(kardashian|kim kardashian|taylor swift.{0,40}(concert|tour|album|boyfriend|dating)|justin bieber|brad pitt|leonardo dicaprio)\b/i,
+  // Gaming / E-Sports (Plattform-Level, nicht Industry-Level)
+  /\b(twitch streamer|esports tournament|league of legends tournament|fortnite event)\b/i,
+];
+
+/**
+ * Prüft ob der User absichtlich über Sport/Entertainment fragt. In dem
+ * Fall darf der Noise-Filter nicht greifen — sonst verliert der User
+ * genau die Signale, die er sucht.
+ */
+function queryIsAboutNoiseTopic(queryKeywords: string[]): boolean {
+  const noiseQueryTerms = new Set([
+    "sport", "sports", "fußball", "football", "soccer", "basketball",
+    "tennis", "betting", "wetten", "bundesliga", "nfl", "nba",
+    "entertainment", "celebrity", "hollywood", "music industry", "gaming industry",
+  ]);
+  return queryKeywords.some((kw) => noiseQueryTerms.has(kw));
+}
+
 function isNoiseSignal(
   signal: LiveSignal & { relevance_score: number },
   queryKeywords: string[]
 ): boolean {
-  const sourceNoise = NOISE_SOURCE_TOPICS[signal.source];
-  if (!sourceNoise) return false;
-
-  // If the user's query is actually about sports/betting, don't filter
-  const sportTerms = new Set([
-    "sport", "sports", "fußball", "football", "soccer", "basketball",
-    "tennis", "betting", "wetten", "bundesliga", "nfl", "nba",
-  ]);
-  if (queryKeywords.some((kw) => sportTerms.has(kw))) return false;
+  // Wenn der User selbst über Sport/Entertainment fragt: kein Filter.
+  if (queryIsAboutNoiseTopic(queryKeywords)) return false;
 
   const signalText = [
     signal.title, signal.topic, signal.tags, signal.content?.slice(0, 500),
   ].filter(Boolean).join(" ").toLowerCase();
 
-  for (const noiseWord of sourceNoise) {
-    if (signalText.includes(noiseWord)) return true;
+  // Schicht 1: Source-spezifische Prediction-Market-Blocklist (wie bisher).
+  const sourceNoise = NOISE_SOURCE_TOPICS[signal.source];
+  if (sourceNoise) {
+    for (const noiseWord of sourceNoise) {
+      if (signalText.includes(noiseWord)) return true;
+    }
   }
+
+  // Schicht 2: Globale Noise-Pattern. Wirkt auf ALLE Sources, fängt
+  // News/GDELT/Social-Media-Leaks von Entertainment-Content.
+  for (const pattern of GLOBAL_NOISE_PATTERNS) {
+    if (pattern.test(signalText)) return true;
+  }
+
   return false;
 }
 

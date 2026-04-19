@@ -300,7 +300,14 @@ export function validateLLMResponse(
     }
   }
 
-  // Step 2: Validate matchedTrendIds — filter hallucinated IDs
+  // Step 2: Validate matchedTrendIds — filter hallucinated IDs.
+  //
+  // Critical-Fix-Plan P0-3 (Notion 2026-04-20): zusätzlich zur klassischen
+  // Filter-Logik geben wir einen expliziten [HALLUCINATION]-Server-Log
+  // aus, wenn mehr als die Hälfte der LLM-zurückgegebenen IDs nicht in
+  // der echten Trend-DB existieren. Das triggert Log-Alerts und macht
+  // schleichende Prompt-Regressionen sichtbar, bevor sie den Output-
+  // Qualität aushöhlen.
   const originalCount = data.matchedTrendIds.length;
   const droppedIds = data.matchedTrendIds.filter((id) => !validTrendIds.has(id));
   data.matchedTrendIds = data.matchedTrendIds.filter((id) => validTrendIds.has(id));
@@ -308,6 +315,15 @@ export function validateLLMResponse(
     warnings.push(
       `Dropped ${droppedIds.length}/${originalCount} hallucinated matchedTrendIds: ${droppedIds.slice(0, 5).join(", ")}`
     );
+    // >50%-Schwelle: harter Konsolen-Warn für Monitoring.
+    if (originalCount > 0 && droppedIds.length / originalCount > 0.5) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[HALLUCINATION] >50% invalid trend IDs returned by LLM ` +
+        `(${droppedIds.length}/${originalCount}). ` +
+        `Dropped samples: ${droppedIds.slice(0, 3).join(", ")}`
+      );
+    }
   }
   if (data.matchedTrendIds.length === 0 && originalCount > 0) {
     warnings.push("ALL matchedTrendIds were invalid — LLM did not match any real trends");
