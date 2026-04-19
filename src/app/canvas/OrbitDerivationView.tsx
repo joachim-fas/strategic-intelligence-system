@@ -1139,10 +1139,23 @@ function DerivationEdges({
   chainSet: Set<string> | null;
   threshold: number;
 }) {
-  const paths: React.ReactElement[] = [];
-  let pathKey = 0;
+  // ── 1. Kanten einsammeln (mit allen Infos, die wir zum Rendern brauchen) ──
+  //
+  // Wichtig: pro Ziel-Knoten bündeln wir alle eingehenden Kanten in einem
+  // Array, damit wir sie im zweiten Pass gestaffelt anordnen können. Ohne
+  // Staffelung laufen alle Linien in denselben Mittelpunkt der linken Kante
+  // des Ziels — das erzeugt das Ballungsproblem bei stark referenzierten
+  // Karten (z.B. „Artificial Intelligence & Automation" mit 9 Sources).
+  type EdgeHit = {
+    fromId: string;
+    toId: string;
+    fromXY: { x: number; y: number; w: number; h: number };
+    toXY:   { x: number; y: number; w: number; h: number };
+    hot: boolean;
+    rel: number;
+  };
+  const byTarget = new Map<string, EdgeHit[]>();
 
-  // For each adjacency, draw a spline from source node's right edge to target's left edge
   spine.edges.forEach((tos, fromId) => {
     tos.forEach(toId => {
       if (!filteredSet.has(fromId) || !filteredSet.has(toId)) return;
@@ -1151,19 +1164,57 @@ function DerivationEdges({
       const toXY = coordsFor(toId, nodePos, bucketPos);
       if (!fromXY || !toXY) return;
 
-      const x1 = fromXY.x + fromXY.w;
-      const y1 = fromXY.y + fromXY.h / 2;
-      const x2 = toXY.x;
-      const y2 = toXY.y + toXY.h / 2;
-      const midX = (x1 + x2) / 2;
-
-      const hot = chainSet && chainSet.has(fromId) && chainSet.has(toId);
+      const hot = !!(chainSet && chainSet.has(fromId) && chainSet.has(toId));
       const rel = Math.min(
         findSpineNodeChainRel(spine, fromId) ?? 1,
         findSpineNodeChainRel(spine, toId) ?? 1,
       );
-      // Hide edges whose minimum chain-relevance is below threshold
+      // Kanten unter Threshold ausblenden (außer sie sind im Hot-Chain)
       if (rel < threshold && !hot) return;
+
+      const arr = byTarget.get(toId) ?? [];
+      arr.push({ fromId, toId, fromXY, toXY, hot, rel });
+      byTarget.set(toId, arr);
+    });
+  });
+
+  // ── 2. Rendering mit vertikaler Staffelung am Ziel-Knoten ──
+  //
+  // Für jedes Ziel sortieren wir die einlaufenden Kanten nach der Y-Position
+  // ihrer Source — dann bekommen sie in derselben Reihenfolge Y-Offsets am
+  // Ziel zugewiesen. Das sorgt dafür, dass sich die Linien NICHT kreuzen und
+  // die obere Source auch oben einläuft.
+  //
+  // Die Auftreffpunkte werden gleichmäßig zwischen 25 % und 75 % der Ziel-
+  // Höhe verteilt — enges Band, damit Pfeile sichtbar in die Karte zeigen,
+  // aber weit genug gespreizt, dass sich die Arrowheads nicht überlagern.
+  const paths: React.ReactElement[] = [];
+  let pathKey = 0;
+
+  byTarget.forEach((hits) => {
+    // Sortiere nach Source-Mittelpunkt-Y — obere Sources ziehen oben ein.
+    hits.sort((a, b) =>
+      (a.fromXY.y + a.fromXY.h / 2) - (b.fromXY.y + b.fromXY.h / 2)
+    );
+
+    const n = hits.length;
+    hits.forEach((hit, idx) => {
+      const { fromXY, toXY, hot, rel } = hit;
+
+      const x1 = fromXY.x + fromXY.w;
+      const y1 = fromXY.y + fromXY.h / 2;
+
+      // Zielpunkt: eine Linie → Mittelpunkt. Mehrere → gestaffelt im
+      // mittleren 50 %-Band der Karte.
+      const targetBandStart = toXY.y + toXY.h * 0.25;
+      const targetBandEnd   = toXY.y + toXY.h * 0.75;
+      const targetY = n === 1
+        ? toXY.y + toXY.h / 2
+        : targetBandStart + ((targetBandEnd - targetBandStart) * idx) / (n - 1);
+
+      const x2 = toXY.x;
+      const y2 = targetY;
+      const midX = (x1 + x2) / 2;
 
       paths.push(
         <path
@@ -1287,7 +1338,13 @@ function ContextPanel({
 
   return (
     <div style={{
-      width: 340, flexShrink: 0, height: "100%",
+      // Panel breiter als zuvor (340 → 420), damit längere Headlines und
+      // mehrzeiliger Text atmen können. Max-width deckelt ihn bei 520, falls
+      // der Container sehr breit wird; flexShrink erlaubt Schrumpfen auf engen
+      // Viewports bis auf 320.
+      width: "clamp(320px, 32vw, 520px)", flexShrink: 1, flexBasis: 420,
+      minWidth: 320, maxWidth: 520,
+      height: "100%",
       borderLeft: "1px solid var(--color-border)",
       background: "rgba(248,248,248,0.94)", backdropFilter: "blur(10px)",
       padding: 12,
