@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ReasoningTrace } from "./ReasoningTrace";
 import { SequentialPipeline, type PipelineStageMap } from "./SequentialPipeline";
 import { SynthesisBlock } from "./SynthesisBlock";
+import { InlineProvenance } from "./InlineProvenance";
 import { EigenerGedanke } from "./EigenerGedanke";
 import { CausalOrbit } from "./CausalOrbit";
 import { ScenarioSelector } from "./ScenarioSelector";
@@ -576,7 +577,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                         paddingTop: 5,
                       }}
                     >
-                      {insight}
+                      <InlineProvenance text={insight} locale={locale} />
                     </p>
                   </div>
                 ))}

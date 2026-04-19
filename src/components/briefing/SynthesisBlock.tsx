@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Radio, TrendingUp, FileText, Brain } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Locale } from "@/lib/i18n";
-import { Tooltip } from "@/components/ui/Tooltip";
+import { InlineProvenance } from "./InlineProvenance";
 
 /**
  * SynthesisBlock — Haupt-Text eines Briefings.
@@ -34,160 +34,8 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * der eckigen Klammern), damit keine Information verschluckt wird.
  */
 
-type TagKind = "signal" | "trend" | "reg" | "llm";
-
-interface Segment {
-  kind: "text" | "tag";
-  text: string;
-  tagKind?: TagKind;
-  tagDetail?: string;
-}
-
-const TAG_META: Record<TagKind, {
-  short: string;
-  fullDe: string;
-  fullEn: string;
-  color: string;
-  bg: string;
-  border: string;
-  Icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-}> = {
-  signal: {
-    short: "SIGNAL",
-    fullDe: "Live-Signal aus externer Datenquelle",
-    fullEn: "Live signal from external data source",
-    color: "#7A5C00",
-    bg: "rgba(245, 198, 80, 0.14)",
-    border: "rgba(245, 198, 80, 0.45)",
-    Icon: Radio,
-  },
-  trend: {
-    short: "TREND",
-    fullDe: "Aus dem kuratierten Trend-Graph",
-    fullEn: "From the curated trend graph",
-    color: "#0F6038",
-    bg: "rgba(26, 158, 90, 0.10)",
-    border: "rgba(26, 158, 90, 0.35)",
-    Icon: TrendingUp,
-  },
-  reg: {
-    short: "REG",
-    fullDe: "Aus der Regulierungs-Datenbank",
-    fullEn: "From the regulation registry",
-    color: "#1A4A8A",
-    bg: "rgba(26, 74, 138, 0.08)",
-    border: "rgba(26, 74, 138, 0.30)",
-    Icon: FileText,
-  },
-  llm: {
-    short: "LLM",
-    fullDe: "Vom Sprachmodell formuliert — kein externer Beleg",
-    fullEn: "Authored by the language model — no external citation",
-    color: "#6B6B6B",
-    bg: "rgba(107, 107, 107, 0.10)",
-    border: "rgba(107, 107, 107, 0.30)",
-    Icon: Brain,
-  },
-};
-
-const TAG_RE = /\[([^\]]+)\]/g;
-
-function parseSegments(text: string): Segment[] {
-  const out: Segment[] = [];
-  let lastIdx = 0;
-  let m: RegExpExecArray | null;
-  TAG_RE.lastIndex = 0;
-  while ((m = TAG_RE.exec(text)) !== null) {
-    if (m.index > lastIdx) {
-      out.push({ kind: "text", text: text.slice(lastIdx, m.index) });
-    }
-    const inner = m[1].trim();
-    const lower = inner.toLowerCase();
-    let tagKind: TagKind | null = null;
-    let detail = "";
-
-    const colonIdx = inner.indexOf(":");
-    const head = (colonIdx >= 0 ? inner.slice(0, colonIdx) : inner).trim().toLowerCase();
-    const rest = colonIdx >= 0 ? inner.slice(colonIdx + 1).trim() : "";
-
-    if (head === "signal") {
-      tagKind = "signal";
-      detail = rest;
-    } else if (head === "trend") {
-      tagKind = "trend";
-      detail = rest;
-    } else if (head === "reg" || head === "regulation") {
-      tagKind = "reg";
-      detail = rest;
-    } else if (
-      lower === "llm-einschätzung" ||
-      lower === "llm-einschaetzung" ||
-      lower === "llm-assessment" ||
-      lower === "llm"
-    ) {
-      tagKind = "llm";
-    }
-
-    if (tagKind) {
-      out.push({ kind: "tag", tagKind, text: TAG_META[tagKind].short, tagDetail: detail });
-    } else {
-      // Unbekannte Klammer — als Text durchreichen (inkl. der Klammern).
-      out.push({ kind: "text", text: m[0] });
-    }
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < text.length) {
-    out.push({ kind: "text", text: text.slice(lastIdx) });
-  }
-  return out;
-}
-
-function ProvenanceTag({ tagKind, detail, locale }: {
-  tagKind: TagKind;
-  detail?: string;
-  locale: Locale;
-}) {
-  const meta = TAG_META[tagKind];
-  const Icon = meta.Icon;
-  const tooltipBase = locale === "de" ? meta.fullDe : meta.fullEn;
-  const tooltip = detail ? `${tooltipBase} — ${detail}` : tooltipBase;
-  return (
-    <Tooltip content={tooltip} placement="top">
-      <span
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 3,
-          padding: "1px 6px 1px 4px",
-          margin: "0 2px",
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.06em",
-          fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
-          textTransform: "uppercase" as const,
-          color: meta.color,
-          background: meta.bg,
-          border: `1px solid ${meta.border}`,
-          borderRadius: 4,
-          verticalAlign: "baseline",
-          cursor: "help",
-          lineHeight: 1.4,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <Icon size={9} strokeWidth={2.25} />
-        <span>{meta.short}</span>
-        {detail && (
-          <span style={{
-            fontWeight: 500, textTransform: "none", letterSpacing: 0,
-            opacity: 0.85, maxWidth: 180, overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}>
-            : {detail}
-          </span>
-        )}
-      </span>
-    </Tooltip>
-  );
-}
+// Parser + Renderer leben jetzt in `./InlineProvenance` — damit sie auch
+// außerhalb der Synthesis nutzbar sind (Key Insights, Causal Chains, …).
 
 export function SynthesisBlock({ text, locale, isHelp }: {
   text: string;
@@ -243,57 +91,43 @@ export function SynthesisBlock({ text, locale, isHelp }: {
 
   return (
     <div style={{ fontFamily: "var(--font-ui)" }}>
-      {shownParagraphs.map((para, i) => {
-        const segs = parseSegments(para.body);
-        return (
-          <section key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
-            {/* Zwischenüberschrift — klein, mono, als Marker über dem Absatz.
-             * Stilistisch wie ein Section-Label, nicht wie eine Hero-H2. Die
-             * eigentliche Hierarchie (H1 = Frage, H2 = Synthesis-Überschrift
-             * des Briefings) bleibt dem Parent überlassen. */}
-            {para.heading && (
-              <h4
-                style={{
-                  margin: "0 0 8px",
-                  fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase" as const,
-                  color: "var(--volt-text-faint, #9B9B9B)",
-                }}
-              >
-                {para.heading}
-              </h4>
-            )}
-            <p
+      {shownParagraphs.map((para, i) => (
+        <section key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
+          {/* Zwischenüberschrift — klein, mono, als Marker über dem Absatz.
+           * Stilistisch wie ein Section-Label, nicht wie eine Hero-H2. Die
+           * eigentliche Hierarchie (H1 = Frage, H2 = Synthesis-Überschrift
+           * des Briefings) bleibt dem Parent überlassen. */}
+          {para.heading && (
+            <h4
               style={{
-                color: "var(--color-text-primary)",
-                margin: 0,
-                fontFamily: "var(--font-ui)",
-                fontSize: 16,
-                lineHeight: 1.7,
-                fontWeight: 400,
-                letterSpacing: "-0.005em",
-                maxWidth: "72ch",
+                margin: "0 0 8px",
+                fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase" as const,
+                color: "var(--volt-text-faint, #9B9B9B)",
               }}
             >
-              {segs.map((s, j) =>
-                s.kind === "text" ? (
-                  <React.Fragment key={j}>{s.text}</React.Fragment>
-                ) : (
-                  <ProvenanceTag
-                    key={j}
-                    tagKind={s.tagKind!}
-                    detail={s.tagDetail}
-                    locale={locale}
-                  />
-                ),
-              )}
-            </p>
-          </section>
-        );
-      })}
+              {para.heading}
+            </h4>
+          )}
+          <p
+            style={{
+              color: "var(--color-text-primary)",
+              margin: 0,
+              fontFamily: "var(--font-ui)",
+              fontSize: 16,
+              lineHeight: 1.7,
+              fontWeight: 400,
+              letterSpacing: "-0.005em",
+              maxWidth: "72ch",
+            }}
+          >
+            <InlineProvenance text={para.body} locale={locale} />
+          </p>
+        </section>
+      ))}
       {hasMore && !isHelp && (
         <button onClick={() => setExpanded(e => !e)} style={{
           marginTop: 10,
