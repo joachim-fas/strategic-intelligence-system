@@ -97,6 +97,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Sustainability goals push circular economy adoption",
+    source: "EU Circular Economy Action Plan (2020) + Ellen MacArthur Foundation Circularity Gap Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-climate-sustainability",
@@ -140,6 +143,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "amplifies",
     strength: 0.95,
     description: "AI advances enable autonomous agent systems",
+    source: "Anthropic Claude Agent SDK docs + OpenAI GPT-4 Function Calling (2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-ai-transformation",
@@ -238,6 +244,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.75,
     description: "Migration patterns reshape urban landscapes",
+    source: "UN World Urbanization Prospects 2024 + OECD Urban Policy Reviews",
+    timestamp: "2026-04-19",
+    confidence: 0.85,
   },
   {
     from: "mega-demographic-shift",
@@ -245,6 +254,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Workforce gaps demand continuous upskilling",
+    source: "World Economic Forum Future of Jobs Report 2024 + ILO Global Employment Trends 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.88,
   },
 
   // ─── Technology enables connectivity ───────────────────────
@@ -365,6 +377,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.9,
     description: "Changing work demands continuous learning",
+    source: "World Economic Forum Future of Jobs Report 2024 + McKinsey Global Institute Skill Shift (2024)",
+    timestamp: "2026-04-19",
+    confidence: 0.88,
   },
   {
     from: "mega-future-of-work",
@@ -413,6 +428,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "Quantum threatens current encryption, drives post-quantum crypto",
+    source: "NIST Post-Quantum Cryptography Standardization (FIPS 203/204/205, 2024) + NSA CNSA 2.0 (2022)",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "macro-spatial-computing",
@@ -440,6 +458,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.8,
     description: "Climate shocks (drought, flooding, sea-level rise) are a primary structural driver of displacement",
+    source: "IDMC Global Report on Internal Displacement 2024 + IPCC AR6 Working Group II",
+    timestamp: "2026-04-19",
+    confidence: 0.82,
   },
   {
     from: "mega-geopolitical-fracturing",
@@ -447,6 +468,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.9,
     description: "Armed conflict and state collapse drive the largest refugee flows",
+    source: "UNHCR Global Trends in Forced Displacement 2024 + ACLED Conflict Events Database",
+    timestamp: "2026-04-19",
+    confidence: 0.95,
   },
   // FIX: Merged duplicate pair into single bidirectional edge (was two separate edges)
   {
@@ -486,6 +510,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.85,
     description: "Electrification mandates restructure the entire mobility sector",
+    source: "EU Fit for 55 Package (Reg. 2023/851) + IEA Global EV Outlook 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.9,
   },
   {
     from: "mega-mobility",
@@ -501,6 +528,9 @@ export const TREND_EDGES: TrendEdge[] = [
     type: "drives",
     strength: 0.75,
     description: "Climate targets force decarbonization of transport — the largest single emitter",
+    source: "IPCC AR6 WG III Chapter 10 (Transport) + UNEP Emissions Gap Report 2024",
+    timestamp: "2026-04-19",
+    confidence: 0.87,
   },
 
   // ── Identity & Values (was orphan) ─────────────────────────────────────
