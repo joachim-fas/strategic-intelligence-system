@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useLocale } from "@/lib/locale-context";
+import { useT } from "@/lib/locale-context";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,23 +35,29 @@ interface WorkflowPanelProps {
 
 // ─── Status Icons ────────────────────────────────────────────────────────────
 
-const STATUS_CFG = (de: boolean): Record<string, { icon: string; color: string; bg: string; label: string }> => ({
-  done:    { icon: "✓", color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", label: de ? "Erledigt" : "Done" },
-  running: { icon: "⟳", color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", label: de ? "Läuft..." : "Running..." },
-  pending: { icon: "○", color: "var(--volt-text-muted, #6B7280)", bg: "var(--color-surface-2, #F3F4F6)", label: de ? "Bereit" : "Ready" },
-  locked:  { icon: "🔒", color: "var(--volt-text-faint, #9CA3AF)", bg: "var(--color-surface, #F9FAFB)", label: de ? "Gesperrt" : "Locked" },
+type StatusT = (key:
+  | "workflowPanel.statusDone"
+  | "workflowPanel.statusRunning"
+  | "workflowPanel.statusReady"
+  | "workflowPanel.statusLocked"
+) => string;
+
+const STATUS_CFG = (t: StatusT): Record<string, { icon: string; color: string; bg: string; label: string }> => ({
+  done:    { icon: "✓", color: "var(--pastel-mint-text, #0F6038)", bg: "var(--pastel-mint, #C3F4D3)", label: t("workflowPanel.statusDone") },
+  running: { icon: "⟳", color: "var(--pastel-sky-text, #1A4A8A)", bg: "var(--pastel-sky, #D4E8FF)", label: t("workflowPanel.statusRunning") },
+  pending: { icon: "○", color: "var(--volt-text-muted, #6B7280)", bg: "var(--color-surface-2, #F3F4F6)", label: t("workflowPanel.statusReady") },
+  locked:  { icon: "🔒", color: "var(--volt-text-faint, #9CA3AF)", bg: "var(--color-surface, #F9FAFB)", label: t("workflowPanel.statusLocked") },
 });
 
 // ─── WorkflowPanel ───────────────────────────────────────────────────────────
 
 export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelProps) {
-  const { locale } = useLocale();
-  const de = locale === "de";
+  const { t } = useT();
   const [userInputs, setUserInputs] = useState<Record<number, string>>({});
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
 
   const { steps, currentStepIndex, frameworkName, methodology, topic } = workflow;
-  const statusCfg = STATUS_CFG(de);
+  const statusCfg = STATUS_CFG(t as StatusT);
   const doneCount = steps.filter(s => s.status === "done").length;
   const progress = steps.length > 0 ? (doneCount / steps.length) * 100 : 0;
 
@@ -78,7 +84,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
         {/* Progress bar */}
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--color-text-muted)", marginBottom: 4 }}>
-            <span>{doneCount}/{steps.length} {de ? "Schritte" : "steps"}</span>
+            <span>{doneCount}/{steps.length} {t("workflowPanel.stepsLabel")}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <div style={{ height: 4, background: "rgba(0,0,0,0.06)", borderRadius: 2, overflow: "hidden" }}>
@@ -155,7 +161,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                   {step.dependsOn.length > 0 && step.dependsOn.some(d => steps[d]?.synthesis) && (
                     <div style={{ marginBottom: 10, padding: "8px 10px", background: "rgba(37,99,235,0.04)", borderRadius: 6, border: "1px solid rgba(37,99,235,0.1)" }}>
                       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", color: "var(--pastel-sky-text, #2563EB)", textTransform: "uppercase", marginBottom: 4 }}>
-                        {de ? "Kontext aus vorherigen Schritten" : "Context from previous steps"}
+                        {t("workflowPanel.contextFromPrevious")}
                       </div>
                       <div style={{ fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.5, maxHeight: 100, overflowY: "auto" }}>
                         {step.dependsOn.map(d => steps[d]?.synthesis).filter(Boolean).join("\n\n").slice(0, 300)}
@@ -173,7 +179,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                       <textarea
                         value={userInputs[i] ?? ""}
                         onChange={e => setUserInputs(prev => ({ ...prev, [i]: e.target.value }))}
-                        placeholder={de ? "Dein spezifischer Kontext (optional)..." : "Your specific context (optional)..."}
+                        placeholder={t("workflowPanel.userContextPlaceholder")}
                         rows={3}
                         style={{
                           width: "100%", fontSize: 12, padding: "8px 10px", borderRadius: 6,
@@ -196,7 +202,7 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                   {step.status === "running" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ width: 14, height: 14, border: "2px solid #2563EB", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                      <span style={{ fontSize: 12, color: "var(--pastel-sky-text, #2563EB)", fontWeight: 500 }}>{de ? "Analyse läuft..." : "Analysis running..."}</span>
+                      <span style={{ fontSize: 12, color: "var(--pastel-sky-text, #2563EB)", fontWeight: 500 }}>{t("workflowPanel.analysisRunning")}</span>
                       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                     </div>
                   )}
@@ -214,13 +220,13 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
                       onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
                       onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
                     >
-                      {de ? "Analyse starten →" : "Start analysis →"}
+                      {t("workflowPanel.startAnalysis")}
                     </button>
                   )}
 
                   {step.status === "locked" && (
                     <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic" }}>
-                      {de ? "Wartet auf" : "Waiting for"}: {step.dependsOn.map(d => steps[d]?.title).join(", ")}
+                      {t("workflowPanel.waitingFor")}: {step.dependsOn.map(d => steps[d]?.title).join(", ")}
                     </div>
                   )}
                 </div>
@@ -234,10 +240,10 @@ export function WorkflowPanel({ workflow, onStartStep, onClose }: WorkflowPanelP
       {doneCount === steps.length && steps.length > 0 && (
         <div style={{ padding: "16px 20px", borderTop: "1px solid var(--color-border)", flexShrink: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "var(--signal-positive, #1A9E5A)", marginBottom: 4 }}>
-            ✓ {de ? `Alle ${steps.length} Schritte abgeschlossen` : `All ${steps.length} steps completed`}
+            ✓ {t("workflowPanel.allStepsCompleted", { n: String(steps.length) })}
           </div>
           <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            {de ? "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten." : "Results are visible as cards on the canvas. You can close the panel and continue working."}
+            {t("workflowPanel.resultsOnCanvas")}
           </div>
         </div>
       )}

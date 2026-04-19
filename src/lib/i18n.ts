@@ -1199,6 +1199,22 @@ const en = {
     exportPdfButton: "Export as PDF (Cmd+P)",
   },
 
+  workflowPanel: {
+    statusDone: "Done",
+    statusRunning: "Running...",
+    statusReady: "Ready",
+    statusLocked: "Locked",
+    stepsLabel: "steps",
+    contextFromPrevious: "Context from previous steps",
+    userContextPlaceholder: "Your specific context (optional)...",
+    analysisRunning: "Analysis running...",
+    startAnalysis: "Start analysis →",
+    waitingFor: "Waiting for",
+    // {{n}} = step count
+    allStepsCompleted: "All {{n}} steps completed",
+    resultsOnCanvas: "Results are visible as cards on the canvas. You can close the panel and continue working.",
+  },
+
   briefingExport: {
     copiedTooltip: "Copied to clipboard",
     exportTooltip: "Export briefing (Markdown, JSON)",
@@ -2337,6 +2353,21 @@ const de: Dictionary = {
     sourcesHeading: "Quellen",
     confidential: "Vertraulich",
     exportPdfButton: "Als PDF exportieren (Cmd+P)",
+  },
+
+  workflowPanel: {
+    statusDone: "Erledigt",
+    statusRunning: "Läuft...",
+    statusReady: "Bereit",
+    statusLocked: "Gesperrt",
+    stepsLabel: "Schritte",
+    contextFromPrevious: "Kontext aus vorherigen Schritten",
+    userContextPlaceholder: "Dein spezifischer Kontext (optional)...",
+    analysisRunning: "Analyse läuft...",
+    startAnalysis: "Analyse starten →",
+    waitingFor: "Wartet auf",
+    allStepsCompleted: "Alle {{n}} Schritte abgeschlossen",
+    resultsOnCanvas: "Die Ergebnisse sind als Karten im Canvas sichtbar. Du kannst das Panel schließen und frei weiterarbeiten.",
   },
 
   briefingExport: {
