@@ -190,6 +190,76 @@ function PixelMan() {
 }
 
 /**
+ * Pixel-art inchworm sprite that replaces PixelMan in the reasoning walkway.
+ *
+ * Visual language is lifted from the standalone Pixel Worm HTML demo
+ * (Downloads/Pixel Worm.html): a flat horizontal worm drawn as pixel cells
+ * in a single ink colour (#0A0A0A) against the warm off-white card, with a
+ * single light-coloured "eye" pixel near the head and an inchworm-style
+ * arch in the middle segments.
+ *
+ * Why SVG instead of canvas: the rest of the reasoning indicator uses
+ * CSS keyframes on discrete DOM nodes (legs, eye, arm), which compose
+ * cheaply with the rest of the card and respect prefers-reduced-motion
+ * without extra wiring. The original canvas demo renders a smooth
+ * parametric spine; here we approximate that look with a small fixed set
+ * of segments whose vertical offset animates to produce the hunch.
+ *
+ * Wrapper structure mirrors PixelMan:
+ *   <div.sis-pixel-worm>        — owns left-right travel animation + vertical centering
+ *     <div.pw-body>              — owns the subtle body wiggle (vertical breathing)
+ *       <svg>                    — the pixel cells
+ *
+ * Grid is 24x8 (viewBox) rendered at 48x16 CSS px. That keeps the worm
+ * the same height as PixelMan's torso area but stretches horizontally
+ * enough to read as "worm". Each body segment is a 1x1 pixel with its
+ * own small translateY keyframe offset in globals.css — the phase shifts
+ * produce a travelling arch wave along the body.
+ */
+function PixelWorm() {
+  const INK = "#0A0A0A";   // body — matches page text colour
+  const BG = "#F4F1EA";    // eye highlight — warm off-white, matches original demo palette
+  return (
+    <div className="sis-pixel-worm" aria-hidden="true">
+      <div className="pw-body">
+        <svg width="48" height="16" viewBox="0 0 24 8" shapeRendering="crispEdges">
+          {/* Body segments, left (tail) to right (head). Each .pw-seg-N rect
+               gets its own keyframe in globals.css; staggered vertical
+               offsets produce a travelling arch wave that looks like the
+               worm hunches forward. y=6 is the resting "ground line" for
+               the body; segments lift above it during the hunch. */}
+
+          {/* Tail tip — tapered (thin, 1px tall). Stays mostly on the ground. */}
+          <rect className="pw-seg-0" x="2"  y="6" width="1" height="1" fill={INK} />
+          <rect className="pw-seg-0" x="3"  y="5" width="1" height="2" fill={INK} />
+
+          {/* Mid-back body — thicker (2px tall). These lift the most during
+               the hunch to form the classic inchworm arch. */}
+          <rect className="pw-seg-1" x="4"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-2" x="5"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-3" x="6"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-4" x="7"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-5" x="8"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-6" x="9"  y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-7" x="10" y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-8" x="11" y="5" width="1" height="2" fill={INK} />
+          <rect className="pw-seg-9" x="12" y="5" width="1" height="2" fill={INK} />
+
+          {/* Head — wider, 3px tall to give the worm a bulbous snout. The
+               eye is a single light pixel inset from the head's front edge. */}
+          <rect className="pw-seg-10" x="13" y="4" width="1" height="3" fill={INK} />
+          <rect className="pw-seg-10" x="14" y="4" width="1" height="3" fill={INK} />
+          <rect className="pw-seg-10" x="15" y="4" width="1" height="3" fill={INK} />
+          <rect className="pw-seg-10" x="16" y="5" width="1" height="2" fill={INK} />
+          {/* Eye pixel — off-white on the head, slightly back from the front */}
+          <rect className="pw-eye"    x="14" y="5" width="1" height="1" fill={BG} />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Placeholder that takes over the hero command-line slot while the pipeline
  * is running. Shows an animated shimmer bar + pulsing sonar + label + pixel-
  * man walking across the middle + mm:ss clock. The SequentialPipeline card
@@ -298,12 +368,12 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-2 1.5s infinite" }}>.</span>
         <span aria-hidden="true" style={{ animation: "sis-reasoning-dot-3 1.5s infinite" }}>.</span>
       </span>
-      {/* Pixel-man walkway — the explicit strip between label and timer where
-           the tiny 8-bit character paces back and forth. Anchored position:
-           relative so the absolutely-positioned PixelMan animates against this
-           parent's width (the left-% keyframes in sis-pm-walk). overflow:
-           hidden clips the character at the walkway's left/right edges so
-           the entrance/exit animations don't bleed over the "Reasoning
+      {/* Pixel-worm walkway — the explicit strip between label and timer where
+           the tiny pixel-art inchworm slides back and forth. Anchored
+           position: relative so the absolutely-positioned PixelWorm animates
+           against this parent's width (the left-% keyframes in
+           sis-worm-travel). overflow: hidden clips the worm at the walkway's
+           left/right edges so its body doesn't bleed over the "Reasoning
            läuft" label or the mm:ss timer. minWidth keeps the walkway
            usable on narrow cards. */}
       <div
@@ -316,7 +386,7 @@ function ReasoningIndicator({ elapsedMs, locale }: { elapsedMs: number; locale: 
           minWidth: 120,
         }}
       >
-        <PixelMan />
+        <PixelWorm />
       </div>
       <span style={{
         fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",

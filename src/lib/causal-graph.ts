@@ -1204,6 +1204,60 @@ export function getEdgesForTrend(trendId: string): TrendEdge[] {
 }
 
 /**
+ * Name-basiertes Edge-Matching — überbrückt DB-UUIDs und Curated-Slug-IDs.
+ *
+ * **Warum:** Die DB hat Trends mit UUIDs (`e62f1c4e-…`), der kuratierte
+ * Causal-Graph in dieser Datei arbeitet mit Slug-IDs (`mega-ai-transformation`).
+ * Ein direkter `getEdgesForTrend(uuid)` matcht niemals. Diese Funktion ist
+ * die Brücke: Sie bekommt Trend-*Namen* (die in beiden Welten konsistent
+ * sind), findet die zugehörigen Curated-Slugs über `mega-trends.ts`, und
+ * liefert die Edges mit eingebetteten Namen (`fromName`/`toName`) zurück,
+ * damit der Aufrufer sie wieder auf DB-UUIDs mappen kann.
+ *
+ * Case- und whitespace-insensitiv. Nicht gemappte Namen werden stillschweigend
+ * ignoriert.
+ */
+export function getEdgesBetweenTrendNames(names: string[]): Array<
+  TrendEdge & { fromName: string; toName: string }
+> {
+  if (names.length === 0) return [];
+
+  // Dynamischer Require verhindert einen Circular-Import zwischen
+  // causal-graph.ts und mega-trends.ts (mega-trends könnte theoretisch
+  // zurück auf TrendEdge-Types verweisen; lieber klar getrennt halten).
+  const { megaTrends } = require("@/lib/mega-trends") as {
+    megaTrends: Array<{ id: string; name: string }>;
+  };
+
+  const norm = (s: string) => s.toLowerCase().trim();
+  const nameSet = new Set(names.map(norm));
+
+  // Slug ↔ Name-Map aus mega-trends aufbauen
+  const slugToName = new Map<string, string>();
+  for (const t of megaTrends) {
+    slugToName.set(t.id, t.name);
+  }
+
+  // Slugs sammeln, deren Name in der übergebenen Menge vorkommt
+  const matchedSlugs = new Set<string>();
+  for (const [slug, name] of slugToName) {
+    if (nameSet.has(norm(name))) matchedSlugs.add(slug);
+  }
+
+  // Edges filtern: beide Endpunkte in der gemappten Menge
+  const out: Array<TrendEdge & { fromName: string; toName: string }> = [];
+  for (const e of TREND_EDGES) {
+    if (!matchedSlugs.has(e.from) || !matchedSlugs.has(e.to)) continue;
+    out.push({
+      ...e,
+      fromName: slugToName.get(e.from) || e.from,
+      toName: slugToName.get(e.to) || e.to,
+    });
+  }
+  return out;
+}
+
+/**
  * Get trends that DRIVE a specific trend (upstream causes).
  * Includes reverse direction of bidirectional edges.
  */

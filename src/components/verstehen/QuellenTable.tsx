@@ -191,7 +191,7 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   const locale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
-  const [statusMap, setStatusMap] = useState<Record<string, { lastRunAt?: string; status?: string }>>({});
+  const [statusMap, setStatusMap] = useState<Record<string, { lastRunAt?: string; status?: string; signalCount?: number }>>({});
   const [activeMacro, setActiveMacro] = useState<SteepVKey | "all">("all");
   const [activeFilter, setActiveFilter] = useState<CategoryKey>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -216,17 +216,24 @@ export default function QuellenTable({ de }: QuellenTableProps) {
         const data = json.data ?? json;
         const list = data?.connectors || data?.sources || [];
         if (Array.isArray(list)) {
-          const map: Record<string, { lastRunAt?: string; status?: string }> = {};
+          const map: Record<string, { lastRunAt?: string; status?: string; signalCount?: number }> = {};
           for (const s of list) {
             map[s.name] = {
               lastRunAt: s.lastFetch || s.lastRunAt,
               status: s.status || s.lastStatus,
+              signalCount: typeof s.signalCount === "number" ? s.signalCount : undefined,
             };
           }
           setStatusMap(map);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        // Fehler nicht mehr still schlucken — sonst bleibt "0 aktiv" im UI
+        // stehen, obwohl die API funktioniert. Der Fehler wird in der Konsole
+        // sichtbar und das Fallback auf signalCount / lastRunAt (im Row-Mapper
+        // unten) greift, sobald mindestens eins der beiden Felder befüllt ist.
+        console.error("[QuellenTable] /api/v1/sources/status fetch failed:", err);
+      });
   }, []);
 
   // Derive a single unified row list from live connectors AND planned
@@ -235,14 +242,26 @@ export default function QuellenTable({ de }: QuellenTableProps) {
   const allRows: UnifiedRow[] = useMemo(() => {
     const liveRows: UnifiedRow[] = connectors.map((c) => {
       const stat = statusMap[c.name] || {};
+      // Aktiv-Heuristik in **drei** Schritten — jeder Schritt reicht allein,
+      // damit eine Quelle als „aktiv" zählt. Vorher wurde nur auf
+      // `status` geschaut; Folge: wenn das Status-Feld leer war (z.B. weil
+      // der Fetch noch lief oder der Connector kein Status-Mapping hatte),
+      // standen aktive Connectors als „0 aktiv" im UI.
+      //
+      //   1. Explizit als aktiv markiert (`ok`, `active`, `fresh`, `stale`)
+      //   2. Es existieren überhaupt Signale (`signalCount > 0`) — die
+      //      Quelle hat in den letzten 72h tatsächlich Daten geliefert
+      //   3. `lastRunAt` liegt < 7 Tage zurück — generous fallback, damit
+      //      Batch-Connectors (die nur alle paar Tage laufen) nicht als
+      //      tot gelten.
       let isActive = false;
       if (stat.status === "active" || stat.status === "ok" || stat.status === "fresh" || stat.status === "stale") {
-        // "stale" = data exists but > 12h old. Still counts as active since
-        // the connector works — it just hasn't run recently.
+        isActive = true;
+      } else if (typeof stat.signalCount === "number" && stat.signalCount > 0) {
         isActive = true;
       } else if (stat.lastRunAt) {
         const age = Date.now() - new Date(stat.lastRunAt).getTime();
-        isActive = age < 7 * 24 * 60 * 60 * 1000; // 7 days — generous for batch connectors
+        isActive = age < 7 * 24 * 60 * 60 * 1000;
       }
       const category = (CONNECTOR_CATEGORY[c.name] || "tech") as CategoryKey;
       const type = (CONNECTOR_TYPE[c.name] || "live-signal") as TypeBadgeKind;

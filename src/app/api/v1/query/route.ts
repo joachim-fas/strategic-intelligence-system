@@ -625,14 +625,6 @@ export async function POST(req: Request) {
             qualityWarnings.push("Szenario-Wahrscheinlichkeiten wurden normalisiert.");
           }
 
-          const signalsMeta = relevantSignals.map((s: any) => ({
-            source: s.source,
-            title: s.title,
-            url: s.url,
-            strength: s.strength,
-            date: s.fetched_at.slice(0, 10),
-          }));
-
           // Augment: matched trend details for radar + demographics
           const matchedIds: string[] = validated.matchedTrendIds || [];
           const matchedIdSet = new Set(matchedIds);
@@ -652,21 +644,104 @@ export async function POST(req: Request) {
               };
             });
 
-          // Augment: causal edges between matched trends
-          const { getEdgesForTrend } = await import("@/lib/causal-graph");
+          // Zweiter Signal-Pass — angereichert durch Matched-Trend-Namen.
+          //
+          // **Warum:** Die erste Signal-Suche oben (`getRelevantSignals(query)`)
+          // matcht nur auf Keywords aus der Original-Frage. Bei nischigen
+          // Fragen („öffentlich-rechtlicher Rundfunk qualitativ beleben")
+          // liefert das oft 0 Treffer, obwohl die LLM-Analyse 9 strategisch
+          // relevante Trends identifiziert hat — und zu **jedem** dieser
+          // Trends existieren Signale in der DB.
+          //
+          // **Fix:** Nach der Trend-Identifikation ein zweites
+          // `getRelevantSignals` mit den Trend-Namen als Query. Die Ergebnisse
+          // werden mit dem ersten Pass dedupliziert und in `usedSignals`
+          // gemergt, damit das Frontend (Orbit, Card-Stream) eine aussagekräftige
+          // Signal-Basis sieht. **Keine** Auswirkung auf die LLM-Antwort selbst
+          // — die ist zum Zeitpunkt des zweiten Passes schon fertig; dies ist
+          // reine Output-Anreicherung.
+          type EnrichedSignal = typeof relevantSignals[number];
+          const enriched = new Map<string, EnrichedSignal>();
+          const signalKey = (s: any) => s.url || `${s.source}|${s.title}`;
+          for (const s of relevantSignals) enriched.set(signalKey(s), s);
+
+          if (matchedTrends.length > 0) {
+            try {
+              // Über-Sampling, damit wir nach Dedup noch genug übrig haben.
+              // 8 Signale pro Trend, Cap insgesamt auf ~32, damit der Response
+              // kompakt bleibt.
+              const perTrend = Math.max(2, Math.floor(24 / matchedTrends.length));
+              for (const t of matchedTrends) {
+                if (!t?.name) continue;
+                const hits = getRelevantSignals(t.name, perTrend);
+                for (const s of hits) {
+                  const k = signalKey(s);
+                  if (!enriched.has(k)) enriched.set(k, s);
+                }
+                if (enriched.size >= 32) break;
+              }
+            } catch (e) {
+              // Nicht fatal — im Zweifel bleibt der erste Pass die Quelle.
+              console.warn("[query] trend-based signal enrichment failed:", e);
+            }
+          }
+
+          const mergedSignals = Array.from(enriched.values()).slice(0, 32);
+          const signalsMeta = mergedSignals.map((s: any) => ({
+            source: s.source,
+            title: s.title,
+            url: s.url,
+            strength: s.strength,
+            date: s.fetched_at.slice(0, 10),
+          }));
+
+          // Augment: causal edges between matched trends.
+          //
+          // **Historischer Bug (19.04.2026):** Der alte Code nutzte
+          // `getEdgesForTrend(id)` mit `matchedIds`. Problem: die DB führt
+          // Trends unter UUIDs, der kuratierte Causal-Graph in
+          // `src/lib/causal-graph.ts` arbeitet aber mit Slug-IDs wie
+          // `mega-ai-transformation`. Die beiden ID-Systeme matchten nie,
+          // also blieb `matchedEdges` konstant leer — selbst für klassische
+          // Fälle wie „AI × Future of Work" mit kuratierten Kanten.
+          //
+          // **Fix:** Name-basiertes Matching via
+          // `getEdgesBetweenTrendNames`. Die Funktion mappt Trend-Namen
+          // (in beiden Welten identisch) auf Slugs, zieht die Edges aus
+          // dem Curated-Graph und gibt sie mit eingebetteten Namen zurück.
+          // Wir mappen die Namen hier wieder auf die UUIDs aus
+          // `matchedTrends`, damit das Frontend (das mit UUIDs arbeitet)
+          // die Edges an die Trend-Karten anschließen kann.
+          const { getEdgesBetweenTrendNames } = await import("@/lib/causal-graph");
+          const norm = (s: string) => s.toLowerCase().trim();
+          const nameToUuid = new Map<string, string>();
+          for (const t of matchedTrends) {
+            if (t?.name) nameToUuid.set(norm(t.name), t.id);
+          }
+          const edgesByName = getEdgesBetweenTrendNames(
+            matchedTrends.map((t: any) => t.name).filter(Boolean),
+          );
           const seen = new Set<string>();
-          const matchedEdges = matchedIds
-            .flatMap((id: string) => getEdgesForTrend(id))
-            .filter((e: any) => {
+          const matchedEdges = edgesByName
+            .map((e) => {
+              const fromUuid = nameToUuid.get(norm(e.fromName));
+              const toUuid = nameToUuid.get(norm(e.toName));
+              if (!fromUuid || !toUuid) return null;
+              return {
+                from: fromUuid,
+                to: toUuid,
+                type: e.type,
+                strength: e.strength,
+                description: e.description,
+              };
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+            .filter((e) => {
               const key = `${e.from}→${e.to}`;
               if (seen.has(key)) return false;
               seen.add(key);
-              return matchedIdSet.has(e.from) && matchedIdSet.has(e.to);
-            })
-            .map((e: any) => ({
-              from: e.from, to: e.to, type: e.type,
-              strength: e.strength, description: e.description,
-            }));
+              return true;
+            });
 
           // API-03 + VAL-01: Final result with validation metadata
           const finalResult = {
