@@ -212,26 +212,7 @@ function isNoiseSignal(
  * mit sqlite-vec + Embeddings. Bis dahin rufen alle Call-Sites das
  * bestehende Keyword-basierte getRelevantSignals().
  */
-/**
- * Homonymy-Fix 2026-04-21: der dritte Parameter `coherenceQuery` filtert
- * die Treffer zusätzlich gegen eine *zweite* Query.
- *
- * Der Hauptfall ist der Enrichment-Loop in `/api/v1/query/route.ts`:
- * dort rufen wir `getRelevantSignals(trend.name)` pro matched Trend,
- * um die Signal-Basis thematisch zu erweitern. `trend.name` ist aber
- * oft ein einzelner, homonym-anfälliger Begriff ("Mobility Evolution").
- * Single-Token-Matching zieht dann Homonyme an: UNHCR "Labor Mobility"
- * stolpert in eine "Mobility-as-a-Service"-Frage. Mit
- * `coherenceQuery = userOriginalQuery` fordern wir von jedem
- * Trend-Treffer zusätzlich einen Bigram-Overlap mit der User-Frage
- * (Fallback: Single-Keyword, wenn User-Query nur ein sinntragendes
- * Wort hat). Das schneidet Homonyme ab, ohne valide Mobility-Signale
- * — die die User-Phrase tragen — zu verlieren.
- *
- * Keine Auswirkung, wenn `coherenceQuery` weggelassen wird (Default-
- * Aufrufer nutzen die alte 2-Argument-Signatur weiter).
- */
-export function getRelevantSignals(query: string, limit = 12, coherenceQuery?: string): LiveSignal[] {
+export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const d = db();
 
   // ALG-21: Cross-language alias map for common DE<>EN term pairs.
@@ -368,39 +349,6 @@ export function getRelevantSignals(query: string, limit = 12, coherenceQuery?: s
     }
     return matchedCount >= minOverlapCount;
   });
-
-  // Filter 3 (Homonymy-Fix 2026-04-21): Wenn `coherenceQuery` übergeben
-  // wurde — typischerweise die User-Original-Frage beim Trend-basierten
-  // Enrichment — muss der Treffer zusätzlich einen Bigram-Overlap mit
-  // dieser Zweitquery zeigen. Verhindert UNHCR "Labor Mobility"-Signale
-  // auf "Mobility-as-a-Service"-Fragen: Signal matcht zwar "mobility"
-  // (Trend-Keyword), aber keines der User-Bigrams ("mobility service",
-  // "service deutschland"). Bei 1-Keyword-User-Queries fällt das
-  // Bigram-Requirement auf Single-Keyword zurück — dann verhält sich
-  // der Filter wie ein zweiter Overlap-Check.
-  if (coherenceQuery && coherenceQuery.trim().length > 0) {
-    const coherenceKeywords = coherenceQuery
-      .toLowerCase()
-      .replace(/[^\w\säöüß]/g, " ")
-      .split(/\s+/)
-      .filter((w) => !stopWords.has(w) && (w.length >= 4 || importantShortTerms.has(w)));
-    const coherenceBigrams: string[] = [];
-    for (let i = 0; i < coherenceKeywords.length - 1; i++) {
-      coherenceBigrams.push(`${coherenceKeywords[i]} ${coherenceKeywords[i + 1]}`);
-    }
-    // Falls User-Query ≥ 2 Keywords ergibt, ist Bigram-Overlap Pflicht.
-    // Einzelkeyword-Queries fallen zurück auf Single-Token (sonst würde
-    // der Filter fälschlicherweise alles rausdroppen).
-    const useBigram = coherenceBigrams.length > 0;
-    filtered = filtered.filter((row) => {
-      const signalText = [row.title, row.topic, row.content?.slice(0, 1000), row.tags]
-        .filter(Boolean).join(" ").toLowerCase();
-      if (useBigram) {
-        return coherenceBigrams.some((bg) => signalText.includes(bg));
-      }
-      return coherenceKeywords.some((kw) => signalText.includes(kw));
-    });
-  }
 
   return filtered.slice(0, limit);
 }

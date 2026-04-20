@@ -362,31 +362,6 @@ export interface ConfidenceCalibrationInputs {
    * erleben. [0, 1].
    */
   refVerification?: number;
-  /**
-   * v0.3 Confidence-Rebalance 2026-04-21: Abdeckung durch den kuratierten
-   * Trend-Graph. Die alte v0.2-Formel gewichtete Live-Signale mit 82% der
-   * Gesamtmasse — bei nischigen Themen ohne aktuelle RSS/News-Treffer
-   * stürzte die Konfidenz trotz 10+ sauber gematchter Trends und
-   * geschlossener Kausalkette auf ~5% ab. Das ist strukturell unfair:
-   * ein dichter Trend-Match ist echte, validierte Evidenz — nur eben
-   * aus dem kuratierten Weltmodell statt aus Live-Signalen.
-   *
-   * `trendCoverage` normalisiert `matchedTrends.length` gegen eine
-   * Erwartung (Default: 8) und cappt bei 1.0. Die Call-Site rechnet
-   * `min(1, matchedTrends.length / 8)`.
-   *
-   * Optional — alte Aufrufer ohne diesen Input erhalten den neutralen
-   * Wert 0.5, damit keine Regression entsteht. [0, 1].
-   */
-  trendCoverage?: number;
-  /**
-   * v0.3: Durchschnittliche Qualität der gematchten Trends (relevance ×
-   * confidence oder `queryRelevance` falls vorhanden). Unterscheidet
-   * zwischen "10 lose tangierende Trends" (niedrige Strength) und
-   * "10 zentrale Trends mit 0.9+ Relevance" (hohe Strength). Default
-   * 0.5 (neutral), wenn nicht gesetzt. [0, 1].
-   */
-  trendStrength?: number;
 }
 
 export interface CalibratedConfidence {
@@ -397,40 +372,24 @@ export interface CalibratedConfidence {
 }
 
 /**
- * v0.3 Gewichtungsschema 2026-04-21 (User-Feedback "Ergebnisse unzureichend",
- * Konfidenz fiel bei trend-reichen, signal-armen Queries auf 5%).
+ * Notion v0.2 (28/22/18/14/8) plus Critical-Fix-Plan P3-1 (+10%
+ * refVerification). Die Summe der 6 Gewichte = 1.00.
  *
- * Historie:
- *   - v0.2: signalCoverage 28 / signalRecency 22 / signalStrength 18 /
- *           sourceVerification 14 / causalCoverage 8.  → Signal-Faktoren
- *           trugen 82% des Gesamtgewichts. Für nischige Themen ohne
- *           frische Live-Signale stürzte Konfidenz strukturell ab.
- *   - v0.2 + P3-1: +10% refVerification, Rest um 7% gekürzt.
- *   - v0.3 (hier): 20/15/12/10/8/8 für Signals+Refs+Causal (73%),
- *                  15+12 neu für Trends (27%). Summe weiter = 1.00.
- *
- * Wirkung der Rebalance:
- *   - Signal-reich + Trend-reich → ~100% möglich (wie bisher).
- *   - Signal-reich + Trend-arm → ~65–75% (leicht niedriger als v0.2,
- *     da Trends nun echten Anteil haben).
- *   - Signal-arm  + Trend-reich → ~45–55% statt vorher <15% —
- *     der eigentliche Fix des Demo-Blockers.
- *   - Signal-arm  + Trend-arm → ~15–25% (weiter niedrig, zu Recht).
- *
- * Die Signal-Dominanz ist bewusst reduziert, nicht eliminiert: frische
- * Belege aus Live-Quellen bleiben die wertvollste Evidenz, aber der
- * kuratierte Trend-Graph ist jetzt anerkannte Sekundär-Evidenz statt
- * vernachlässigtem Zusatz.
+ * Designprinzip: die Prompt-Anweisungen im System-Prompt spiegeln
+ * die v0.2-Formel wider (signalCoverage 30% etc.). Bei der Migration
+ * auf 6 Faktoren wurden alle v0.2-Gewichte proportional um 7% gekürzt
+ * und refVerification mit 10% dazugegeben. Der LLM-seitige "self-score"-
+ * Vergleich stimmt weiter grob, und die neue Dimension (Anteil
+ * verifizierter Refs gegen KNOWN_DOMAINS-Allowlist) belohnt Queries
+ * mit Zitaten auf autoritativen Quellen.
  */
 const CONFIDENCE_WEIGHTS: Record<keyof ConfidenceCalibrationInputs, number> = {
-  signalCoverage: 0.20,
-  signalRecency: 0.15,
-  signalStrength: 0.12,
-  sourceVerification: 0.10,
+  signalCoverage: 0.28,
+  signalRecency: 0.22,
+  signalStrength: 0.18,
+  sourceVerification: 0.14,
   causalCoverage: 0.08,
-  refVerification: 0.08,
-  trendCoverage: 0.15,
-  trendStrength: 0.12,
+  refVerification: 0.10,
 };
 
 export function computeCalibratedConfidence(
@@ -448,10 +407,6 @@ export function computeCalibratedConfidence(
     // halber Bonus, halber Abschlag, beeinflusst die Summe also nur
     // marginal.
     refVerification: clamp01(inputs.refVerification ?? 0.5),
-    // v0.3: Trends als eigenständige Evidenz. Neutral 0.5 für alte
-    // Call-Sites ohne expliziten Input.
-    trendCoverage: clamp01(inputs.trendCoverage ?? 0.5),
-    trendStrength: clamp01(inputs.trendStrength ?? 0.5),
   };
 
   const rawScore =
@@ -460,9 +415,7 @@ export function computeCalibratedConfidence(
     norm.signalStrength    * CONFIDENCE_WEIGHTS.signalStrength +
     norm.sourceVerification* CONFIDENCE_WEIGHTS.sourceVerification +
     norm.causalCoverage    * CONFIDENCE_WEIGHTS.causalCoverage +
-    norm.refVerification   * CONFIDENCE_WEIGHTS.refVerification +
-    norm.trendCoverage     * CONFIDENCE_WEIGHTS.trendCoverage +
-    norm.trendStrength     * CONFIDENCE_WEIGHTS.trendStrength;
+    norm.refVerification   * CONFIDENCE_WEIGHTS.refVerification;
 
   const score = Math.round(rawScore * 100);
 

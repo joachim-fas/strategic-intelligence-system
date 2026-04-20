@@ -692,18 +692,10 @@ export async function POST(req: Request) {
               // Über-Sampling, damit wir nach Dedup noch genug übrig haben.
               // 8 Signale pro Trend, Cap insgesamt auf ~32, damit der Response
               // kompakt bleibt.
-              //
-              // Homonymy-Fix 2026-04-21: der dritte Parameter `query` liefert
-              // `getRelevantSignals` die User-Original-Frage als
-              // Coherence-Filter. Damit landen Signale, die nur auf den
-              // homonymen Trend-Namen matchen (UNHCR "Labor Mobility" bei
-              // einer "Mobility-as-a-Service"-Frage), NICHT mehr in
-              // `enriched`. Valide Mobility-Signale (die die User-Phrase
-              // tragen) bleiben durch Bigram-Overlap erhalten.
               const perTrend = Math.max(2, Math.floor(24 / matchedTrends.length));
               for (const t of matchedTrends) {
                 if (!t?.name) continue;
-                const hits = getRelevantSignals(t.name, perTrend, query);
+                const hits = getRelevantSignals(t.name, perTrend);
                 for (const s of hits) {
                   const k = signalKey(s);
                   if (!enriched.has(k)) enriched.set(k, s);
@@ -880,23 +872,6 @@ export async function POST(req: Request) {
             ? verifiedRefs.length / refsWithUrl.length
             : 0.5;
 
-          // v0.3 Confidence-Rebalance 2026-04-21: Trends als eigene
-          // Evidenz-Dimension. Nischige Themen ohne Live-Signal-Abdeckung
-          // (z.B. rurale Mobilität DACH) dürfen nicht mehr strukturell
-          // auf 5% Konfidenz abstürzen, wenn 10+ Trends sauber gematcht
-          // wurden. `trendCoverage` normalisiert gegen 8 erwartete Trends;
-          // `trendStrength` ist der Durchschnitt queryRelevance × confidence
-          // (Fallback: relevance × confidence).
-          const trendCoverage = Math.min(1, matchedTrends.length / 8);
-          const trendStrength = matchedTrends.length > 0
-            ? matchedTrends.reduce((acc: number, t: any) => {
-                const qr = typeof t.queryRelevance === "number" ? t.queryRelevance : null;
-                const fallback = (typeof t.relevance === "number" ? t.relevance : 0.5)
-                               * (typeof t.confidence === "number" ? t.confidence : 0.5);
-                return acc + (qr ?? fallback);
-              }, 0) / matchedTrends.length
-            : 0;
-
           const calibrated = computeCalibratedConfidence({
             signalCoverage,
             signalRecency,
@@ -904,8 +879,6 @@ export async function POST(req: Request) {
             sourceVerification,
             causalCoverage,
             refVerification,
-            trendCoverage,
-            trendStrength,
           });
 
           // Overwrite the LLM's self-assessed confidence with the
@@ -944,14 +917,6 @@ export async function POST(req: Request) {
             refVerification: {
               de: "Referenzen stammen mehrheitlich von nicht-verifizierten Domains",
               en: "References are mostly from unverified domains",
-            },
-            trendCoverage: {
-              de: "Weniger als 8 Trends sauber zugeordnet — Frage fällt am Rand des Weltmodells",
-              en: "Fewer than 8 trends matched cleanly — the question sits at the edge of the world model",
-            },
-            trendStrength: {
-              de: "Gematchte Trends nur lose mit der Frage verknüpft",
-              en: "Matched trends only loosely tied to the question",
             },
           };
           const backendCoverageGaps = calibrated.limitingFactors
@@ -1055,7 +1020,7 @@ export async function POST(req: Request) {
               score: calibrated.score,
               band: calibrated.band,
               limitingFactors: calibrated.limitingFactors,
-              inputs: { signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage, refVerification, trendCoverage, trendStrength },
+              inputs: { signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage },
             },
             _scenarioDivergence: scenarioDivergence,
             _mode: queryMode,

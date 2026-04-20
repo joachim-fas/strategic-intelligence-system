@@ -312,6 +312,12 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
 {
   "synthesis": "6-10 substantive sentences, structured into 2-3 paragraphs separated by \\n\\n. OPTIONAL: each paragraph may begin with a short Markdown heading ('## Title\\n<paragraph text>', max 4 words). If no heading is set, the frontend renders default labels (Core finding / Driving dynamics / Implications). Paragraph 1: core finding and current state. Paragraph 2: driving forces and dynamics. Paragraph 3: implications and uncertainties. Use concrete examples, numbers, actors, timeframes. Tag every claim with [SIGNAL/TREND/REG/EDGE/LLM-KNOWLEDGE]. Forbidden: filler like 'X is a megatrend with Y% relevance'.",
 
+  "keyInsights": [
+    "Concrete, non-trivial insight with rationale and consequence. Each insight tagged with [SIGNAL/TREND/EDGE/LLM-KNOWLEDGE].",
+    "Second insight — a different angle, concrete, tagged.",
+    "Third insight — action-relevant, tagged."
+  ],
+
   "matchedTrendIds": ["${exampleIds[0]}", "${exampleIds[1]}", "${exampleIds[2]}"],
 
   "matchedTrendRelevance": {
@@ -351,12 +357,6 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
     }
   ],
 
-  "keyInsights": [
-    "Concrete, non-trivial insight derived FROM the trends and causal chain above. Each insight tagged with [SIGNAL/TREND/EDGE/LLM-KNOWLEDGE].",
-    "Second insight — a different angle, concrete, tagged.",
-    "Third insight — action-relevant, tagged."
-  ],
-
   "scenarios": {
     "optimistic": {
       "title": "Short thematic name (≤ 5 words)",
@@ -369,8 +369,6 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
     "likely": { "title": "…", "description": "…", "probability": "<INTEGER — derive>", "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] },
     "pessimistic": { "title": "…", "description": "…", "probability": "<INTEGER — derive>", "horizon": "…", "keyAssumptions": ["…"], "earlyIndicators": ["…"] }
   },
-
-  "decisionFramework": "Concrete 3-5 point decision framework derived from the scenarios: what to do, when, why.",
 
   "confidence": 0.0,
 
@@ -408,26 +406,14 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
 
   "newsContext": "Concrete recent events or developments that illuminate the question (if any — else empty string).",
 
+  "decisionFramework": "Concrete 3-5 point decision framework: what to do, when, why.",
+
   "reasoningChains": [
     "Causal chain: starting factor → intermediate step → strategic implication"
   ],
 
   "balancedScorecard": null
 }
-
-## Output Order (CRITICAL — the UI renders a pipeline progress indicator tied to key order)
-
-Emit the keys in EXACTLY the order shown above. The streaming pipeline indicator watches for specific JSON keys to mark each stage as done:
-
-  synthesis → (stream-level delta, not a stage)
-  matchedTrendIds / matchedTrends  → stage "Trends"
-  causalChain / causalAnalysis     → stage "Causalities"
-  regulatoryContext, anomalySignals → auxiliary context
-  keyInsights                       → stage "Insights" (MUST come after trends + causalities)
-  scenarios                         → stage "Scenarios"
-  decisionFramework                 → stage "Recommendations" (MUST come after scenarios)
-
-Emitting keyInsights BEFORE matchedTrendIds or causalChain is a hard quality failure: insights that precede the trend/causal analysis they are supposed to synthesize are intellectually invalid. The UI will surface this as a stage-order violation.
 
 ## Scenario Probability Rules
 

@@ -121,26 +121,11 @@ export interface PipelineStageEvent {
   count?: number;
 }
 
-/**
- * Fachliche Reihenfolge der Pipeline-Stages. Erkenntnisse dürfen NIE vor
- * Trends+Kausalitäten "done" werden, Empfehlungen NIE vor Szenarien.
- * Der Stage-Emitter (`transition`) nutzt diese Indizes, um nur
- * vorwärts-Transitions zuzulassen.
- */
-const STAGE_ORDER: PipelineStage[] = [
-  "frage", "signale", "trends", "kausal", "erkenntnisse", "szenarien", "empfehlungen",
-];
-const STAGE_INDEX: Record<PipelineStage, number> = STAGE_ORDER.reduce(
-  (acc, s, i) => { acc[s] = i; return acc; },
-  {} as Record<PipelineStage, number>,
-);
-
 const STAGE_MARKERS: Array<{ stage: PipelineStage; marker: string }> = [
-  // Reihenfolge entspricht der fachlichen Pipeline — NICHT der Reihenfolge,
-  // in der das LLM die Keys ausgeben könnte. Der Prompt-Schema-Reorder in
-  // `llm.ts` stellt sicher, dass die Keys in dieser Sequenz gestreamt
-  // werden. Die `transition()`-Funktion unten blockiert zusätzlich jede
-  // Rückwärts-Transition, falls das LLM trotzdem die Reihenfolge bricht.
+  // synthesis is the first LLM-generated field; seeing it means we've left
+  // "signale" and moved into "trends" orbit — but we use matchedTrendIds as
+  // the first hard trend marker because synthesis streams character-by-char
+  // and isn't a clean transition point.
   { stage: "trends", marker: '"matchedTrendIds"' },
   { stage: "kausal", marker: '"causalAnalysis"' },
   { stage: "erkenntnisse", marker: '"keyInsights"' },
@@ -150,9 +135,7 @@ const STAGE_MARKERS: Array<{ stage: PipelineStage; marker: string }> = [
 
 /**
  * Detect which stage markers have newly appeared in the accumulated buffer.
- * Returns stages in STAGE_ORDER order (not insertion order) so the caller
- * always processes them forward — prevents "Insights done" before "Trends
- * done" even if the LLM streams keyInsights first.
+ * Returns stages in discovery order so callers can fire events in sequence.
  */
 function detectNewStages(text: string, fired: Set<PipelineStage>): PipelineStage[] {
   const fresh: PipelineStage[] = [];
@@ -162,10 +145,6 @@ function detectNewStages(text: string, fired: Set<PipelineStage>): PipelineStage
       fresh.push(stage);
     }
   }
-  // Nach Marker-Scanning in fachliche Reihenfolge sortieren. Wenn das LLM
-  // `keyInsights` vor `matchedTrendIds` emittiert, feuern wir trotzdem
-  // erst "trends" und dann "erkenntnisse" — niemals umgekehrt.
-  fresh.sort((a, b) => STAGE_INDEX[a] - STAGE_INDEX[b]);
   return fresh;
 }
 
@@ -234,13 +213,6 @@ export async function queryIntelligenceAsync(
 
   const transition = (next: PipelineStage) => {
     if (!onStage) return;
-    // Guard: Rückwärts-Transitions blockieren. Wenn `next` vor der aktuell
-    // aktiven Stage liegt (z.B. LLM-Stream emittiert keyInsights vor
-    // matchedTrendIds trotz Prompt-Reorder), ignorieren wir das Event —
-    // sonst würde "Erkenntnisse ✓" vor "Trends ✓" blinken (fachlich falsch).
-    if (activeStage && STAGE_INDEX[next] <= STAGE_INDEX[activeStage]) {
-      return;
-    }
     if (activeStage && activeStage !== next) {
       onStage({ stage: activeStage, status: "done" });
     }
