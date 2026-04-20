@@ -255,10 +255,21 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         matchedEdges: edges,
       };
       if (activeTenantId) {
+        // Fix 2026-04-21: `projectId` mit in die Transfer-Payload. Home hat
+        // via syncToCanvasDb bereits ein Projekt angelegt (oder das Briefing
+        // gehört zu einem bestehenden Projekt), der Canvas-Handoff soll
+        // diesen Kontext erben statt eine zweite "Kein Projekt"-Session
+        // aufzumachen. Ohne diesen Pfad zeigt der Canvas-Header "Kein
+        // Projekt" und der User muss das Canvas manuell einem Projekt
+        // zuordnen — obwohl das Projekt bereits existiert.
         tenantStorage.set(
           activeTenantId,
           TENANT_STORAGE_KEYS.transferToCanvas,
-          JSON.stringify({ query: entry.query, result }),
+          JSON.stringify({
+            query: entry.query,
+            result,
+            projectId: activeProjectId ?? null,
+          }),
         );
       }
       window.location.href = "/canvas";

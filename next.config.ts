@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
   // better-sqlite3 contains native C++ bindings that cannot be bundled.
   serverExternalPackages: ["better-sqlite3"],
 
+  // Fix 2026-04-21: Der Next.js Dev-Indicator (kleine schwarze "N"-Bubble)
+  // sitzt per Default unten-links und überdeckt im Canvas die Status-
+  // Legende ("Status · Fertig · Läuft · Fehler · Offen"). Verschieben
+  // nach bottom-right, wo der Canvas-Zoom-Control sitzt aber mehr Luft
+  // vorhanden ist. Greift nur im Dev-Modus — Production zeigt den
+  // Indicator gar nicht, also keine Prod-Auswirkung.
+  devIndicators: {
+    position: "bottom-right",
+  },
+
   // SEC-15: Security headers for all responses
   async headers() {
     return [

@@ -713,7 +713,7 @@ export default function CanvasPage() {
     })();
     if (transferRaw) {
       try {
-        const { query, result } = JSON.parse(transferRaw);
+        const { query, result, projectId: transferProjectId } = JSON.parse(transferRaw);
         if (query && result) {
           const id = `transfer-${Date.now()}`;
           const qNode: QueryNode = {
@@ -727,6 +727,32 @@ export default function CanvasPage() {
           setNodes([qNode, ...derived]);
           setConnections(conns);
           setZoom(0.7);
+
+          // Fix 2026-04-21: Transfer-Payload darf eine projectId mitbringen
+          // (Home hat via syncToCanvasDb bereits das Projekt angelegt). Wenn
+          // gesetzt, verknüpfen wir das Canvas sofort mit diesem Projekt —
+          // State + tenantStorage.activeCanvas + Load des Projektnamens —
+          // damit der Canvas-Header nicht mehr "Kein Projekt" zeigt.
+          // Die bereits berechneten Nodes bleiben aktiv; der bestehende
+          // Auto-Save-Mechanismus persistiert sie anschließend ins Projekt.
+          if (transferProjectId && typeof transferProjectId === "string") {
+            setProjectId(transferProjectId);
+            tenantStorage.set(activeTenantId, TENANT_STORAGE_KEYS.activeCanvas, transferProjectId);
+            // Projektnamen nachladen, damit der Header den richtigen Titel zeigt
+            // (ohne die Nodes zu überschreiben — loadProject würde das tun).
+            void (async () => {
+              try {
+                const res = await fetchWithTimeout(`/api/v1/canvas/${transferProjectId}`, {}, 10_000);
+                if (res.ok) {
+                  const json = await res.json();
+                  const name = (json?.data?.canvas ?? json?.canvas)?.name;
+                  if (typeof name === "string" && name.length > 0) setProjectName(name);
+                }
+              } catch {
+                // nicht kritisch — Header zeigt dann "Unbenanntes Projekt"
+              }
+            })();
+          }
           return; // skip all other init paths
         }
       } catch { /* ignore malformed transfer data */ }
