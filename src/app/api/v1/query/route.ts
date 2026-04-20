@@ -692,10 +692,18 @@ export async function POST(req: Request) {
               // Über-Sampling, damit wir nach Dedup noch genug übrig haben.
               // 8 Signale pro Trend, Cap insgesamt auf ~32, damit der Response
               // kompakt bleibt.
+              //
+              // Homonymy-Fix 2026-04-21: der dritte Parameter `query` liefert
+              // `getRelevantSignals` die User-Original-Frage als
+              // Coherence-Filter. Damit landen Signale, die nur auf den
+              // homonymen Trend-Namen matchen (UNHCR "Labor Mobility" bei
+              // einer "Mobility-as-a-Service"-Frage), NICHT mehr in
+              // `enriched`. Valide Mobility-Signale (die die User-Phrase
+              // tragen) bleiben durch Bigram-Overlap erhalten.
               const perTrend = Math.max(2, Math.floor(24 / matchedTrends.length));
               for (const t of matchedTrends) {
                 if (!t?.name) continue;
-                const hits = getRelevantSignals(t.name, perTrend);
+                const hits = getRelevantSignals(t.name, perTrend, query);
                 for (const s of hits) {
                   const k = signalKey(s);
                   if (!enriched.has(k)) enriched.set(k, s);
