@@ -880,6 +880,23 @@ export async function POST(req: Request) {
             ? verifiedRefs.length / refsWithUrl.length
             : 0.5;
 
+          // v0.3 Confidence-Rebalance 2026-04-21: Trends als eigene
+          // Evidenz-Dimension. Nischige Themen ohne Live-Signal-Abdeckung
+          // (z.B. rurale Mobilität DACH) dürfen nicht mehr strukturell
+          // auf 5% Konfidenz abstürzen, wenn 10+ Trends sauber gematcht
+          // wurden. `trendCoverage` normalisiert gegen 8 erwartete Trends;
+          // `trendStrength` ist der Durchschnitt queryRelevance × confidence
+          // (Fallback: relevance × confidence).
+          const trendCoverage = Math.min(1, matchedTrends.length / 8);
+          const trendStrength = matchedTrends.length > 0
+            ? matchedTrends.reduce((acc: number, t: any) => {
+                const qr = typeof t.queryRelevance === "number" ? t.queryRelevance : null;
+                const fallback = (typeof t.relevance === "number" ? t.relevance : 0.5)
+                               * (typeof t.confidence === "number" ? t.confidence : 0.5);
+                return acc + (qr ?? fallback);
+              }, 0) / matchedTrends.length
+            : 0;
+
           const calibrated = computeCalibratedConfidence({
             signalCoverage,
             signalRecency,
@@ -887,6 +904,8 @@ export async function POST(req: Request) {
             sourceVerification,
             causalCoverage,
             refVerification,
+            trendCoverage,
+            trendStrength,
           });
 
           // Overwrite the LLM's self-assessed confidence with the
@@ -925,6 +944,14 @@ export async function POST(req: Request) {
             refVerification: {
               de: "Referenzen stammen mehrheitlich von nicht-verifizierten Domains",
               en: "References are mostly from unverified domains",
+            },
+            trendCoverage: {
+              de: "Weniger als 8 Trends sauber zugeordnet — Frage fällt am Rand des Weltmodells",
+              en: "Fewer than 8 trends matched cleanly — the question sits at the edge of the world model",
+            },
+            trendStrength: {
+              de: "Gematchte Trends nur lose mit der Frage verknüpft",
+              en: "Matched trends only loosely tied to the question",
             },
           };
           const backendCoverageGaps = calibrated.limitingFactors
@@ -1028,7 +1055,7 @@ export async function POST(req: Request) {
               score: calibrated.score,
               band: calibrated.band,
               limitingFactors: calibrated.limitingFactors,
-              inputs: { signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage },
+              inputs: { signalCoverage, signalRecency, signalStrength, sourceVerification, causalCoverage, refVerification, trendCoverage, trendStrength },
             },
             _scenarioDivergence: scenarioDivergence,
             _mode: queryMode,
