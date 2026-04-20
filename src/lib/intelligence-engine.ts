@@ -236,16 +236,36 @@ export async function queryIntelligenceAsync(
 
   const transition = (next: PipelineStage) => {
     if (!onStage) return;
-    // Guard: Rückwärts- oder Selbst-Transitions blockieren. Wenn Claude
-    // `keyInsights` VOR `matchedTrendIds` streamt (also `erkenntnisse`
-    // aktivieren will obwohl `trends` noch nicht aktiv war), ignorieren
-    // wir das Event. Der detectNewStages-Sortierer stellt zwar schon
-    // die "frische" Reihenfolge sicher; dieser Guard fängt zusätzlich
-    // den Fall ab, dass mehrere Marker in aufeinanderfolgenden Buffer-
-    // Chunks auftauchen und der Caller transition() einzeln triggered.
-    if (activeStage && STAGE_INDEX[next] <= STAGE_INDEX[activeStage]) {
-      return;
+    const nextIdx = STAGE_INDEX[next];
+    const activeIdx = activeStage ? STAGE_INDEX[activeStage] : -1;
+
+    // (1) Rückwärts- oder Selbst-Transitions blockieren.
+    if (nextIdx <= activeIdx) return;
+
+    // (2) Vorwärts-Sprung über Zwischen-Stages — das war der eigentliche
+    // Bug: Claude streamt oft `"keyInsights"` bevor `"matchedTrendIds"`
+    // im Buffer auftaucht (JSON-Key-Reihenfolge vom LLM != fachliche
+    // Reihenfolge). Die vorherige Guard-Variante blockierte nur
+    // Rückwärts, ließ aber Vorwärts-Sprünge wie signale → erkenntnisse
+    // durch. Ergebnis: trends/kausal blieben "pending", erkenntnisse
+    // wurde später "done" (wenn szenarien aktivierte) — der User sah
+    // "Erkenntnisse ✓ bevor Trends ✓" als Glitch.
+    //
+    // Fix: jeden übersprungenen Zwischen-Schritt (activeIdx+1 .. nextIdx-1)
+    // nachträglich als active+done durchlaufen. Der UI-State ist danach
+    // fachlich konsistent: signale ✓ → trends ✓ → kausal ✓ → erkenntnisse ⟳.
+    // Die Content-Zähler der Zwischenstages sind zu diesem Zeitpunkt
+    // undefined; der Final-Burst am Stream-Ende überschreibt sie mit
+    // den echten Counts (falls vorhanden).
+    if (activeStage && nextIdx > activeIdx + 1) {
+      for (let i = activeIdx + 1; i < nextIdx; i++) {
+        const intermediate = STAGE_ORDER[i];
+        onStage({ stage: intermediate, status: "active" });
+        onStage({ stage: intermediate, status: "done" });
+        firedStages.add(intermediate);
+      }
     }
+
     if (activeStage && activeStage !== next) {
       onStage({ stage: activeStage, status: "done" });
     }
