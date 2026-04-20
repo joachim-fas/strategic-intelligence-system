@@ -290,15 +290,60 @@ export async function queryIntelligenceAsync(
     if (!llmResult) return null;
 
     // Map LLM response to IntelligenceBriefing
+    // Bugfix 2026-04-20 Nacht-Session: Die alte Implementierung baute
+    // matchedTrends aus `matchedTrendIds.map(trendMap.get)` — das verwirft
+    // stillschweigend alle Server-seitigen Trends, die die Client-Map
+    // (megaTrends-Fallback oder unvollständiger /api/v1/trends-Load) nicht
+    // kennt. Im realen Testfall: API liefert 8 UUIDs, Client kennt nur 1 →
+    // Canvas zeigt 1 Trend statt 8 → < 3 Trends → Dimensions-Card
+    // wird nicht angelegt → 0 derived Nodes.
+    //
+    // Fix: Die Server-Response trägt `result.matchedTrends` bereits als
+    // fertige MatchedTrend-Liste (mit id, name, category, tags,
+    // relevance, queryRelevance — alles was Client-UI braucht). Nutze
+    // die direkt und wrap sie nur in den TrendMatch-Envelope, den
+    // HomeClient-Components erwarten. Fallback auf die alte Logik, falls
+    // matchedTrends nicht im Server-Response (Abwärtskompat).
     const trendMap = new Map(allTrends.map((t) => [t.id, t]));
-    const matchedTrends: TrendMatch[] = (llmResult.matchedTrendIds || [])
-      .map((id: string) => trendMap.get(id))
-      .filter(Boolean)
-      .map((trend: TrendDot) => ({
-        trend,
-        relevanceToQuery: trend.relevance,
+    let matchedTrends: TrendMatch[];
+    const serverMatched = Array.isArray((llmResult as any).matchedTrends)
+      ? ((llmResult as any).matchedTrends as unknown[])
+      : [];
+    const serverLooksLikeFlat = serverMatched.length > 0 && serverMatched.every((m: any) => m && typeof m === "object" && typeof m.id === "string" && typeof m.name === "string");
+    if (serverLooksLikeFlat) {
+      matchedTrends = (serverMatched as any[]).map((t) => ({
+        trend: {
+          id: t.id,
+          name: t.name,
+          description: t.description ?? "",
+          category: t.category ?? "other",
+          tags: Array.isArray(t.tags) ? t.tags : [],
+          relevance: typeof t.relevance === "number" ? t.relevance : 0.5,
+          confidence: typeof t.confidence === "number" ? t.confidence : 0.5,
+          impact: typeof t.impact === "number" ? t.impact : 0.5,
+          timeHorizon: t.timeHorizon ?? "mid",
+          ring: t.ring ?? "assess",
+          quadrant: t.quadrant ?? 0,
+          signalCount: typeof t.signalCount === "number" ? t.signalCount : 0,
+          topSources: Array.isArray(t.topSources) ? t.topSources : [],
+          velocity: t.velocity ?? "stable",
+          userOverride: false,
+        } as TrendDot,
+        relevanceToQuery: typeof t.queryRelevance === "number" ? t.queryRelevance : (typeof t.relevance === "number" ? t.relevance : 0.5),
         matchReason: "LLM analysis",
       }));
+    } else {
+      // Legacy-Pfad: aus IDs rekonstruieren. Hier darf der Client-Datenverlust
+      // durch das .filter(Boolean) passieren, weil wir nichts besseres haben.
+      matchedTrends = (llmResult.matchedTrendIds || [])
+        .map((id: string) => trendMap.get(id))
+        .filter(Boolean)
+        .map((trend: TrendDot) => ({
+          trend,
+          relevanceToQuery: trend.relevance,
+          matchReason: "LLM analysis",
+        }));
+    }
 
     const totalSignals = matchedTrends.reduce((sum: number, m: TrendMatch) => sum + m.trend.signalCount, 0);
 

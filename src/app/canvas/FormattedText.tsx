@@ -54,9 +54,34 @@ export function FormattedText({
   const processedText = ensureParagraphs(text);
 
   // Parse inline provenance tags and bold markers into React elements.
+  // v0.2 tag-Taxonomie (siehe src/components/briefing/InlineProvenance.tsx):
+  //   [SIGNAL: …]                 → blau (external evidence)
+  //   [TREND: …]                  → grün (curated trend)
+  //   [REG: …]                    → navy (regulation)
+  //   [EDGE: A → B]               → violett (causal edge)
+  //   [LLM-KNOWLEDGE|LLM-Einschätzung|LLM-Einschaetzung|LLM-Assessment|LLM] → orange
+  //   [Quelle, Datum]             → grau (generische Zitation)
+  //   **bold**                    → fett
+  // Fix 2026-04-20: vorher kannte der Parser nur `[LLM-Einschätzung]` (alte DE
+  // Variante); die v0.2-Prompts schreiben aber `[LLM-KNOWLEDGE]` → Tag landete
+  // als roher Text auf der Card. Jetzt via gemeinsamem Head-Match wie in
+  // InlineProvenance.
+  const pillStyle = (bg: string, fg: string, border: string): React.CSSProperties => ({
+    fontSize: compact ? 7 : 9,
+    fontWeight: 600,
+    padding: "0px 4px",
+    borderRadius: 4,
+    background: bg,
+    color: fg,
+    border: `1px solid ${border}`,
+    fontFamily: "var(--font-code, monospace)",
+    whiteSpace: "nowrap",
+  });
+
   const renderInline = (line: string, keyPrefix: string) => {
     const parts: React.ReactNode[] = [];
-    const regex = /(\[SIGNAL:\s*[^\]]+\]|\[TREND:\s*[^\]]+\]|\[LLM-Einschätzung\]|\[[A-Za-zÄÖÜäöüß][^\]]{1,40},\s*\d{2,4}[^\]]*\]|\*\*[^*]+\*\*)/g;
+    // Greedy: any [..] bracket first (we dispatch by head inside), then **bold**.
+    const regex = /(\[[^\]]+\]|\*\*[^*]+\*\*)/g;
     let lastIdx = 0;
     let match: RegExpExecArray | null;
     let i = 0;
@@ -65,88 +90,81 @@ export function FormattedText({
         parts.push(line.slice(lastIdx, match.index));
       }
       const m = match[0];
-      if (m.startsWith("[SIGNAL:")) {
-        parts.push(
-          <span
-            key={`${keyPrefix}-${i}`}
-            style={{
-              fontSize: compact ? 7 : 9,
-              fontWeight: 600,
-              padding: "0px 4px",
-              borderRadius: 4,
-              background: "#2563EB10",
-              color: "#2563EB",
-              border: "1px solid #2563EB20",
-              fontFamily: "var(--font-code, monospace)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {m.slice(1, -1)}
-          </span>,
-        );
-      } else if (m.startsWith("[TREND:")) {
-        parts.push(
-          <span
-            key={`${keyPrefix}-${i}`}
-            style={{
-              fontSize: compact ? 7 : 9,
-              fontWeight: 600,
-              padding: "0px 4px",
-              borderRadius: 4,
-              background: "#1A9E5A10",
-              color: "#1A9E5A",
-              border: "1px solid #1A9E5A20",
-              fontFamily: "var(--font-code, monospace)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {m.slice(1, -1)}
-          </span>,
-        );
-      } else if (m === "[LLM-Einschätzung]") {
-        parts.push(
-          <span
-            key={`${keyPrefix}-${i}`}
-            style={{
-              fontSize: compact ? 7 : 9,
-              fontWeight: 600,
-              padding: "0px 4px",
-              borderRadius: 4,
-              background: "#F5A62310",
-              color: "#F5A623",
-              border: "1px solid #F5A62320",
-              fontFamily: "var(--font-code, monospace)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            LLM
-          </span>,
-        );
-      } else if (m.startsWith("[") && m.endsWith("]")) {
-        // Citation: [Source, Date]
-        parts.push(
-          <span
-            key={`${keyPrefix}-${i}`}
-            style={{
-              fontSize: compact ? 7 : 9,
-              fontWeight: 500,
-              padding: "0px 3px",
-              borderRadius: 3,
-              background: "var(--color-page-bg)",
-              color: "var(--color-text-muted)",
-              border: "1px solid var(--color-border)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {m.slice(1, -1)}
-          </span>,
-        );
-      } else if (m.startsWith("**") && m.endsWith("**")) {
+
+      if (m.startsWith("**") && m.endsWith("**")) {
         parts.push(
           <strong key={`${keyPrefix}-${i}`} style={{ fontWeight: 700, color: "var(--color-text-heading)" }}>
             {m.slice(2, -2)}
           </strong>,
         );
+      } else if (m.startsWith("[") && m.endsWith("]")) {
+        const inner = m.slice(1, -1).trim();
+        const lower = inner.toLowerCase();
+        const colonIdx = inner.indexOf(":");
+        const head = (colonIdx >= 0 ? inner.slice(0, colonIdx) : inner).trim().toLowerCase();
+        const rest = colonIdx >= 0 ? inner.slice(colonIdx + 1).trim() : "";
+
+        if (head === "signal") {
+          parts.push(
+            <span key={`${keyPrefix}-${i}`} style={pillStyle("#2563EB10", "#2563EB", "#2563EB20")}>
+              SIGNAL{rest ? `: ${rest}` : ""}
+            </span>,
+          );
+        } else if (head === "trend") {
+          parts.push(
+            <span key={`${keyPrefix}-${i}`} style={pillStyle("#1A9E5A10", "#1A9E5A", "#1A9E5A20")}>
+              TREND{rest ? `: ${rest}` : ""}
+            </span>,
+          );
+        } else if (head === "reg" || head === "regulation") {
+          parts.push(
+            <span key={`${keyPrefix}-${i}`} style={pillStyle("rgba(26,74,138,0.08)", "#1A4A8A", "rgba(26,74,138,0.30)")}>
+              REG{rest ? `: ${rest}` : ""}
+            </span>,
+          );
+        } else if (head === "edge") {
+          // Normalize "->" / "–>" to the unicode arrow for display parity with InlineProvenance.
+          const arrow = rest.replace(/\s*->\s*/g, " → ").replace(/\s*–>\s*/g, " → ");
+          parts.push(
+            <span key={`${keyPrefix}-${i}`} style={pillStyle("rgba(107,63,160,0.10)", "#6B3FA0", "rgba(107,63,160,0.32)")}>
+              EDGE{arrow ? `: ${arrow}` : ""}
+            </span>,
+          );
+        } else if (
+          lower === "llm-knowledge" ||
+          lower === "llm-einschätzung" ||
+          lower === "llm-einschaetzung" ||
+          lower === "llm-assessment" ||
+          lower === "llm"
+        ) {
+          parts.push(
+            <span key={`${keyPrefix}-${i}`} style={pillStyle("#F5A62310", "#F5A623", "#F5A62320")}>
+              LLM
+            </span>,
+          );
+        } else if (/^[A-Za-zÄÖÜäöüß][^\]]{1,40},\s*\d{2,4}/.test(inner)) {
+          // Citation fallback: [Source, Date]
+          parts.push(
+            <span
+              key={`${keyPrefix}-${i}`}
+              style={{
+                fontSize: compact ? 7 : 9,
+                fontWeight: 500,
+                padding: "0px 3px",
+                borderRadius: 3,
+                background: "var(--color-page-bg)",
+                color: "var(--color-text-muted)",
+                border: "1px solid var(--color-border)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {inner}
+            </span>,
+          );
+        } else {
+          // Unknown bracket content — keep verbatim (incl. brackets) so no info is lost.
+          parts.push(m);
+        }
       }
       lastIdx = match.index + m.length;
       i++;
