@@ -121,7 +121,17 @@ export function NodePicker({ onSelect, onClose, hasContext }: {
   );
 
   return (
-    <div onPointerDown={e => e.stopPropagation()}
+    // Scroll-Isolations-Fix 2026-04-21 (User-Feedback): der darunter
+    // liegende Canvas verarbeitet Wheel-Events als Zoom. Ohne diesen
+    // `onWheel`-Stop bubbelt jedes Mausrad-Scroll im NodePicker zum
+    // Canvas durch und ändert dessen Zoom-Stufe (im Test von 75% auf
+    // 222% oder 20% nach wenigen Scroll-Ticks). `stopPropagation`
+    // reicht — das Default-Browser-Scroll-Verhalten der innere Items-
+    // Liste (maxHeight: 380, overflowY: auto) bleibt unberührt. Same
+    // für `onPointerDown` oben, der Click-Isolation garantiert.
+    <div
+      onPointerDown={e => e.stopPropagation()}
+      onWheel={e => e.stopPropagation()}
       style={{ width: 340, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(20px) saturate(180%)", WebkitBackdropFilter: "blur(20px) saturate(180%)", border: "1px solid rgba(0,0,0,0.1)", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)", overflow: "hidden" }}
     >
       {/* Header */}

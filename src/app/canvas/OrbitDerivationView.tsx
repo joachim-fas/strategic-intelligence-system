@@ -1377,8 +1377,15 @@ function ContextPanel({
         background: "var(--color-surface)",
         border: `1.5px solid ${isFocused ? "#0A0A0A" : "var(--color-border, #E8E8E8)"}`,
         borderRadius: 12, overflow: "hidden",
+        // Fix 2026-04-21 (User-Feedback "gelber glow"): der pastel-lime Ring
+        // (0 0 0 3px rgba(228,255,151,0.55)) mischte sich mit dem inset
+        // Stage-Farbstreifen und wirkte auf goldenen/amber Stage-Karten
+        // als gelb-orange Aureole rund um das Panel. Jetzt: kein äußerer
+        // Ring mehr, Fokus wird nur durch den dunklen 1.5px-Border +
+        // den farbigen inset-Streifen + einen dezenten Lift-Schatten
+        // signalisiert.
         boxShadow: isFocused
-          ? `inset 3px 0 0 ${stageColor}, 0 0 0 3px rgba(228,255,151,0.55), 0 4px 18px rgba(0,0,0,0.08)`
+          ? `inset 3px 0 0 ${stageColor}, 0 4px 18px rgba(0,0,0,0.08)`
           : `inset 3px 0 0 ${stageColor}, 0 1px 3px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.05)`,
       }}>
         {/* Header — stage badge pill + optional FOKUS + close */}

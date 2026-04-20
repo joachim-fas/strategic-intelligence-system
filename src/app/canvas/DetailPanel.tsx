@@ -1819,19 +1819,23 @@ export function DetailPanel({
       aria-modal="true"
       aria-label={tl("detail.panelAria")}
       style={{
+        // Right-Side-Drawer 2026-04-21 (User-Feedback: "diese Ansicht
+        // macht doch keinen Sinn, wir bleiben bei der reinen Karten-
+        // Darstellung rechts"). Vorher lag der DetailPanel als zentrales
+        // Modal (left: 50%, transform: translateX(-50%), max 1200px
+        // Breite) über dem Canvas und verdeckte die Karten. Jetzt sitzt
+        // er als Side-Drawer rechts — wie der Orbit-Detail-Panel —
+        // sodass der Canvas sichtbar bleibt und der User Context
+        // behält. Breite bewusst kleiner (max 480 px) damit der
+        // Canvas-Arbeitsbereich nicht verkrampft wirkt. Der Backdrop
+        // (rgba(0,0,0,0.22)-Overlay oben in page.tsx) bleibt als
+        // Click-Catcher zum Schließen, wurde dort aber auf transparent
+        // gesetzt, damit der Canvas nicht mehr verdunkelt wird.
         position: "fixed",
-        left: "50%", top: 72,
-        transform: "translateX(-50%)",
-        // Was 880 px. The user asked for noticeably wider panels
-        // (especially visible in Orbit view where the right-hand
-        // ContextPanel eats viewport width and the centered
-        // DetailPanel was getting squeezed to ~440 px). 1200 px gives
-        // the briefing content (synthesis paragraphs, scenarios,
-        // insights) room to breathe on typical laptop + desktop
-        // viewports; the calc(100vw - 48px) clamp keeps the panel
-        // inside the viewport on smaller screens.
-        width: "min(1200px, calc(100vw - 48px))",
-        maxHeight: "calc(100vh - 96px)",
+        right: 16,
+        top: 72,
+        bottom: 16,
+        width: "min(480px, calc(100vw - 32px))",
         background: "rgba(255,255,255,0.98)",
         backdropFilter: "blur(24px) saturate(180%)",
         WebkitBackdropFilter: "blur(24px) saturate(180%)",

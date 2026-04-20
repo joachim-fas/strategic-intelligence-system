@@ -4338,10 +4338,15 @@ export default function CanvasPage() {
         if (!detailNode) return null;
         return (
           <>
-            {/* Backdrop */}
+            {/* Backdrop — transparent Click-Catcher. Vorher dunkler Overlay
+                (rgba(0,0,0,0.22) + blur), der den Canvas verdeckte. Der User
+                hat entschieden: der Canvas soll sichtbar bleiben, wenn das
+                Detail-Panel als Side-Drawer rechts erscheint. Der Click-
+                Catcher bleibt funktional erhalten (Klick irgendwo außerhalb
+                schließt das Panel), ist aber nun visuell neutral. */}
             <div
               onClick={() => setDetailNodeId(null)}
-              style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.22)", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" }}
+              style={{ position: "fixed", inset: 0, zIndex: 900, background: "transparent" }}
             />
             <DetailPanel
               key={detailNodeId}
