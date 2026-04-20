@@ -121,6 +121,21 @@ export interface PipelineStageEvent {
   count?: number;
 }
 
+/**
+ * Fachliche Reihenfolge der Pipeline-Stages. Der Stage-Emitter (`transition`)
+ * nutzt diese Indizes, um sicherzustellen dass die UI-Anzeige der Stages
+ * NIE rückwärts läuft — egal in welcher Reihenfolge Claude die JSON-Keys
+ * streamt. Kein Prompt-Eingriff: was Claude ausgibt bleibt unverändert,
+ * nur der Pipeline-Indicator wird in fachliche Reihenfolge normalisiert.
+ */
+const STAGE_ORDER: PipelineStage[] = [
+  "frage", "signale", "trends", "kausal", "erkenntnisse", "szenarien", "empfehlungen",
+];
+const STAGE_INDEX: Record<PipelineStage, number> = STAGE_ORDER.reduce(
+  (acc, s, i) => { acc[s] = i; return acc; },
+  {} as Record<PipelineStage, number>,
+);
+
 const STAGE_MARKERS: Array<{ stage: PipelineStage; marker: string }> = [
   // synthesis is the first LLM-generated field; seeing it means we've left
   // "signale" and moved into "trends" orbit — but we use matchedTrendIds as
@@ -135,7 +150,10 @@ const STAGE_MARKERS: Array<{ stage: PipelineStage; marker: string }> = [
 
 /**
  * Detect which stage markers have newly appeared in the accumulated buffer.
- * Returns stages in discovery order so callers can fire events in sequence.
+ * Returns stages in STAGE_ORDER order (fachlich), NOT in buffer-scan order —
+ * so the caller always processes them forward. Wenn Claude `keyInsights`
+ * vor `matchedTrendIds` emittiert, feuert der Emitter trotzdem erst
+ * "trends" und dann "erkenntnisse", niemals umgekehrt.
  */
 function detectNewStages(text: string, fired: Set<PipelineStage>): PipelineStage[] {
   const fresh: PipelineStage[] = [];
@@ -145,6 +163,11 @@ function detectNewStages(text: string, fired: Set<PipelineStage>): PipelineStage
       fresh.push(stage);
     }
   }
+  // In fachliche Reihenfolge sortieren, nicht in der Reihenfolge, in der
+  // die Marker im Stream-Buffer aufgetaucht sind. Garantiert dass
+  // "trends" < "kausal" < "erkenntnisse" < "szenarien" < "empfehlungen"
+  // immer ascending abgearbeitet wird.
+  fresh.sort((a, b) => STAGE_INDEX[a] - STAGE_INDEX[b]);
   return fresh;
 }
 
@@ -213,6 +236,16 @@ export async function queryIntelligenceAsync(
 
   const transition = (next: PipelineStage) => {
     if (!onStage) return;
+    // Guard: Rückwärts- oder Selbst-Transitions blockieren. Wenn Claude
+    // `keyInsights` VOR `matchedTrendIds` streamt (also `erkenntnisse`
+    // aktivieren will obwohl `trends` noch nicht aktiv war), ignorieren
+    // wir das Event. Der detectNewStages-Sortierer stellt zwar schon
+    // die "frische" Reihenfolge sicher; dieser Guard fängt zusätzlich
+    // den Fall ab, dass mehrere Marker in aufeinanderfolgenden Buffer-
+    // Chunks auftauchen und der Caller transition() einzeln triggered.
+    if (activeStage && STAGE_INDEX[next] <= STAGE_INDEX[activeStage]) {
+      return;
+    }
     if (activeStage && activeStage !== next) {
       onStage({ stage: activeStage, status: "done" });
     }
