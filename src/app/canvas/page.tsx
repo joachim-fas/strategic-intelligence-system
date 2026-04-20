@@ -705,8 +705,27 @@ export default function CanvasPage() {
 
     loadProjects();
 
-    // Check if transferring an analysis from main page
-    const transferRaw = (() => {
+    // Resolve URL project param EARLY so we can gate the transfer path on it.
+    // Fix 2026-04-21: wenn die URL explizit ein Projekt nennt (`?project=<id>`),
+    // hat das ABSOLUTEN Vorrang vor einem rumliegenden Transfer-Payload. Vorher
+    // hat der Transfer-Path jede neu-eröffnete Projekt-Session mit frischen
+    // Transfer-Nodes überschrieben, der Auto-Save hat dann den Projekt-Canvas-
+    // State in der DB platt gemacht — Effekt: "alle alten Projekte sind leer".
+    // Jetzt: bei URL-Param wird der Transfer-Key sauber verworfen und das
+    // bestehende Projekt ganz normal aus der DB geladen.
+    const urlProjectIdEarly = (() => {
+      try { return new URLSearchParams(window.location.search).get("project"); }
+      catch { return null; }
+    })();
+    if (urlProjectIdEarly) {
+      // Discard any pending transfer payload so it doesn't get re-applied
+      // on the next /canvas visit.
+      tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
+    }
+
+    // Check if transferring an analysis from main page — only when the URL
+    // does NOT name a project explicitly.
+    const transferRaw = urlProjectIdEarly ? null : (() => {
       const v = tenantStorage.get(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
       tenantStorage.remove(activeTenantId, TENANT_STORAGE_KEYS.transferToCanvas);
       return v;

@@ -153,6 +153,32 @@ const GLOBAL_NOISE_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * Polymarket-spezifische Match-/Wett-Patterns. Fix 2026-04-21:
+ * Polymarket-Feed taggt Sportwetten (WM-Spiele, IPL, Esports-Matches,
+ * Spread-Wetten) fälschlich mit strategischen Topics wie "Mobility &
+ * Autonomous Transport" — der User sah in Demo-Queries "Will Switzerland
+ * win on 2026-06-18?" als Mobility-Signal. Keine klassischen Sport-
+ * Keywords in den Titeln, nur strukturelle Wett-Form. Diese Patterns
+ * matchen die Struktur. Wirken AUSSCHLIESSLICH bei source === "polymarket".
+ */
+const POLYMARKET_MATCH_NOISE: RegExp[] = [
+  // "Will X win|lose on <date>?"
+  /^\s*will\s+[^?]{2,60}\s+(win|lose)\b/i,
+  // vs-Match / draw / "match between"
+  /\b(end\s+in\s+a\s+draw|\bvs\b|match\s+between)/i,
+  // Spread-Wetten: "Spread: Team (-1.5)"
+  /^\s*spread\s*:/i,
+  // Cricket-Toss
+  /\bwho\s+wins\s+the\s+toss\b/i,
+  // Sport-Team-Präfixe (AFC/FC/AC/SV/...) gefolgt von Großbuchstaben-Team
+  /\b(afc|fc|ac|sv|bv|vfb|vfl|tsv|fsv|sc)\s+[A-ZÄÖÜ][a-zäöü]/,
+  // Roster-Moves (Esports + traditional sports)
+  /\broster\s+(change|move|update)\b/i,
+  // Liga- / Turnier-Phasen
+  /\b(premier\s+league|cup\s+final|grand\s+final|season\s+(opener|finale)|group\s+stage|knockout\s+round|quarter[-\s]?final|semi[-\s]?final)\b/i,
+];
+
+/**
  * Prüft ob der User absichtlich über Sport/Entertainment fragt. In dem
  * Fall darf der Noise-Filter nicht greifen — sonst verliert der User
  * genau die Signale, die er sucht.
@@ -182,6 +208,16 @@ function isNoiseSignal(
   if (sourceNoise) {
     for (const noiseWord of sourceNoise) {
       if (signalText.includes(noiseWord)) return true;
+    }
+  }
+
+  // Schicht 1b: Polymarket-spezifische Sport-Match-Patterns. Fängt die
+  // 850+ falsch getaggten WM-/IPL-/Esports-Wetten, die bisher in
+  // Mobility- und Wirtschafts-Queries als relevante Signale durchschlugen.
+  if (signal.source === "polymarket") {
+    const titleAndTags = [signal.title, signal.tags].filter(Boolean).join(" ");
+    for (const pattern of POLYMARKET_MATCH_NOISE) {
+      if (pattern.test(titleAndTags)) return true;
     }
   }
 
