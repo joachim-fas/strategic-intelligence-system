@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { ChevronLeft, ChevronRight, X, Filter, ArrowDownToLine } from "lucide-react";
 import type { MatchedEdge } from "@/types";
 import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import { stageColor } from "./orbit-colors";
 
 interface OrbitNode {
   id: string;
@@ -816,8 +817,10 @@ function DetailPanel({
 }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
-  // Trends stage color (matches STAGE_META.trends.color in OrbitDerivationView)
-  const typeColor = "#1A9E5A";
+  // Trends-Stage-Farbe — zentral verwaltet in `orbit-colors.ts` und
+  // dadurch konsistent mit OrbitDerivationView, Canvas-[TREND]-Pills,
+  // und InlineProvenance.
+  const typeColor = stageColor("trends");
 
   return (
     <div style={{

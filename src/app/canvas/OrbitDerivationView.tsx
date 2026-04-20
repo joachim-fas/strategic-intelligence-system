@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { UsedSignal, MatchedTrend, MatchedEdge, QueryResult } from "@/types";
 import { t as translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import { ORBIT_STAGE_COLORS, ORBIT_STATE_COLORS, stageColor } from "./orbit-colors";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    OrbitDerivationView — 7-stage left-to-right derivation chain.
@@ -45,15 +46,20 @@ type Stage = "question" | "signals" | "trends" | "edges" | "insights" | "scenari
 
 const STAGE_ORDER: Stage[] = ["question", "signals", "trends", "edges", "insights", "scenarios", "decisions"];
 
+// Farben kommen aus `orbit-colors.ts` (Single Source of Truth). STAGE_META
+// trägt nur noch Labels + Icons; `color` ist ein Proxy, damit bestehende
+// Call-Sites (STAGE_META[s].color) unverändert weiter funktionieren.
 const STAGE_META: Record<Stage, { labelDe: string; labelEn: string; color: string; Icon: React.ComponentType<{ size?: number; strokeWidth?: number }> }> = {
-  question:  { labelDe: "Frage",      labelEn: "Question",  color: "#6B7A00", Icon: HelpCircle    },
-  signals:   { labelDe: "Signale",    labelEn: "Signals",   color: "#F59E0B", Icon: Radio         },
-  trends:    { labelDe: "Trends",     labelEn: "Trends",    color: "#1A9E5A", Icon: TrendingUp    },
-  edges:     { labelDe: "Kausal",     labelEn: "Causal",    color: "#2563EB", Icon: GitBranch     },
-  insights:  { labelDe: "Erkenntnis", labelEn: "Insight",   color: "#C58A00", Icon: Lightbulb     },
-  scenarios: { labelDe: "Szenario",   labelEn: "Scenario",  color: "#A855F7", Icon: GitFork       },
-  decisions: { labelDe: "Empfehlung", labelEn: "Decision",  color: "#E8402A", Icon: CheckCircle2  },
+  question:  { labelDe: "Frage",      labelEn: "Question",  color: stageColor("question"),  Icon: HelpCircle    },
+  signals:   { labelDe: "Signale",    labelEn: "Signals",   color: stageColor("signals"),   Icon: Radio         },
+  trends:    { labelDe: "Trends",     labelEn: "Trends",    color: stageColor("trends"),    Icon: TrendingUp    },
+  edges:     { labelDe: "Kausal",     labelEn: "Causal",    color: stageColor("edges"),     Icon: GitBranch     },
+  insights:  { labelDe: "Erkenntnis", labelEn: "Insight",   color: stageColor("insights"),  Icon: Lightbulb     },
+  scenarios: { labelDe: "Szenario",   labelEn: "Scenario",  color: stageColor("scenarios"), Icon: GitFork       },
+  decisions: { labelDe: "Empfehlung", labelEn: "Decision",  color: stageColor("decisions"), Icon: CheckCircle2  },
 };
+// Silence "unused import" linter for ORBIT_STAGE_COLORS — used by SpineRow below.
+void ORBIT_STAGE_COLORS;
 
 // ─── Spine node shape ────────────────────────────────────────────────────────
 
@@ -687,7 +693,9 @@ export function OrbitDerivationView({
               </marker>
               <marker id="deriv-arrow-hot" viewBox="0 0 10 10" refX="9" refY="5"
                 markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7A00" />
+                {/* Hot-Arrow: Slate-Anker statt der alten question-Grünfarbe —
+                    der Pfeil signalisiert State (aktive Chain), nicht Stage. */}
+                <path d="M 0 0 L 10 5 L 0 10 z" fill={ORBIT_STATE_COLORS.selectedBorder} />
               </marker>
             </defs>
             <DerivationEdges
@@ -892,25 +900,34 @@ function NodeChip({
   isSelected?: boolean;
   small?: boolean;
 }) {
-  const dim = chainSet && !chainSet.has(node.id) ? 0.25 : 1;
+  const dim = chainSet && !chainSet.has(node.id) ? ORBIT_STATE_COLORS.dimmedOpacity : 1;
   const inChain = chainSet && chainSet.has(node.id);
   const relPct = Math.round(node.chainRel * 100);
   // Relevance as a small left-edge bar (1px..4px depending on strength)
   const barWidth = 2 + node.chainRel * 3;
-  // Border/background priority: focus > selected > in-chain > default
+
+  // Orbit-Farbrefactor 2026-04-21:
+  // - State-Farben (Focus / Selected / In-Chain) sind orthogonal zu Stage-Farben.
+  //   Vorher kollidierten Focus = "#6B7A00" (Oliv-grün) und Selected = "#2563EB" (blau)
+  //   mit den Stage-Farben für `question` bzw. `edges`/`scenarios`. Jetzt benutzt
+  //   State die ORBIT_STATE_COLORS, Stage die ORBIT_STAGE_COLORS — keine Kollision.
+  // - Relevance-Bar am linken Rand ist nun stage-spezifisch eingefärbt, nicht mehr
+  //   pauschal Question-grün. Damit sieht der User auf einen Blick, welche
+  //   Kategorie die Node ist, UND wie stark ihr Kettenbezug ist.
+  const stageAccent = stageColor(node.stage);
   const borderColor = isFocus
-    ? "#6B7A00"
+    ? ORBIT_STATE_COLORS.focusBorder
     : isSelected
-    ? "#2563EB"
+    ? ORBIT_STATE_COLORS.selectedBorder
     : inChain
-    ? "#E4FF97"
+    ? ORBIT_STATE_COLORS.inChainBorder
     : "var(--color-border)";
   const bgColor = isFocus
-    ? "#E4FF97"
+    ? ORBIT_STATE_COLORS.focusBg
     : isSelected
-    ? "#EEF4FF"
+    ? ORBIT_STATE_COLORS.selectedBg
     : inChain
-    ? "#FAFFE5"
+    ? ORBIT_STATE_COLORS.inChainBg
     : "var(--color-surface, #FFFFFF)";
 
   return (
@@ -930,17 +947,19 @@ function NodeChip({
         opacity: dim,
         transition: "opacity 0.15s, border-color 0.12s, background 0.12s",
         boxShadow: isFocus
-          ? "0 0 0 2px #6B7A0022"
+          ? `0 0 0 2px ${ORBIT_STATE_COLORS.focusRingShadow}`
           : isSelected
-          ? "0 0 0 2px #2563EB22"
+          ? `0 0 0 2px ${ORBIT_STATE_COLORS.selectedRingShadow}`
           : "none",
         overflow: "hidden",
       }}
     >
-      {/* Relevance bar (left edge) */}
+      {/* Relevance bar (left edge) — colored by stage, saturated on focus,
+          slightly translucent otherwise. */}
       <div style={{
         position: "absolute", left: 0, top: 0, bottom: 0,
-        width: barWidth, background: isFocus ? "#6B7A00" : "#6B7A00AA",
+        width: barWidth,
+        background: isFocus ? stageAccent : `${stageAccent}AA`,
       }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
