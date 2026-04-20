@@ -48,6 +48,26 @@ export function nodeAge(ms: number): "fresh" | "aging" | "stale" {
  * Estimate the rendered height of a derived card from its content.
  * Layout code needs this to place cards without overlap before React
  * has had a chance to measure them.
+ *
+ * **Kalibrierung 2026-04-21 (User-Feedback "Karten zu lang, ineffizient"):**
+ * Die alte Schätzung addierte bei jeder Card einen FOOTER (44) und ein
+ * TIMESTAMP-Feld (18), die es in DerivedNodeCard.tsx gar nicht gibt —
+ * der Card-Body endet ohne Footer, Content-Padding ist `10px 12px 0`
+ * (kein Bottom-Padding). Plus CHARS_PER_LINE=32 war zu konservativ für
+ * eine Kartenbreite von ~280px und 12px Font; realistisch passen ~46
+ * Zeichen pro Zeile. Und `Math.max(DERIVED_W, h)` erzwang die Breite
+ * als Mindesthöhe — ein 1-Zeiler war damit quadratisch 280×280 mit
+ * >200px Leerraum unten.
+ *
+ * Neuer Estimator:
+ * - HEADER = 36 (tatsächliche Header-Höhe)
+ * - Content-Pad = 14 (10 top + 4 Sicherheits-Puffer zu Resize-Handle)
+ * - kein Footer, kein Timestamp (nicht gerendert)
+ * - SOURCES nur wenn explizit vorhanden, und nur ~22px (kompakte Badge-Zeile)
+ * - Scenario-Extras: 3 (Probability-Bar) + ~36 (Label-Zeile) + 8 (Drivers-Pills) = 47
+ * - BUFFER = 14 (Fade-Gradient-Kaschierung)
+ * - CHARS_PER_LINE = 46 für DERIVED_W ≈ 280px
+ * - Mindesthöhe: 120 (statt Breite als Höhe)
  */
 export function estimateCardHeight(
   type: DerivedType,
@@ -57,32 +77,32 @@ export function estimateCardHeight(
 ): number {
   if (type === "dimensions") return DIMENSIONS_CARD_H;
   if (type === "causalgraph") return CAUSAL_GRAPH_CARD_H;
-  const CHARS_PER_LINE = 32;
+  const CHARS_PER_LINE = 46;
   const LINE_H = 20;
-  // Cards render all content without truncation via FormattedText —
-  // no cap on lines.
   const contentLines = Math.max(1, Math.ceil(content.length / CHARS_PER_LINE));
   const labelLines = label ? Math.min(3, Math.ceil(label.length / CHARS_PER_LINE)) : 0;
 
-  const HEADER = 44;
-  const FOOTER = 44;
-  const PAD = 20;
-  const SOURCES = hasSources ? 26 : 0;
-  const TIMESTAMP = 18;
-  const BUFFER = 28;
+  const HEADER = 36;
+  const CONTENT_PAD = 14;
+  const SOURCES = hasSources ? 22 : 0;
+  const BUFFER = 14;
 
   let h: number;
   if (type === "scenario") {
-    h = HEADER + PAD + 42 + labelLines * LINE_H + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
+    // Probability-Bar (3) + Label-Block (labelLines * ~16 + 5 margin) + Driver-Pills (8)
+    const scenarioExtras = 3 + labelLines * 16 + 5 + 8;
+    h = HEADER + CONTENT_PAD + scenarioExtras + contentLines * LINE_H + SOURCES + BUFFER;
   } else if (type === "decision") {
-    // Decision cards contain multi-step frameworks — add ~20 % extra
-    // height vs insight.
-    h = Math.ceil((HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER) * 1.2);
+    // Decision-Karten haben oft 3–5-Punkt-Frameworks. ~10% extra Puffer,
+    // kein Multiplikator mehr — der alte 1.2x war bei realer Höhe overkill.
+    h = Math.ceil((HEADER + CONTENT_PAD + contentLines * LINE_H + SOURCES + BUFFER) * 1.1);
   } else {
-    h = HEADER + PAD + contentLines * LINE_H + SOURCES + TIMESTAMP + FOOTER + BUFFER;
+    h = HEADER + CONTENT_PAD + contentLines * LINE_H + SOURCES + BUFFER;
   }
-  // Cards render with minimum height = DERIVED_W; never estimate less.
-  return Math.max(DERIVED_W, h);
+  // Mindesthöhe 120 — genug für einen 1-Zeiler plus Header. Wichtig:
+  // NICHT mehr DERIVED_W (Breite) als Höhen-Minimum, das erzwang
+  // quadratische Karten mit sinnloser Leerfläche.
+  return Math.max(120, h);
 }
 
 // ── Universal node dimension helpers (used by layout algorithms) ──
