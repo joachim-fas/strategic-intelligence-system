@@ -1,5 +1,50 @@
 # Strategic Intelligence System (SIS)
 
+**Headline.** Belegbare Antworten auf jede strategische Frage.
+
+## Mission
+
+Strategic decisions in business, policy and research fail for two symmetric
+reasons: either the evidence base is too thin (gut feeling dressed as
+analysis), or it is too broad to act on (a dashboard of 300 metrics that
+each reflect a different quarter of a different market). SIS sits in the
+narrow band between these two failure modes.
+
+SIS is a European, civilian intelligence terminal built to answer
+forward-looking strategic questions with **traceable, hallucination-free
+synthesis**. Every claim in a briefing carries a provenance tag
+(`[SIGNAL]`, `[TREND]`, `[REG]`, `[EDGE]`, `[LLM-KNOWLEDGE]`) so the user
+can tell what rests on live data, what on a curated trend catalogue, what
+on regulation, what on structural causal inference, and what on model
+background. Where data is missing, the system says so — transparency
+about uncertainty beats false precision.
+
+### For whom
+
+SIS is built for strategists, policy analysts, foresight teams, research
+leads and operators who need to translate complex, multi-dimensional
+evidence into decisions on a timeline of months to years. It is **not**
+a chatbot and not a dashboard. It is a structured analysis terminal that
+aggregates signals from 56+ open sources, maps them against a causal
+trend graph, and walks the user through a seven-stage reasoning chain
+from raw question to concrete recommendation.
+
+### Design principles
+
+1. **Provenance over plausibility.** Every factual claim gets an inline
+   source tag. Untagged assertions are treated as bugs by the validator.
+2. **Evidence-based confidence.** The confidence score is a weighted
+   blend of signal coverage, recency, strength, source verification and
+   causal coverage — not LLM self-assessment.
+3. **Honesty over coverage.** When live signals do not support a claim,
+   SIS says so rather than synthesising filler.
+4. **Causal over correlational.** Trends connect via a curated
+   drives/amplifies/dampens/correlates graph; edges carry semantic
+   weight and are reused during analysis.
+5. **European reference frame.** Analysis is grounded in the 14 EU-JRC
+   megatrends and the STEEP+V framework; EU-specific perspectives are
+   surfaced where they apply.
+
 A multi-tenant strategic intelligence platform: combine live signals
 from 56 public data sources with a curated trend radar, causal network,
 and strategic canvas to answer forward-looking business questions.

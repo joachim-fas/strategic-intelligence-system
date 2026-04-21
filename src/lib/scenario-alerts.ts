@@ -1,9 +1,20 @@
 /**
  * Scenario alert system — detects when new signals might invalidate existing analyses.
+ *
+ * Backlog-Task „Trigger-System: Schwellwert-Logik" (2026-04-22): die
+ * Keyword-Overlap- und Source-Tier-Helper aus `lib/signals` wiederverwenden,
+ * damit die Alert-Relevanz dieselbe Topic-Fit-Metrik nutzt wie das
+ * Briefing-UI. Vorher war's „Signal-Wort in Query-Text enthalten" — das
+ * hat einen Bluesky-Personal-Post bei einer Wien-Bezirk-Analyse als
+ * potenziellen Alert gewertet. Jetzt gelten dieselben per-Tier-
+ * Schwellen wie im Retrieval: authoritative 0.25 gewichtete Overlap,
+ * social 0.60, plus Anchor-Keyword-Match.
  */
 import Database from "better-sqlite3";
 import path from "path";
 import { randomUUID } from "crypto";
+import { classifySource, computeKeywordStats, extractQueryKeywords } from "./signals";
+import type { SourceTier } from "@/types";
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -139,12 +150,39 @@ export function createAlert(opts: {
 }
 
 /**
+ * Minimum signal strength + minimum topic-fit per source tier for an
+ * alert to fire. Mirrors the per-tier thresholds in getRelevantSignals
+ * so the alert-system is as permissive (or strict) as the retrieval —
+ * an alert about a Bluesky post that wouldn't even pass retrieval is
+ * pure noise. Extracted as named constants so downstream test code
+ * and ops dashboards can reference them.
+ */
+export const ALERT_MIN_STRENGTH = 0.65;
+export const ALERT_HIGH_SEVERITY_STRENGTH = 0.85;
+export const ALERT_TIER_MIN_TOPIC_FIT: Record<SourceTier, number> = {
+  authoritative: 0.25,
+  academic: 0.30,
+  media: 0.30,
+  proxy: 0.40,
+  social: 0.60,
+};
+
+/**
  * After a signal refresh, scan existing query_versions for potentially stale analyses.
  * Compares new signal topics against query texts. Creates alerts for matches.
  *
  * This is called from the signals route after a successful refresh.
+ *
+ * Topic-fit rule (since 2026-04-22):
+ *   - Signal-Text muss mindestens ein ≥5-Zeichen-Keyword der Query enthalten
+ *     (Anchor-Match) — verhindert, dass generische Kurzwörter-Treffer zählen.
+ *   - Gewichtete Keyword-Overlap (Wortlänge-weighted) muss die per-Tier-
+ *     Schwelle reißen (ALERT_TIER_MIN_TOPIC_FIT).
+ *   - Signal-Stärke muss über ALERT_MIN_STRENGTH liegen.
  */
-export function checkForStaleness(newSignals: Array<{ id: string; title: string; topic?: string; strength?: number }>): void {
+export function checkForStaleness(
+  newSignals: Array<{ id: string; title: string; topic?: string; strength?: number; source?: string }>
+): void {
   if (newSignals.length === 0) return;
   const d = db();
   try {
@@ -158,19 +196,23 @@ export function checkForStaleness(newSignals: Array<{ id: string; title: string;
 
     if (recentVersions.length === 0) return;
 
-    // High-strength signals only (> 0.65)
-    const strongSignals = newSignals.filter(s => (s.strength ?? 0) > 0.65);
+    // High-strength signals only
+    const strongSignals = newSignals.filter(s => (s.strength ?? 0) > ALERT_MIN_STRENGTH);
     if (strongSignals.length === 0) return;
 
     // For each version, check if any strong signal is topically relevant
     for (const version of recentVersions) {
-      const queryLower = version.query_text.toLowerCase();
+      const queryKeywords = extractQueryKeywords(version.query_text);
+      if (queryKeywords.length === 0) continue;
+
       for (const signal of strongSignals) {
-        const signalText = `${signal.title} ${signal.topic ?? ""}`.toLowerCase();
-        // Simple keyword overlap: extract significant words (> 4 chars) from query
-        const queryWords = queryLower.split(/\W+/).filter(w => w.length > 4);
-        const isRelevant = queryWords.some(word => signalText.includes(word));
-        if (!isRelevant) continue;
+        const signalText = `${signal.title} ${signal.topic ?? ""}`;
+        const stats = computeKeywordStats(queryKeywords, signalText);
+        if (!stats.anchorMatched) continue;
+
+        const tier = signal.source ? classifySource(signal.source) : "media";
+        const minTopicFit = ALERT_TIER_MIN_TOPIC_FIT[tier];
+        if (stats.weightedOverlap < minTopicFit) continue;
 
         // Don't create duplicate alerts (same node + signal)
         const exists = d.prepare(`
@@ -179,7 +221,8 @@ export function checkForStaleness(newSignals: Array<{ id: string; title: string;
         `).get(version.canvas_node_id, signal.id);
         if (exists) continue;
 
-        const severity: "low" | "medium" | "high" = (signal.strength ?? 0) > 0.85 ? "high" : "medium";
+        const severity: "low" | "medium" | "high" =
+          (signal.strength ?? 0) > ALERT_HIGH_SEVERITY_STRENGTH ? "high" : "medium";
         d.prepare(`
           INSERT INTO scenario_alerts (id, canvas_node_id, radar_id, query_text, trigger_signal_id, reason, severity)
           VALUES (?, ?, ?, ?, ?, ?, ?)

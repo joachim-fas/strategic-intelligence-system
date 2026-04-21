@@ -19,6 +19,7 @@
 import React from "react";
 import { Key as KeyIcon } from "lucide-react";
 import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
+import { HelpIcon } from "@/components/ui/HelpIcon";
 
 // ─── StatusRing: adopt / trial / assess / hold ─────────────────────────
 // Color mapping is SEMANTIC — matches Volt UI pastel spec exactly.
@@ -977,6 +978,7 @@ export function VoltKpiCard({
   subLabel,
   icon,
   variant = "light",
+  helpText,
 }: {
   label: string;
   value: React.ReactNode;
@@ -987,6 +989,13 @@ export function VoltKpiCard({
   subLabel?: string;
   icon: React.ReactNode;
   variant?: "lime" | "dark" | "light";
+  /**
+   * Inline help tooltip shown next to the label via a "?"-Icon. Backlog
+   * task 2.5 (2026-04-22): strategic terms like Konfidenz, Live-Signale
+   * or Szenarien-Count get a hover-reveal definition so first-time users
+   * get context without opening a separate help page.
+   */
+  helpText?: React.ReactNode;
 }) {
   const isLime = variant === "lime";
   const isDark = variant === "dark";
@@ -1027,9 +1036,12 @@ export function VoltKpiCard({
             textTransform: "uppercase",
             color: labelColor,
             lineHeight: 1.2,
+            display: "inline-flex",
+            alignItems: "center",
           }}
         >
           {label}
+          {helpText && <HelpIcon content={helpText} size={11} />}
         </span>
         <VoltIconBox
           icon={icon}
@@ -1105,6 +1117,7 @@ export function VoltSectionCard({
   chips,
   children,
   padding = "default",
+  helpText,
 }: {
   icon?: React.ReactNode;
   iconVariant?: IconBoxVariant;
@@ -1114,6 +1127,13 @@ export function VoltSectionCard({
   chips?: React.ReactNode;
   children: React.ReactNode;
   padding?: "default" | "none";
+  /**
+   * Inline help tooltip shown next to the section title via a "?"-Icon.
+   * Backlog task 2.5 (2026-04-22): strategic sections (STEEP+V, Causal
+   * Network, Scenarios, Live-Signale) explain themselves on hover
+   * without needing a separate help screen.
+   */
+  helpText?: React.ReactNode;
 }) {
   return (
     <section
@@ -1146,9 +1166,12 @@ export function VoltSectionCard({
               lineHeight: 1.2,
               color: "var(--foreground, #0A0A0A)",
               margin: 0,
+              display: "inline-flex",
+              alignItems: "center",
             }}
           >
             {title}
+            {helpText && <HelpIcon content={helpText} size={15} />}
           </h2>
           {subtitle && (
             <p

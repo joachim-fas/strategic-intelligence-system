@@ -550,6 +550,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                     : (locale === "de" ? "Geringe Datenbasis" : "Limited data basis")
                   }
                   icon={<Gauge size={16} />}
+                  helpText={locale === "de"
+                    ? "Gewichtete Mischung aus Signal-Abdeckung (30%), Signal-Aktualität (25%), durchschnittlicher Signal-Stärke (20%), Quellen-Verifikation (15%) und kausaler Abdeckung (10%). Alter des gespeicherten Briefings reduziert den Score mit 3%/Tag."
+                    : "Weighted blend of signal coverage (30%), signal recency (25%), average signal strength (20%), source verification (15%), and causal coverage (10%). The stored briefing loses 3%/day to age."}
                 />
               )}
               {rawSignals.length > 0 && (
@@ -565,6 +568,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                         : (locale === "de" ? "Aus aktiven Connectors" : "From active connectors")
                   }
                   icon={<Radio size={16} />}
+                  helpText={locale === "de"
+                    ? "Anzahl der Live-Signale, die topisch zur Frage passen. Signale werden nach Keyword-Overlap (gewichtet nach Wortlänge) und Anchor-Keyword-Match gefiltert. Social-Tier-Quellen (Bluesky/Mastodon) müssen eine höhere Topic-Schwelle erreichen als authoritative Quellen (UN/ECFR/IPCC)."
+                    : "Number of live signals that topically fit the question. Signals are filtered by weighted keyword overlap and anchor-keyword match. Social-tier sources (Bluesky/Mastodon) need a higher topic threshold than authoritative ones (UN/ECFR/IPCC)."}
                 />
               )}
               {b.references?.length > 0 && (
@@ -574,6 +580,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                   value={b.references.length}
                   subLabel={locale === "de" ? "Authoritative Referenzen" : "Authoritative references"}
                   icon={<BookOpen size={16} />}
+                  helpText={locale === "de"
+                    ? "Externe Referenzen, die in der Synthese zitiert wurden. Quellen auf der Allowlist (EU/UN/Research-Domains) bekommen ein ✓; unverifizierte Domains ein ? — letzteres heißt nicht falsch, nur nicht editoriell geprüft."
+                    : "External references cited in the synthesis. Sources on the allowlist (EU/UN/research domains) get a ✓; unverified domains get a ? — the latter means not editorially vetted, not necessarily wrong."}
                 />
               )}
               {b.scenarios?.length > 0 && (
@@ -583,6 +592,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                   value={b.scenarios.length}
                   subLabel={locale === "de" ? "Optimistisch · Basis · Pessimistisch" : "Optimistic · Base · Pessimistic"}
                   icon={<Compass size={16} />}
+                  helpText={locale === "de"
+                    ? "Drei primäre Zukunftsszenarien. Wahrscheinlichkeiten ergeben ~100% und werden aus der Analyse hergeleitet, nicht aus einem Default-Template. Eine optionale Wildcard kann als viertes Szenario auftauchen — ein Low-Probability-High-Impact-Ereignis."
+                    : "Three primary future scenarios. Probabilities sum to ~100% and are derived from the analysis, not from a default template. An optional wildcard may appear as a fourth scenario — a low-probability, high-impact event."}
                 />
               )}
             </div>
@@ -732,6 +744,9 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 subtitle={locale === "de"
                   ? `${activeCount} von 6 Dimensionen relevant für diese Frage`
                   : `${activeCount} of 6 dimensions relevant to this question`}
+                helpText={locale === "de"
+                  ? <>STEEP+V ist ein sechs-dimensionales Foresight-Framework zur systematischen Strategie-Analyse:<br/><br/><strong>S</strong> Society · <strong>T</strong> Technology · <strong>E</strong> Economy · <strong>E</strong> Environment · <strong>P</strong> Politics · <strong>V</strong> Values. Nicht jede Dimension ist für jede Frage gleich wichtig — der LLM lässt irrelevante Dimensionen bewusst leer.</>
+                  : <>STEEP+V is a six-dimensional foresight framework for systematic strategy analysis:<br/><br/><strong>S</strong> Society · <strong>T</strong> Technology · <strong>E</strong> Economy · <strong>E</strong> Environment · <strong>P</strong> Politics · <strong>V</strong> Values. Not every dimension matters equally for every question — the LLM intentionally leaves irrelevant dimensions blank.</>}
               >
                 <div style={{
                   display: "grid",

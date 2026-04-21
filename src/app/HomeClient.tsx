@@ -1003,6 +1003,17 @@ export default function HomeClient() {
     if (q === "/graph" || q === "/g") { window.location.href = "/cockpit?tab=netzwerk"; return; }
     if (q === "/close" || q === "/c") { setShowFullRadar(false); setShowGraph(false); setQuery(""); return; }
 
+    // Backlog-Task 2.4 (2026-04-22): weitere Power-User-Shortcuts zum
+    // Öffnen zentraler Views ohne Umweg über Menüs. Die Liste deckt die
+    // am häufigsten angesprungenen Oberflächen ab — Quellen-Tabelle,
+    // Dokumentation, Frameworks, Projekt-Liste. Konsistent zu den
+    // schon existierenden /radar, /graph, /live, /help, /context.
+    if (q === "/sources" || q === "/q" || q === "/quellen") { window.location.href = "/cockpit?tab=quellen"; return; }
+    if (q === "/docs" || q === "/d") { window.location.href = "/dokumentation"; return; }
+    if (q === "/frameworks" || q === "/f") { window.location.href = "/frameworks"; return; }
+    if (q === "/projects" || q === "/p") { window.location.href = "/projects"; return; }
+    if (q === "/monitor" || q === "/m") { window.location.href = "/monitor"; return; }
+
     // ── Query Shortcuts (Bloomberg Learning 1) ──
     if (q.startsWith("TREND:") || q.startsWith("trend:")) {
       const trendName = q.slice(6).trim();
@@ -1012,6 +1023,16 @@ export default function HomeClient() {
     if (q.startsWith("SIGNAL:") || q.startsWith("signal:")) {
       const filter = q.slice(7).trim();
       window.location.href = `/cockpit?tab=signale&q=${encodeURIComponent(filter)}`;
+      return;
+    }
+    if (q.startsWith("SOURCE:") || q.startsWith("source:") || q.startsWith("QUELLE:") || q.startsWith("quelle:")) {
+      const sourceName = q.substring(q.indexOf(":") + 1).trim();
+      window.location.href = `/cockpit?tab=quellen&q=${encodeURIComponent(sourceName)}`;
+      return;
+    }
+    if (q.startsWith("FRAMEWORK:") || q.startsWith("framework:")) {
+      const topic = q.substring(q.indexOf(":") + 1).trim();
+      window.location.href = `/frameworks?topic=${encodeURIComponent(topic)}`;
       return;
     }
     if (q.startsWith("SCENARIO:") || q.startsWith("scenario:") || q.startsWith("SZENARIO:") || q.startsWith("szenario:")) {
@@ -1063,17 +1084,21 @@ export default function HomeClient() {
           synthesis: "",
           keyInsights: locale === "de" ? [
             "Tippe ein Stichwort oder eine Frage — z.B. 'AI', 'Klimawandel', 'Taiwan', 'Cybersecurity'",
-            "/radar oder /r — Vollständiges Radar öffnen",
-            "/close oder /c — Radar schließen",
+            "Navigation: /radar (/r) · /graph (/g) · /sources (/q) · /docs (/d) · /frameworks (/f) · /projects (/p) · /monitor (/m)",
+            "Shortcut-Suchen: TREND:AI · SIGNAL:rising · SOURCE:Guardian · SCENARIO:Wintersport Europa · FRAMEWORK:war-gaming",
+            "/close oder /c — Radar/Graph schließen",
             "/live — Live-Daten von allen Quellen laden",
+            "/context — Persona/Kontext setzen (z. B. /context cto-automotive-dach)",
             "/en oder /de — Sprache wechseln",
             "/clear — Verlauf löschen",
             "Klicke auf einen Trend-Chip um Details zu sehen",
           ] : [
             "Type a keyword or question — e.g. 'AI', 'climate change', 'Taiwan', 'cybersecurity'",
-            "/radar or /r — Open full radar view",
-            "/close or /c — Close radar view",
+            "Navigation: /radar (/r) · /graph (/g) · /sources (/q) · /docs (/d) · /frameworks (/f) · /projects (/p) · /monitor (/m)",
+            "Shortcut searches: TREND:AI · SIGNAL:rising · SOURCE:Guardian · SCENARIO:Winter Sports Europe · FRAMEWORK:war-gaming",
+            "/close or /c — Close radar/graph view",
             "/live — Fetch live data from all sources",
+            "/context — Set persona/context (e.g. /context cto-automotive-dach)",
             "/en or /de — Switch language",
             "/clear — Clear history",
             "Click any trend chip to see details",
