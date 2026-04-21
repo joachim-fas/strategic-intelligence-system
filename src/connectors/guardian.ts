@@ -42,7 +42,14 @@ export const guardianConnector: SourceConnector = {
       // NOTE: The query `q=*` returns zero hits because Guardian's search rejects
       // the wildcard. Omitting `q` falls back to the full content stream — that's
       // the closest equivalent to "latest across all sections" for this endpoint.
-      const url = `https://content.guardianapis.com/search?order-by=newest&show-fields=trailText,headline&page-size=20&api-key=${key}`;
+      //
+      // Backlog-Task 1.6 (2026-04-21): bodyText mit anfragen, damit auch der
+      // erste Absatz der Artikel als `content`-Snippet in live_signals
+      // landet. trailText alleine ist oft nur ein 80-Zeichen-Teaser, das
+      // gibt dem LLM nicht genug Kontext zum Zitieren. bodyText liefert den
+      // vollen Text, aus dem wir die ersten 500 Zeichen als content
+      // speichern.
+      const url = `https://content.guardianapis.com/search?order-by=newest&show-fields=trailText,headline,bodyText&page-size=20&api-key=${key}`;
 
       const res = await fetch(url, {
         headers: { Accept: "application/json" },
@@ -59,6 +66,10 @@ export const guardianConnector: SourceConnector = {
         const topic = SECTION_TOPICS[section] || "Geopolitical Fragmentation";
         const headline = article.fields?.headline || article.webTitle || "Unknown";
         const trailText = article.fields?.trailText || "";
+        const bodyText = article.fields?.bodyText || "";
+        const richSnippet = bodyText.length > 100
+          ? bodyText.slice(0, 500)
+          : trailText;
 
         const signal: RawSignal = {
           sourceType: "guardian",
@@ -71,6 +82,9 @@ export const guardianConnector: SourceConnector = {
             section,
             headline,
             trailText,
+            // `content` wird vom Pipeline-Extractor bevorzugt; trailText
+            // bleibt als Sekundärfeld für Abwärtskompatibilität erhalten.
+            content: richSnippet || undefined,
             publishedAt: article.webPublicationDate,
             type: article.type,
           },

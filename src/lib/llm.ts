@@ -276,6 +276,8 @@ No live signals are attached to this query. Rely on trends, edges, regulations, 
    - From causal graph edges: \`[EDGE: TrendA → TrendB]\`
    - From LLM background knowledge: ALWAYS tag with \`[LLM-KNOWLEDGE]\` — never present as fact
 
+   Untagged factual claims are bugs. The server-side validator will flag any synthesis longer than 300 characters that contains zero provenance tags. If a sentence truly has no source — either cite trend knowledge as [LLM-KNOWLEDGE] or remove the sentence. Never leave an unsourced assertion standing.
+
 2. NEVER invent URLs. When you cite a source, name only Source + Date, no hyperlinks.
 
 3. If you lack sufficient data: say so explicitly. "No current signals available on this topic" is better than speculation.
@@ -436,6 +438,14 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
 
   "balancedScorecard": null
 }
+
+## Scenario Count (hard contract)
+
+If the question is strategic (roadmap, opportunity, risk, positioning, forecast): emit EXACTLY THREE primary scenarios, keyed as \`optimistic\`, \`likely\`, and \`pessimistic\`. Not two, not four. Three.
+
+A fourth \`wildcard\` scenario is optional and may be added if a genuinely low-probability-but-high-impact tail event deserves its own narrative. Do not use wildcard as a substitute for one of the three required primary scenarios.
+
+If the question is purely factual ("Who is X?", "What year did Y?") and scenarios are not meaningful, set \`scenarios: {}\` — the server accepts an empty object and the UI hides the section. Do not pad empty scenarios with filler.
 
 ## Scenario Probability Rules
 

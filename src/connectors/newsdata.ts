@@ -49,6 +49,15 @@ export const newsdataConnector: SourceConnector = {
         const category = (article.category?.[0] || "world").toLowerCase();
         const topic = CATEGORY_TOPICS[category] || "Geopolitical Fragmentation";
 
+        // Backlog-Task 1.6 (2026-04-21): NewsData liefert `description`
+        // (Teaser) UND `content` (voller Text, wenn verfügbar). Wir
+        // nutzen das reichhaltigste vorhandene Feld und schneiden auf 500
+        // Zeichen — genug für einen snippet-artigen Kontext, ohne die
+        // live_signals-Row übermäßig aufzublähen.
+        const richSnippet = (article.content && article.content.length > 100)
+          ? String(article.content).slice(0, 500)
+          : (article.description ? String(article.description).slice(0, 500) : "");
+
         const signal: RawSignal = {
           sourceType: "newsdata",
           sourceUrl: article.link || "https://newsdata.io/",
@@ -60,6 +69,9 @@ export const newsdataConnector: SourceConnector = {
             title,
             category,
             description: article.description?.slice(0, 300),
+            // Pipeline-Extractor greift `content` bevorzugt auf — enthält
+            // den besten verfügbaren Snippet.
+            content: richSnippet || undefined,
             country: article.country,
             language: article.language,
             publishedAt: article.pubDate,

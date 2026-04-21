@@ -653,6 +653,34 @@ export async function POST(req: Request) {
           if (warnings.some(w => w.includes("probability"))) {
             qualityWarnings.push("Szenario-Wahrscheinlichkeiten wurden normalisiert.");
           }
+          if (warnings.some(w => w.includes("Missing scenarios") || w.includes("Normalized"))) {
+            qualityWarnings.push("Szenarien-Satz wurde auf exakt 3 (opt./basis/pess.) normalisiert — fehlende wurden als Platzhalter markiert.");
+          }
+
+          // Backlog-Task 1.5 (2026-04-21): Quellenangaben-Pflicht.
+          //
+          // Jede faktische Aussage MUSS inline getaggt sein — [SIGNAL: …],
+          // [TREND: …], [REG: …], [EDGE: …] oder zumindest [LLM-KNOWLEDGE].
+          // Wenn die Synthese lang ist aber keinen einzigen Provenance-Tag
+          // trägt, ist das eine Regressionsform, die wir aktiv benennen statt
+          // still durchgehen zu lassen. Bisher sanktionierte die Pipeline das
+          // nicht — die UI zeigte nur einen kleinen Italic-Hinweis, wenn
+          // references leer war. Jetzt surft das als sichtbare
+          // Datenqualitäts-Warnung auf der Briefing-Karte auf.
+          const synthesisText = validated.synthesis ?? "";
+          const provenanceTagCount =
+            (synthesisText.match(/\[\s*SIGNAL[^\]]*\]/gi) || []).length +
+            (synthesisText.match(/\[\s*TREND[^\]]*\]/gi)  || []).length +
+            (synthesisText.match(/\[\s*REG[^\]]*\]/gi)    || []).length +
+            (synthesisText.match(/\[\s*EDGE[^\]]*\]/gi)   || []).length +
+            (synthesisText.match(/\[\s*LLM[-\s]?(KNOWLEDGE|Einsch[äa]tzung|Einschaetzung|Assessment)[^\]]*\]/gi) || []).length;
+          if (synthesisText.length > 300 && provenanceTagCount === 0) {
+            qualityWarnings.push("Die Synthese enthält keine Quellen-Tags — Aussagen sind nicht provenance-markiert. Kritisch prüfen.");
+          }
+          const hasReferences = Array.isArray(validated.references) && validated.references.length > 0;
+          if (!hasReferences && provenanceTagCount === 0 && synthesisText.length > 200) {
+            qualityWarnings.push("Antwort ohne externe Referenzen und ohne Inline-Tags — reine LLM-Einschätzung ohne belegte Evidenz.");
+          }
 
           // Augment: matched trend details for radar + demographics
           const matchedIds: string[] = validated.matchedTrendIds || [];
@@ -748,12 +776,23 @@ export async function POST(req: Request) {
             const signalText = [s.title, s.topic, s.content?.slice(0, 1000), s.tags]
               .filter(Boolean).join(" ");
             const stats = computeKeywordStats(queryKeywords, signalText);
+            // Backlog-Task 1.6 (2026-04-21): Snippet-Feld bis in die UI durchreichen.
+            // Der pipeline extrahiert content aus dem connector-rawData und
+            // persistiert es in live_signals.content. Hier geben wir die ersten
+            // ~220 Zeichen als snippet mit, damit die Briefing-UI Preview-Text
+            // unter dem Titel anzeigen kann — das ist der sichtbare Gegenpart
+            // der verbesserten Connector-Content-Extraktion.
+            const rawContent = typeof s.content === "string" ? s.content.trim() : "";
+            const snippet = rawContent.length > 0
+              ? (rawContent.length > 220 ? rawContent.slice(0, 217) + "…" : rawContent)
+              : undefined;
             return {
               source: s.source,
               title: s.title,
               url: s.url,
               strength: s.strength,
               date: s.fetched_at.slice(0, 10),
+              snippet,
               keywordOverlap: stats.weightedOverlap,
               sourceTier: s.sourceTier ?? classifySource(s.source),
               queryRelevance: refLookup.get(refKey(s.source, s.title)),

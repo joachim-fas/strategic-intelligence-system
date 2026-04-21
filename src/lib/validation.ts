@@ -427,39 +427,106 @@ export function validateLLMResponse(
     data.causalChain = data.causalAnalysis;
   }
 
-  // Step 3: Normalize scenario probabilities
-  if (data.scenarios.length === 3) {
-    const probs = data.scenarios.map((s) => s.probability);
-    const hasNulls = probs.some((p) => p === null);
+  // Step 3: Scenario-Kontrakt erzwingen (Master Spec, Backlog-Task 1.2).
+  //
+  // Invariante: wenn die LLM überhaupt Szenarien zurückgegeben hat, müssen es
+  // genau 3 sein — optimistic / baseline / pessimistic. Eine Wildcard darf
+  // optional als 4. Szenario mitlaufen. Der alte Code hat 0–∞ akzeptiert und
+  // nur gewarnt; damit landete eine 2-Szenarien-LLM-Antwort ungefiltert in der
+  // UI und der User bekam zwei Karten statt drei.
+  //
+  // Regel: leere Liste bleibt leer (FACTUAL-Query, UI blendet Sektion aus).
+  // Für 1–2 Szenarien füllen wir die fehlenden Slots mit deklarativen
+  // Platzhaltern und markieren sie mit einer Warning, damit die Datenqualität-
+  // Anzeige den Hinweis aufgreift. Ab 3 Szenarien sortieren wir in
+  // optimistic→baseline→pessimistic + Wildcard-Rest.
+  if (data.scenarios.length > 0) {
+    const wildcards = data.scenarios.filter((s) => s.type === "wildcard");
+    const primaryCandidates = data.scenarios.filter((s) => s.type !== "wildcard");
 
-    if (hasNulls) {
-      warnings.push("Scenario probabilities contained non-numeric values — applied type-based defaults");
-      data.scenarios.forEach((s) => {
-        if (s.probability === null) {
-          s.probability =
-            s.type === "baseline" ? 0.45 :
-            s.type === "optimistic" ? 0.30 : 0.25;
-        }
-      });
+    const requiredTypes: Array<"optimistic" | "baseline" | "pessimistic"> = [
+      "optimistic", "baseline", "pessimistic",
+    ];
+    const primary: Array<z.infer<typeof ScenarioSchema>> = [];
+
+    // Erster Durchgang: Typen exakt matchen
+    const taken = new Set<number>();
+    for (const requested of requiredTypes) {
+      const idx = primaryCandidates.findIndex((s, i) => !taken.has(i) && s.type === requested);
+      if (idx !== -1) {
+        primary.push(primaryCandidates[idx]);
+        taken.add(idx);
+      }
     }
 
-    const numericProbs = data.scenarios.map((s) => s.probability as number);
-    const sum = numericProbs.reduce((a, b) => a + b, 0);
+    // Zweiter Durchgang: fehlende Slots mit untyped-Szenarien auffüllen,
+    // dabei den gewünschten Typ zuweisen.
+    for (let slot = 0; slot < requiredTypes.length; slot++) {
+      if (primary[slot]) continue;
+      const nextUntyped = primaryCandidates.findIndex((s, i) => !taken.has(i) && !s.type);
+      if (nextUntyped !== -1) {
+        primary[slot] = { ...primaryCandidates[nextUntyped], type: requiredTypes[slot] };
+        taken.add(nextUntyped);
+      }
+    }
 
+    // Dritter Durchgang: noch immer fehlend → synthetischer Platzhalter.
+    const missingPlaceholders: string[] = [];
+    for (let slot = 0; slot < requiredTypes.length; slot++) {
+      if (primary[slot]) continue;
+      const requiredType = requiredTypes[slot];
+      missingPlaceholders.push(requiredType);
+      primary[slot] = {
+        type: requiredType,
+        name: requiredType === "optimistic" ? "Positive Auslenkung (nicht modelliert)"
+            : requiredType === "baseline" ? "Basisfall (nicht modelliert)"
+            : "Negative Auslenkung (nicht modelliert)",
+        description: "Dieses Szenario wurde von der Analyse nicht belastbar hergeleitet — Datenlage oder Fragetyp haben kein eigenständiges Szenario dieser Richtung getragen.",
+        probability: requiredType === "baseline" ? 0.45 : 0.275,
+      };
+    }
+    if (missingPlaceholders.length > 0) {
+      warnings.push(
+        `Missing scenarios: ${missingPlaceholders.join(", ")} — filled with placeholders`,
+      );
+    }
+
+    // In die eigentliche Liste zurückschreiben: 3 Primär-Szenarien + optional
+    // Wildcards (maximal 2, der LLM soll sparsam mit Wildcards sein).
+    const finalList = [...primary, ...wildcards.slice(0, 2)];
+
+    // Probability-Defaults für alle null-Werte setzen.
+    for (const s of finalList) {
+      if (s.probability === null) {
+        s.probability =
+          s.type === "baseline" ? 0.45 :
+          s.type === "optimistic" ? 0.30 :
+          s.type === "wildcard" ? 0.08 :
+          0.25;
+      }
+    }
+
+    // Normalize primary probabilities to sum ≈ 1.0 (Wildcards bleiben außen vor,
+    // damit ihre Wahrscheinlichkeit additiv und nicht re-normalisiert wirkt).
+    const primaryProbs = primary.map((s) => s.probability as number);
+    const sum = primaryProbs.reduce((a, b) => a + b, 0);
     if (sum > 0 && (sum > 1.1 || sum < 0.8)) {
-      warnings.push(`Scenario probability sum was ${sum.toFixed(2)} — normalized to 1.0`);
-      data.scenarios.forEach((s, i) => {
-        s.probability = Math.round((numericProbs[i] / sum) * 100) / 100;
+      warnings.push(`Primary scenario probability sum was ${sum.toFixed(2)} — normalized to 1.0`);
+      primary.forEach((s, i) => {
+        s.probability = Math.round((primaryProbs[i] / sum) * 100) / 100;
       });
     }
 
-    // Detect identical/default distributions
-    const probValues = data.scenarios.map((s) => s.probability);
-    if (probValues[0] === probValues[1] && probValues[1] === probValues[2]) {
-      warnings.push(`All scenario probabilities identical (${probValues[0]}) — LLM may be defaulting`);
+    // Detect identical/default distributions (Hinweis auf LLM-Default).
+    const probValues = primary.map((s) => s.probability);
+    if (probValues.length === 3 && probValues[0] === probValues[1] && probValues[1] === probValues[2]) {
+      warnings.push(`All primary scenario probabilities identical (${probValues[0]}) — LLM may be defaulting`);
     }
-  } else if (data.scenarios.length > 0 && data.scenarios.length !== 3) {
-    warnings.push(`Expected 3 scenarios, got ${data.scenarios.length}`);
+
+    if (data.scenarios.length !== finalList.length) {
+      warnings.push(`Normalized ${data.scenarios.length} scenarios to ${finalList.length} (3 primary + ${wildcards.length > 0 ? "wildcards" : "no wildcards"})`);
+    }
+    data.scenarios = finalList;
   }
 
   // Step 4: Validate reference URLs — check format, drop malformed +

@@ -737,14 +737,20 @@ function ConfidenceBreakdown({ de }: { de: boolean }) {
 function EdgeTypesGrid({ de }: { de: boolean }) {
   const tlocale: Locale = de ? "de" : "en";
   const tl = (key: TranslationKey) => translate(tlocale, key);
+  // Master-Spec-Konformität (Task 1.1, 2026-04-21): Das kausale Vokabular
+  // des SIS ist viergliedrig und einheitlich — drives / amplifies / dampens /
+  // correlates. Die alten deutsch/englischen Doppel-Semantiken (ermöglicht,
+  // enables, hemmt, inhibits) sind ausgemustert. Das Kanten-Datenmodell in
+  // causal-graph.ts + CausalGraphView.tsx nutzt diese vier schon; hier wurde
+  // die Methodik-Seite nachgezogen, damit die Erklärung der UI entspricht.
   const edges = de ? [
     { type: "treibt",      color: "#1A9E5A", solid: true,  desc: "A treibt B direkt an. Wenn A stärker wird, wird B wahrscheinlicher.", example: "Agentic AI → Automatisierungs-Druck" },
-    { type: "ermöglicht",  color: "#7AB8F5", solid: true,  desc: "A ist Voraussetzung für B. B kann ohne A nicht existieren.", example: "5G-Netze → Autonomes Fahren" },
-    { type: "hemmt",       color: "#E8402A", solid: true,  desc: "A wirkt B entgegen. Stärker A, schwächer B.", example: "Datenschutz-Regulierung → Daten-Monetarisierung" },
+    { type: "verstärkt",   color: "#1A4A8A", solid: true,  desc: "A verstärkt eine bestehende Dynamik von B. Stärker A, noch stärker B — positives Feedback.", example: "Low-Code-Plattformen → Digitalisierungstempo" },
+    { type: "dämpft",      color: "#E8402A", solid: true,  desc: "A wirkt B entgegen. Stärker A, schwächer B.", example: "Datenschutz-Regulierung → Daten-Monetarisierung" },
     { type: "korreliert",  color: "#F5C87A", solid: false, desc: "A und B treten gemeinsam auf, ohne dass einer den anderen kausal bedingt.", example: "Urbanisierung ↔ Mikromobilität" },
   ] : [
     { type: "drives",     color: "#1A9E5A", solid: true,  desc: "A directly drives B. As A grows stronger, B becomes more likely.", example: "Agentic AI → automation pressure" },
-    { type: "enables",    color: "#7AB8F5", solid: true,  desc: "A is a prerequisite for B. B cannot exist without A.", example: "5G networks → autonomous driving" },
+    { type: "amplifies",  color: "#1A4A8A", solid: true,  desc: "A amplifies an existing dynamic in B. Stronger A, even stronger B — positive feedback.", example: "Low-code platforms → pace of digitalization" },
     { type: "dampens",    color: "#E8402A", solid: true,  desc: "A counteracts B. Stronger A, weaker B.", example: "Privacy regulation → data monetization" },
     { type: "correlates", color: "#F5C87A", solid: false, desc: "A and B appear together without one causally determining the other.", example: "Urbanization ↔ micromobility" },
   ];

@@ -923,14 +923,49 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </div>
           )}
 
-          {/* Sources — References */}
-          {(!b.references || b.references.length === 0) && !isHelp && briefing.synthesis && (
-            <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic", padding: "4px 0" }}>
-              {locale === "de"
-                ? "Keine externen Quellen zitiert — Antwort basiert auf strukturellem Trend-Wissen und Live-Signalen."
-                : "No external sources cited — response is based on structural trend knowledge and live signals."}
-            </div>
-          )}
+          {/* Sources — References.
+               Backlog-Task 1.5 (2026-04-21): Wenn gar keine externen
+               Referenzen zitiert wurden, zeigen wir das jetzt sichtbar als
+               Datenlage-Hinweis (nicht mehr nur als Klein-Italic). Der
+               Server-Validator in query/route.ts meldet zusätzlich eine
+               Warnung in _dataQualityWarnings, wenn die Synthese keine
+               Provenance-Tags trägt — so entsteht eine doppelte Sicherung
+               (Inline-Tag-Disziplin im Prompt + Ref-Anwesenheit im UI). */}
+          {(!b.references || b.references.length === 0) && !isHelp && briefing.synthesis && (() => {
+            const synth = briefing.synthesis ?? "";
+            const hasTags = /\[\s*(SIGNAL|TREND|REG|EDGE|LLM[-\s]?(KNOWLEDGE|Einsch[äa]tzung|Einschaetzung|Assessment))[^\]]*\]/i.test(synth);
+            return (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "10px 12px",
+                background: hasTags ? "var(--pastel-butter, rgba(245, 198, 80, 0.12))" : "var(--volt-negative-light, rgba(217, 54, 54, 0.08))",
+                border: `1px solid ${hasTags ? "var(--pastel-butter-border, rgba(245, 198, 80, 0.35))" : "var(--volt-negative-border, rgba(217, 54, 54, 0.35))"}`,
+                borderRadius: 8,
+                fontSize: 12,
+                color: hasTags ? "var(--pastel-butter-text, #7A5C00)" : "var(--volt-negative-text, #7F1D1D)",
+                lineHeight: 1.5,
+              }}>
+                <AlertTriangle size={14} strokeWidth={2.25} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                    {hasTags
+                      ? (locale === "de" ? "Keine externen Quellen zitiert" : "No external sources cited")
+                      : (locale === "de" ? "Antwort ohne Quellenbelege" : "Unsourced response")}
+                  </div>
+                  <div>
+                    {hasTags
+                      ? (locale === "de"
+                          ? "Die Antwort stützt sich auf Trend-Wissen und Inline-Provenance-Tags, aber nennt keine verlinkbaren Referenzen. Kritisch gegenprüfen."
+                          : "This answer relies on trend knowledge and inline provenance tags but cites no linkable references. Cross-check critically.")
+                      : (locale === "de"
+                          ? "Weder externe Referenzen noch Inline-Quellen-Tags. Die Aussagen sind reine LLM-Einschätzung — bitte nicht als belegte Fakten behandeln."
+                          : "Neither external references nor inline source tags. The statements are pure LLM assessment — do not treat as verified facts.")
+                    }
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {b.references?.length > 0 && (
             <VoltSectionCard
               icon={<BookOpen size={18} />}
@@ -1165,6 +1200,23 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                           >
                             {s.title}
                           </div>
+                          {typeof s.snippet === "string" && s.snippet.length > 0 && (
+                            <div
+                              style={{
+                                fontFamily: "var(--font-ui)",
+                                fontSize: 12,
+                                color: "var(--muted-foreground)",
+                                lineHeight: 1.45,
+                                marginTop: 4,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical" as const,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {s.snippet}
+                            </div>
+                          )}
                           <div
                             style={{
                               fontFamily: "var(--font-mono)",

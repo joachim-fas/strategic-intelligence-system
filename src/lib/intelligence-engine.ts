@@ -52,6 +52,12 @@ export interface IntelligenceBriefing {
     strength: number | null;
     date: string;
     /**
+     * First ~220 characters of the article body / abstract / lead paragraph,
+     * added by Backlog-Task 1.6 (2026-04-21). Displayed by BriefingResult
+     * as preview under the signal title so users can judge relevance in-line.
+     */
+    snippet?: string;
+    /**
      * Topical-fit metadata populated in `src/app/api/v1/query/route.ts` and
      * consumed by the BriefingResult + Orbit UI to filter signals whose
      * content is off-topic for the current question. See the 2026-04-21
@@ -1039,9 +1045,13 @@ function extractInsights(matches: TrendMatch[], locale: Locale): string[] {
       )
     );
     if (connected.length > 0) {
+      // Master-Spec-Vokabular (Task 1.1): treibt/dämpft/verstärkt/korreliert.
+      // „hemmt" / „inhibits" fehlte in der Vier-Relations-Ontologie und wurde
+      // durch „dämpft" / „dampens" ersetzt, damit Prosa und Edge-Legende
+      // sauber zusammenpassen.
       insights.push(de
-        ? `Kausale Verbindung: ${matches[0].trend.name} treibt oder hemmt ${connected.slice(0,2).map((c) => c.trend.name).join(" und ")} — Wechselwirkungen beachten`
-        : `Causal link: ${matches[0].trend.name} drives or inhibits ${connected.slice(0,2).map((c) => c.trend.name).join(" and ")} — monitor feedback loops`);
+        ? `Kausale Verbindung: ${matches[0].trend.name} treibt oder dämpft ${connected.slice(0,2).map((c) => c.trend.name).join(" und ")} — Wechselwirkungen beachten`
+        : `Causal link: ${matches[0].trend.name} drives or dampens ${connected.slice(0,2).map((c) => c.trend.name).join(" and ")} — monitor feedback loops`);
     }
   }
 

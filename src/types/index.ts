@@ -197,6 +197,15 @@ export interface UsedSignal {
   strength?: number;
   date?: string;
   /**
+   * First ~220 characters of the signal's content field (article snippet,
+   * abstract, lead paragraph). Provided by `query/route.ts` after
+   * reading from `live_signals.content`. Serves the Briefing UI as
+   * preview text below the signal title so users can judge relevance
+   * without leaving the page. Absent when the source did not deliver
+   * a usable content/snippet field.
+   */
+  snippet?: string;
+  /**
    * Fraction of query keywords matched in this signal's text [0, 1].
    * Set by `getRelevantSignals` during retrieval. Serves as the
    * deterministic fallback for topical relevance when the LLM has not

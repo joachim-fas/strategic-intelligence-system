@@ -51,6 +51,18 @@ export const nytConnector: SourceConnector = {
         const section = doc.section_name || "World";
         const topic = SECTION_TOPICS[section] || "Geopolitical Fragmentation";
 
+        // Backlog-Task 1.6 (2026-04-21): Article-Snippet-Anreicherung.
+        // NYT liefert drei potenzielle Kurzfassungen — snippet (Preview),
+        // abstract (Zusammenfassung), lead_paragraph (Einstiegs-Absatz).
+        // Wir bevorzugen das reichhaltigste vorhandene und fallen zurück,
+        // damit die Pipeline's content-Extraktion nie an einem leeren
+        // Feld scheitert.
+        const richSnippet = (doc.lead_paragraph && doc.lead_paragraph.length > 40)
+          ? doc.lead_paragraph
+          : (doc.abstract && doc.abstract.length > 20)
+            ? doc.abstract
+            : (doc.snippet || "");
+
         const signal: RawSignal = {
           sourceType: "nyt",
           sourceUrl: doc.web_url || "https://www.nytimes.com/",
@@ -62,6 +74,11 @@ export const nytConnector: SourceConnector = {
             headline,
             section,
             abstract: doc.abstract,
+            snippet: doc.snippet,
+            lead_paragraph: doc.lead_paragraph,
+            // `content` wird vom Pipeline-Extractor bevorzugt aufgegriffen —
+            // darin die beste vorhandene Kurzfassung.
+            content: richSnippet ? String(richSnippet).slice(0, 500) : undefined,
             publishedAt: doc.pub_date,
             byline: doc.byline?.original,
           },

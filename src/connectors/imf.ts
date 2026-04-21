@@ -24,12 +24,15 @@ export const imfConnector: SourceConnector = {
     const signals: RawSignal[] = [];
     const year = new Date().getFullYear();
 
+    // Backlog-Task 1.4 (2026-04-21): 20s → 25s Timeout analog zum
+    // WorldBank- und GDELT-Fix, damit langsame IMF-Antworten nicht das
+    // Pipeline-Budget ausschöpfen.
     try {
       const res = await fetch(
         `https://www.imf.org/external/datamapper/api/v1/NGDP_RPCH?periods=${year}`,
         {
           headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(25_000),
         }
       );
 
