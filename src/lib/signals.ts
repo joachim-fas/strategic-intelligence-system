@@ -264,35 +264,51 @@ const GLOBAL_NOISE_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Personal-/lifestyle-noise patterns. Fix 2026-04-21 (Wintersport-Fall):
- * Bluesky and Mastodon posts about babysitters, pets, baby-weight
- * updates, sunrise photos, cooking etc. were passing the keyword filter
- * via stray topic-tag matches and appearing as "Live-Signale" in
- * strategic-intelligence queries. These patterns apply ONLY to
- * social-tier sources — we do not want to strip "baby boom" demographic
- * news from an authoritative connector.
+ * Strukturelle Noise-Heuristiken für social-tier Signale.
+ *
+ * Der erste Versuch hatte eine Liste verbatim aus Screenshots übernommener
+ * Wörter („wackelkandidat", „babysitter", „sunrise this morning"). Das ist
+ * überangepasst — funktioniert nur für den einen Fall, den wir gesehen haben,
+ * nicht für die tausend anderen Personal-Post-Varianten (andere Sprachen,
+ * andere Themen, Cooking-Posts, Marathon-Trainings-Updates, Pet-Updates
+ * in beliebigen Varianten, …).
+ *
+ * Generische strukturelle Eigenschaften eines personal/lifestyle-Posts:
+ *  1. Sehr kurzer Text (< 80 Zeichen) mit wenig informationsdichter Substanz
+ *  2. Emoji-Dichte hoch relativ zur Textlänge
+ *  3. Reine Gewichts-/Maßangabe neben Baby/Haustier-Wort (strukturelle Form,
+ *     nicht konkrete Tier-/Wort-Liste)
+ *
+ * Diese Checks wirken NUR auf social-tier Sources und NUR wenn die Query
+ * nicht explizit über Social/Lifestyle-Themen geht. Für jede andere
+ * Tier ist es zu invasiv (ein UN-Bericht könnte kurzen Pressetext haben).
  */
-const SOCIAL_PERSONAL_NOISE_PATTERNS: RegExp[] = [
-  // Childcare / baby / pets
-  /\b(babysitter|babysitting|windel|diaper|stroller|kinderwagen|wackelkandidat)\b/i,
-  /\b(mein kleiner|meine kleine|unser baby|our baby)\b/i,
-  /\b(best\s+(babysitter|dog|cat|pet))\b/i,
-  // Lifestyle photo updates
-  /\b(sunrise this morning|good morning from|coffee this morning|this morning here in)\b/i,
-  /\b(guten morgen aus|heute morgen|frühstück|breakfast vibes)\b/i,
-  // Pet weight / feeding
-  /\b\d+[.,]?\d*\s*kg\b.*\b(baby|baby['´]s|katze|hund|puppy|kitten)\b/i,
-  /\b(baby|baby['´]s|katze|hund|puppy|kitten)\b.*\b\d+[.,]?\d*\s*kg\b/i,
-  // Generic personal greetings / emoji-heavy
-  /^[^\w]*(best|love|❤️|♥|😍|🥰)\b.{0,40}[❤️♥😍🥰]/i,
-];
+const EMOJI_REGEX = /\p{Extended_Pictographic}/gu;
 
-function isSocialPersonalNoise(signal: LiveSignal): boolean {
+function isSocialStructuralNoise(signal: LiveSignal): boolean {
   const text = [signal.title, signal.content?.slice(0, 400)]
-    .filter(Boolean).join(" ").toLowerCase();
-  for (const p of SOCIAL_PERSONAL_NOISE_PATTERNS) {
-    if (p.test(text)) return true;
-  }
+    .filter(Boolean).join(" ").trim();
+  if (text.length === 0) return true;
+
+  // (1) Sehr kurzer Text ohne erkennbaren Content-Anker — unter 60 Zeichen
+  //     ist es statistisch extrem selten, dass ein Post strategische
+  //     Substanz trägt. Pressetexte von Authoritative-Sources wären nie
+  //     so kurz; social-tier Threshold darf hier hart sein.
+  if (text.length < 60) return true;
+
+  // (2) Emoji-Dichte: wenn > 10% der Zeichen Emoji sind, ist das ein
+  //     Personal-/Greeting-Post, kein Intelligence-Signal.
+  const emojiCount = (text.match(EMOJI_REGEX) || []).length;
+  if (emojiCount > 0 && emojiCount / text.length > 0.10) return true;
+
+  // (3) Struktur „<Gewicht/Maß> <Lebewesen>" oder umgekehrt — greift
+  //     Baby-/Haustier-Weight-Updates OHNE harte Wort-Liste. „1,2 kg"
+  //     oder „3kg" neben einer zoologisch/familial-Kategorie wie baby/
+  //     kid/infant/pet/puppy/kitten/katze/hund/welpe in beliebiger
+  //     Reihenfolge, innerhalb 60 Zeichen.
+  const WEIGHT_NEAR_BEING = /\b\d+[.,]?\d*\s*(kg|lbs|oz|pound|pfund|gramm?)\b[^.]{0,60}\b(baby|babies|infant|kid|kids|kiddo|child|kleinen?|puppy|kitten|pup|welpe|welpen|kätzchen|hundie|hundchen|cat|dog|pet|haustier)\b|\b(baby|babies|infant|kid|kids|kiddo|child|kleinen?|puppy|kitten|pup|welpe|welpen|kätzchen|cat|dog|pet|haustier)\b[^.]{0,60}\b\d+[.,]?\d*\s*(kg|lbs|oz|pound|pfund|gramm?)\b/i;
+  if (WEIGHT_NEAR_BEING.test(text)) return true;
+
   return false;
 }
 
@@ -374,6 +390,116 @@ function isNoiseSignal(
   return false;
 }
 
+// ─── Query-keyword extraction & topic-score helpers ────────────────────────
+//
+// Extracted from `getRelevantSignals` so the same logic can be reused in
+// the API route to recompute topic-fit against the ORIGINAL query after
+// trend-based enrichment. Without this reuse, the second retrieval pass
+// (by trend name) produced signals whose `keywordOverlap` was relative to
+// the TREND name, not the user's question — misleading in the UI.
+
+const STOP_WORDS = new Set([
+  // DE question words
+  "wie", "was", "wo", "wer", "wann", "warum", "welche", "welcher", "welches",
+  // DE articles & pronouns
+  "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
+  "sich", "ich", "du", "er", "sie", "es", "wir", "ihr", "mein", "dein", "sein",
+  "diese", "dieser", "dieses", "diesen", "diesem", "jede", "jeder", "jedes",
+  // DE common verbs & auxiliaries
+  "ist", "sind", "hat", "haben", "wird", "werden", "kann", "können",
+  "sein", "war", "waren", "wurde", "würde", "soll", "sollen", "muss", "müssen",
+  "gibt", "geben", "macht", "machen", "geht", "gehen", "kommt", "kommen",
+  // DE prepositions & conjunctions
+  "für", "von", "mit", "bei", "auf", "an", "in", "zu", "über", "unter",
+  "und", "oder", "aber", "also", "noch", "schon", "sehr", "nach", "vor",
+  "nicht", "kein", "keine", "nur", "mehr", "dass", "wenn", "weil", "dann",
+  "dort", "hier", "alle", "viel", "viele", "etwa", "erst", "bereits",
+  "im", "am", "zum", "zur", "als",
+  // EN question words
+  "the", "how", "what", "where", "when", "why", "which", "who",
+  // EN common
+  "is", "are", "has", "have", "will", "can", "for", "with", "from",
+  "and", "but", "not", "this", "that", "these", "those", "been", "does",
+  "into", "than", "then", "some", "such", "also", "most", "much", "many",
+]);
+
+const IMPORTANT_SHORT_TERMS = new Set([
+  "ki", "ai", "eu", "un", "us", "uk", "it", "ml", "ar", "vr", "xr",
+  "5g", "6g", "iot", "llm", "rag", "api", "b2b", "b2c", "esg", "gdp",
+]);
+
+/**
+ * Extract the query's content-bearing keywords — stopword-free, lower-case,
+ * no alias expansion. This is the "canonical" keyword set the UI should use
+ * to measure a signal's topic fit.
+ */
+export function extractQueryKeywords(query: string): string[] {
+  return query
+    .toLowerCase()
+    .replace(/[^\w\säöüß]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .filter((w) => !STOP_WORDS.has(w) && (w.length >= 4 || IMPORTANT_SHORT_TERMS.has(w)));
+}
+
+/**
+ * Measure how topically a signal engages with a query's keywords.
+ *
+ * Returns three complementary metrics:
+ *
+ *  - `overlap`: fraction of query keywords that appear somewhere in the
+ *    signal text. Legacy metric, kept for backward compatibility.
+ *
+ *  - `weightedOverlap`: length-weighted overlap. A matching 10-character
+ *    word counts more than a matching 4-character word, on the intuition
+ *    that longer words are typically more content-bearing and less likely
+ *    to be incidental stopword-like matches. Formula: sum of matched
+ *    keyword.length / sum of all keyword.length. This is a cheap, local
+ *    TF-IDF approximation — no corpus needed.
+ *
+ *  - `anchorMatched`: did at least one "anchor" keyword appear? Anchors
+ *    are keywords of length ≥ 5 — if the query has no ≥5 keyword we fall
+ *    back to "any keyword". The anchor rule prevents a signal that only
+ *    matched a short generic word (e.g. only "eu" from "eu mobility
+ *    policy") from being treated as topical evidence.
+ *
+ * Generic enough to work for any query in any domain — no per-topic
+ * customisation required.
+ */
+export function computeKeywordStats(
+  baseKeywords: string[],
+  signalText: string,
+): { matched: number; overlap: number; weightedOverlap: number; anchorMatched: boolean } {
+  if (baseKeywords.length === 0) {
+    return { matched: 0, overlap: 0, weightedOverlap: 0, anchorMatched: false };
+  }
+  const text = signalText.toLowerCase();
+
+  let matched = 0;
+  let matchedWeight = 0;
+  let totalWeight = 0;
+  let anchorMatched = false;
+
+  const anchors = baseKeywords.filter((k) => k.length >= 5);
+  const anchorSet = new Set(anchors.length > 0 ? anchors : baseKeywords);
+
+  for (const kw of baseKeywords) {
+    totalWeight += kw.length;
+    if (text.includes(kw)) {
+      matched += 1;
+      matchedWeight += kw.length;
+      if (anchorSet.has(kw)) anchorMatched = true;
+    }
+  }
+
+  return {
+    matched,
+    overlap: matched / baseKeywords.length,
+    weightedOverlap: totalWeight > 0 ? matchedWeight / totalWeight : 0,
+    anchorMatched,
+  };
+}
+
 /**
  * Finds live signals relevant to a query using keyword + phrase matching
  * with post-retrieval coherence filtering.
@@ -385,6 +511,13 @@ function isNoiseSignal(
  *  3. Source-topic coherence filter removes prediction-market noise
  *  4. Keyword overlap ratio check (30% minimum)
  *  5. Over-fetches 3x from SQL then post-filters to requested limit
+ *
+ * 2026-04-21 update (generalisation pass):
+ *  - Length-weighted keyword overlap (cheap TF-IDF) replaces flat 30% rule.
+ *  - Anchor-keyword requirement: at least one ≥5-char query keyword must
+ *    appear in the signal, otherwise it is discarded regardless of score.
+ *  - Social-tier signals face structural noise checks (text length, emoji
+ *    density, weight-near-being pattern) instead of a verbatim word list.
  */
 /**
  * Synchron-Variante für Legacy-Aufrufer. Der Notion-Plan P1-1 (#13)
@@ -419,42 +552,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     }
   }
 
-  // Extract meaningful keywords from query (skip short/common words)
-  const stopWords = new Set([
-    // DE question words
-    "wie", "was", "wo", "wer", "wann", "warum", "welche", "welcher", "welches",
-    // DE articles & pronouns
-    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
-    "sich", "ich", "du", "er", "sie", "es", "wir", "ihr", "mein", "dein", "sein",
-    "diese", "dieser", "dieses", "diesen", "diesem", "jede", "jeder", "jedes",
-    // DE common verbs & auxiliaries
-    "ist", "sind", "hat", "haben", "wird", "werden", "kann", "können",
-    "sein", "war", "waren", "wurde", "würde", "soll", "sollen", "muss", "müssen",
-    "gibt", "geben", "macht", "machen", "geht", "gehen", "kommt", "kommen",
-    // DE prepositions & conjunctions
-    "für", "von", "mit", "bei", "auf", "an", "in", "zu", "über", "unter",
-    "und", "oder", "aber", "also", "noch", "schon", "sehr", "nach", "vor",
-    "nicht", "kein", "keine", "nur", "mehr", "dass", "wenn", "weil", "dann",
-    "dort", "hier", "alle", "viel", "viele", "etwa", "erst", "bereits",
-    "im", "am", "zum", "zur", "als",
-    // EN question words
-    "the", "how", "what", "where", "when", "why", "which", "who",
-    // EN common
-    "is", "are", "has", "have", "will", "can", "for", "with", "from",
-    "and", "but", "not", "this", "that", "these", "those", "been", "does",
-    "into", "than", "then", "some", "such", "also", "most", "much", "many",
-  ]);
-
-  const importantShortTerms = new Set([
-    "ki", "ai", "eu", "un", "us", "uk", "it", "ml", "ar", "vr", "xr",
-    "5g", "6g", "iot", "llm", "rag", "api", "b2b", "b2c", "esg", "gdp",
-  ]);
-
-  const baseKeywords = query
-    .toLowerCase()
-    .replace(/[^\w\säöüß]/g, " ")
-    .split(/\s+/)
-    .filter((w) => !stopWords.has(w) && (w.length >= 4 || importantShortTerms.has(w)));
+  const baseKeywords = extractQueryKeywords(query);
 
   // ALG-22: Extract bigrams for phrase matching
   const bigrams: string[] = [];
@@ -516,45 +614,57 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // ── Post-SQL filtering ────────────────────────────────────────────────
 
   // Filter 1: Remove prediction market sports/betting noise
-  let filtered = rows.filter((row) => !isNoiseSignal(row, baseKeywords));
+  const filtered = rows.filter((row) => !isNoiseSignal(row, baseKeywords));
 
-  // Filter 2: Per-tier keyword overlap ratio.
+  // Filter 2: Anchor-match + weighted overlap + per-tier threshold.
   //
-  // Previously a flat 30% overlap floor applied to every source. Result:
-  // a Bluesky personal post ("Sunrise this morning here in Glastonbury")
-  // could sneak into a "Welche Regionen in Europa…" query just by
-  // coincidence of stopword-adjacent matches. Now each tier gets its
-  // own threshold (TIER_MIN_OVERLAP) — social content must actually
-  // engage with the query, not just brush against it.
+  // 2026-04-21 generalisation pass. The earlier heuristic stack was a
+  // flat 30% overlap (too permissive for short-form content) plus a
+  // verbatim word-list filter for social posts (overfit to the one
+  // screenshot we had). Both are replaced here by structural rules
+  // that apply to any query in any domain:
   //
-  // Each surviving signal also carries its keywordOverlap and sourceTier
-  // forward, so the UI + Orbit scoring can use them as deterministic
-  // fallbacks when the LLM does not supply queryRelevance.
-  const keywordCount = Math.max(1, baseKeywords.length);
+  //   A) ANCHOR-MATCH — the signal must contain at least one ≥5-char
+  //      query keyword (or, if no such keyword exists, at least one
+  //      keyword). Short accidental matches on "eu" / "ai" / "us" no
+  //      longer qualify as topical fit.
+  //
+  //   B) WEIGHTED OVERLAP — matched-keyword length sum / total-keyword
+  //      length sum. A cheap TF-IDF approximation that weighs rare
+  //      (longer) words more. `TIER_MIN_OVERLAP` is evaluated against
+  //      this, not the unweighted count.
+  //
+  //   C) SOCIAL STRUCTURAL NOISE — social-tier signals additionally
+  //      must pass `isSocialStructuralNoise`: too short / emoji-heavy /
+  //      weight-near-being patterns get dropped. No word list — pattern
+  //      captures shape, not specific vocabulary.
+  //
+  // Each surviving signal carries `keywordOverlap` (= weighted overlap
+  // against the query) and `sourceTier` forward, so downstream UI +
+  // Orbit scoring can use them as deterministic fallbacks when the LLM
+  // has not supplied per-signal queryRelevance.
   const enriched: (LiveSignal & { relevance_score: number; keywordOverlap: number; sourceTier: SourceTier })[] = [];
   for (const row of filtered) {
     const signalText = [row.title, row.topic, row.content?.slice(0, 1000), row.tags]
-      .filter(Boolean).join(" ").toLowerCase();
-    let matchedCount = 0;
-    for (const kw of baseKeywords) {
-      if (signalText.includes(kw)) matchedCount++;
-    }
-    const overlap = matchedCount / keywordCount;
+      .filter(Boolean).join(" ");
+    const stats = computeKeywordStats(baseKeywords, signalText);
     const tier = classifySource(row.source);
 
-    // Social-tier signals must clear a personal-noise check too — stops
-    // Bluesky babysitter / sunrise / pet-weight posts even when they
-    // somehow pass the keyword overlap. We skip this for sport/entertainment
-    // queries that the user explicitly asked about (same contract as
-    // queryIsAboutNoiseTopic above).
-    if (tier === "social" && !queryIsAboutNoiseTopic(baseKeywords) && isSocialPersonalNoise(row)) {
+    // (A) Anchor-match — skipped when the user explicitly asked about a
+    // noise topic (sports, entertainment) so the strict filter does not
+    // swallow the signals they actually want.
+    if (!stats.anchorMatched && !queryIsAboutNoiseTopic(baseKeywords)) continue;
+
+    // (C) Social-tier structural noise check.
+    if (tier === "social" && !queryIsAboutNoiseTopic(baseKeywords) && isSocialStructuralNoise(row)) {
       continue;
     }
 
+    // (B) Weighted overlap against per-tier threshold.
     const minOverlap = TIER_MIN_OVERLAP[tier];
-    if (overlap < minOverlap) continue;
+    if (stats.weightedOverlap < minOverlap) continue;
 
-    enriched.push({ ...row, keywordOverlap: overlap, sourceTier: tier });
+    enriched.push({ ...row, keywordOverlap: stats.weightedOverlap, sourceTier: tier });
   }
 
   return enriched.slice(0, limit);

@@ -292,7 +292,14 @@ export async function POST(req: Request) {
   }
 
   const { buildSystemPrompt } = await import("@/lib/llm");
-  const { getRelevantSignals, formatSignalsForPrompt, getSignalAge } = await import("@/lib/signals");
+  const {
+    getRelevantSignals,
+    formatSignalsForPrompt,
+    getSignalAge,
+    extractQueryKeywords,
+    computeKeywordStats,
+    classifySource,
+  } = await import("@/lib/signals");
   const { buildContextProfilePrefix } = await import("@/lib/context-profiles");
 
   const trends = loadTrendsFromDB();
@@ -728,16 +735,30 @@ export async function POST(req: Request) {
             }
           }
 
-          const signalsMeta = mergedSignals.map((s: any) => ({
-            source: s.source,
-            title: s.title,
-            url: s.url,
-            strength: s.strength,
-            date: s.fetched_at.slice(0, 10),
-            keywordOverlap: typeof s.keywordOverlap === "number" ? s.keywordOverlap : undefined,
-            sourceTier: s.sourceTier,
-            queryRelevance: refLookup.get(refKey(s.source, s.title)),
-          }));
+          // Recompute keyword overlap against the ORIGINAL query for
+          // every merged signal. The second retrieval pass (by trend
+          // name) decorates signals with overlap relative to the TREND
+          // name, which is misleading in the UI — the user sees the
+          // number next to their original question, not the trend. By
+          // recomputing here, every signal displayed to the user carries
+          // a topic-fit number that is honestly relative to the question
+          // they asked. Generic, applies to any query.
+          const queryKeywords = extractQueryKeywords(query);
+          const signalsMeta = mergedSignals.map((s: any) => {
+            const signalText = [s.title, s.topic, s.content?.slice(0, 1000), s.tags]
+              .filter(Boolean).join(" ");
+            const stats = computeKeywordStats(queryKeywords, signalText);
+            return {
+              source: s.source,
+              title: s.title,
+              url: s.url,
+              strength: s.strength,
+              date: s.fetched_at.slice(0, 10),
+              keywordOverlap: stats.weightedOverlap,
+              sourceTier: s.sourceTier ?? classifySource(s.source),
+              queryRelevance: refLookup.get(refKey(s.source, s.title)),
+            };
+          });
 
           // Augment: causal edges between matched trends.
           //
