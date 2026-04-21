@@ -384,6 +384,27 @@ export const PLANNED_CONNECTORS: PlannedConnector[] = [
     notionUrl: "https://www.notion.so/4c5f6254f3dd46dc99f91bb015c1565d",
   },
   {
+    // 2026-04-22 (Backlog: „ESPAS / EU JRC Quelle integrieren"): ESPAS ist
+    // das EU-Foresight-Konsortium (Kommission + EP + Rat + EAD + Ausschüsse)
+    // und publiziert langfristige Trend-Reports (Horizont 2030/2050). Keine
+    // API — nur PDF-Publikationen. Daher als Referenzquelle / Foresight-
+    // Dokument eingeordnet (backlog=true), um die Absicht festzuhalten,
+    // ohne einen Connector zu versprechen, der technisch nicht baubar ist.
+    slug: "espas-eu-foresight",
+    displayName: "ESPAS (EU Foresight System)",
+    category: "foresight",
+    type: "forschung",
+    priority: "medium",
+    access: "download",
+    descriptionDe: "Gemeinsames Foresight-Programm von EU-Kommission, EP, Rat und EAD. Publiziert strategische Lang-Trend-Reports (2030/2050) als PDF. Für SIS als Referenzquelle und LLM-Kontext nutzbar, keine Live-API.",
+    descriptionEn: "Joint foresight programme of the European Commission, Parliament, Council and EEAS. Publishes long-horizon (2030/2050) trend reports as PDF. For SIS usable as a reference source and LLM context, no live API.",
+    docUrl: "https://espas.eu/",
+    apiUrl: "https://espas.eu/",
+    rateLimit: "N/A (PDF)",
+    notionUrl: "https://www.notion.so/33661c848a4f819e8ed4dc0a894aa73c",
+    backlog: true,
+  },
+  {
     slug: "gesis-eurobarometer-datenzugang",
     displayName: "GESIS / Eurobarometer Datenzugang",
     category: "umfragen",

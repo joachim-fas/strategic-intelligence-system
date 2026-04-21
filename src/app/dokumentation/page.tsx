@@ -234,7 +234,7 @@ export default function Dokumentation() {
     {
       id: "social", label: "Social (2)",
       content: <ConnectorGrid items={[
-        { name: "Bluesky" }, { name: "Mastodon" },
+        { name: "Bluesky (AT Protocol)" }, { name: "Mastodon" },
       ]} />,
     },
     {

@@ -12,7 +12,9 @@ import { computeSignalStrength } from "@/lib/signal-strength";
 
 export const unDataConnector: SourceConnector = {
   name: "un_data",
-  displayName: "UN Data (Population Statistics)",
+  // Backlog "Quellen-Namensinkonsistenzen" (2026-04-22): auf kurzen
+  // Grid-Pill-Name („UN Data") in /dokumentation angeglichen.
+  displayName: "UN Data",
 
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];

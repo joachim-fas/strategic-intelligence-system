@@ -357,10 +357,10 @@ Signals are fetched every 4 hours and stored in `live_signals` for RAG context.
 
 | Connector | Source | Free | Auth | Reliability |
 |-----------|--------|------|------|-------------|
-| `bluesky` | Bluesky / AT Protocol | Yes | None | Medium |
-| `mastodon_api` | Mastodon Fediverse | Yes | None | Medium |
+| `bluesky` | Bluesky (AT Protocol) | Yes | None | Medium |
+| `mastodon_api` | Mastodon | Yes | None | Medium |
 | `docker_hub` | Docker Hub Image Stats | Yes | None | High |
-| `patentsview` | USPTO PatentsView | Yes | None | High |
+| `patentsview` | PatentsView (USPTO) | Yes | None | High |
 | `crossref` | CrossRef DOI Metadata | Yes | None (polite) | High |
 | `semantic_scholar` | Semantic Scholar (AI2) | Yes | None | High |
 

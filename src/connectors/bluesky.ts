@@ -37,7 +37,12 @@ function detectTopic(text: string): string {
 
 export const blueskyConnector: SourceConnector = {
   name: "bluesky",
-  displayName: "Bluesky (Social)",
+  // Backlog "Quellen-Namensinkonsistenzen" (2026-04-22): Einheitlicher
+  // Anzeigename quer durch SOURCES.md, /cockpit Quellen-Tabelle und
+  // /dokumentation. „AT Protocol" beschreibt die Plattform präziser als
+  // das generische „Social" und stimmt mit der externen Markenführung
+  // von Bluesky überein.
+  displayName: "Bluesky (AT Protocol)",
 
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];

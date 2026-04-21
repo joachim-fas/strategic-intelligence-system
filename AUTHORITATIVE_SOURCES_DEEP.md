@@ -920,6 +920,24 @@ These are already integrated into SIS and are excluded from the new source count
 
 ---
 
+### Source 51a: EU AI Act Open-Source Compliance Toolkits
+
+| Field | Detail |
+|-------|--------|
+| **Organization** | Multi-consortium (European Commission AI Office, open-source community) |
+| **Publications** | EU AI Act Compliance Checker, AI Verify Foundation toolkit, OECD AI System Classification Framework |
+| **URLs** | https://artificialintelligenceact.eu/assessment/eu-ai-act-compliance-checker/ · https://aiverifyfoundation.sg/ · https://oecd.ai/en/classification |
+| **Trend Data** | Machine-readable compliance templates for EU AI Act Articles 9–15 (risk management, data governance, technical documentation, record-keeping, transparency, human oversight, accuracy/robustness/cybersecurity). AI Verify Foundation publishes an open-source testing toolkit implementing OECD + NIST AI RMF principles. OECD AI System Classification Framework gives a shared vocabulary for system risk tier assignment. |
+| **Update Frequency** | Rolling updates as AI Act implementing acts and code-of-conduct drafts land |
+| **Data Format** | Open-source repos, web assessment tool, YAML/JSON classification outputs |
+| **Cost** | Free |
+| **Geographic Coverage** | EU primary, OECD/global secondary |
+| **Reliability** | 4/5 (consortium-maintained; authoritative reference but implementations still evolving) |
+| **STEEP+V Mapping** | P (AI governance, EU regulation), V (AI ethics & accountability) |
+| **SIS use** | Reference frame for any compliance-adjacent query. The toolkit URLs are appropriate `[REG]`/`[LLM-KNOWLEDGE]` citation targets when a user asks about EU AI Act obligations. Added 2026-04-22 per backlog item „Open-Source AI Governance Toolkit für EU Compliance". |
+
+---
+
 ## 8. Economics & Finance
 
 ### Source 52: BIS Annual Report & Quarterly Review

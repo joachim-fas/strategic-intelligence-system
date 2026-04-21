@@ -12,7 +12,10 @@ import { computeSignalStrength } from "@/lib/signal-strength";
 
 export const patentsviewConnector: SourceConnector = {
   name: "patentsview",
-  displayName: "PatentsView (USPTO Patents)",
+  // Backlog "Quellen-Namensinkonsistenzen" (2026-04-22): „Patents" im
+  // Namen doppelt — der Produktname PatentsView macht es schon klar.
+  // Gleichzeitig an /dokumentation-Pills und SOURCES.md angeglichen.
+  displayName: "PatentsView (USPTO)",
 
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];

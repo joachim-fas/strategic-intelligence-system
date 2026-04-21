@@ -40,7 +40,9 @@ function detectTopic(text: string): string {
 
 export const mastodonApiConnector: SourceConnector = {
   name: "mastodon_api",
-  displayName: "Mastodon (Public Timeline)",
+  // Backlog "Quellen-Namensinkonsistenzen" (2026-04-22): auf den
+  // kurzen Grid-Pill-Name („Mastodon") in /dokumentation angeglichen.
+  displayName: "Mastodon",
 
   async fetchSignals(): Promise<RawSignal[]> {
     const signals: RawSignal[] = [];
