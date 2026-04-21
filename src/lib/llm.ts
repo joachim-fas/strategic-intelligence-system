@@ -151,6 +151,20 @@ interface LLMBriefingResponse {
     name: string;
     date?: string;
   }>;
+  /**
+   * Per-query relevance rating for the live signals the LLM actually
+   * leaned on. Keyed by the signal's source + title so downstream code
+   * can join this with the server-side retrieved signal set. Added
+   * 2026-04-21 as part of the Signal-Kettenbezug fix — lets the UI
+   * distinguish "signal that topically engages with the question" from
+   * "signal that happened to share a keyword". Absent → consumers fall
+   * back to keyword-overlap as the topical-fit proxy.
+   */
+  usedSignalRefs?: Array<{
+    source: string;
+    title: string;
+    queryRelevance: number;
+  }>;
   balancedScorecard?: {
     perspectives: Array<{
       id: string;
@@ -389,6 +403,14 @@ The schema below COMBINES the v0.2 Notion-spec fields with the legacy fields the
     { "type": "signal | trend | regulation | edge | llm", "name": "Source identifier", "date": "ISO date or 'LLM-knowledge'" }
   ],
 
+  "usedSignalRefs": [
+    {
+      "source": "Exact source identifier as shown in <live_signals>, e.g. 'un_sdg' or 'ECFR_RSS'",
+      "title": "Exact signal title copied from <live_signals>",
+      "queryRelevance": 0.85
+    }
+  ],
+
   "steepV": {
     "S": "1-2 sentences — or null if irrelevant to this question",
     "T": "1-2 sentences — or null",
@@ -459,6 +481,19 @@ For EVERY matched trend, supply a per-query relevance in \`matchedTrendRelevance
 - 0.10-0.29: touches the topic but not formative
 - < 0.10: don't match this trend
 The global trend relevance (in the list above) is NOT automatically the query relevance. Rate topic-specifically.
+
+## Signal Relevance (critical — fixes the 2026-04-21 Wintersport/Wien-Bezirk bug)
+
+Many queries are served a broad retrieval pool where the keyword filter is intentionally permissive (cross-language aliases, bigrams). The UI previously treated the entire pool as "evidence cited by the LLM" — which is wrong when most pool entries are topically unrelated (e.g. a UN fertility story shown as evidence for a Vienna-district question).
+
+For EVERY signal you actually engage with in your synthesis, add an entry to \`usedSignalRefs\` with a per-query relevance rating. Copy source + title VERBATIM from the \`<live_signals>\` block so the server can join on exact strings.
+
+- 0.80-1.00: directly on-topic, could be cited as evidence in the answer
+- 0.50-0.79: useful context for one facet of the question
+- 0.25-0.49: tangentially related, mentioned but not load-bearing
+- < 0.25: do NOT include — you are not actually using this signal
+
+If the live-signals block contains NO signals that are topically on the question — say so in your synthesis (transparent data-gap statement). Do NOT pad \`usedSignalRefs\` with off-topic entries just to have a non-empty list. An empty \`usedSignalRefs\` paired with \`dataQuality.dominantSourceType = "llm-knowledge"\` is the honest answer when live coverage is thin.
 
 ## Balanced Scorecard
 

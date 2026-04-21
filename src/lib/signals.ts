@@ -8,6 +8,7 @@
 
 import Database from "better-sqlite3";
 import path from "path";
+import type { SourceTier } from "@/types";
 
 export interface LiveSignal {
   id: string;
@@ -21,7 +22,117 @@ export interface LiveSignal {
   strength: number | null;
   raw_data: string | null;
   fetched_at: string;
+  /**
+   * Topical-relevance metadata attached by `getRelevantSignals`.
+   * Downstream code (orbit scoring, briefing UI) consumes these instead
+   * of guessing — see the 2026-04-21 Signal-Relevance fix plan.
+   */
+  keywordOverlap?: number;
+  sourceTier?: SourceTier;
 }
+
+// ─── Source tiering ─────────────────────────────────────────────────────────
+
+/**
+ * Map connector source identifiers to authority tiers. Unknown sources
+ * default to "media" — middle of the road, neither privileged nor
+ * penalised. Extend this map as new connectors are added in
+ * src/connectors/.
+ */
+const SOURCE_TIER_MAP: Record<string, SourceTier> = {
+  // Authoritative — intergovernmental, government, policy bodies
+  un_sdg: "authoritative",
+  un_news_rss: "authoritative",
+  un_data: "authoritative",
+  who_gho: "authoritative",
+  ilo: "authoritative",
+  imf: "authoritative",
+  oecd: "authoritative",
+  worldbank: "authoritative",
+  eurostat: "authoritative",
+  destatis: "authoritative",
+  fred: "authoritative",
+  bls: "authoritative",
+  ecfr_rss: "authoritative",
+  ucdp: "authoritative",
+  acled: "authoritative",
+  nasa_eonet: "authoritative",
+  owid: "authoritative",
+  vdem: "authoritative",
+  patentsview: "authoritative",
+
+  // Academic — peer-reviewed & preprint
+  arxiv: "academic",
+  arxiv_qbio_rss: "academic",
+  crossref: "academic",
+  semantic_scholar: "academic",
+  openalex: "academic",
+  nature_rss: "academic",
+
+  // Media — edited news (strength-weighted, not privileged)
+  guardian: "media",
+  nyt: "media",
+  newsdata: "media",
+  news_sentiment: "media",
+  media_cloud: "media",
+  spiegel_rss: "media",
+  aljazeera_rss: "media",
+  gdelt: "media",
+
+  // Social — personal/unedited, needs high topic-match to count
+  bluesky: "social",
+  mastodon_api: "social",
+  mastodon_sentiment: "social",
+  reddit: "social",
+  youtube_sentiment: "social",
+
+  // Proxy — aggregate indicators, not content-as-evidence
+  polymarket: "proxy",
+  kalshi: "proxy",
+  manifold: "proxy",
+  metaculus: "proxy",
+  "google-ngram": "proxy",
+  google_trends: "proxy",
+  hackernews: "proxy",
+  github: "proxy",
+  producthunt: "proxy",
+  stackoverflow: "proxy",
+  npm_pypi: "proxy",
+  docker_hub: "proxy",
+  finnhub: "proxy",
+  open_exchange: "proxy",
+  sentiment: "proxy",
+  worldmonitor: "proxy",
+  wikipedia: "proxy",
+  open_meteo: "proxy",
+};
+
+export function classifySource(source: string): SourceTier {
+  const key = source.toLowerCase();
+  if (SOURCE_TIER_MAP[key]) return SOURCE_TIER_MAP[key];
+  // Heuristic fallbacks for unmapped sources
+  if (key.includes("rss") || key.includes("news")) return "media";
+  if (key.includes("sdg") || key.includes("gov") || key.endsWith("_data")) return "authoritative";
+  if (key.includes("ngram") || key.includes("trends") || key.includes("sentiment")) return "proxy";
+  return "media";
+}
+
+/**
+ * Minimum keyword-overlap per tier. The more authoritative the source,
+ * the looser the topical-match requirement: UN/IPCC content is editorial
+ * and focused, so even a single matching keyword signals engagement with
+ * the topic. Social content is noisy — we demand substantial keyword
+ * density before we let it through.
+ *
+ * These override the global 30% overlap floor in getRelevantSignals.
+ */
+const TIER_MIN_OVERLAP: Record<SourceTier, number> = {
+  authoritative: 0.25,
+  academic: 0.30,
+  media: 0.30,
+  proxy: 0.40,
+  social: 0.60,  // Bluesky etc. — needs to really be on-topic
+};
 
 function db() {
   const d = new Database(path.join(process.cwd(), "local.db"));
@@ -151,6 +262,39 @@ const GLOBAL_NOISE_PATTERNS: RegExp[] = [
   // Gaming / E-Sports (Plattform-Level, nicht Industry-Level)
   /\b(twitch streamer|esports tournament|league of legends tournament|fortnite event)\b/i,
 ];
+
+/**
+ * Personal-/lifestyle-noise patterns. Fix 2026-04-21 (Wintersport-Fall):
+ * Bluesky and Mastodon posts about babysitters, pets, baby-weight
+ * updates, sunrise photos, cooking etc. were passing the keyword filter
+ * via stray topic-tag matches and appearing as "Live-Signale" in
+ * strategic-intelligence queries. These patterns apply ONLY to
+ * social-tier sources — we do not want to strip "baby boom" demographic
+ * news from an authoritative connector.
+ */
+const SOCIAL_PERSONAL_NOISE_PATTERNS: RegExp[] = [
+  // Childcare / baby / pets
+  /\b(babysitter|babysitting|windel|diaper|stroller|kinderwagen|wackelkandidat)\b/i,
+  /\b(mein kleiner|meine kleine|unser baby|our baby)\b/i,
+  /\b(best\s+(babysitter|dog|cat|pet))\b/i,
+  // Lifestyle photo updates
+  /\b(sunrise this morning|good morning from|coffee this morning|this morning here in)\b/i,
+  /\b(guten morgen aus|heute morgen|frühstück|breakfast vibes)\b/i,
+  // Pet weight / feeding
+  /\b\d+[.,]?\d*\s*kg\b.*\b(baby|baby['´]s|katze|hund|puppy|kitten)\b/i,
+  /\b(baby|baby['´]s|katze|hund|puppy|kitten)\b.*\b\d+[.,]?\d*\s*kg\b/i,
+  // Generic personal greetings / emoji-heavy
+  /^[^\w]*(best|love|❤️|♥|😍|🥰)\b.{0,40}[❤️♥😍🥰]/i,
+];
+
+function isSocialPersonalNoise(signal: LiveSignal): boolean {
+  const text = [signal.title, signal.content?.slice(0, 400)]
+    .filter(Boolean).join(" ").toLowerCase();
+  for (const p of SOCIAL_PERSONAL_NOISE_PATTERNS) {
+    if (p.test(text)) return true;
+  }
+  return false;
+}
 
 /**
  * Polymarket-spezifische Match-/Wett-Patterns. Fix 2026-04-21:
@@ -374,19 +518,46 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // Filter 1: Remove prediction market sports/betting noise
   let filtered = rows.filter((row) => !isNoiseSignal(row, baseKeywords));
 
-  // Filter 2: Keyword overlap ratio — require 30% of keywords to appear
-  const minOverlapCount = Math.max(1, Math.ceil(baseKeywords.length * 0.3));
-  filtered = filtered.filter((row) => {
+  // Filter 2: Per-tier keyword overlap ratio.
+  //
+  // Previously a flat 30% overlap floor applied to every source. Result:
+  // a Bluesky personal post ("Sunrise this morning here in Glastonbury")
+  // could sneak into a "Welche Regionen in Europa…" query just by
+  // coincidence of stopword-adjacent matches. Now each tier gets its
+  // own threshold (TIER_MIN_OVERLAP) — social content must actually
+  // engage with the query, not just brush against it.
+  //
+  // Each surviving signal also carries its keywordOverlap and sourceTier
+  // forward, so the UI + Orbit scoring can use them as deterministic
+  // fallbacks when the LLM does not supply queryRelevance.
+  const keywordCount = Math.max(1, baseKeywords.length);
+  const enriched: (LiveSignal & { relevance_score: number; keywordOverlap: number; sourceTier: SourceTier })[] = [];
+  for (const row of filtered) {
     const signalText = [row.title, row.topic, row.content?.slice(0, 1000), row.tags]
       .filter(Boolean).join(" ").toLowerCase();
     let matchedCount = 0;
     for (const kw of baseKeywords) {
       if (signalText.includes(kw)) matchedCount++;
     }
-    return matchedCount >= minOverlapCount;
-  });
+    const overlap = matchedCount / keywordCount;
+    const tier = classifySource(row.source);
 
-  return filtered.slice(0, limit);
+    // Social-tier signals must clear a personal-noise check too — stops
+    // Bluesky babysitter / sunrise / pet-weight posts even when they
+    // somehow pass the keyword overlap. We skip this for sport/entertainment
+    // queries that the user explicitly asked about (same contract as
+    // queryIsAboutNoiseTopic above).
+    if (tier === "social" && !queryIsAboutNoiseTopic(baseKeywords) && isSocialPersonalNoise(row)) {
+      continue;
+    }
+
+    const minOverlap = TIER_MIN_OVERLAP[tier];
+    if (overlap < minOverlap) continue;
+
+    enriched.push({ ...row, keywordOverlap: overlap, sourceTier: tier });
+  }
+
+  return enriched.slice(0, limit);
 }
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────

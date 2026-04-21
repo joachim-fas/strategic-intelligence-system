@@ -169,12 +169,51 @@ export const DEFAULT_QUADRANTS = [
 
 // ─── Shared Canvas / Analysis Types ─────────────────────────
 
+/**
+ * Source authority classification — drives UI weighting, relevance
+ * thresholds in the retrieval filter, and the evidence-vs-noise
+ * decision in the BriefingResult Live-Signale section.
+ *
+ * Motivated by the 2026-04-21 Wintersport-Bug: a Bluesky personal post
+ * ("Best babysitter ❤️") passed both the keyword-overlap filter and
+ * the source-topic coherence filter, appeared in the Live-Signale
+ * section of a strategic-intelligence query as if it were evidence.
+ * Tiering lets us apply topic thresholds commensurate with the source's
+ * editorial authority.
+ *
+ *  - "authoritative": UN, IPCC, ECFR, EUR-Lex, government publications
+ *  - "media":         edited news outlets (Spiegel, Al Jazeera, Guardian)
+ *  - "academic":      peer-reviewed / preprint (arxiv, nature, crossref)
+ *  - "social":        Bluesky, Mastodon, Reddit — personal/unedited
+ *  - "proxy":         prediction markets, ngram corpora — aggregate
+ *                     signals, not content-as-evidence
+ */
+export type SourceTier = "authoritative" | "media" | "academic" | "social" | "proxy";
+
 export interface UsedSignal {
   source: string;
   title: string;
   url?: string;
   strength?: number;
   date?: string;
+  /**
+   * Fraction of query keywords matched in this signal's text [0, 1].
+   * Set by `getRelevantSignals` during retrieval. Serves as the
+   * deterministic fallback for topical relevance when the LLM has not
+   * supplied `queryRelevance`.
+   */
+  keywordOverlap?: number;
+  /**
+   * Source authority class — drives per-tier relevance thresholds in
+   * the Orbit and Briefing UIs. See `SourceTier` for the taxonomy.
+   */
+  sourceTier?: SourceTier;
+  /**
+   * Per-query topical relevance [0, 1] optionally supplied by the LLM.
+   * Preferred over `keywordOverlap` by consumers. Absent when the LLM
+   * did not score this signal or did not include it in its output.
+   */
+  queryRelevance?: number;
 }
 
 export interface Scenario {

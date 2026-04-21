@@ -93,6 +93,35 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSignals, setShowSignals] = useState(true); // default OPEN for transparency
 
+  // ── Topisch relevante Signale herausfiltern (Fix 2026-04-21) ──────────────
+  //
+  // `b.usedSignals` kommt als gemergter Pool aus Retrieval (1. Pass) + Trend-
+  // Namen-basierter Anreicherung (2. Pass). Ohne Filter landen Bluesky-
+  // Personal-Posts und Al-Jazeera-Geopolitik-Stories in der „Live-Signale"-
+  // Sektion, obwohl sie mit der Frage nichts zu tun haben. Der Filter zieht
+  // pro Signal den besten verfügbaren Topic-Score (LLM queryRelevance →
+  // keyword overlap → konservativer Default) und gated auf 0.25. Social-
+  // Tier-Signale müssen 0.5 schaffen.
+  //
+  // Die Kachel „Live-Signale N" zählt jetzt die GEFILTERTE Menge, damit
+  // UI-Zahl und inhaltliche Aussage konsistent sind (LLM sagt „keine
+  // direkten Signale" ⇒ Kachel zeigt 0 statt 13).
+  const rawSignals: any[] = Array.isArray(b.usedSignals) ? b.usedSignals : [];
+  const relevantSignals = rawSignals.filter((s: any) => {
+    const topic = typeof s.queryRelevance === "number"
+      ? s.queryRelevance
+      : typeof s.keywordOverlap === "number"
+        ? s.keywordOverlap
+        : 0.3;
+    if (s.sourceTier === "social") return topic >= 0.5;
+    return topic >= 0.25;
+  }).sort((a: any, b2: any) => {
+    const ta = typeof a.queryRelevance === "number" ? a.queryRelevance : (a.keywordOverlap ?? 0);
+    const tb = typeof b2.queryRelevance === "number" ? b2.queryRelevance : (b2.keywordOverlap ?? 0);
+    return tb - ta;
+  });
+  const hiddenSignalCount = rawSignals.length - relevantSignals.length;
+
   const saveToProject = async () => {
     // Allow retry after a previous failure — but guard against repeated
     // clicks while a save is in flight or after a successful save.
@@ -413,8 +442,8 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           const confPct = Math.round(displayConf * 100);
           const isStale = showDecay && decayFactor < 0.7; // >12 Tage ≈ 30% Verlust
           const tooltipBase = locale === "de"
-            ? `Konfidenz ${confPct}% — basiert auf ${b.usedSignals?.length ?? 0} Live-Signalen und ${b.references?.length ?? 0} Quellen.`
-            : `Confidence ${confPct}% — based on ${b.usedSignals?.length ?? 0} live signals and ${b.references?.length ?? 0} sources.`;
+            ? `Konfidenz ${confPct}% — basiert auf ${relevantSignals.length} topisch relevanten Signalen und ${b.references?.length ?? 0} Quellen.`
+            : `Confidence ${confPct}% — based on ${relevantSignals.length} topically relevant signals and ${b.references?.length ?? 0} sources.`;
           const tooltipDecay = showDecay
             ? (locale === "de"
               ? ` Alter ${ageDays.toFixed(1)} Tage — ursprünglich ${Math.round(briefing.confidence * 100)}%, mit 3%/Tag Decay.`
@@ -501,7 +530,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
           )}
 
           {/* 1b. KPI Hero Grid — Volt UI Dashboard pattern (4 cards) */}
-          {!isHelp && (b.usedSignals?.length > 0 || b.references?.length > 0 || briefing.confidence > 0 || b.scenarios?.length > 0) && (
+          {!isHelp && (rawSignals.length > 0 || b.references?.length > 0 || briefing.confidence > 0 || b.scenarios?.length > 0) && (
             <div
               style={{
                 display: "grid",
@@ -523,12 +552,18 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                   icon={<Gauge size={16} />}
                 />
               )}
-              {b.usedSignals?.length > 0 && (
+              {rawSignals.length > 0 && (
                 <VoltKpiCard
                   variant="light"
                   label={locale === "de" ? "Live-Signale" : "Live Signals"}
-                  value={b.usedSignals.length}
-                  subLabel={locale === "de" ? "Aus aktiven Connectors" : "From active connectors"}
+                  value={relevantSignals.length}
+                  subLabel={
+                    relevantSignals.length === 0
+                      ? (locale === "de" ? `0 topisch relevant (${hiddenSignalCount} gefiltert)` : `0 topically relevant (${hiddenSignalCount} filtered)`)
+                      : hiddenSignalCount > 0
+                        ? (locale === "de" ? `thematisch relevant · ${hiddenSignalCount} ausgefiltert` : `topically relevant · ${hiddenSignalCount} filtered out`)
+                        : (locale === "de" ? "Aus aktiven Connectors" : "From active connectors")
+                  }
                   icon={<Radio size={16} />}
                 />
               )}
@@ -1016,16 +1051,31 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
             </VoltSectionCard>
           )}
 
-          {/* Live Signals as Activity-List inside Section Card */}
-          {b.usedSignals?.length > 0 && (
+          {/* Live Signals as Activity-List inside Section Card.
+               Fix 2026-04-21: Sektion zeigt jetzt NUR noch topisch relevante
+               Signale (relevantSignals), nicht den gesamten Retrieval-Pool.
+               Subtitle trägt die Filter-Info, damit transparent bleibt, wie
+               viele Kandidaten rausgefallen sind. Bei 0 relevanten aber >0
+               Kandidaten → ehrlicher Empty-State, der NICHT dem LLM-Synthese-
+               Text widerspricht („keine direkten Signale"). */}
+          {rawSignals.length > 0 && (
             <VoltSectionCard
               icon={<Radio size={18} />}
               iconVariant="mint"
               title={locale === "de" ? "Live-Signale" : "Live Signals"}
-              subtitle={locale === "de"
-                ? `${b.usedSignals.length} aggregierte Signale`
-                : `${b.usedSignals.length} aggregated signals`}
-              action={
+              subtitle={relevantSignals.length === 0
+                ? (locale === "de"
+                  ? `Keine topisch relevanten Signale (${hiddenSignalCount} Kandidaten ausgefiltert)`
+                  : `No topically relevant signals (${hiddenSignalCount} candidates filtered out)`)
+                : hiddenSignalCount > 0
+                  ? (locale === "de"
+                    ? `${relevantSignals.length} thematisch relevant · ${hiddenSignalCount} ausgefiltert`
+                    : `${relevantSignals.length} topically relevant · ${hiddenSignalCount} filtered out`)
+                  : (locale === "de"
+                    ? `${relevantSignals.length} aggregierte Signale`
+                    : `${relevantSignals.length} aggregated signals`)
+              }
+              action={relevantSignals.length > 0 ? (
                 <button
                   onClick={() => setShowSignals((v) => !v)}
                   style={{
@@ -1043,11 +1093,23 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 >
                   {showSignals ? (locale === "de" ? "Einklappen" : "Collapse") : (locale === "de" ? "Ausklappen" : "Expand")}
                 </button>
-              }
+              ) : undefined}
             >
-              {showSignals && (
+              {relevantSignals.length === 0 ? (
+                <div style={{
+                  fontSize: 12,
+                  color: "var(--muted-foreground)",
+                  fontStyle: "italic",
+                  lineHeight: 1.55,
+                  padding: "4px 0",
+                }}>
+                  {locale === "de"
+                    ? "Die aktiven Connectors lieferten aktuell keine Signale, die direkt zur Frage passen. Die Synthese stützt sich auf strukturelle Trends und Fachwissen."
+                    : "The active connectors did not return any signals that directly match this question. The synthesis is grounded in structural trends and domain knowledge."}
+                </div>
+              ) : showSignals && (
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {b.usedSignals.map((s: { source: string; title: string; url: string | null; strength: number | null; date: string }, i: number) => {
+                  {relevantSignals.map((s: any, i: number) => {
                     const sourceIconVariant: "blue" | "mint" | "orchid" | "peach" | "butter" | "rose" =
                       s.source.toLowerCase().includes("arxiv") || s.source.toLowerCase().includes("crossref") ? "orchid"
                       : s.source.toLowerCase().includes("github") ? "light" as any
@@ -1058,6 +1120,14 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                     const SourceIcon = s.source.toLowerCase().includes("arxiv") || s.source.toLowerCase().includes("crossref") || s.source.toLowerCase().includes("openalex") ? DocIcon
                       : s.source.toLowerCase().includes("news") || s.source.toLowerCase().includes("guardian") || s.source.toLowerCase().includes("nyt") ? Newspaper
                       : Radio;
+                    // Zeige die Topic-Score-Badge, damit der User nachvollziehen kann,
+                    // WARUM dieses Signal hier auftaucht — und in welcher Stärke.
+                    const topic = typeof s.queryRelevance === "number"
+                      ? s.queryRelevance
+                      : typeof s.keywordOverlap === "number" ? s.keywordOverlap : null;
+                    const topicSource: "llm" | "keyword" | null = typeof s.queryRelevance === "number"
+                      ? "llm"
+                      : typeof s.keywordOverlap === "number" ? "keyword" : null;
                     return (
                       <a
                         key={i}
@@ -1069,7 +1139,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                           alignItems: "flex-start",
                           gap: 12,
                           padding: "12px 0",
-                          borderBottom: i < b.usedSignals.length - 1 ? "1px solid var(--color-border)" : "none",
+                          borderBottom: i < relevantSignals.length - 1 ? "1px solid var(--color-border)" : "none",
                           textDecoration: "none",
                           color: "inherit",
                         }}
@@ -1104,9 +1174,29 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                               textTransform: "uppercase",
                               color: "var(--muted-foreground)",
                               marginTop: 3,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
                           >
-                            {s.source}
+                            <span>{s.source}</span>
+                            {topic !== null && (
+                              <span
+                                title={topicSource === "llm"
+                                  ? (locale === "de" ? "Topischer Bezug laut LLM-Einschätzung" : "Topical relevance rated by LLM")
+                                  : (locale === "de" ? "Topischer Bezug aus Keyword-Überschneidung" : "Topical relevance from keyword overlap")}
+                                style={{
+                                  padding: "1px 6px",
+                                  borderRadius: 8,
+                                  background: topic >= 0.6 ? "rgba(26, 158, 90, 0.12)" : topic >= 0.4 ? "rgba(245, 200, 122, 0.18)" : "rgba(0,0,0,0.05)",
+                                  color: topic >= 0.6 ? "#0F6038" : topic >= 0.4 ? "#7A5C00" : "var(--muted-foreground)",
+                                  fontWeight: 600,
+                                  letterSpacing: "0.02em",
+                                }}
+                              >
+                                {Math.round(topic * 100)}%
+                              </span>
+                            )}
                           </div>
                         </div>
                       </a>

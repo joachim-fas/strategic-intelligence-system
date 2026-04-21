@@ -45,7 +45,22 @@ export interface IntelligenceBriefing {
   followUpQuestions?: string[];
   newsContext?: string;
   decisionFramework?: string;
-  usedSignals?: { source: string; title: string; url: string | null; strength: number | null; date: string }[];
+  usedSignals?: {
+    source: string;
+    title: string;
+    url: string | null;
+    strength: number | null;
+    date: string;
+    /**
+     * Topical-fit metadata populated in `src/app/api/v1/query/route.ts` and
+     * consumed by the BriefingResult + Orbit UI to filter signals whose
+     * content is off-topic for the current question. See the 2026-04-21
+     * Signal-Kettenbezug fix in Notion for the full data flow.
+     */
+    keywordOverlap?: number;
+    sourceTier?: "authoritative" | "media" | "academic" | "social" | "proxy";
+    queryRelevance?: number;
+  }[];
   /**
    * STEEP+V-Dimensionen — im System-Prompt (v0.2) als steepV-Feld
    * abgefragt und vom UI (BriefingResult.tsx) als 6-Kacheln-Grid

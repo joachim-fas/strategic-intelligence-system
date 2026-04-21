@@ -144,6 +144,33 @@ const UsedSourceSchema = z.object({
 });
 
 /**
+ * Per-query relevance rating for a live signal the LLM actually engaged
+ * with. Added 2026-04-21 as part of the Signal-Kettenbezug fix — lets
+ * the server and UI tell apart "signal that the LLM used" from
+ * "signal that matched a keyword by accident".
+ *
+ * The match back to the retrieved signal set is via exact
+ * source + title string equality, so both fields must be copied VERBATIM
+ * from the `<live_signals>` block in the prompt.
+ */
+const UsedSignalRefSchema = z.object({
+  source: z.string().max(120),
+  title: z.string().max(500),
+  queryRelevance: z.preprocess(
+    (val) => {
+      if (typeof val === "number") return val > 1 ? val / 100 : val;
+      if (typeof val === "string") {
+        const p = parseFloat(val);
+        if (isNaN(p)) return 0;
+        return p > 1 ? p / 100 : p;
+      }
+      return 0;
+    },
+    z.number().min(0).max(1).default(0)
+  ),
+});
+
+/**
  * Critical-Fix-Plan P1-2 (Notion 2026-04-20): Domains, deren URLs wir als
  * "editorially verified" markieren. Reihenfolge ist irrelevant; der
  * Match läuft via `host === domain || host.endsWith("." + domain)`.
@@ -263,6 +290,8 @@ export const LLMResponseSchema = z.object({
   dataQuality: DataQualitySchema.optional(),
   /** v0.2 structured source list for the provenance panel. */
   usedSources: z.array(UsedSourceSchema).max(40).optional(),
+  /** 2026-04-21 Signal-Kettenbezug fix: per-signal query relevance. */
+  usedSignalRefs: z.array(UsedSignalRefSchema).max(40).optional(),
   confidence: z.preprocess(
     (val) => {
       if (typeof val === "number") return val > 1 ? val / 100 : val;

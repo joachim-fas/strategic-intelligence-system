@@ -709,12 +709,34 @@ export async function POST(req: Request) {
           }
 
           const mergedSignals = Array.from(enriched.values()).slice(0, 32);
+
+          // Join LLM-supplied per-signal relevance with the retrieved pool.
+          // The LLM copied source+title verbatim from the prompt's
+          // <live_signals> block (per-prompt instruction), so we can key
+          // the lookup on `source|title`. Signals the LLM did not score
+          // keep `queryRelevance` undefined — the UI/Orbit then fall
+          // back to `keywordOverlap` as the topical-fit proxy.
+          const llmRefs = Array.isArray((validated as any).usedSignalRefs)
+            ? ((validated as any).usedSignalRefs as Array<{ source: string; title: string; queryRelevance: number }>)
+            : [];
+          const refLookup = new Map<string, number>();
+          const refKey = (source: string, title: string) =>
+            `${source.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
+          for (const r of llmRefs) {
+            if (typeof r.queryRelevance === "number" && r.source && r.title) {
+              refLookup.set(refKey(r.source, r.title), r.queryRelevance);
+            }
+          }
+
           const signalsMeta = mergedSignals.map((s: any) => ({
             source: s.source,
             title: s.title,
             url: s.url,
             strength: s.strength,
             date: s.fetched_at.slice(0, 10),
+            keywordOverlap: typeof s.keywordOverlap === "number" ? s.keywordOverlap : undefined,
+            sourceTier: s.sourceTier,
+            queryRelevance: refLookup.get(refKey(s.source, s.title)),
           }));
 
           // Augment: causal edges between matched trends.

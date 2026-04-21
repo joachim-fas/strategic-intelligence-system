@@ -19,10 +19,12 @@ import { ORBIT_STAGE_COLORS, ORBIT_STATE_COLORS, stageColor } from "./orbit-colo
    from the focused terminal node. Low-relevance debris (e.g. off-topic
    signals) is filtered by a user-controlled threshold (default 0.20).
 
-   Data model (client-only, MVP): relevance per trend is approximated as
-   `trend.relevance × trend.confidence`. If Phase B lands a per-match score
-   on the API, the spine will prefer `matchedTrend.queryRelevance` when
-   present — see `chainRelevanceForTrend`.
+   Scoring (post 2026-04-21 Signal-Kettenbezug fix):
+   - Trends:  queryRelevance (LLM) → fallback relevance × confidence
+   - Edges:   queryRelevance (LLM) → fallback strength
+   - Signals: strength × topic × avgTrendRel, where `topic` =
+              queryRelevance (LLM) → keywordOverlap (retrieval) → 0.3 default.
+              Social-tier signals with topic < 0.5 are hidden entirely.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ─── Input shape (matches CanvasNode surface needed here) ────────────────────
@@ -110,6 +112,33 @@ function edgeQueryRelevance(e: MatchedEdge): number {
   const apiScore = e.queryRelevance;
   if (typeof apiScore === "number" && apiScore >= 0 && apiScore <= 1) return apiScore;
   return clamp01(e.strength);
+}
+
+/**
+ * Per-query topical relevance for a live signal. Fix 2026-04-21:
+ *
+ * Previously, signals inherited chainRel as `signal.strength × avgTrendRel`.
+ * That formula has ZERO component measuring how topically the signal engages
+ * with the question — a UN-News piece on fertility with strength 0.8 and
+ * avgTrendRel 0.55 displayed as "45% Kettenbezug" for a Vienna-district
+ * query, even though its content had nothing to do with Vienna districts.
+ *
+ * The new topical-fit factor is:
+ *   1. LLM-supplied `queryRelevance` when present — the model rates how much
+ *      it actually leaned on this signal
+ *   2. Fallback: `keywordOverlap` from the retrieval filter — fraction of
+ *      query keywords that appeared in the signal's text
+ *   3. Last resort: 0.3 — pessimistic default, so an unknown signal does not
+ *      inherit the full strength × avgTrend blend without topical evidence
+ */
+function signalTopicalFit(s: UsedSignal): number {
+  if (typeof s.queryRelevance === "number" && s.queryRelevance >= 0 && s.queryRelevance <= 1) {
+    return s.queryRelevance;
+  }
+  if (typeof s.keywordOverlap === "number" && s.keywordOverlap >= 0 && s.keywordOverlap <= 1) {
+    return s.keywordOverlap;
+  }
+  return 0.3;
 }
 
 function clamp01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
@@ -245,12 +274,28 @@ function buildSpine(focusId: string, allNodes: DerivCanvasNode[]): Spine | null 
   columns.edges.sort((a, b) => b.chainRel - a.chainRel);
 
   // ── Stage 2: Signals ──────────────────────────────────────────────────────
-  // Each signal inherits from query via avgTrendRel (MVP proxy). When a signal
-  // carries a `trendIds` field from the API (future), we'd multiply by the max
-  // of those trends' relevances instead.
+  // Fix 2026-04-21 (Signal-Kettenbezug): drei-Faktor-Formel statt der alten
+  // zweifaktorigen `strength × avgTrendRel`. Die bisherige Formel hatte KEINE
+  // Komponente, die Signal↔Frage-Passung misst — Folge: ein UN-Fertilitäts-
+  // Artikel bei „Welcher Bezirk in Wien…" wurde mit 45% Kettenbezug angezeigt,
+  // obwohl inhaltlich null Verbindung zu Wien-Bezirken bestand.
+  //
+  // Neu: rel = strength × topic × avgTrendRel, wobei `topic` die topische
+  // Nähe zur Frage aus drei Quellen zieht (LLM queryRelevance → keyword
+  // overlap → pessimistischer Default). Social-Tier-Signale mit niedriger
+  // Topic-Nähe werden ganz aus der Darstellung genommen, damit Bluesky-
+  // Personal-Posts nicht als „Evidence" für strategische Queries erscheinen.
   usedSignals.forEach((s, i) => {
     const base = s.strength ?? 0.5;
-    const rel = clamp01(base * avgTrendRel);
+    const topic = signalTopicalFit(s);
+
+    // Social-Signale mit schwacher topischer Passung ganz ausblenden — der
+    // `getRelevantSignals`-Filter ist zwar per-Tier strenger, aber der
+    // zweite Trend-Namen-basierte Retrieval-Pass in der API kann nochmal
+    // soziale Signale reinschleusen. Harte Schwelle hier schützt das UI.
+    if (s.sourceTier === "social" && topic < 0.5) return;
+
+    const rel = clamp01(base * topic * avgTrendRel);
     const spineId = `s:${i}`;
     const node: SpineNode = {
       id: spineId,
