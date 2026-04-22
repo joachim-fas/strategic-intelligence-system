@@ -176,6 +176,50 @@ section("computeKeywordStats");
 }
 
 {
+  // 2026-04-22 P2-Smoketest Bigram-Anchor-Regression:
+  //
+  // EN heat-pump query has "heat" + "pump" as two adjacent base-keywords.
+  // Each individually is 4 chars (<5), so neither qualifies as a single-
+  // word anchor. But the bigram "heat pump" is a precise compound term —
+  // any signal containing it literally should anchor-match.
+  //
+  // Without the bigram-anchor rule, the C-EN pilot run gets 0 heat-pump
+  // signals because Gate (A) drops them before the bigram bypass in
+  // Gate (B) can rescue them.
+  const heatPumpQuery = [
+    "heat", "pump", "regulatory", "penetration", "europe",
+    "2030", "economic", "technological", "policy", "market",
+  ];
+  const heatPumpSignal = "Adoption of heat pumps slower than expected across Europe - Sustainability Online";
+  const stats = computeKeywordStats(heatPumpQuery, heatPumpSignal);
+  assert(
+    stats.anchorMatched === true,
+    "bigram-anchor: 'heat pump' (both halves 4 chars, neither single-word anchor) IS anchor",
+  );
+
+  // Negative: bigram of two words where one half is <4 chars should NOT anchor
+  const shortBigramQuery = ["a", "test", "case"];
+  const shortBigramSignal = "a test case for bigram floor";
+  const shortStats = computeKeywordStats(shortBigramQuery, shortBigramSignal);
+  // "a" is filtered out at extractQueryKeywords-time normally, but if it
+  // somehow ends up in baseKeywords the bigram "a test" should not anchor.
+  // However "test case" (4+4) WOULD qualify, and that's in the signal too.
+  // So this signal anchor-matches via "test case", not via "a test".
+  assert(
+    shortStats.anchorMatched === true,
+    "bigram-anchor: 'test case' (both ≥4) IS anchor (correct), 'a test' (one <4) is filtered",
+  );
+
+  // True negative: bigrams where neither pair is in the signal
+  const noBigramSignal = "Weather forecast for Hamburg looks sunny";
+  const noBigramStats = computeKeywordStats(heatPumpQuery, noBigramSignal);
+  assert(
+    noBigramStats.anchorMatched === false,
+    "bigram-anchor: no bigram in signal → no anchor (and no single-word anchor either)",
+  );
+}
+
+{
   // 2026-04-22 Abend-Fix (Pilot-Eval B-DE-Re-Run):
   //
   // Sub-fragen-reiche Queries haben typisch sehr lange, aber seltene

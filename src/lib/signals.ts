@@ -549,6 +549,35 @@ export function computeKeywordStats(
     }
   }
 
+  // 2026-04-22 P2-Smoketest Bigram-Anchor:
+  //
+  // Multi-word concepts where each individual word is too short to qualify
+  // as a single-word anchor are still semantically precise as a compound:
+  //   - "heat pump" → both halves 4 chars (<5), neither is anchor on its own
+  //     but "heat pump" together is a domain-specific term
+  //   - "supply chain" → same shape
+  //   - "labor market" → same shape
+  //
+  // Without this rule, an EN heat-pump query against EN heat-pump signals
+  // gets anchorMatched=false and is dropped by Gate (A) in getRelevantSignals
+  // before the bigram bypass in Gate (B) can rescue it.
+  //
+  // Rule: an adjacent base-keyword pair where both halves are ≥4 chars and
+  // the literal bigram appears in the signal counts as an anchor. The "both
+  // halves ≥4 chars" floor blocks function-word bigrams like "of the".
+  if (!anchorMatched) {
+    for (let i = 0; i < baseKeywords.length - 1; i += 1) {
+      const a = baseKeywords[i];
+      const b = baseKeywords[i + 1];
+      if (a.length < 4 || b.length < 4) continue;
+      const bigram = `${a} ${b}`;
+      if (text.includes(bigram)) {
+        anchorMatched = true;
+        break;
+      }
+    }
+  }
+
   return {
     matched,
     overlap: matched / baseKeywords.length,
@@ -634,8 +663,13 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "automatisierung": ["automation", "automated", "autonomous"],
     "arbeit": ["work", "labor", "labour"],
     // Wärmepumpen / Gebäudeenergie (C-Pilot) — DE→EN
-    "wärmepumpe": ["heat pump", "heat pump system", "hp"],
-    "wärmepumpen": ["heat pumps", "heat pump"],
+    // 2026-04-22 P2-Smoketest: Singular ↔ Plural-Cross-Aliase ergänzt.
+    // Ohne sie scheitert „wärmepumpen"-Query (Plural) an Titeln, die
+    // nur „Wärmepumpe" (Singular) enthalten — substring-include matcht
+    // nicht in beide Richtungen (Plural-String enthält Singular, aber
+    // Singular-String nicht den Plural).
+    "wärmepumpe": ["wärmepumpen", "heat pump", "heat pumps", "heat pump system", "hp"],
+    "wärmepumpen": ["wärmepumpe", "heat pumps", "heat pump"],
     "heizung": ["heating", "heating system", "boiler"],
     "heizungstausch": ["boiler replacement", "heating replacement", "heat pump adoption"],
     "sanierung": ["renovation", "retrofit", "energy retrofit", "deep renovation"],
@@ -799,15 +833,31 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const bigramParams = bigrams.flatMap(bg => [`%${bg}%`, `%${bg}%`, `%${bg}%`]);
   const likeParams = [...singleParams, ...bigramParams];
 
-  // Over-fetch 3x to leave room for post-filtering
-  const sqlLimit = limit * 3;
+  // Over-fetch 6x to leave room for post-filtering. Was 3x, but with
+  // the relaxed SQL threshold (>=2 instead of >=3) the candidate pool
+  // includes more low-score-but-relevant rows; the post-filter needs
+  // headroom to find the anchor-/bigram-matched ones that score lower
+  // in pure SQL terms but are domain-on-topic.
+  const sqlLimit = limit * 6;
 
+  // 2026-04-22 P2-Smoketest: SQL pre-filter relaxed from `>= 3` to
+  // `>= 2`. Reason: a single title-only keyword match scores exactly 2
+  // (title weight). The previous threshold required either two title
+  // matches, or one title + one content match, or a topic match alone.
+  // For domain-specific news feeds (Google News Wärmepumpe — 26/31
+  // signals contain "Wärmepumpe" in the real title) this killed almost
+  // all candidates before the smart post-filter could evaluate them.
+  // The post-filter (alias-aware anchor-match + long-domain-anchor
+  // bypass + bigram bypass + per-tier overlap threshold) is now
+  // sophisticated enough to reject noise on its own; the SQL pre-filter
+  // is reduced to its job — produce a candidate set that's not the full
+  // 1000+-row table.
   const rows = d.prepare(`
     SELECT *,
       (${scoreExpr}) as relevance_score
     FROM live_signals
     WHERE fetched_at > datetime('now', '-336 hours')
-      AND (${scoreExpr}) >= 3
+      AND (${scoreExpr}) >= 2
     ORDER BY relevance_score DESC, strength DESC, fetched_at DESC
     LIMIT ?
   `).all([...likeParams, ...likeParams, sqlLimit]) as (LiveSignal & { relevance_score: number })[];
@@ -897,7 +947,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     //
     // The overlap fraction dilutes for complex multi-part queries: a query
     // with 20 keywords gives only 5% overlap for a single match, far below
-    // any static threshold. We bypass the gate in two safe cases:
+    // any static threshold. We bypass the gate in three safe cases:
     //
     //   1. academic / authoritative tier: anchor-match alone is a sufficient
     //      quality gate. Peer-reviewed papers don't produce off-topic content.
@@ -905,14 +955,41 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     //   2. Any tier + long domain-specific anchor (≥9 chars): compound terms
     //      like "wärmepumpen" (11), "autonomous" (9), "arbeitsmarkt" (12),
     //      "interventions" (13), "penetration" (11) are not false-positive
-    //      prone. If such a term appears in a signal title the signal IS on
-    //      topic, regardless of the overlap fraction or the source tier.
-    //      Generic 4-8-char anchors (european, market, labor) still require
-    //      the overlap gate so noise from broad media feeds is suppressed.
+    //      prone. If such a term appears (literally or via alias) in a signal
+    //      title the signal IS on topic, regardless of the overlap fraction
+    //      or the source tier.
+    //
+    //   3. Any tier + bigram-phrase anchor: adjacent base-keyword pairs that
+    //      appear literally in the signal text — e.g. "heat pump" (the EN
+    //      query has "heat" + "pump" as two short keywords, but the bigram
+    //      "heat pump" is a precise compound term). Same precision argument
+    //      as long single keywords; bigrams of two ≥4-char words are
+    //      compound concepts, not coincidence.
+    //
+    // 2026-04-22 Pilot-Eval P2-Smoketest: long-anchor check made alias-aware
+    // (was raw substring of baseKeyword) — fixed C-DE 1/31 → 30/31 issue
+    // where signals say "Wärmepumpe" but query keyword is "wärmepumpen".
+    // Bigram path added — fixed C-EN 0/30 issue where heat-pump signals
+    // contain "heat pump" but neither "heat" (4) nor "pump" (4) is ≥9 chars.
     const minOverlap = TIER_MIN_OVERLAP[tier];
+    const lowerSignal = signalText.toLowerCase();
+    const longAnchorMatched =
+      baseKeywords.some(kw => {
+        if (kw.length < 9) return false;
+        const variants = aliasMap[kw] ? [kw, ...aliasMap[kw]] : [kw];
+        return variants.some(v => lowerSignal.includes(v));
+      });
+    const bigramAnchorMatched =
+      bigrams.some(bg => {
+        // Both halves of the bigram must be ≥4 chars to count — pure
+        // function-word bigrams ("of the") shouldn't qualify, and the
+        // shorter side acts as the precision floor.
+        const [a, b] = bg.split(" ");
+        if (!a || !b || a.length < 4 || b.length < 4) return false;
+        return lowerSignal.includes(bg);
+      });
     const hasLongDomainAnchor =
-      stats.anchorMatched &&
-      baseKeywords.some(kw => kw.length >= 9 && signalText.toLowerCase().includes(kw));
+      stats.anchorMatched && (longAnchorMatched || bigramAnchorMatched);
     const anchorIsSufficient =
       stats.anchorMatched && (
         tier === "academic" ||
