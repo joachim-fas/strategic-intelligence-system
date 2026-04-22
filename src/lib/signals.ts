@@ -884,8 +884,17 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     }
 
     // (B) Weighted overlap against per-tier threshold.
+    // Exception: for academic and authoritative sources, anchor-match
+    // alone is a sufficient quality gate. Peer-reviewed papers and
+    // institutional reports don't produce off-topic content — if an
+    // anchor keyword (≥5 chars) appears in the title, the paper is
+    // on-topic regardless of the overlap fraction. This prevents complex
+    // multi-part queries (many keywords → diluted overlap) from
+    // suppressing relevant arxiv / Eurostat / ECFR papers.
     const minOverlap = TIER_MIN_OVERLAP[tier];
-    if (stats.weightedOverlap < minOverlap) continue;
+    const anchorIsSufficient =
+      stats.anchorMatched && (tier === "academic" || tier === "authoritative");
+    if (!anchorIsSufficient && stats.weightedOverlap < minOverlap) continue;
 
     enriched.push({ ...row, keywordOverlap: stats.weightedOverlap, sourceTier: tier });
   }

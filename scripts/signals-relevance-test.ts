@@ -83,7 +83,41 @@ section("extractQueryKeywords");
 
 // ═══════════════════════════════════════════════════════════════════════
 //  computeKeywordStats — overlap, weightedOverlap, anchorMatched
+//
+//  2026-04-22 Abend: anchor-IsSufficient-Gate-Test (B EN regression)
+//
+//  Complex multi-part queries produce 20+ keywords. A perfectly relevant
+//  arxiv paper ("Generative AI at Work: … 35 European Countries") only
+//  matches 1 keyword out of 20 → overlap = 5% < 15%-academic-threshold.
+//  anchorMatched=true because "european" is in the anchor set.
+//  The fix: anchor-match alone is sufficient for academic/authoritative.
+//  This test documents the stats that the retrieval gate must evaluate.
 // ═══════════════════════════════════════════════════════════════════════
+section("computeKeywordStats — anchor-is-sufficient für academic (B-EN-Regression)");
+
+{
+  // Simulate a B EN keyword list: 20 keywords, only 1 matches the arxiv title.
+  const bEnKeywords = [
+    "european", "labor", "market", "change", "autonomous",
+    "agents", "sectors", "exposed", "structural", "interventions",
+    "regulation", "education", "social", "systems", "effective",
+    "biggest", "gap", "looming", "political", "reality",
+  ];
+  const arxivTitle = "Generative AI at Work: From Exposure to Adoption across 35 European Countries";
+
+  const stats = computeKeywordStats(bEnKeywords, arxivTitle);
+
+  // "european" is position-1, ≥5 chars → anchor set includes it
+  assert(stats.anchorMatched === true, "B-EN arxiv: 'european' IS an anchor (position 1, ≥5)");
+  // Only 1/20 keywords match → overlap far below 0.15 threshold
+  assert(stats.overlap < 0.10, "B-EN arxiv: raw overlap < 10% (20 keywords, 1 match)");
+  // weightedOverlap also low — this is what the old gate tested and rejected
+  assert(stats.weightedOverlap < 0.15, "B-EN arxiv: weightedOverlap < 15%-academic-threshold");
+  // The retrieval fix allows academic sources through when anchorMatched=true,
+  // bypassing the overlap threshold. This test documents the stats that
+  // trigger the bypass — the fix itself is tested in integration (B-EN re-run).
+}
+
 section("computeKeywordStats");
 
 {
