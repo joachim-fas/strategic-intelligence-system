@@ -560,6 +560,58 @@ export const PLANNED_CONNECTORS: PlannedConnector[] = [
     notionUrl: "https://www.notion.so/b299bf360a7343668be3cff3bba30f34",
     backlog: true,
   },
+  // 2026-04-22 (Backlog: „Gesellschaftliche Akzeptanz — Umfragen/Polls"):
+  // Drei international anerkannte Longitudinal-Trust-/Values-Studien als
+  // Backlog-Referenzen. Keine davon bietet eine öffentliche Live-API; alle
+  // publizieren jährlich Reports mit charts + Microdata auf Anfrage. Für
+  // SIS sinnvoll als (a) LLM-Context-Quellen für Values-bezogene Queries
+  // und (b) langfristig als Scraping-Targets, sobald ein PDF-Parsing-
+  // Layer existiert.
+  {
+    slug: "edelman-trust-barometer",
+    displayName: "Edelman Trust Barometer",
+    category: "umfragen",
+    type: "forschung",
+    priority: "medium",
+    access: "download",
+    descriptionDe: "Jährliche globale Trust-Studie seit 2001 (28+ Länder, 36.000+ Befragte). Misst Vertrauen in Regierung, Unternehmen, Medien und NGOs — zentrale Proxy-Metrik für institutionelle Legitimität.",
+    descriptionEn: "Annual global trust study since 2001 (28+ countries, 36,000+ respondents). Measures trust in government, business, media and NGOs — a key proxy for institutional legitimacy.",
+    docUrl: "https://www.edelman.com/trust/trust-barometer",
+    apiUrl: "https://www.edelman.com/trust/trust-barometer",
+    rateLimit: "N/A (PDF-Report + Supplemental Tables)",
+    notionUrl: "https://www.notion.so/33661c848a4f81b9bfc6fdc484816926",
+    backlog: true,
+  },
+  {
+    slug: "ipsos-global-trends",
+    displayName: "Ipsos Global Trends",
+    category: "umfragen",
+    type: "forschung",
+    priority: "medium",
+    access: "download",
+    descriptionDe: "Längsschnitt-Studie (seit 2013, 50+ Länder) zu Gesellschaftstrends — Polarisierung, Umweltbewusstsein, Tech-Adoption, Nostalgie, Purpose. Thematisch breiter als Edelman, ergänzt WVS.",
+    descriptionEn: "Longitudinal study (since 2013, 50+ countries) on societal trends — polarisation, environmental awareness, tech adoption, nostalgia, purpose. Broader scope than Edelman, complements WVS.",
+    docUrl: "https://www.ipsos.com/en/global-trends",
+    apiUrl: "https://www.ipsos.com/en/global-trends",
+    rateLimit: "N/A (PDF + dashboard)",
+    notionUrl: "https://www.notion.so/33661c848a4f81b9bfc6fdc484816926",
+    backlog: true,
+  },
+  {
+    slug: "globescan-radar",
+    displayName: "GlobeScan Radar / ReGeneration Rising",
+    category: "umfragen",
+    type: "forschung",
+    priority: "low",
+    access: "download",
+    descriptionDe: "Internationale Stakeholder-Trust- und Sustainability-Umfragen (30+ Jahre). ReGeneration Rising ist der jüngste Schwerpunkt (14 Länder, Gen-Z + Millennial values on climate, business, democracy).",
+    descriptionEn: "International stakeholder trust and sustainability surveys (30+ years). ReGeneration Rising is the current focus (14 countries, Gen-Z + millennial values on climate, business, democracy).",
+    docUrl: "https://globescan.com/insights/",
+    apiUrl: "https://globescan.com/insights/",
+    rateLimit: "N/A (Reports)",
+    notionUrl: "https://www.notion.so/33661c848a4f81b9bfc6fdc484816926",
+    backlog: true,
+  },
   {
     slug: "alpha-vantage",
     displayName: "Alpha Vantage API",

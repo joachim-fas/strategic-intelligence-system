@@ -174,6 +174,57 @@ export function getVersionCount(canvasNodeId: string): number {
   }
 }
 
+/**
+ * Get recent query versions that mentioned a given trend ID in their
+ * matched-trends output. Backlog-Task "Szenarien-History" (2026-04-22):
+ * TrendDetailPanel zeigt damit eine Liste der letzten Analysen, die
+ * diesen Trend berührt haben.
+ *
+ * Implementation note — SQLite-LIKE-Scan auf result_json. Funktioniert
+ * ohne Schema-Migration und trifft den 99%-Fall (wir halten nur maximal
+ * 20 Versionen pro Knoten, plus max ein paar Tausend Canvas-Knoten pro
+ * Tenant). Ein Volltext- oder JSON-Index wäre fürwahr sauberer, aber
+ * hier überdimensioniert. Wenn die Tabelle 100k+ Zeilen erreicht, auf
+ * `json_each`-Query wechseln.
+ *
+ * Tenant-Guard: wie bei getVersionsForNode — wenn `tenantId` gesetzt
+ * ist, werden nur Versionen mit passendem Radar-Tenant oder orphaned
+ * Canvas-Nodes (radar_id IS NULL) zurückgegeben.
+ */
+export function getVersionsForTrend(
+  trendId: string,
+  tenantId?: string,
+  limit = 10,
+): QueryVersionMeta[] {
+  if (!trendId || !/^[a-zA-Z0-9\-_]+$/.test(trendId)) return [];
+  const d = db();
+  try {
+    const likePattern = `%"${trendId}"%`;
+    const sql = tenantId
+      ? `SELECT v.id, v.canvas_node_id, v.radar_id, v.query_text, v.locale,
+               v.version_number, v.confidence, v.matched_trend_count,
+               v.signal_count, v.executed_at, v.notes
+          FROM query_versions v
+          LEFT JOIN radars r ON r.id = v.radar_id
+          WHERE v.result_json LIKE ?
+            AND (v.radar_id IS NULL OR r.tenant_id = ?)
+          ORDER BY v.executed_at DESC
+          LIMIT ?`
+      : `SELECT id, canvas_node_id, radar_id, query_text, locale, version_number,
+               confidence, matched_trend_count, signal_count, executed_at, notes
+          FROM query_versions
+          WHERE result_json LIKE ?
+          ORDER BY executed_at DESC
+          LIMIT ?`;
+    const rows = tenantId
+      ? (d.prepare(sql).all(likePattern, tenantId, limit) as any[])
+      : (d.prepare(sql).all(likePattern, limit) as any[]);
+    return rows.map(mapMeta);
+  } finally {
+    d.close();
+  }
+}
+
 /** Get version counts for multiple canvas node IDs (batch). */
 export function getVersionCounts(canvasNodeIds: string[]): Record<string, number> {
   if (canvasNodeIds.length === 0) return {};

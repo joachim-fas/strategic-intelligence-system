@@ -13,6 +13,176 @@ import { getDrivers, getEffects, getInhibitors, calculateCascadeDepth, TrendEdge
 import { getRegulationsForTrend, getRegulatoryPressure } from "@/lib/regulations";
 import { getClusterForTrend } from "@/lib/trend-clusters";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+
+/**
+ * Szenarien-History — lädt aus /api/v1/versions/for-trend/[trendId] die
+ * letzten 10 Analysen, die diesen Trend in ihren `matchedTrendIds` hatten.
+ * Kompakte Listenansicht: Query-Text (truncated), Konfidenz-Farbe, Alter.
+ * Click öffnet die Home-Route mit der Frage als vorbefüllte Query, damit
+ * der User direkt weiterdenken kann.
+ *
+ * Backlog-Task „Szenarien-History" (2026-04-22).
+ */
+interface HistoryVersion {
+  id: string;
+  canvasNodeId: string;
+  queryText: string;
+  versionNumber: number;
+  confidence: number | null;
+  executedAt: string;
+  signalCount: number | null;
+}
+
+function ScenarioHistorySection({ trendId, locale }: { trendId: string; locale: Locale }) {
+  const [versions, setVersions] = useState<HistoryVersion[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchWithTimeout(`/api/v1/versions/for-trend/${encodeURIComponent(trendId)}?limit=10`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const list = json?.data?.versions ?? json?.versions ?? [];
+        if (!cancelled) setVersions(Array.isArray(list) ? list : []);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trendId]);
+
+  // Wenn die History komplett leer ist ODER noch lädt: Sektion nicht rendern.
+  // Das vermeidet eine hohle Überschrift auf frisch deployed Systemen.
+  if (loading) return null;
+  if (error) return null;
+  if (!versions || versions.length === 0) return null;
+
+  const fmtAge = (iso: string): string => {
+    const now = Date.now();
+    const then = new Date(iso + "Z").getTime();
+    const h = Math.max(0, (now - then) / 3_600_000);
+    if (h < 1) return locale === "de" ? "gerade" : "just now";
+    if (h < 24) return `${Math.round(h)}h`;
+    const days = Math.round(h / 24);
+    if (days < 7) return `${days}d`;
+    const weeks = Math.round(days / 7);
+    if (weeks < 5) return `${weeks}w`;
+    return `${Math.round(days / 30)}mo`;
+  };
+
+  const confBadge = (c: number | null) => {
+    if (c == null) return null;
+    const pct = Math.round(c * 100);
+    const color = pct >= 70 ? "#0F6038" : pct >= 40 ? "#7A5C00" : "#B91C1C";
+    const bg    = pct >= 70 ? "#EEFAF4" : pct >= 40 ? "#FFFDE8" : "#FFF0F4";
+    return (
+      <span
+        style={{
+          fontSize: 10,
+          fontFamily: "var(--font-mono)",
+          fontWeight: 700,
+          padding: "2px 6px",
+          borderRadius: 4,
+          background: bg,
+          color,
+          flexShrink: 0,
+        }}
+      >
+        {pct}%
+      </span>
+    );
+  };
+
+  return (
+    <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider">
+          {locale === "de" ? "Szenarien-History" : "Scenario History"}
+        </h3>
+        <span className="text-[10px]" style={{ color: "var(--muted-foreground)", fontFamily: "var(--font-mono)" }}>
+          {versions.length} {locale === "de" ? "Analysen" : "analyses"}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {versions.map((v) => (
+          <a
+            key={v.id}
+            href={`/?q=${encodeURIComponent(v.queryText)}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--volt-border, #E8E8E8)",
+              background: "var(--card, #fff)",
+              textDecoration: "none",
+              color: "var(--foreground, #0A0A0A)",
+              transition: "all 150ms ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--foreground, #0A0A0A)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <span
+              style={{
+                flex: 1,
+                fontSize: 13,
+                lineHeight: 1.4,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {v.queryText}
+            </span>
+            {typeof v.signalCount === "number" && v.signalCount > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--muted-foreground)",
+                  flexShrink: 0,
+                }}
+                title={locale === "de" ? `${v.signalCount} Live-Signale` : `${v.signalCount} live signals`}
+              >
+                {v.signalCount} sig.
+              </span>
+            )}
+            {confBadge(v.confidence)}
+            <span
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                color: "var(--muted-foreground)",
+                flexShrink: 0,
+                minWidth: 32,
+                textAlign: "right",
+              }}
+            >
+              {fmtAge(v.executedAt)}
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * TrendActionsBar — kontextbewusste Primaerwahl + Vertiefen-Link.
@@ -739,6 +909,12 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
             })}
         </div>
       </div>
+
+      {/* ── Szenarien-History (2026-04-22) ────────────────────────────────
+           Liefert die letzten bis zu 10 Analysen, die diesen Trend in
+           ihren matchedTrendIds hatten. Nur gerendert, wenn echte History
+           existiert — auf frischen Systemen bleibt die Sektion still. */}
+      <ScenarioHistorySection trendId={trend.id} locale={locale} />
 
       {/* ── What-If Prompts ────────────────────────────────────────────────
            Backlog 2.1 (Bloomberg Learning 5, 2026-04-22): L3 Trend-Detail

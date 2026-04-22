@@ -8,7 +8,8 @@ export type FrameworkId =
   | "pre-mortem"
   | "post-mortem"
   | "trend-deep-dive"
-  | "stakeholder";
+  | "stakeholder"
+  | "design-thinking";
 
 export interface FrameworkMeta {
   id: FrameworkId;
@@ -70,6 +71,21 @@ export const FRAMEWORK_META: FrameworkMeta[] = [
     subtitle: { de: "Akteure · Koalitionen · Dynamiken", en: "Actors · Coalitions · Dynamics" },
     color: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", accent: "#7A5C00" },
     llmIntensity: "medium", timeHorizon: { de: "Gegenwart + Entwicklung", en: "Present + Evolution" },
+  },
+  {
+    // 2026-04-22 (Backlog: „Design Thinking / weitere Analyse-Methoden"):
+    // Human-centered strategic design — vier Schritte von Stakeholder-
+    // Empathie über Problem-Reframing und Solution-Divergenz bis zum
+    // konkreten Validierungsplan. Kein klassisches 5-Phasen-DT (Empathize/
+    // Define/Ideate/Prototype/Test), sondern auf strategische Fragen
+    // zugeschnitten: „Prototype" verschwindet, „Validate" übernimmt die
+    // letzte Phase und tritt als konkreter Test-Plan an.
+    id: "design-thinking", slug: "design-thinking",
+    icon: "🧭", iconSvg: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+    name: { de: "Design Thinking", en: "Design Thinking" },
+    subtitle: { de: "Empathie · Reframing · Lösungsraum · Validierung", en: "Empathy · Reframing · Solution Space · Validation" },
+    color: { card: "#FFF4E6", icon: "#FFE1C1", border: "#F0C088", accent: "#B45309" },
+    llmIntensity: "high", timeHorizon: { de: "Gegenwart + 6–18 Monate", en: "Present + 6–18 months" },
   },
 ];
 

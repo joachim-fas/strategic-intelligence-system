@@ -1023,6 +1023,160 @@ Minimum 6 strategies (matching Step 1 stakeholders) and all 4 weeks.`,
     };
     return steps[step] || steps["inventory"];
   },
+
+  // ═════════════════════════════════════════════════════════════════════
+  // 3.7 DESIGN THINKING — 4 steps (human-centered strategic design)
+  // 2026-04-22 Backlog-Task "Design Thinking als Template".
+  // Klassisches DT ist 5-phasig (Empathize/Define/Ideate/Prototype/Test).
+  // Für eine strategische Intelligence-Frage werden "Prototype" und
+  // "Test" zu einer Validierungsphase zusammengefasst, da das Framework
+  // nicht auf ein konkretes Produkt-MVP zielt, sondern auf ein
+  // überprüfbares Entscheidungs-Artefakt (z.B. Policy, Roadmap, Offer).
+  // ═════════════════════════════════════════════════════════════════════
+  "design-thinking": (topic, step, context, locale, worldModel) => {
+    const preamble = buildFrameworkPreamble(locale);
+    const steps: Record<string, string> = {
+      "empathize": `You are a human-centered strategic designer. Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 1: Empathize (stakeholder empathy & jobs-to-be-done)
+
+Identify the human actors who are impacted by this question — not abstract categories like "users" or "the market", but concrete stakeholder groups with names, contexts, motivations and pain points. For each group, articulate the job they are trying to get done, the constraints they work under, and the emotional load they carry. Pull in live signals and trend data where they illuminate what these stakeholders are currently doing / saying / feeling.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "stakeholders": [
+    {
+      "name": "Concrete group (e.g. 'Municipal procurement officers in mid-sized German cities')",
+      "jobToBeDone": "The functional + emotional job they are hiring a solution to do",
+      "context": "Operating environment, constraints, resources [SIGNAL/TREND: …]",
+      "painPoints": ["Concrete pain 1", "Concrete pain 2"],
+      "signals": ["What would indicate they are changing?"]
+    }
+  ],
+  "emotionalMap": [
+    {"phase": "Awareness", "feeling": "Overwhelm", "trigger": "What causes it"},
+    {"phase": "Consideration", "feeling": "…", "trigger": "…"},
+    {"phase": "Decision", "feeling": "…", "trigger": "…"}
+  ],
+  "synthesis": "2-3 sentences naming the central human tension that drives this topic"
+}
+
+Minimum 4 distinct stakeholder groups. "Users" or "customers" alone is not enough — name the actor, not the role. Avoid generalities. Cite a signal or trend inline where possible.`,
+
+      "define": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 2: Define (problem reframing)
+
+A good problem statement is small enough to act on and big enough to matter. Take the central human tension from Step 1 and produce 3–5 distinct reframings. Each reframing should start with "How might we…" and name (a) the specific actor, (b) the specific need, (c) the specific constraint. Rank them by (1) strategic leverage, (2) feasibility within the topic's timeframe, (3) blast radius if wrong. Call out hidden assumptions behind each reframing so the team can challenge them.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "reframings": [
+    {
+      "statement": "How might we [verb] [specific actor] to [specific need] despite [specific constraint]",
+      "leverage": 4,
+      "feasibility": 3,
+      "blastRadius": 2,
+      "hiddenAssumption": "What we are quietly assuming is true",
+      "whyItMatters": "Concrete consequence if we solve this — for whom"
+    }
+  ],
+  "rejectedFrames": [
+    {"statement": "A tempting but misleading framing", "whyRejected": "Which evidence defeats it"}
+  ],
+  "synthesis": "2-3 sentences naming the one reframing most worth pursuing and why"
+}
+
+leverage / feasibility / blastRadius on 0–5 scale. Minimum 3 reframings + 2 rejected frames.`,
+
+      "ideate": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 3: Ideate (solution divergence)
+
+For the lead reframing from Step 2, generate 6–10 distinct solution directions. Force diversity by explicitly covering at least: one incremental solution (works in current constraints), one disruptive solution (rewrites a constraint), one non-obvious analog (borrowed from a different domain), one policy/structural solution (not product), one solution that rejects the reframing and insists the real problem is elsewhere. For each, name the core mechanism, a representative early prototype, and the signals that would tell us it is working.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "solutions": [
+    {
+      "name": "Short, concrete name",
+      "type": "incremental",
+      "mechanism": "How it creates value in one sentence",
+      "prototype": "The smallest version that can be tested in 4-8 weeks",
+      "earlySignals": ["Signal 1 that would confirm traction"],
+      "killSignals": ["Signal that would tell us to stop"],
+      "linkedTrends": ["Trend IDs or names this relies on"]
+    }
+  ],
+  "synthesis": "2-3 sentences naming the dominant pattern across the solution set — where the real opportunity lives"
+}
+
+type: "incremental" | "disruptive" | "analog" | "structural" | "reframe-challenge"
+Minimum 6 solutions, at least one per type.`,
+
+      "validate": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 4: Validate (experiment design)
+
+Pick the 2–3 solutions from Step 3 worth testing first. For each, design a concrete validation experiment that could run in 4–12 weeks: what hypothesis is being tested, what the smallest representative test looks like, which real stakeholders participate, what metric confirms vs. disconfirms, what early-warning signals would abort. Be explicit about invalidation — a validation plan that cannot fail isn't real. End with a decision rubric for what happens next based on results.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "experiments": [
+    {
+      "solutionName": "Solution from Step 3",
+      "hypothesis": "If we do X, then Y happens, because Z",
+      "smallestTest": "Concrete 4-12 week test, named deliverables",
+      "participants": ["Which stakeholders from Step 1 are involved"],
+      "successMetric": {"name": "Metric", "threshold": "Value or ratio that counts as confirmation"},
+      "killMetric": {"name": "Metric", "threshold": "Value that means stop"},
+      "earlyWarnings": ["Signal 1", "Signal 2"],
+      "cost": "Rough resource envelope",
+      "timeline": "e.g. 6 weeks"
+    }
+  ],
+  "decisionRubric": [
+    {"ifOutcome": "Success metric hit", "then": "Scale with plan X"},
+    {"ifOutcome": "Kill metric hit", "then": "Retire and pick next reframing"},
+    {"ifOutcome": "Ambiguous", "then": "Extend by N weeks with changed variable Y"}
+  ],
+  "synthesis": "2-3 sentences: what we will know after the experiments we did not know before"
+}
+
+Minimum 2 experiments + 3 rubric entries. Each experiment must have both a success and a kill metric — one-sided experiments are not accepted.`,
+    };
+    return steps[step] || steps["empathize"];
+  },
 };
 
 // ── Model fallback chain ─────────────────────────────────────────────────────
@@ -1166,6 +1320,7 @@ export async function POST(req: Request) {
     "post-mortem": ["timeline", "causes", "lessons"],
     "trend-deep-dive": ["definition", "evidence", "drivers", "impact", "actions"],
     "stakeholder": ["inventory", "power-matrix", "coalitions", "engagement"],
+    "design-thinking": ["empathize", "define", "ideate", "validate"],
   };
   const allowedSteps = VALID_STEPS[frameworkId];
   if (allowedSteps && !allowedSteps.includes(step)) {
