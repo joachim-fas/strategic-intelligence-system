@@ -7,6 +7,25 @@ import { autoClassify } from "./classify";
 import { Locale } from "./i18n";
 
 /**
+ * Dedicated error class for SSE `error`-events reported by the server.
+ * Allows the caller (HomeClient) to distinguish between
+ *   (a) true network errors (fetch threw, connection dropped) and
+ *   (b) server-reported application errors (billing, auth, rate limit,
+ *       bad request) — the latter carrying a ready-to-display message.
+ *
+ * Pilot-Eval-Fix 2026-04-22: vorher wurden SSE-error-Events stumm
+ * ignoriert, die Route lieferte dann `null` zurück und der Client zeigte
+ * einen generischen Empty-Stream-Fallback statt den tatsächlichen
+ * Server-Fehler.
+ */
+export class ServerReportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ServerReportedError";
+  }
+}
+
+/**
  * Intelligence Engine
  *
  * Takes a user query (question, keyword, or topic) and synthesizes
@@ -318,6 +337,7 @@ export async function queryIntelligenceAsync(
     let fullRawText = "";    // accumulated LLM text for synthesis extraction
     let synthExtractedLen = 0; // chars of synthesis already emitted
     let llmResult: any = null;
+    let serverError: string | null = null; // captured SSE error event
 
     const processLine = (line: string) => {
       if (!line.startsWith("data: ")) return;
@@ -342,6 +362,11 @@ export async function queryIntelligenceAsync(
           }
         } else if (event.type === "complete" && event.result) {
           llmResult = event.result;
+        } else if (event.type === "error" && typeof event.error === "string") {
+          // Pilot-Eval-Fix 2026-04-22: kapture server-reported errors
+          // (billing/auth/rate-limit/generic) statt sie zu verschlucken.
+          // Wird nach dem Stream-End als ServerReportedError gethrown.
+          serverError = event.error;
         }
       } catch {
         // ignore parse errors on individual SSE lines
@@ -360,6 +385,14 @@ export async function queryIntelligenceAsync(
 
     // Process any remaining buffered content (last line without trailing \n)
     if (lineBuffer.trim()) processLine(lineBuffer.trim());
+
+    // Pilot-Eval-Fix 2026-04-22: wenn der Server einen error-Event
+    // geschickt hat (billing/auth/rate-limit/generic), throw einen
+    // typed Error, damit der HomeClient-.catch() den Text ohne
+    // „Verbindungsfehler:"-Prefix direkt anzeigen kann.
+    if (serverError) {
+      throw new ServerReportedError(serverError);
+    }
 
     if (!llmResult) return null;
 

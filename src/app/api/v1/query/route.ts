@@ -491,14 +491,15 @@ export async function POST(req: Request) {
           const errText = await anthropicRes.text();
           console.error(`[query] Anthropic API error ${anthropicRes.status}:`, errText);
 
-          // Map to generic client-facing error messages
-          const status = anthropicRes.status;
-          const clientError =
-            status === 429
-              ? "AI service is temporarily overloaded. Please try again in a moment."
-              : status >= 500
-                ? "AI service is temporarily unavailable."
-                : "Unable to process your request. Please try again.";
+          // Pilot-Eval-Fix 2026-04-22: differenziertes Mapping via
+          // mapAnthropicError() — trennt credit-balance / auth / rate-
+          // limit-Fehler von generic „bad request", damit der User im
+          // UI die richtige Ursache sieht (vorher: alles wurde generic
+          // gemappt, im Frontend kam dann „Anfrage zu kurz" für einen
+          // Billing-Fehler).
+          const { mapAnthropicError } = await import("@/lib/error-mapping");
+          const mapped = mapAnthropicError(anthropicRes.status, errText);
+          const clientError = mapped[validLocale];
           send({ type: "error", error: clientError });
           cleanup();
           if (!closed) { closed = true; try { controller.close(); } catch {} }

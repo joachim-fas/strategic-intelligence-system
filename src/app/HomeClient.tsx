@@ -9,7 +9,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { AppHeader } from "@/components/AppHeader";
 import { TrendDot } from "@/types";
 import { megaTrends } from "@/lib/mega-trends";
-import { queryIntelligenceAsync, type PipelineStageEvent } from "@/lib/intelligence-engine";
+import { queryIntelligenceAsync, ServerReportedError, type PipelineStageEvent } from "@/lib/intelligence-engine";
 import { defaultPipelineStages, type PipelineStageMap } from "@/components/briefing/SequentialPipeline";
 import { classifyTrends } from "@/lib/classify";
 import { useLocale } from "@/lib/locale-context";
@@ -1304,13 +1304,23 @@ export default function HomeClient() {
       })
       .catch((err: unknown) => {
         setIsAnalyzing(false);
-        // ❌ Network or API error — show specific error, no silent fallback
+        // Pilot-Eval-Fix 2026-04-22: Server-reported errors
+        // (billing/auth/rate-limit/generic) werden als ServerReportedError
+        // gethrown — deren Message ist server-seitig locale-aware gemappt
+        // und soll OHNE „Verbindungsfehler:"-Prefix angezeigt werden,
+        // damit der User die tatsächliche Ursache sieht (vorher: alle
+        // Fehler wurden als „Die Anfrage ist zu kurz oder das System
+        // überlastet" gezeigt, auch bei Billing- und Auth-Problemen).
+        const isServerReported = err instanceof ServerReportedError;
         const msg = err instanceof Error ? err.message : String(err);
+        const displayError = isServerReported
+          ? msg
+          : (locale === "de"
+              ? `Verbindungsfehler: ${msg}. Bitte erneut versuchen.`
+              : `Connection error: ${msg}. Please try again.`);
         setHistory((prev) => prev.map((e) =>
           e.id === entryId
-            ? { ...e, isLoading: false, error: locale === "de"
-                ? `Verbindungsfehler: ${msg}. Bitte erneut versuchen.`
-                : `Connection error: ${msg}. Please try again.` }
+            ? { ...e, isLoading: false, error: displayError }
             : e
         ));
       });
