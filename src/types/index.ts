@@ -223,6 +223,20 @@ export interface UsedSignal {
    * did not score this signal or did not include it in its output.
    */
   queryRelevance?: number;
+  /**
+   * 2026-04-23 Layered-Filter-Architecture-Fix: explicit reason this
+   * signal passed retrieval. See `LiveSignal.passReason` in
+   * `src/lib/signals.ts` for the full taxonomy.
+   */
+  passReason?: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor";
+  /**
+   * 2026-04-23 Layered-Filter-Architecture-Fix: canonical relevance score
+   * for UI sort/display/filter. Floored above raw `keywordOverlap` when
+   * the signal passed via anchor-bypass — see `LiveSignal.displayScore`.
+   * Consumers should prefer this over `keywordOverlap` for display logic;
+   * `keywordOverlap` remains available as the raw-overlap debug value.
+   */
+  displayScore?: number;
 }
 
 export interface Scenario {

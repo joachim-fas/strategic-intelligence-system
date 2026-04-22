@@ -97,7 +97,28 @@ for (const probe of PROBES) {
   console.log(`  top 5 titles:`);
   for (const s of signals.slice(0, 5)) {
     const overlap = s.keywordOverlap?.toFixed(2) ?? "?";
-    console.log(`    [${s.source}] (overlap=${overlap}) ${s.title.slice(0, 90)}`);
+    const display = s.displayScore?.toFixed(2) ?? "?";
+    const reason = s.passReason ?? "?";
+    console.log(`    [${s.source}] (overlap=${overlap} display=${display} via=${reason}) ${s.title.slice(0, 70)}`);
+  }
+
+  // 2026-04-23 Layered-Filter-Architecture-Fix verification:
+  // every retrieved signal must carry both passReason and displayScore,
+  // and displayScore must be ≥ keywordOverlap (the floor invariant).
+  let invariantOK = true;
+  for (const s of signals) {
+    if (!s.passReason) { invariantOK = false; console.log(`  ✗ missing passReason on ${s.source}`); break; }
+    if (typeof s.displayScore !== "number") { invariantOK = false; console.log(`  ✗ missing displayScore on ${s.source}`); break; }
+    if (typeof s.keywordOverlap === "number" && s.displayScore < s.keywordOverlap) {
+      invariantOK = false;
+      console.log(`  ✗ displayScore<keywordOverlap on ${s.source} (${s.displayScore} < ${s.keywordOverlap})`);
+      break;
+    }
+  }
+  if (invariantOK) {
+    console.log(`  ✓ passReason + displayScore invariants hold on all ${signals.length} signals`);
+  } else {
+    allPassed = false;
   }
 
   // Pass criteria

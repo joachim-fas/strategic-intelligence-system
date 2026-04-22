@@ -136,23 +136,26 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   // Hürde, weil dort auch heute noch Personal-Posts durchrutschen können
   // (Bluesky/Mastodon haben kürzere Titel und keine redaktionelle
   // Pre-Filterung).
+  // 2026-04-23 Layered-Filter-Architecture-Fix: consume the canonical
+  // `displayScore` from the retrieval layer instead of re-deriving topic
+  // fit from raw `keywordOverlap` (which gives misleading 0.07 for short
+  // news titles that legitimately passed via long-domain-anchor or bigram
+  // bypass). Resolution: queryRelevance (LLM-set) > displayScore
+  // (retrieval-set, anchor-aware) > keywordOverlap (raw) > 0.3 (default).
+  const topicFit = (s: any): number => {
+    if (typeof s.queryRelevance === "number") return s.queryRelevance;
+    if (typeof s.displayScore === "number") return s.displayScore;
+    if (typeof s.keywordOverlap === "number") return s.keywordOverlap;
+    return 0.3;
+  };
   const rawSignals: any[] = Array.isArray(b.usedSignals) ? b.usedSignals : [];
   const relevantSignals = rawSignals.filter((s: any) => {
-    if (s.sourceTier === "social") {
-      const topic = typeof s.queryRelevance === "number"
-        ? s.queryRelevance
-        : typeof s.keywordOverlap === "number"
-          ? s.keywordOverlap
-          : 0.3;
-      return topic >= 0.5;
-    }
+    // Social-tier still needs the strict 0.5 floor — Bluesky/Mastodon
+    // personal posts can slip past retrieval and noise the briefing.
+    if (s.sourceTier === "social") return topicFit(s) >= 0.5;
     // Non-social: trust retrieval. If it made it into usedSignals, show it.
     return true;
-  }).sort((a: any, b2: any) => {
-    const ta = typeof a.queryRelevance === "number" ? a.queryRelevance : (a.keywordOverlap ?? 0);
-    const tb = typeof b2.queryRelevance === "number" ? b2.queryRelevance : (b2.keywordOverlap ?? 0);
-    return tb - ta;
-  });
+  }).sort((a: any, b2: any) => topicFit(b2) - topicFit(a));
   const hiddenSignalCount = rawSignals.length - relevantSignals.length;
 
   const saveToProject = async () => {

@@ -960,6 +960,13 @@ export async function POST(req: Request) {
               keywordOverlap: stats.weightedOverlap,
               sourceTier: s.sourceTier ?? classifySource(s.source),
               queryRelevance: refLookup.get(refKey(s.source, s.title)),
+              // 2026-04-23 Layered-Filter-Architecture-Fix: propagate the
+              // canonical relevance score + pass-reason that the retrieval
+              // layer computed. Without this, downstream UI (Orbit, Live-
+              // Signale tile) would have to re-derive these from raw
+              // overlap and would miss anchor-bypass signals.
+              passReason: s.passReason,
+              displayScore: s.displayScore,
             };
           });
 

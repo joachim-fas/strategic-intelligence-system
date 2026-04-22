@@ -29,6 +29,34 @@ export interface LiveSignal {
    */
   keywordOverlap?: number;
   sourceTier?: SourceTier;
+  /**
+   * 2026-04-23 Layered-Filter-Architecture-Fix: explicit reason this
+   * signal passed the retrieval filter. Useful for debugging, observability,
+   * and future ML scoring. One of:
+   *   - "overlap":            passed the per-tier weighted-overlap threshold
+   *   - "academic-bypass":    academic/authoritative source + anchor matched
+   *   - "long-domain-anchor": ≥9-char keyword (or alias) in signal text
+   *   - "bigram-anchor":      adjacent base-keyword pair (each ≥4) in signal text
+   * Multiple may apply — the field captures the strongest reason.
+   */
+  passReason?: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor";
+  /**
+   * 2026-04-23 Layered-Filter-Architecture-Fix: the canonical score
+   * downstream UI layers should use for sorting/display/threshold checks.
+   *
+   * Computed by retrieval = max(rawOverlap, anchor-bypass-floor):
+   *   - long-domain-anchor pass: floor 0.50 (compound term is highly precise)
+   *   - bigram-anchor pass:      floor 0.55 (phrase match in title is strong)
+   *   - academic-bypass pass:    floor 0.45 (peer-reviewed source vetted)
+   *   - overlap pass:            no floor (raw weighted overlap)
+   *
+   * This solves the layered-filter anti-pattern: UI tiles and the Orbit
+   * derivation no longer need their own threshold logic — they trust this
+   * score as the single source of truth for "how strongly does this signal
+   * engage with the query?". A `keywordOverlap` of 0.07 with a long-domain
+   * anchor pass surfaces as `displayScore=0.50` and ranks correctly.
+   */
+  displayScore?: number;
 }
 
 // ─── Source tiering ─────────────────────────────────────────────────────────
@@ -998,7 +1026,44 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
       );
     if (!anchorIsSufficient && stats.weightedOverlap < minOverlap) continue;
 
-    enriched.push({ ...row, keywordOverlap: stats.weightedOverlap, sourceTier: tier });
+    // 2026-04-23 Layered-Filter-Architecture-Fix: compute passReason +
+    // displayScore once at the retrieval layer, so all downstream UI
+    // layers (Live-Signale tile, Orbit derivation, briefing surfaces) can
+    // sort/filter/display from a single source of truth instead of each
+    // layer re-deriving relevance from raw overlap.
+    //
+    // The displayScore floor reflects how confident retrieval is about
+    // the pass — a long-domain-anchor (compound 9+-char term) is more
+    // precise than the raw overlap suggests, so the score is floored at
+    // a level that ranks the signal correctly relative to high-overlap
+    // signals. Bigram anchors are even stronger (phrase match in a short
+    // news title is rare-by-coincidence). Academic-bypass is a tier-of-
+    // origin floor (peer-review pre-filtered the content).
+    let passReason: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor" = "overlap";
+    let displayScore = stats.weightedOverlap;
+    if (bigramAnchorMatched) {
+      passReason = "bigram-anchor";
+      displayScore = Math.max(displayScore, 0.55);
+    } else if (longAnchorMatched) {
+      passReason = "long-domain-anchor";
+      displayScore = Math.max(displayScore, 0.50);
+    } else if (
+      stats.anchorMatched &&
+      (tier === "academic" || tier === "authoritative") &&
+      stats.weightedOverlap < minOverlap
+    ) {
+      passReason = "academic-bypass";
+      displayScore = Math.max(displayScore, 0.45);
+    }
+    // else: passed via raw overlap, displayScore = stats.weightedOverlap
+
+    enriched.push({
+      ...row,
+      keywordOverlap: stats.weightedOverlap,
+      sourceTier: tier,
+      passReason,
+      displayScore,
+    });
   }
 
   // 2026-04-22 Pilot-Eval-Fix P1-Dedup: Signal-Deduplizierung gegen

@@ -117,7 +117,9 @@ function edgeQueryRelevance(e: MatchedEdge): number {
 }
 
 /**
- * Per-query topical relevance for a live signal. Fix 2026-04-21:
+ * Per-query topical relevance for a live signal. Fix 2026-04-21,
+ * extended 2026-04-23 to consume the canonical `displayScore` from the
+ * retrieval layer.
  *
  * Previously, signals inherited chainRel as `signal.strength × avgTrendRel`.
  * That formula has ZERO component measuring how topically the signal engages
@@ -125,17 +127,31 @@ function edgeQueryRelevance(e: MatchedEdge): number {
  * avgTrendRel 0.55 displayed as "45% Kettenbezug" for a Vienna-district
  * query, even though its content had nothing to do with Vienna districts.
  *
- * The new topical-fit factor is:
- *   1. LLM-supplied `queryRelevance` when present — the model rates how much
- *      it actually leaned on this signal
- *   2. Fallback: `keywordOverlap` from the retrieval filter — fraction of
- *      query keywords that appeared in the signal's text
- *   3. Last resort: 0.3 — pessimistic default, so an unknown signal does not
- *      inherit the full strength × avgTrend blend without topical evidence
+ * Resolution priority (most-trusted first):
+ *
+ *   1. LLM-supplied `queryRelevance` — the model rates how much it actually
+ *      leaned on this signal in producing the synthesis. Most-authoritative
+ *      because it's based on observed use, not a priori match.
+ *
+ *   2. Retrieval-supplied `displayScore` — canonical relevance score from
+ *      `getRelevantSignals`, with the pass-reason floor applied (long-domain
+ *      anchor: 0.50, bigram anchor: 0.55, academic-bypass: 0.45, raw overlap
+ *      otherwise). 2026-04-23 fix: this layer used to read `keywordOverlap`
+ *      directly, which gave 0.07 for short news titles that passed via
+ *      anchor-bypass — making them visually invisible despite being
+ *      domain-relevant.
+ *
+ *   3. Fallback: raw `keywordOverlap` for older cached results without
+ *      `displayScore` (signals stored before the 2026-04-23 schema bump).
+ *
+ *   4. Last resort: 0.3 — pessimistic default.
  */
 function signalTopicalFit(s: UsedSignal): number {
   if (typeof s.queryRelevance === "number" && s.queryRelevance >= 0 && s.queryRelevance <= 1) {
     return s.queryRelevance;
+  }
+  if (typeof s.displayScore === "number" && s.displayScore >= 0 && s.displayScore <= 1) {
+    return s.displayScore;
   }
   if (typeof s.keywordOverlap === "number" && s.keywordOverlap >= 0 && s.keywordOverlap <= 1) {
     return s.keywordOverlap;
