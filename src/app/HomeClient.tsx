@@ -2175,6 +2175,20 @@ export default function HomeClient() {
                       synthesis: activeEntry.briefing?.synthesis ?? "",
                     });
                   }}
+                  onRetry={(q) => {
+                    // Pilot-Eval-Fix 2026-04-22 P2: Retry einer
+                    // gescheiterten Query darf NICHT als Folgefrage
+                    // gelten — sonst setzt der parent-query-Render
+                    // den „↳ FOLGEFRAGE ZU"-Header auf die eigene Query
+                    // (Self-Reference). Der Retry ruft handleSubmit
+                    // ohne prevCtx auf; dadurch wird parentQuery
+                    // sauber undefined und der Retry verhält sich
+                    // wie ein frischer Submit der gleichen Frage.
+                    // `reuseActiveProject: true` erhält das bisherige
+                    // Canvas-Projekt (sonst würde jeder Retry ein neues
+                    // Projekt anlegen — genau so störend wie vorher).
+                    void handleSubmit(q, undefined, { reuseActiveProject: true });
+                  }}
                 />
               </div>
             );

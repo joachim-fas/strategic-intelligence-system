@@ -77,13 +77,23 @@ export interface HistoryEntry {
 }
 
 // ── BriefingResult ────────────────────────────────────────────────────────────
-export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp, onProjectCreated }: {
+export function BriefingResult({ entry, locale, trendCount, onTrendClick, activeProjectId, onFollowUp, onRetry, onProjectCreated }: {
   entry: HistoryEntry;
   locale: Locale;
   trendCount: number;
   onTrendClick: (trend: TrendDot) => void;
   activeProjectId?: string | null;
   onFollowUp?: (query: string) => void;
+  /**
+   * Optional: explizit separater Retry-Callback für die „Wiederholen"-
+   * Schaltfläche nach einem gescheiterten Briefing. Muss gegen onFollowUp
+   * abgegrenzt werden, damit der Retry nicht als Folgefrage zur eigenen
+   * Query markiert wird (Pilot-Eval-Bug 2026-04-22: Self-Reference in
+   * parentQuery, sichtbar als „↳ FOLGEFRAGE ZU [eigene Query]"). Fehlt
+   * der Callback, fällt der Retry-Button auf onFollowUp zurück, um
+   * Aufwärtskompatibilität zu wahren — nicht ideal, aber kein Crash.
+   */
+  onRetry?: (query: string) => void;
   /** Optional: Callback wenn beim Speichern automatisch ein neues
    *  Projekt angelegt wurde. Parent setzt damit seinen activeProjectId,
    *  sodass folgende Briefings in dasselbe Projekt wandern. */
@@ -505,7 +515,20 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               <div style={{ fontSize: 12, color: "var(--signal-negative-text, #7F1D1D)", lineHeight: 1.5 }}>{entry.error}</div>
             </div>
             <Tooltip content={locale === "de" ? "Analyse mit derselben Frage erneut starten" : "Retry with the same query"} placement="top">
-              <VoltButton variant="destructive" size="sm" onClick={() => onFollowUp?.(entry.query)}>
+              <VoltButton
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  // Pilot-Eval-Fix 2026-04-22 P2: Retry nutzt einen
+                  // separaten Callback, damit die wiederholte Query
+                  // NICHT als Folgefrage zu sich selbst markiert wird.
+                  // Fallback auf onFollowUp nur, wenn onRetry fehlt
+                  // (ältere Call-Sites); in dem Fall bleibt der Self-
+                  // Reference-Bug sichtbar, aber kein Crash.
+                  if (onRetry) onRetry(entry.query);
+                  else onFollowUp?.(entry.query);
+                }}
+              >
                 <RotateCcw size={13} style={{ marginRight: 6 }} />
                 {locale === "de" ? "Wiederholen" : "Retry"}
               </VoltButton>
