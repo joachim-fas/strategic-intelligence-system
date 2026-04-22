@@ -210,8 +210,12 @@ No prose, no markdown fences, no commentary. The array must contain exactly ${si
  * but occasionally wraps it in code fences or adds prose despite the
  * instruction. This function strips common decorations and tries hard
  * to return a parsed array.
+ *
+ * Exported for testing (signal-relevance-llm-test.ts) — the brittle
+ * surface is the LLM's tendency to decorate output, so the parser
+ * deserves explicit regression coverage.
  */
-function extractJudgmentArray(text: string): RelevanceJudgment[] | null {
+export function extractJudgmentArray(text: string): RelevanceJudgment[] | null {
   if (!text) return null;
 
   // Strip code fences if present

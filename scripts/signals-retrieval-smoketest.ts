@@ -27,6 +27,20 @@ interface Probe {
   query: string;
   expectedSources: string[];
   minSignals: number;
+  /**
+   * 2026-04-23 Noise-Regression-Erweiterung: optional ceiling on signal
+   * count. When set, more than `maxSignals` signals coming back is
+   * treated as a noise-leak failure (typically because a generic word
+   * like a country name has matched everywhere it shouldn't).
+   */
+  maxSignals?: number;
+  /**
+   * 2026-04-23 Noise-Regression-Erweiterung: optional list of source
+   * names that must NOT appear. Used for queries where certain sources
+   * leaking through is a known anti-pattern (e.g. usgs-earthquake on a
+   * Rundfunk query — was the original report bug ff19ba5 was fixing).
+   */
+  forbiddenSources?: string[];
 }
 
 const PROBES: Probe[] = [
@@ -65,6 +79,50 @@ const PROBES: Probe[] = [
     expectedSources: ["google_news_hp_en", "google_news_wp_de"],
     minSignals: 5,
   },
+  {
+    // 2026-04-23 Noise-Regression-Probe (promoted from probe-rundfunk.ts).
+    //
+    // Original report: a Rundfunk-Query produced 30 signals, 27 of them
+    // off-topic (heat-pump articles, Iran-war news, USGS earthquakes —
+    // anything containing "Deutschland"). Root cause was the
+    // `long-domain-anchor` bypass admitting single-keyword matches on
+    // common long words like country names. Fix in ff19ba5 retired the
+    // bypass and replaced it with the multi-evidence-gate.
+    //
+    // This probe pins that fix: the Rundfunk query has no real DB-backed
+    // sources (no broadcasting connectors), so it should return VERY FEW
+    // signals — and never the noise-class (heat-pump, earthquakes,
+    // prediction markets, social posts).
+    //
+    // If this probe ever shows >8 signals OR includes any forbidden
+    // source, the noise-leak bug has regressed.
+    name: "Rundfunk noise-regression — should NOT leak heat-pump/earthquake/etc.",
+    query:
+      "Welchen Einfluss hat der öffentliche Rundfunk auf die Gesellschaft in Deutschland und Österreich?",
+    // We don't strictly require any specific source — DB simply lacks
+    // broadcasting connectors. The point is what should NOT come back.
+    // Listing ECFR/OSW as "expected" because they were the only legit
+    // matches we saw (multi-match on Germany + governance/security
+    // keywords). The expectedSources check tolerates either being
+    // present, but the real test is below.
+    expectedSources: ["ecfr_rss", "osw_rss"],
+    minSignals: 0,
+    maxSignals: 8,
+    forbiddenSources: [
+      "usgs-earthquake",
+      "google_news_hp_en",
+      "google_news_wp_de",
+      "polymarket",
+      "manifold",
+      "kalshi",
+      "metaculus",
+      "bluesky",
+      "mastodon_api",
+      "reddit",
+      "finnhub",
+      "coingecko",
+    ],
+  },
 ];
 
 let allPassed = true;
@@ -80,6 +138,11 @@ for (const probe of PROBES) {
   console.log(`  → ${signals.length} signals (${dt} ms)`);
 
   if (signals.length === 0) {
+    if (probe.minSignals === 0) {
+      console.log(`  ✓ 0 signals (acceptable for this probe — minSignals=0)`);
+      console.log(`  ✓ PASS`);
+      continue;
+    }
     console.log(`  ✗ FAIL: 0 signals returned`);
     allPassed = false;
     continue;
@@ -128,17 +191,47 @@ for (const probe of PROBES) {
   }
 
   // Pass criteria
+  let probePassed = true;
+
+  // Min-signal floor
   if (signals.length < probe.minSignals) {
     console.log(`  ✗ FAIL: only ${signals.length} signals, need ≥${probe.minSignals}`);
-    allPassed = false;
-  } else {
+    probePassed = false;
+  }
+
+  // Max-signal ceiling (noise-regression probes)
+  if (typeof probe.maxSignals === "number" && signals.length > probe.maxSignals) {
+    console.log(
+      `  ✗ FAIL (noise-leak): ${signals.length} signals returned, ceiling is ${probe.maxSignals}. ` +
+      `Likely cause: a generic word in the query is matching too broadly.`,
+    );
+    probePassed = false;
+  }
+
+  // Forbidden-sources check (noise-regression probes)
+  if (Array.isArray(probe.forbiddenSources) && probe.forbiddenSources.length > 0) {
+    const leaked = probe.forbiddenSources.filter(src => sourceCounts.has(src));
+    if (leaked.length > 0) {
+      console.log(
+        `  ✗ FAIL (forbidden-source-leak): [${leaked.join(", ")}] should NOT appear in this query's results`,
+      );
+      probePassed = false;
+    }
+  }
+
+  // Expected-sources check (only meaningful when minSignals > 0)
+  if (probe.minSignals > 0) {
     const expectedHit = probe.expectedSources.some(src => sourceCounts.has(src));
     if (!expectedHit) {
       console.log(`  ⚠ WARN: none of expected sources [${probe.expectedSources.join(", ")}] in top signals`);
-      allPassed = false;
-    } else {
-      console.log(`  ✓ PASS`);
+      probePassed = false;
     }
+  }
+
+  if (probePassed) {
+    console.log(`  ✓ PASS`);
+  } else {
+    allPassed = false;
   }
 }
 

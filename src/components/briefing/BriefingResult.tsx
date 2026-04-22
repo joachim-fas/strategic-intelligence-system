@@ -6,6 +6,7 @@ import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { useActiveTenantId } from "@/lib/tenant-context";
 import { tenantStorage, TENANT_STORAGE_KEYS } from "@/lib/tenant-storage";
 import { IntelligenceBriefing } from "@/lib/intelligence-engine";
+import { signalTopicalFit } from "@/lib/signal-topic-fit";
 import { TrendDot } from "@/types";
 import { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -136,17 +137,14 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   // Hürde, weil dort auch heute noch Personal-Posts durchrutschen können
   // (Bluesky/Mastodon haben kürzere Titel und keine redaktionelle
   // Pre-Filterung).
-  // 2026-04-23 Iteration-Loop Pass 2: LLM-judged relevance is the most-
-  // trusted score (semantic, not lexical). Normalised from 0-10 to 0-1.
+  // 2026-04-23 (Hygiene-Pass): topic-fit-Logik aus dieser Datei und
+  // OrbitDerivationView dedupliziert in src/lib/signal-topic-fit.ts.
+  // Single Source of Truth für «wie topisch passend ist dieses Signal?»
   // Resolution: llmRelevanceScore/10 > queryRelevance > displayScore >
-  // keywordOverlap > 0.3 default.
-  const topicFit = (s: any): number => {
-    if (typeof s.llmRelevanceScore === "number") return s.llmRelevanceScore / 10;
-    if (typeof s.queryRelevance === "number") return s.queryRelevance;
-    if (typeof s.displayScore === "number") return s.displayScore;
-    if (typeof s.keywordOverlap === "number") return s.keywordOverlap;
-    return 0.3;
-  };
+  // keywordOverlap > 0.3 default. Die alte ungeprüfte Version hatte
+  // keinen Range-Check und hätte Out-of-Range-Werte stillschweigend
+  // weitergegeben.
+  const topicFit = signalTopicalFit;
   const rawSignals: any[] = Array.isArray(b.usedSignals) ? b.usedSignals : [];
   const relevantSignals = rawSignals.filter((s: any) => {
     // Social-tier still needs the strict 0.5 floor — Bluesky/Mastodon
