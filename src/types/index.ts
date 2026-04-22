@@ -228,7 +228,7 @@ export interface UsedSignal {
    * signal passed retrieval. See `LiveSignal.passReason` in
    * `src/lib/signals.ts` for the full taxonomy.
    */
-  passReason?: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor";
+  passReason?: "academic-bypass" | "multi-match" | "bigram-anchor";
   /**
    * 2026-04-23 Layered-Filter-Architecture-Fix: canonical relevance score
    * for UI sort/display/filter. Floored above raw `keywordOverlap` when

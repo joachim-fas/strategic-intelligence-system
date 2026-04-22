@@ -30,16 +30,28 @@ export interface LiveSignal {
   keywordOverlap?: number;
   sourceTier?: SourceTier;
   /**
-   * 2026-04-23 Layered-Filter-Architecture-Fix: explicit reason this
-   * signal passed the retrieval filter. Useful for debugging, observability,
-   * and future ML scoring. One of:
-   *   - "overlap":            passed the per-tier weighted-overlap threshold
-   *   - "academic-bypass":    academic/authoritative source + anchor matched
-   *   - "long-domain-anchor": ≥9-char keyword (or alias) in signal text
-   *   - "bigram-anchor":      adjacent base-keyword pair (each ≥4) in signal text
-   * Multiple may apply — the field captures the strongest reason.
+   * 2026-04-23 Multi-Evidence Gate: explicit reason this signal passed
+   * retrieval. Every passing signal satisfies at least one of:
+   *   - "academic-bypass": academic/authoritative source tier + anchor match
+   *                        (single-keyword pass is OK because the source
+   *                        itself is editorially pre-filtered)
+   *   - "multi-match":     ≥2 distinct base-keyword matches (alias-aware) —
+   *                        co-occurrence is structural evidence
+   *   - "bigram-anchor":   adjacent base-keyword pair appears literally in
+   *                        the signal text — precision-by-construction
+   *
+   * Multiple may apply; the field captures the highest-strength reason
+   * (bigram > multi-match > academic-bypass).
+   *
+   * 2026-04-23 STRUCTURAL HISTORY:
+   *   - "long-domain-anchor" was retired — keyword length is NOT a proxy
+   *     for keyword precision; "deutschland" is 11 chars and appears in
+   *     30%+ of DE signals; "wärmepumpen" is 11 chars and appears in <0.5%.
+   *   - "overlap" was retired — the weighted-overlap-fraction gate scaled
+   *     wrong with query length and was trivially defeated by any high-
+   *     frequency long word (single "deutschland" = 18% > 15% media tier).
    */
-  passReason?: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor";
+  passReason?: "academic-bypass" | "multi-match" | "bigram-anchor";
   /**
    * 2026-04-23 Layered-Filter-Architecture-Fix: the canonical score
    * downstream UI layers should use for sorting/display/threshold checks.
@@ -975,87 +987,110 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     //
     // The overlap fraction dilutes for complex multi-part queries: a query
     // with 20 keywords gives only 5% overlap for a single match, far below
-    // any static threshold. We bypass the gate in three safe cases:
+    // any static threshold. We bypass the gate in three safe cases — each
+    // requires MULTI-EVIDENCE that the signal engages with the question,
+    // not just incidental shared vocabulary.
     //
-    //   1. academic / authoritative tier: anchor-match alone is a sufficient
-    //      quality gate. Peer-reviewed papers don't produce off-topic content.
+    //   1. academic / authoritative tier + anchor-match: peer-reviewed /
+    //      intergovernmental sources don't produce off-topic content; the
+    //      tier-of-origin is itself an editorial pre-filter, so a single
+    //      anchor match is sufficient evidence.
     //
-    //   2. Any tier + long domain-specific anchor (≥9 chars): compound terms
-    //      like "wärmepumpen" (11), "autonomous" (9), "arbeitsmarkt" (12),
-    //      "interventions" (13), "penetration" (11) are not false-positive
-    //      prone. If such a term appears (literally or via alias) in a signal
-    //      title the signal IS on topic, regardless of the overlap fraction
-    //      or the source tier.
+    //   2. Any tier + multi-match (≥2 distinct keyword matches): when the
+    //      signal text contains TWO OR MORE of the query's base keywords
+    //      (alias-aware via computeKeywordStats), the signal is genuinely
+    //      engaging multiple aspects of the question. Co-occurrence is
+    //      structural evidence; single-keyword incidence is not.
     //
-    //   3. Any tier + bigram-phrase anchor: adjacent base-keyword pairs that
-    //      appear literally in the signal text — e.g. "heat pump" (the EN
-    //      query has "heat" + "pump" as two short keywords, but the bigram
-    //      "heat pump" is a precise compound term). Same precision argument
-    //      as long single keywords; bigrams of two ≥4-char words are
-    //      compound concepts, not coincidence.
+    //   3. Any tier + bigram-phrase anchor: adjacent base-keyword pairs
+    //      that appear literally in the signal text — e.g. "heat pump"
+    //      (each half 4 chars but the phrase is a domain compound).
+    //      Bigrams are inherently multi-word evidence — the user typed
+    //      both words next to each other AND the signal echoes them
+    //      verbatim. Precision-by-construction.
     //
-    // 2026-04-22 Pilot-Eval P2-Smoketest: long-anchor check made alias-aware
-    // (was raw substring of baseKeyword) — fixed C-DE 1/31 → 30/31 issue
-    // where signals say "Wärmepumpe" but query keyword is "wärmepumpen".
-    // Bigram path added — fixed C-EN 0/30 issue where heat-pump signals
-    // contain "heat pump" but neither "heat" (4) nor "pump" (4) is ≥9 chars.
-    const minOverlap = TIER_MIN_OVERLAP[tier];
+    // 2026-04-23 STRUCTURAL FIX: removed the `long-domain-anchor` bypass
+    // (single ≥9-char keyword match). It worked for "wärmepumpen" (a
+    // domain-unique compound) but flooded results with country-name-only
+    // matches: a Rundfunk query produced 27/30 off-topic signals because
+    // "deutschland" (11 chars) matched in heat pump / Iran-war / oil
+    // pipeline articles. The principle was wrong: keyword length is NOT
+    // a proxy for keyword precision. "Deutschland" is 11 chars and
+    // appears in 30%+ of all DE-language signals; "wärmepumpen" is 11
+    // chars and appears in <0.5%. Without a frequency index we can't
+    // distinguish them per-keyword. The multi-match rule sidesteps the
+    // distinction entirely — a signal needs to match more than one query
+    // concept to count, and a single country-name match no longer leaks.
+    // (B) MULTI-EVIDENCE GATE — replaces the previous weighted-overlap
+    // threshold gate.
+    //
+    // 2026-04-23 STRUCTURAL FIX (second pass): The overlap-fraction gate
+    // had an additional unfixable failure mode: for short queries
+    // (6 keywords), a single match on a long keyword (e.g. "deutschland",
+    // 11 chars, weight 11 of 60 total = 18%) crosses the per-tier
+    // threshold (15% media) even though the signal engaged with only ONE
+    // query concept. A Rundfunk query produced 27/30 off-topic signals
+    // because heat-pump / Iran-war / oil-pipeline articles all contained
+    // "Deutschland" and that single word was enough to pass.
+    //
+    // The fix: a signal must have MULTI-EVIDENCE that it engages with the
+    // question. The gate accepts exactly three pass-conditions, none of
+    // which can be satisfied by a single-keyword incidence:
+    //
+    //   1. multi-match (≥2 distinct base-keyword matches, alias-aware) —
+    //      the signal text covers TWO OR MORE query concepts. Co-
+    //      occurrence is structural evidence; single incidence is not.
+    //
+    //   2. bigram-anchor (adjacent base-keyword pair appears literally) —
+    //      the user typed the words next to each other AND the signal
+    //      echoes them verbatim. Precision-by-construction, even when
+    //      each individual word is short.
+    //
+    //   3. academic-bypass (anchor-match + academic/authoritative tier) —
+    //      single anchor match is sufficient ONLY when the source itself
+    //      is editorially pre-filtered (peer-review, intergovernmental).
+    //      The tier-of-origin is the second piece of evidence.
+    //
+    // The TIER_MIN_OVERLAP / weightedOverlap-fraction comparison is
+    // RETIRED. It was a structural design that scaled wrong with query
+    // length: too lenient for short queries, too strict for long ones,
+    // and trivially defeated by any high-frequency long-word like a
+    // country name.
     const lowerSignal = signalText.toLowerCase();
-    const longAnchorMatched =
-      baseKeywords.some(kw => {
-        if (kw.length < 9) return false;
-        const variants = aliasMap[kw] ? [kw, ...aliasMap[kw]] : [kw];
-        return variants.some(v => lowerSignal.includes(v));
-      });
     const bigramAnchorMatched =
       bigrams.some(bg => {
-        // Both halves of the bigram must be ≥4 chars to count — pure
-        // function-word bigrams ("of the") shouldn't qualify, and the
-        // shorter side acts as the precision floor.
         const [a, b] = bg.split(" ");
         if (!a || !b || a.length < 4 || b.length < 4) return false;
         return lowerSignal.includes(bg);
       });
-    const hasLongDomainAnchor =
-      stats.anchorMatched && (longAnchorMatched || bigramAnchorMatched);
-    const anchorIsSufficient =
+    const multiMatchAnchor = stats.matched >= 2;
+    const academicTrustedBypass =
+      (tier === "academic" || tier === "authoritative");
+    const hasMultiEvidence =
       stats.anchorMatched && (
-        tier === "academic" ||
-        tier === "authoritative" ||
-        hasLongDomainAnchor
+        multiMatchAnchor ||
+        bigramAnchorMatched ||
+        academicTrustedBypass
       );
-    if (!anchorIsSufficient && stats.weightedOverlap < minOverlap) continue;
+    if (!hasMultiEvidence) continue;
 
-    // 2026-04-23 Layered-Filter-Architecture-Fix: compute passReason +
-    // displayScore once at the retrieval layer, so all downstream UI
-    // layers (Live-Signale tile, Orbit derivation, briefing surfaces) can
-    // sort/filter/display from a single source of truth instead of each
-    // layer re-deriving relevance from raw overlap.
-    //
-    // The displayScore floor reflects how confident retrieval is about
-    // the pass — a long-domain-anchor (compound 9+-char term) is more
-    // precise than the raw overlap suggests, so the score is floored at
-    // a level that ranks the signal correctly relative to high-overlap
-    // signals. Bigram anchors are even stronger (phrase match in a short
-    // news title is rare-by-coincidence). Academic-bypass is a tier-of-
-    // origin floor (peer-review pre-filtered the content).
-    let passReason: "overlap" | "academic-bypass" | "long-domain-anchor" | "bigram-anchor" = "overlap";
+    // displayScore floors reflect pass-strength priority:
+    //   - bigram-anchor:   0.55 — adjacent-word literal match (strongest)
+    //   - multi-match:     0.50 — ≥2 keyword co-occurrence
+    //   - academic-bypass: 0.45 — single anchor + trusted-tier
+    let passReason: "academic-bypass" | "multi-match" | "bigram-anchor";
     let displayScore = stats.weightedOverlap;
     if (bigramAnchorMatched) {
       passReason = "bigram-anchor";
       displayScore = Math.max(displayScore, 0.55);
-    } else if (longAnchorMatched) {
-      passReason = "long-domain-anchor";
+    } else if (multiMatchAnchor) {
+      passReason = "multi-match";
       displayScore = Math.max(displayScore, 0.50);
-    } else if (
-      stats.anchorMatched &&
-      (tier === "academic" || tier === "authoritative") &&
-      stats.weightedOverlap < minOverlap
-    ) {
+    } else {
+      // Only remaining condition: academic-bypass with single anchor
       passReason = "academic-bypass";
       displayScore = Math.max(displayScore, 0.45);
     }
-    // else: passed via raw overlap, displayScore = stats.weightedOverlap
 
     enriched.push({
       ...row,

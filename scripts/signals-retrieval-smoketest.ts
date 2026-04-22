@@ -48,7 +48,13 @@ const PROBES: Probe[] = [
       "größten Hebel und Bremsen, und welche EU-Politikinstrumente haben den " +
       "stärksten Einfluss auf das Marktwachstum?",
     expectedSources: ["google_news_wp_de"],
-    minSignals: 5,
+    // 2026-04-23 Multi-Evidence-Gate: lowered from 5 → 3.
+    // The C-DE query has many short generic news titles in
+    // `google_news_wp_de` that match only "wärmepumpen" — single-keyword
+    // matches no longer pass the multi-evidence gate. Drops single-match
+    // atmospheric signals; keeps high-quality multi-match. The pilot-eval
+    // 91% score depended on multi-match signals, not solitary matches.
+    minSignals: 3,
   },
   {
     name: "C EN — Heat pump regulatory penetration in Europe",
