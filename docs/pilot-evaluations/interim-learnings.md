@@ -365,3 +365,165 @@ signal-seitig belegbar.
 5. **interim-learnings.md in Notion als Projekt-Page spiegeln**
    (nicht nur im Repo) — für Stakeholder-Gespräche und cross-session
    Kontinuität.
+
+---
+
+# Tagesabschluss 2026-04-22 Abend → 2026-04-23 (Re-Run-Sprint)
+
+Der gestern als „Nächste Schritte / Punkt 1" verabschiedete Re-Run-Batch
+wurde in einer kontinuierlichen Session abgearbeitet. Ergebnis: **alle
+fünf deferred Slots erfolgreich gescored**, davon **drei mit ≥91%**, eine
+**Best-Score von 94%**, plus drei tieferliegende Architektur-Defekte
+gefixt, die erst durch die Re-Runs sichtbar wurden.
+
+## Final Pilot-Eval-Tableau (alle sechs Slots)
+
+| Slot | Thema | Status | Score | Anmerkung |
+|---|---|---|---|---|
+| A DE | Lieferketten | ✅ | **32/35 (91%)** | Reference-Set vom Vortag |
+| A EN | Lieferketten (EN) | ✅ | **31/35 (89%)** | Solider EN-Baseline |
+| B DE | KI-Arbeitsmarkt | ✅ | **publikationsreif** | Nach Anchor-Position-Fix unblocked |
+| B EN | KI-Arbeitsmarkt (EN) | ✅ | **32/35 (91%)** | Academic-Bypass + Long-Anchor wirkten |
+| C DE | Wärmepumpen | ✅ | **32/35 (91%)** | Cross-lingual google_news_hp_en + google_news_wp_de |
+| **C EN** | **Wärmepumpen (EN)** | ✅ | **33/35 (94%)** | **Bester Run** — 14 Signale in Orbit-Chain |
+
+**Mittelwert über alle bewerteten Slots: 91%.** Alle sechs Slots bestehen
+die Publikationsschwelle (≥30/35 = 86%).
+
+## Acht weitere Commits (Tag 2)
+
+| Commit | Was | Wirkung |
+|---|---|---|
+| `cf52363` | Post-Validator + Retry gegen synthesis-only-Collapse | unblocked B-DE |
+| `fd999c4` | Anchor-Match Position-Erweiterung (Top-3-längste + Top-5-Position) | unblocked B-DE-Re-Run |
+| `5102f4a` | DB-Level Dedup (UNIQUE INDEX + INSERT OR IGNORE) + Google News Wärmepumpe Connector | C-DE Signale verfügbar |
+| `765d865` | Academic/Authoritative Sources brauchen kein Overlap-Threshold wenn Anchor matched | unblocked B-EN |
+| `95b9193` | 4-Part C-Pilot Signal-Coverage Fix (Long-Domain-Anchor + Reverse EN→DE Aliase + google_news_hp_en) | C-EN Signale verfügbar |
+| `6a6d5e8` | **Bigram-Anchor + alias-aware Long-Anchor + SQL-Threshold relax + Smoke-Test** | All-Green-Smoke-Test |
+| `3455a91` | Token-Budget-Telemetrie + Retry-Cap 16k→8k | Schritt 6 abgeschlossen |
+| `80288e2` | Live-Signale-Kachel synced mit Retrieval (`≥0.25` Filter entfernt) | Display-Layer ehrlich |
+| `a6bb7cb` | Orbit-Default-Threshold 0.20 → 0.05 | Orbit-Chain sichtbar |
+
+## Die zentrale Architektur-Lesson: Layered-Filter-Anti-Pattern
+
+Die letzten drei Commits (`6a6d5e8`, `80288e2`, `a6bb7cb`) adressieren
+alle die gleiche Klasse von Bug — ein Anti-Pattern, das im
+Pilot-Eval-Sprint dreimal nacheinander aufgedeckt wurde:
+
+**Drei Filter-Schichten mit identischem Threshold-Konzept (`weighted overlap ≥ X`):**
+
+1. **Retrieval Layer** (`src/lib/signals.ts` — `getRelevantSignals`)
+   → smart, alias-aware, mit Anchor-Match + Long-Domain-Bypass + Bigram-Bypass
+2. **UI-Tile** (`src/components/briefing/BriefingResult.tsx` — Live-Signale-Kachel)
+   → hatte eigenen `≥0.25` weighted-overlap-Filter
+3. **Orbit-Visualization** (`src/app/canvas/OrbitDerivationView.tsx`)
+   → hatte eigenen `≥0.20` chainRel-Default-Threshold
+
+**Jede Schicht hat in einer eigenen Bug-Phase einen eigenen Schutz-Filter
+bekommen.** Das war historisch korrekt — als das Retrieval-Layer
+unspezifisch war, brauchten UI und Orbit defensive Eigenfilter, um nicht
+13 marginal-related Bluesky-Posts als „Live-Signale" anzuzeigen.
+
+**Als das Retrieval-Layer dann smart wurde** (Anchor-Match-Reform,
+Long-Domain-Bypass, Bigram-Anchor), **blieben die alten Schutzschichten
+als Fossile zurück** und blockierten korrekt-retrieved Signale. Beweis:
+der C-DE-Run zitierte explizit `[SIGNAL: GOOGLE_NEWS_HP_EN]` und
+`[SIGNAL: GOOGLE_NEWS_WP_DE]` in der Synthesis, aber die UI-Kachel zeigte
+„0 Live-Signale" und der Orbit war leer.
+
+**Dieses Anti-Pattern ist hartnäckig**, weil:
+- Defense-in-depth ist als Architektur-Prinzip sinnvoll
+- Die Schichten wurden in unterschiedlichen Sessions/Sprints gebaut
+- Der Bug ist invisible im Code-Review (jede Schicht ist isoliert korrekt)
+- Er manifestiert sich nur **End-to-End**, wenn der Retrieval-Layer
+  verändert wird und die Display-Layer nicht mit-aktualisiert werden
+
+**Lesson für die Architektur:** Filter-Schichten sollten entweder
+(a) explizit kommunizieren („Trust upstream — show what was passed in"),
+oder (b) ihre eigenen Filter-Schwellen aus einer **gemeinsamen Quelle**
+beziehen (`TIER_MIN_OVERLAP` o.ä.), damit eine Reform an einem Ort
+automatisch alle Schichten konsistent hält. Der heutige Fix ist Variante
+(a) — UI und Orbit vertrauen jetzt der Retrieval-Schicht. Variante (b)
+wäre die nachhaltigere Lösung und sollte in der nächsten Architektur-
+Iteration adressiert werden.
+
+## Smoke-Test als Schleifenbrecher
+
+Der Schlüsselmoment des Tages war das **Offline-Smoke-Test-Skript**
+(`scripts/signals-retrieval-smoketest.ts`, eingeführt in `6a6d5e8`).
+
+**Das Problem:** Wir hatten vier Iterationen Pipeline-Patches gefahren —
+jeder Fix war evidenz-basiert, aber jeder wurde **nur durch einen
+60-200s-Live-LLM-Run** sichtbar. Cycle: Run → 0 Signale → Diagnose →
+Fix → Run → diskovere nächsten Bug → repeat. Der User formulierte das
+als „gefühlt drehen wir uns im Kreis".
+
+**Der Smoke-Test bricht den Zyklus**, indem er `getRelevantSignals()`
+offline gegen die drei Pilot-Queries (B-EN, C-DE, C-EN) ausführt und
+verifiziert dass:
+- ≥5 Signale zurückkommen
+- Die erwarteten Quellen drin sind (`google_news_hp_en`, `google_news_wp_de`,
+  `arxiv_econ_rss`, `ecipe_rss`)
+
+**Laufzeit: 700 ms** statt 60-200 s pro Live-Call. Die ersten beiden
+Smoke-Test-Runs waren rot — aber sie machten die nächsten zwei Bugs
+(alias-blinder Long-Anchor, fehlender Bigram-Anchor) **innerhalb von
+Sekunden** sichtbar statt erst nach einem Live-Run.
+
+**Lesson:** Für jede Pipeline-Klasse, deren End-to-End-Validation teuer
+ist (LLM-Calls, externe APIs), ist ein **deterministischer Offline-Smoke
+Test** mit realistischen Input-Beispielen Pflicht-Infrastruktur. Pay-it-
+forward für künftige Refactorings.
+
+## Token-Budget-Audit-Ergebnis
+
+`3455a91` führt Telemetrie ein — bei jedem Live-Call wird jetzt
+`stop_reason`, `input_tokens`, `output_tokens` und `duration_ms`
+geloggt. Greppable Format:
+
+```
+[query:llm-1] stop_reason=end_turn input_tokens=12453 output_tokens=8234 duration_ms=87412
+[query:llm-2-retry] stop_reason=end_turn input_tokens=20891 output_tokens=2103 duration_ms=24187
+```
+
+**Konkrete Änderung:** Retry-Call `max_tokens` 16000 → 8000. Der Retry
+mergt seine Strukturfelder zurück in die Original-Synthesis (siehe
+`src/app/api/v1/query/route.ts:661-667`), muss also nur scenarios +
+keyInsights + references + decisionFramework + causalChain neu
+generieren. Typisches Strukturfeld-JSON: 2-4k tokens. Worst-case-
+Retry-Latenz halbiert sich von ~200s auf ~100s.
+
+First-Call bleibt bei 16000 — bestätigt durch das ursprüngliche Pilot-
+Eval-Finding (12000 traf mid-JSON).
+
+**Empirische Validierung steht aus** — bei den nächsten Live-Runs müssen
+die `[query:llm-1]`-Logs gegen die Annahmen geprüft werden.
+
+## Bilanz Tag 2
+
+- **9 zusätzliche Commits** (gesamt: 21 Tag-1 + 9 Tag-2 = 30 Commits)
+- **Pilot-Eval-Phase abgeschlossen** mit 91% Mittelwert über alle Slots
+- **Smoke-Test-Infrastruktur** als wiederverwendbares Tooling
+- **Drei Architektur-Layer** (Retrieval / UI-Tile / Orbit) auf konsistente
+  Filter-Semantik gebracht
+- **Ein neues Anti-Pattern dokumentiert** (Layered-Filter ohne Layer-
+  Kommunikation) als Input für die nächste Architektur-Iteration
+
+## Offene Items für die nächste Iteration
+
+1. **Layered-Filter-Pattern als Architektur-Issue** — explizite gemeinsame
+   Threshold-Quelle (`TIER_MIN_OVERLAP` o.ä.) für alle Filter-Schichten,
+   damit Retrieval-Reformen automatisch propagieren
+2. **Token-Budget-Telemetrie-Auswertung** — nach 5-10 Live-Runs die
+   `[query:llm-1]`-Logs auswerten und entscheiden, ob `max_tokens=16000`
+   noch passt oder reduziert werden kann
+3. **BDH/BWP/dena/Agora RSS-Suche** — Google News ist Fallback, native
+   Industrie-Quellen wären stabiler. Status: alle vier checken (Tag 2)
+   = keine öffentlichen RSS-Feeds. Alternative: GDELT-Field-Filter oder
+   Web-Scraping mit Cron.
+4. **Die 7-Dim-Rubrik formal kalibrieren** — drei Runs mit 91% und einer
+   mit 94% legen nahe, dass die Rubrik nahe an einer Plateau-Schwelle
+   liegt. Eine Runde Inter-Rater-Reliability (zweiter Scorer auf einem
+   der Runs) würde die Rubrik validieren.
+5. **Folgefrage-Threading** (P2 vom Vortag) — bleibt offen, weniger
+   dringlich nach den heutigen Fixes

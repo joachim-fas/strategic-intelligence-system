@@ -1,9 +1,48 @@
 # Pilot-Evaluation — c-waermepumpen-de
 
 **Thema:** Welche regulatorischen und wirtschaftlichen Kräfte prägen die Zukunft der Wärmepumpen-Industrie im DACH-Raum bis 2030? Wo liegen die Tipping-Points für Marktdurchdringung — welche Rolle spielt das Gebäudeenergiegesetz (GEG), die EU-Gebäuderichtlinie (EPBD), und die Asia-vs-EU-Lieferkette?
-**Datum:** 2026-04-22
+**Datum:** 2026-04-22 (Initial-Run mit 0 Signalen) → 2026-04-23 (Re-Run mit 22 Signalen)
 **Version-ID:** project_queries.id=`38f0e291-260e-421e-86c3-7da82ebabffa`
-**Status:** Teilbewertung — zwei P0-Bugs aufgedeckt, Rubrik-Scoring deferred.
+**Status:** ✅ **Re-Run vollständig bewertet — 32/35 (91%)**
+
+---
+
+## ✅ Re-Run-Ergebnis (2026-04-23)
+
+Nach den Pipeline-Reformen (`5102f4a` Google News Wärmepumpe Connector +
+`6a6d5e8` Bigram-Anchor + alias-aware Long-Anchor + `80288e2` UI-Sync) ist
+der C-DE-Slot von „0 Signale, deferred" zu **22 Live-Signalen, 91% Score**
+gewechselt.
+
+| Dim | Score | Begründung |
+|---|---|---|
+| D1 Provenienz | 4/5 | Konsequente Tags: `[SIGNAL: GOOGLE_NEWS_HP_EN]`, `[SIGNAL: GOOGLE_NEWS_WP_DE]`, `[REGS: EU Green Deal]`, `[REGS: EU CSRD]`, `[TREND: …]`, `[LLM]` |
+| D2 Source-Qualität | 5/5 | **Gold-Standard für DE-Wärmepumpen-Markt:** BDH (Bundesverband der Deutschen Heizungsindustrie), European Commission EPBD, dena (Deutsche Energie-Agentur), IEA „The Future of Heat Pumps", Agora Energiewende |
+| D3 Signal-Relevanz | 4/5 | Sowohl `GOOGLE_NEWS_HP_EN` als auch `GOOGLE_NEWS_WP_DE` zitiert (cross-lingual, beide datiert 22.04.2026). Geringe Overlap-Werte je Signal (kurze News-Titel), aber LLM nutzt sie für „Aktueller Kontext"-Verankerung — wofür sie da sind |
+| D4 Szenarien | 5/5 | 22% / 51% / 27% = 100% ✓. „Marktdurchbruch durch Systemwende" / „Moderate Erholung mit Strukturhemmnissen" / „Stagnation durch politische Instabilität". Asymmetrisch (51% Basefall) realistisch |
+| D5 EU-Frame | 5/5 | EU Green Deal, **EPBD (recast 2024) mit Nullemissionsgebäuden 2030**, **EU-ETS2** als Strompreis-Mechanismus, **BEG**, GEG, BEG-Förderstopp 2023 |
+| D6 Action-Readiness | 5/5 | 5 nummerierte Policy-Empfehlungen mit Zeitfenster (2026-27, 2027-30) und Akteuren (BEG, BAFA, Kommunen, BMWi) |
+| D7 Ehrlichkeit-über-Lücken | 4/5 | 33% Konfidenz transparent. `[LLM]`-Tags konsequent. Marktrückgang 2024 ehrlich zugegeben (von 356.000 → 180.000-200.000 Einheiten) |
+
+**Total: 32/35 = 91%** — publikationsreif.
+
+**Was zwischen Initial-Run und Re-Run geändert wurde** (chronologisch):
+
+1. `5102f4a`: Google News Wärmepumpe Connector (`google_news_wp_de`) eingeführt — 31 DE-Signale in DB
+2. `765d865`: Academic/Authoritative-Bypass für Anchor-Match
+3. `95b9193`: 4-Part Fix mit Long-Domain-Anchor + Reverse EN→DE Aliasen + `google_news_hp_en`
+4. `6a6d5e8`: Bigram-Anchor + alias-aware Long-Anchor + SQL-Threshold-Relax + Smoke-Test
+5. `80288e2`: Live-Signale-UI-Tile mit Retrieval synchronisiert
+6. `a6bb7cb`: Orbit-Default-Threshold 0.20 → 0.05
+
+Die ursprüngliche Diagnose („Signal-Pool-Drought" + „synthesis-only Collapse") war
+korrekt — beides ist nun strukturell behoben.
+
+---
+
+## 🔴 Initial-Run-Diagnose (zur Historie behalten)
+
+**Status (2026-04-22):** Teilbewertung — zwei P0-Bugs aufgedeckt, Rubrik-Scoring deferred.
 
 Rubrik: [rubric.md](./rubric.md) — 7 Dimensionen · 1–5 Score · Gesamtmax 35.
 
