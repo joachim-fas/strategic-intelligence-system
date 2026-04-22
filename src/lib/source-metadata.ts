@@ -111,6 +111,25 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   vdem:               { steepV: "political",     trendLevel: "mega"  },
   worldmonitor:       { steepV: "political",     trendLevel: "signal" },
   ecfr_rss:           { steepV: "political",     trendLevel: "macro" },
+  // 2026-04-22 Pilot-Eval P0-A: Bruegel ist primär EU-Economic-Policy-
+  // Research (Brüssel-basiert, unabhängig), hat aber einen breiten
+  // Geopolitics-Anteil (Handels-, Sanktions-, Tech-Policy). Einstufung
+  // hier unter Political/macro analog zu ecfr_rss; die Feed-Einträge
+  // selbst bekommen ihre feinere Topic-Zuordnung über THINKTANK_MAPPING
+  // in rss-feeds.ts.
+  bruegel_rss:        { steepV: "political",     trendLevel: "macro" },
+  // Politico Europe — Tages-Newsfeed zu EU-Politik. Political/signal
+  // (nicht macro), weil der Feed stündlich aktualisiert, einzelne
+  // Artikel nur tagesscale relevant. Trotzdem wertvoll als ergänzende
+  // Quelle, weil er Brüsseler Policy-Tagesgeschäft einfängt, das
+  // Quartals-Think-Tank-Papers nicht spiegeln.
+  politico_eu_rss:    { steepV: "political",     trendLevel: "signal" },
+  // IAB — Institut für Arbeitsmarkt- und Berufsforschung: das führende
+  // deutsche Forschungsinstitut zu Arbeitsmarkt-Dynamiken. STEEP+V:
+  // social (nicht economic, weil der Fokus klar auf Arbeitsmarkt-
+  // Soziologie liegt, nicht auf Makroökonomie). Macro-tier (Jahres-
+  // horizont für die Mehrzahl der Publikationen).
+  iab_rss:            { steepV: "social",        trendLevel: "macro" },
 
   // ─── Macroeconomics (Economic, mega) ───────────────────────────────
   worldbank:          { steepV: "economic",      trendLevel: "mega"  },

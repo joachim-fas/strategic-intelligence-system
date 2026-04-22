@@ -324,6 +324,57 @@ const THINKTANK_FEEDS: RssFeedConfig[] = [
     tags: ["think-tank", "eu"],
   },
   {
+    // 2026-04-22 Pilot-Eval P0-A: Bruegel ist das führende EU-Economic-
+    // Policy-Institut (Brüssel-basiert, unabhängig). Deckt Handel,
+    // Makroökonomie, Energie, digitale Wirtschaft, Geopolitik der
+    // EU ab — eine der offensichtlichsten Lücken im bisherigen
+    // Think-Tank-Portfolio, die die Pilot-A/B/C-Queries alle
+    // gebraucht hätten. Hinweis: der aktuelle Feed enthält zeitweise
+    // Event-Agenda-Einträge („Lunch", „Coffee and tea break") — der
+    // Keyword-Filter / Anchor-Match filtert die zuverlässig raus,
+    // echte Publications kommen parallel durch den gleichen Feed.
+    name: "bruegel_rss",
+    displayName: "Bruegel (European Policy Research)",
+    feedUrl: "https://www.bruegel.org/rss.xml",
+    defaultTopic: "Economic Trends",
+    keywordMapping: THINKTANK_MAPPING,
+    tags: ["think-tank", "eu", "policy", "economics"],
+  },
+  {
+    // 2026-04-22 Pilot-Eval P0-A: Politico Europe — Tages-Nachrichten
+    // und Kommentare zu EU-Politik, Handel, Energie, Sicherheit.
+    // Stabiler, sehr aktiver Feed (stündliche Updates laut Feed-
+    // Metadaten). Verstärkt die EU-Policy-Abdeckung deutlich und
+    // bringt politische Tagesthemen mit, die die anderen Think-
+    // Tank-Feeds (Quartals-Papers-Rhythmus) verpassen.
+    name: "politico_eu_rss",
+    displayName: "POLITICO Europe",
+    feedUrl: "https://www.politico.eu/feed/",
+    defaultTopic: "Geopolitical Fragmentation",
+    keywordMapping: THINKTANK_MAPPING,
+    tags: ["news", "policy", "eu", "brussels"],
+  },
+  {
+    // 2026-04-22 Pilot-Eval P0-A: IAB (Institut für Arbeitsmarkt-
+    // und Berufsforschung) — zentrales deutsches Forschungsinstitut
+    // zu Arbeitsmarkt, Beschäftigung, Qualifizierung. Schließt die
+    // Lücke, die die B-Pilot-Query („Arbeitsmarkt × KI-Agenten")
+    // aufgedeckt hat — weder der ECFR-Feed (Geopolitik) noch UN-SDG-8
+    // (generisch) decken strukturelle DACH-Arbeitsmarkt-Dynamiken ab.
+    // Feed in Deutsch, stündlich aktualisiert.
+    name: "iab_rss",
+    displayName: "IAB (Institut für Arbeitsmarkt- und Berufsforschung)",
+    feedUrl: "https://iab.de/feed/",
+    defaultTopic: "Future of Work",
+    keywordMapping: [
+      [["ki", "ai", "algorithmus", "automatisierung", "automation"], "Artificial Intelligence & Automation"],
+      [["migration", "zuwanderung", "demograf", "alter"], "Demographic Shifts & Aging"],
+      [["klima", "energiewende", "transformation"], "Climate Change & Sustainability"],
+      [["inflation", "lohn", "konjunktur", "wirtschaft"], "Economic Trends"],
+    ],
+    tags: ["think-tank", "dach", "de", "labor-market", "research"],
+  },
+  {
     name: "crisisgroup_rss",
     displayName: "International Crisis Group",
     feedUrl: "https://www.crisisgroup.org/rss.xml",
