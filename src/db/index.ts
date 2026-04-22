@@ -77,9 +77,10 @@ export function getDb() {
     // to re-run ALTER TABLE on its own.
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { ensureMultiTenantSchema, ensureDefaultTenant } = require("./sqlite-helpers");
+      const { ensureMultiTenantSchema, ensureDefaultTenant, ensureSignalDedupIndex } = require("./sqlite-helpers");
       ensureMultiTenantSchema(sqlite);
       ensureDefaultTenant(sqlite);
+      ensureSignalDedupIndex(sqlite);
     } catch (err) {
       // Migrations failing here would mean the app is unusable anyway;
       // log loudly so the dev sees it instead of getting mysterious

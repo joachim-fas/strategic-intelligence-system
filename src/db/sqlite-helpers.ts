@@ -303,6 +303,41 @@ export function ensureDefaultTenant(db: Database.Database): EnsureDefaultTenantR
 }
 
 /**
+ * Adds a UNIQUE INDEX on (source, lower(trim(title))) to live_signals so
+ * that successive pump runs silently skip already-ingested articles.
+ *
+ * Steps (both idempotent):
+ *   1. Remove duplicate rows — keeps the row with the highest rowid per
+ *      (source, title) pair, i.e. the most recently inserted version.
+ *   2. Create the UNIQUE INDEX — subsequent INSERTs in storeSignals use
+ *      OR IGNORE so duplicate titles are silently dropped at the DB level.
+ *
+ * Called from:
+ *   - src/db/migrate-sqlite.ts  (manual `npm run db:init-local`)
+ *   - src/db/index.ts           (lazy auto-migrate on first process boot)
+ */
+export function ensureSignalDedupIndex(db: Database.Database): void {
+  // Purge duplicate rows, keeping the one with the highest SQLite rowid
+  // (= the last-inserted row per group). rowid is an implicit integer PK,
+  // so MAX(rowid) is always well-defined.
+  db.exec(`
+    DELETE FROM live_signals
+    WHERE rowid NOT IN (
+      SELECT MAX(rowid)
+      FROM live_signals
+      GROUP BY source, lower(trim(title))
+    )
+  `);
+
+  // UNIQUE INDEX on (source, lower(trim(title))). IF NOT EXISTS makes this
+  // safe to call multiple times; it's a no-op on subsequent invocations.
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS live_signals_dedup
+    ON live_signals(source, lower(trim(title)))
+  `);
+}
+
+/**
  * Returns the default tenant's id, creating it on demand if missing.
  * Used by the runtime path where we need a stable tenant to attach a
  * new user/membership to (dev-mode, first-login fallback).

@@ -144,6 +144,11 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   // der Forscher einfängt (News-Takes, nicht Papers). Trotzdem
   // wertvoll für EU-Geopolitik-Diskurs-Breite.
   clingendael_rss:    { steepV: "political",     trendLevel: "signal" },
+  // Google News — Wärmepumpe (DE): Aggregierter Pressespiegel für den
+  // Wärmepumpen-Markt. Environmental/signal, weil tagesaktuelle Medien-
+  // Artikel (kein Original-Research). C-Pilot Fallback, da BDH/BWP/dena
+  // keine öffentlichen RSS-Feeds anbieten.
+  google_news_wp_de:  { steepV: "environmental", trendLevel: "signal" },
 
   // ─── Macroeconomics (Economic, mega) ───────────────────────────────
   worldbank:          { steepV: "economic",      trendLevel: "mega"  },

@@ -528,6 +528,30 @@ const HEALTH_FEEDS: RssFeedConfig[] = [
   },
 ];
 
+// ── Domain-spezifische Google News Feeds (C-Pilot) ──────────────────────────
+//
+// BDH, BWP, ZVSHK und dena bieten keine öffentlichen RSS-Feeds an
+// (geprüft 2026-04-22). Als Fallback: Google News RSS für domänen-
+// spezifische Suchterme — liefert aggregierte Presseartikel aus dem
+// deutschsprachigen Raum ohne API-Key.
+//
+// URL-Muster: https://news.google.com/rss/search?q=<encoded>&hl=de&gl=DE&ceid=DE:de
+
+const DOMAIN_FEEDS: RssFeedConfig[] = [
+  {
+    name: "google_news_wp_de",
+    displayName: "Google News — Wärmepumpe (DE)",
+    feedUrl: "https://news.google.com/rss/search?q=W%C3%A4rmepumpe&hl=de&gl=DE&ceid=DE:de",
+    defaultTopic: "Climate Change & Sustainability",
+    keywordMapping: [
+      [["markt", "absatz", "verkauf", "preis", "förder", "subvention", "installation"], "Economic Trends"],
+      [["heizung", "gebäude", "sanierung", "dämmung", "effizienz", "energie", "neubau"], "Climate Change & Sustainability"],
+      [["politik", "gesetz", "geg", "gebäudeenergiegesetz", "bund", "eu", "regulier"], "Climate Change & Sustainability"],
+    ],
+    tags: ["energy", "heating", "market", "de"],
+  },
+];
+
 // ── Merged export ─────────────────────────────────────────────────────────
 
 export const RSS_FEED_CONFIGS: RssFeedConfig[] = [
@@ -537,4 +561,5 @@ export const RSS_FEED_CONFIGS: RssFeedConfig[] = [
   ...THINKTANK_FEEDS,
   ...TECH_FEEDS,
   ...HEALTH_FEEDS,
+  ...DOMAIN_FEEDS,
 ];

@@ -78,6 +78,7 @@ const SOURCE_TIER_MAP: Record<string, SourceTier> = {
   spiegel_rss: "media",
   aljazeera_rss: "media",
   gdelt: "media",
+  google_news_wp_de: "media",   // Google News RSS — Wärmepumpe (DE)
 
   // Social — personal/unedited, needs high topic-match to count
   bluesky: "social",
@@ -166,7 +167,7 @@ export function storeSignals(
 ): void {
   const d = db();
   const insert = d.prepare(`
-    INSERT INTO live_signals (id, source, title, content, url, topic, tags, signal_type, strength, raw_data, fetched_at)
+    INSERT OR IGNORE INTO live_signals (id, source, title, content, url, topic, tags, signal_type, strength, raw_data, fetched_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `);
 
@@ -631,8 +632,20 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "innovation": ["innovation", "innovative"],
     "automatisierung": ["automation", "automated", "autonomous"],
     "arbeit": ["work", "labor", "labour"],
-    "wärmepumpe": ["heat pump"],
+    // Wärmepumpen / Gebäudeenergie (C-Pilot)
+    "wärmepumpe": ["heat pump", "heat pump system", "hp"],
     "wärmepumpen": ["heat pumps", "heat pump"],
+    "heizung": ["heating", "heating system", "boiler"],
+    "heizungstausch": ["boiler replacement", "heating replacement", "heat pump adoption"],
+    "sanierung": ["renovation", "retrofit", "energy retrofit", "deep renovation"],
+    "gebäudesanierung": ["building renovation", "building retrofit", "deep renovation"],
+    "energieeffizienz": ["energy efficiency", "efficient buildings"],
+    "dämmung": ["insulation", "thermal insulation", "building insulation"],
+    "fernwärme": ["district heating", "heat network", "heating grid"],
+    "wärmenetz": ["heat network", "district heating"],
+    "förderprogramm": ["subsidy program", "incentive scheme", "public funding", "bafa"],
+    "gebäudeenergiegesetz": ["building energy act", "geg", "energy standards"],
+    "wärmepumpenmarkt": ["heat pump market", "heat pump industry"],
     "gebäude": ["building", "buildings"],
     "dach": ["dach region", "germany austria switzerland"],
     "china": ["china", "chinese", "prc"],

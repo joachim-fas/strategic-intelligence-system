@@ -15,7 +15,7 @@
 
 import Database from "better-sqlite3";
 import path from "path";
-import { ensureMultiTenantSchema, ensureDefaultTenant } from "./sqlite-helpers";
+import { ensureMultiTenantSchema, ensureDefaultTenant, ensureSignalDedupIndex } from "./sqlite-helpers";
 
 const dbPath = path.join(process.cwd(), "local.db");
 const db = new Database(dbPath);
@@ -392,6 +392,13 @@ if (createdTenant) {
   console.log(`[tenants] Created Default Workspace (${tenantId}).`);
 }
 console.log(`[tenants] Backfill — radars: ${radarsBackfilled}, scenarios: ${scenariosBackfilled}, bsc_ratings: ${ratingsBackfilled}, memberships added: ${membershipsAdded}.`);
+
+// ── Signal dedup index ────────────────────────────────────────────────
+// De-duplicates existing live_signals rows, then adds a UNIQUE INDEX so
+// INSERT OR IGNORE in storeSignals() prevents future duplicates at the
+// DB level — no more repeated rows from successive pump runs.
+ensureSignalDedupIndex(db);
+console.log("[signals] UNIQUE dedup index ensured on live_signals(source, lower(trim(title))).");
 
 console.log("SQLite schema created successfully.");
 db.close();
