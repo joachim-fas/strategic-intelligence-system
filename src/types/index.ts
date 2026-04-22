@@ -237,6 +237,19 @@ export interface UsedSignal {
    * `keywordOverlap` remains available as the raw-overlap debug value.
    */
   displayScore?: number;
+  /**
+   * 2026-04-23 Iteration-Loop Pass 2: LLM-judged relevance 0-10. See
+   * `LiveSignal.llmRelevanceScore` in `src/lib/signals.ts` for full docs.
+   * UI consumers should prefer this over `displayScore` when present —
+   * it's based on actual semantic understanding, not keyword heuristics.
+   */
+  llmRelevanceScore?: number;
+  /**
+   * 2026-04-23 Iteration-Loop Pass 2: 1-line LLM-supplied reason for the
+   * relevance score. Useful for UI tooltips ("why is this signal here?"
+   * or "why did this signal get filtered?").
+   */
+  llmRelevanceReason?: string;
 }
 
 export interface Scenario {

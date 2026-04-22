@@ -147,6 +147,12 @@ function edgeQueryRelevance(e: MatchedEdge): number {
  *   4. Last resort: 0.3 — pessimistic default.
  */
 function signalTopicalFit(s: UsedSignal): number {
+  // 2026-04-23 Iteration-Loop Pass 2: prefer LLM-judged relevance when
+  // present. This is a 0-10 score, so we normalise to 0-1 by /10.
+  // The LLM score is the most-trusted measure (semantic, not lexical).
+  if (typeof s.llmRelevanceScore === "number" && s.llmRelevanceScore >= 0 && s.llmRelevanceScore <= 10) {
+    return s.llmRelevanceScore / 10;
+  }
   if (typeof s.queryRelevance === "number" && s.queryRelevance >= 0 && s.queryRelevance <= 1) {
     return s.queryRelevance;
   }

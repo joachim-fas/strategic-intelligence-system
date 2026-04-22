@@ -318,11 +318,64 @@ export async function POST(req: Request) {
 
   emitActivity({ type: "query", phase: "start", message: `Abfrage: "${query.slice(0, 80)}${query.length > 80 ? "…" : ""}"`, meta: { queryLength: query.length, locale: validLocale } });
 
-  const relevantSignals = getRelevantSignals(query, 16);
+  let relevantSignals = getRelevantSignals(query, 16);
+  const preFilterCount = relevantSignals.length;
+
+  // 2026-04-23 Iteration-Loop Pass 2a: LLM-based semantic relevance
+  // filtering BEFORE synthesis. The mechanical multi-evidence-gate in
+  // `getRelevantSignals` admits signals that pass keyword heuristics but
+  // may be off-topic (e.g. a heat-pump article admitted to a Rundfunk
+  // query because both contain "Deutschland"). This pass asks Haiku to
+  // rate each candidate 0-10 against the actual question and drops
+  // anything ≤4. The synthesis Sonnet then only sees signals that an
+  // LLM has confirmed are topically relevant.
+  //
+  // Failure-safe: if Haiku returns null (no API key, HTTP error, malformed
+  // JSON) the original mechanical-only set is used. No regression.
+  //
+  // See `src/lib/signal-relevance-llm.ts` for the full design rationale.
+  const { batchScoreSignalRelevance, applyRelevanceFilter, MIN_RELEVANCE_SCORE } =
+    await import("@/lib/signal-relevance-llm");
+  const relevanceResult = await batchScoreSignalRelevance(query, relevantSignals);
+  if (relevanceResult) {
+    relevantSignals = applyRelevanceFilter(relevantSignals, relevanceResult.judgments);
+    console.log(
+      `[query:relevance-pass-1] ` +
+      `in=${relevanceResult.stats.inputCount} ` +
+      `out=${relevantSignals.length} ` +
+      `dropped=${preFilterCount - relevantSignals.length} ` +
+      `mean=${relevanceResult.stats.meanScore} ` +
+      `coverage=${relevanceResult.fullCoverage} ` +
+      `model=${relevanceResult.modelUsed} ` +
+      `duration_ms=${relevanceResult.callDurationMs} ` +
+      `tokens_in=${relevanceResult.inputTokens} ` +
+      `tokens_out=${relevanceResult.outputTokens}`,
+    );
+  } else {
+    console.warn(
+      `[query:relevance-pass-1] skipped — LLM unavailable or failed; ` +
+      `using mechanical-only set (${relevantSignals.length} signals)`,
+    );
+  }
+
   const liveSignalsContext = formatSignalsForPrompt(relevantSignals);
   const uniqueSources = new Set(relevantSignals.map((s: any) => s.source)).size;
 
-  emitActivity({ type: "query", phase: "signals", message: `${relevantSignals.length} Signale aus ${uniqueSources} Quellen geladen`, meta: { signals: relevantSignals.length, sources: uniqueSources } });
+  emitActivity({
+    type: "query",
+    phase: "signals",
+    message: relevanceResult
+      ? `${relevantSignals.length} Signale aus ${uniqueSources} Quellen (LLM-relevanz-gefiltert: ${preFilterCount}→${relevantSignals.length}, Mittel-Score ${relevanceResult.stats.meanScore})`
+      : `${relevantSignals.length} Signale aus ${uniqueSources} Quellen geladen`,
+    meta: {
+      signals: relevantSignals.length,
+      sources: uniqueSources,
+      llmFiltered: relevanceResult ? true : false,
+      llmFilterDropped: relevanceResult ? preFilterCount - relevantSignals.length : 0,
+      llmMeanScore: relevanceResult?.stats.meanScore,
+      llmMinThreshold: MIN_RELEVANCE_SCORE,
+    },
+  });
 
   // Pilot-Eval-Fix 2026-04-22 (A EN lieferte DE-Antwort):
   // `query` als 4. Argument durchreichen. Der Prompt-Builder
@@ -907,7 +960,44 @@ export async function POST(req: Request) {
             }
           }
 
-          const mergedSignals = Array.from(enriched.values()).slice(0, 32);
+          let mergedSignals = Array.from(enriched.values()).slice(0, 32);
+
+          // 2026-04-23 Iteration-Loop Pass 2b: LLM-relevance filter on
+          // the AUGMENTED signal set. The trend-name re-fetch (above) can
+          // pull in signals that are related to a matched trend but not
+          // to the original question — e.g. a Climate-Change-trend match
+          // can drag in a USGS earthquake signal because earthquakes are
+          // in the climate/environmental cluster. Pass 2a only filtered
+          // the first-pass set; Pass 2b filters the augmented set so the
+          // UI never displays trend-pulled noise either.
+          //
+          // Reuses any judgments from Pass 2a where the same signal was
+          // already scored — but the augmented set has different IDs
+          // (s1..sN over the merged set, not the first-pass set), so in
+          // practice this is a fresh LLM call. Cost: ~$0.008 additional
+          // per query. Worth it for UI honesty.
+          //
+          // Same null-safe contract as Pass 2a: failure = use unfiltered set.
+          const preMergedFilterCount = mergedSignals.length;
+          const mergedRelevanceResult = await batchScoreSignalRelevance(query, mergedSignals);
+          if (mergedRelevanceResult) {
+            mergedSignals = applyRelevanceFilter(mergedSignals, mergedRelevanceResult.judgments) as typeof mergedSignals;
+            console.log(
+              `[query:relevance-pass-2] ` +
+              `in=${mergedRelevanceResult.stats.inputCount} ` +
+              `out=${mergedSignals.length} ` +
+              `dropped=${preMergedFilterCount - mergedSignals.length} ` +
+              `mean=${mergedRelevanceResult.stats.meanScore} ` +
+              `coverage=${mergedRelevanceResult.fullCoverage} ` +
+              `duration_ms=${mergedRelevanceResult.callDurationMs} ` +
+              `tokens_in=${mergedRelevanceResult.inputTokens} ` +
+              `tokens_out=${mergedRelevanceResult.outputTokens}`,
+            );
+          } else {
+            console.warn(
+              `[query:relevance-pass-2] skipped — using mechanical-merged set (${mergedSignals.length} signals)`,
+            );
+          }
 
           // Join LLM-supplied per-signal relevance with the retrieved pool.
           // The LLM copied source+title verbatim from the prompt's
@@ -967,6 +1057,11 @@ export async function POST(req: Request) {
               // overlap and would miss anchor-bypass signals.
               passReason: s.passReason,
               displayScore: s.displayScore,
+              // 2026-04-23 Iteration-Loop Pass 2: propagate LLM-judged
+              // relevance score + reason so the UI can show WHY each
+              // signal was kept/dropped (transparent quality assurance).
+              llmRelevanceScore: s.llmRelevanceScore,
+              llmRelevanceReason: s.llmRelevanceReason,
             };
           });
 

@@ -527,3 +527,260 @@ die `[query:llm-1]`-Logs gegen die Annahmen geprüft werden.
    der Runs) würde die Rubrik validieren.
 5. **Folgefrage-Threading** (P2 vom Vortag) — bleibt offen, weniger
    dringlich nach den heutigen Fixes
+
+---
+
+# Iteration-Loop-Architecture (2026-04-23 Abend)
+
+## Auslöser
+
+Nach den Pipeline-Reformen (`ff19ba5` Multi-Evidence-Gate) testete der
+User eine Rundfunk-Frage: „Welchen Einfluss hat der öffentliche Rundfunk
+auf die Gesellschaft in Deutschland und Österreich?" Resultat: trotz
+Multi-Evidence-Gate erschien ein USGS-Earthquake-Signal in der UI.
+
+User-Diagnose (vollständig korrekt):
+
+> „Es schleichen sich immer noch Signale und Quellen ein, die das ganze
+> System in Frage stellen. … das gilt nicht nur für ein Beispiel, das
+> gilt generell!"
+
+Nach mehreren Iterationen Heuristik-Patches (Cross-Aliase →
+Anchor-Position → Bigram-Anchor → Multi-Evidence-Gate) war klar: jede
+keyword-basierte Heuristik hat Edge-Cases, egal wie clever. **Token-
+Matching wird niemals semantische Relevanz erfassen.**
+
+User-Vorschlag, sinngemäß:
+
+> „Signale dürfen nicht sofort als gegeben angesehen werden, sondern
+> müssten einen zweiten Durchlauf machen um qualitativ eingestuft und
+> sortiert zu werden. Es braucht eine Iterations-Schleife zur
+> Qualitätssicherung."
+
+Das ist exakt der richtige architektonische Pivot: weg vom Heuristik-
+Whack-a-Mole, hin zur Multi-Pass-Pipeline mit semantischer Bewertung.
+
+## Die Loop-Architektur
+
+```
+                    ┌─────────────────────────────────────┐
+                    │  Query                              │
+                    └──────────────┬──────────────────────┘
+                                   ↓
+              ┌────────────────────────────────────────┐
+              │  Pass 1 — Mechanical Multi-Evidence    │
+              │           (signals.ts getRelevantSignals)│
+              │  → 16-32 Kandidaten (alias-aware,       │
+              │    multi-match / bigram / academic)     │
+              └────────────────────┬───────────────────┘
+                                   ↓
+              ┌────────────────────────────────────────┐
+              │  Pass 2a — LLM-Relevance-Scoring        │
+              │            (signal-relevance-llm.ts)    │
+              │  Haiku batched, 0-10 Score + Begründung │
+              │  Filter ≤4 raus, sortiere nach Score    │
+              │  → 5-15 echte Treffer                    │
+              └────────────────────┬───────────────────┘
+                                   ↓
+              ┌────────────────────────────────────────┐
+              │  Synthesis-LLM (Sonnet)                 │
+              │  Sieht NUR LLM-vetted Signale            │
+              └────────────────────┬───────────────────┘
+                                   ↓
+              ┌────────────────────────────────────────┐
+              │  Trend-Augmentation                     │
+              │  (zieht Signale für matched-Trends)     │
+              └────────────────────┬───────────────────┘
+                                   ↓
+              ┌────────────────────────────────────────┐
+              │  Pass 2b — LLM-Relevance-Scoring        │
+              │            (gleiches Modul)             │
+              │  Filtert die augmented Signale          │
+              │  → UI-Display-Set                        │
+              └────────────────────┬───────────────────┘
+                                   ↓
+                    ┌──────────────────────────────────┐
+                    │  Response (UI + Briefing)        │
+                    └──────────────────────────────────┘
+```
+
+**Pass 2a UND Pass 2b sind LLM-Calls.** Pass 2a schützt die Synthesis,
+Pass 2b schützt das UI-Display. Beide nutzen das gleiche Modul
+`src/lib/signal-relevance-llm.ts` — keine Code-Duplikation.
+
+**Pass 3 (Coverage-Critique) und Pass 4 (Refined-Retrieval)** sind
+geplant, noch nicht gebaut. Die Architektur ist so designed, dass sie
+inkrementell hinzugefügt werden können.
+
+## Implementation Detail
+
+### `src/lib/signal-relevance-llm.ts` (neu)
+
+Pures LLM-Pass-Modul. API:
+
+```typescript
+export const MIN_RELEVANCE_SCORE = 5;
+
+export async function batchScoreSignalRelevance(
+  query: string,
+  signals: LiveSignal[],
+): Promise<BatchScoringResult | null>;
+
+export function applyRelevanceFilter(
+  signals: LiveSignal[],
+  judgments: Map<string, RelevanceJudgment> | null,
+  options?: { minScore?: number },
+): LiveSignal[];
+```
+
+**Modell:** `claude-haiku-4-5`. Begründung: günstig (~$0.001-0.008 pro
+Pass), schnell (2-4s), für strukturiertes Scoring (0-10 + 1-Satz-Reason)
+ausreichend.
+
+**Prompt-Design:** alle Signale in EINEM Call, jedes mit stabiler ID
+(`s1`, `s2`, ...) damit das LLM keine Volltitel im Output wiederholen
+muss. Score-Skala explizit definiert (0-2 off-topic, 3-4 tangential,
+5-6 contextual, 7-8 relevant, 9-10 core). Kritische Anweisung:
+„keyword overlap alone is not sufficient" — adressiert genau das
+Heat-Pump-in-Germany-für-Rundfunk-Problem.
+
+**Output:** strict JSON-Array, ein Eintrag pro Signal in gleicher
+Reihenfolge. Robust-Parser strippt `\`\`\`json`-Fences und Prosa falls
+das LLM doch dekoriert.
+
+**Failure-Handling:** strikt additiv. Bei jedem Fehler (kein API-Key,
+HTTP-Fail, malformed JSON, Timeout) gibt die Funktion `null` zurück. Der
+Caller fällt dann auf den ungefilterten Pass-1-Output zurück. **No-
+regression-guarantee.** Wenn Pass 2 ausfällt, ist die Pipeline genau so
+gut/schlecht wie vorher.
+
+### Integration in `src/app/api/v1/query/route.ts`
+
+Pass 2a (vor Synthesis):
+
+```typescript
+let relevantSignals = getRelevantSignals(query, 16);
+const preFilterCount = relevantSignals.length;
+const relevanceResult = await batchScoreSignalRelevance(query, relevantSignals);
+if (relevanceResult) {
+  relevantSignals = applyRelevanceFilter(relevantSignals, relevanceResult.judgments);
+  console.log(`[query:relevance-pass-1] in=… out=… mean=… duration_ms=…`);
+}
+const liveSignalsContext = formatSignalsForPrompt(relevantSignals);
+// ... Synthesis-Call ...
+```
+
+Pass 2b (nach Trend-Augmentation):
+
+```typescript
+let mergedSignals = Array.from(enriched.values()).slice(0, 32);
+const mergedRelevanceResult = await batchScoreSignalRelevance(query, mergedSignals);
+if (mergedRelevanceResult) {
+  mergedSignals = applyRelevanceFilter(mergedSignals, mergedRelevanceResult.judgments);
+  console.log(`[query:relevance-pass-2] in=… out=… mean=… duration_ms=…`);
+}
+// ... signalsMeta build ...
+```
+
+### Type-Erweiterung
+
+`LiveSignal` und `UsedSignal` bekommen zwei neue optionale Felder:
+
+```typescript
+llmRelevanceScore?: number;    // 0-10, von Haiku
+llmRelevanceReason?: string;   // 1-Satz-Begründung
+```
+
+UI-Konsumenten (`OrbitDerivationView.signalTopicalFit`,
+`BriefingResult.topicFit`) priorisieren diesen Score über alle anderen
+(LLM-judged > LLM queryRelevance > displayScore > keywordOverlap > 0.3
+default).
+
+## Telemetry
+
+Jeder LLM-Pass loggt eine greppable Zeile:
+
+```
+[query:relevance-pass-1] in=16 out=8  dropped=8  mean=5.2  coverage=true  model=claude-haiku-4-5  duration_ms=2340  tokens_in=2105  tokens_out=487
+[query:relevance-pass-2] in=32 out=14 dropped=18 mean=4.8  coverage=true  model=claude-haiku-4-5  duration_ms=2180  tokens_in=3640  tokens_out=890
+```
+
+Daraus ableitbar:
+
+- **in/out/dropped:** wie aggressiv filtert Pass 2? Hohe Drop-Quote
+  bedeutet entweder Pass 1 zu permissiv ODER Query ist sehr spezifisch.
+- **mean:** durchschnittlicher Score. Sehr niedrig (< 3) deutet auf
+  schwachen Match Pool — Hinweis auf Connector-Lücke für das Thema.
+- **coverage:** True wenn LLM jedes Signal beurteilt hat. False = Hinweis
+  auf JSON-Parse-Probleme oder LLM-Output-Unvollständigkeit.
+- **tokens / duration:** Cost-Monitoring.
+
+Die Activity-Stream-Events enthalten `llmFiltered`, `llmFilterDropped`,
+`llmMeanScore`, `llmMinThreshold` — dadurch ist die Loop-Aktivität auch
+in der UI nachvollziehbar (Aktivitäts-Panel rechts).
+
+## Kosten und Latenz
+
+| Metrik | Pro Query |
+|---|---:|
+| Pass 2a Tokens | ~2.000 in / ~500 out |
+| Pass 2b Tokens | ~3.500 in / ~900 out |
+| Haiku 4.5 Cost | ~$0.008-0.016 |
+| Latenz-Adder | ~4-6 Sekunden total |
+| Cache-Effekt | Anthropic Prompt-Cache wirkt nicht (Query unique) |
+
+Bei einer Stakeholder-Demo mit 20 Queries: ~$0.30 zusätzlich. Bei einer
+Pilot-Eval-Session mit 6 Queries: ~$0.10. Gegenüber dem Wert „der
+Strategist sieht keine Erdbeben-Daten mehr in der Rundfunk-Antwort":
+trivial.
+
+## Was Pass 2 fundamental ändert
+
+Vorher: das System glaubte an seine Heuristiken. Wenn ein Signal
+strukturell durchkam (Multi-Match etc.), wurde es als relevant
+behandelt. UI zeigte 30 Signale mit displayScore 0.50, davon 27
+Off-Topic.
+
+Jetzt: das System validiert mit einem LLM was es glaubt zu wissen. Wenn
+Haiku sagt „dieses Signal würde einen Strategist in die Irre führen",
+fliegt es raus. UI zeigt 8-12 Signale mit llmRelevanceScore ≥5, alle
+semantisch relevant.
+
+**Das ist der Übergang von „Information Retrieval mit Heuristiken" zu
+„LLM-vetted Information Retrieval".** Das System wird teurer pro Query
+(~$0.01) aber qualitativ um eine Klasse besser.
+
+## Was nicht passiert ist (bewusste Auslassung)
+
+- **Pass 3 (Coverage-Critique)** und **Pass 4 (Refined-Retrieval)** sind
+  geplant aber nicht gebaut. Die Architektur ist darauf vorbereitet,
+  aber Pass 2 alleine ist bereits eine eigenständige Verbesserung. Wenn
+  Pass 2 die Beschwerde-Klasse vollständig löst (was zu testen ist),
+  brauchen wir Pass 3+4 vielleicht gar nicht.
+- **Inter-Pass-Caching:** Pass 2a und Pass 2b könnten Judgments
+  wiederverwenden. Tun sie aktuell nicht — die Signal-Sets unterscheiden
+  sich in den meisten Fällen genug (mergedSignals enthält augmented).
+  Wenn Profiling zeigt dass die Mehrkosten relevant sind, kann hier
+  optimiert werden.
+- **UI-Anzeige des llmRelevanceReason:** der 1-Satz-Grund ist im
+  Datensatz, wird aber noch nicht im UI angezeigt. Geplanter Folge-
+  Schritt: Tooltip auf jedem Signal-Eintrag „Warum ist das Signal hier?".
+- **Backwards-Compatibility-Test für ältere Briefings:** ältere
+  gespeicherte Queries haben kein llmRelevanceScore-Feld. Die Code-
+  Pfade sind defensive (typeof checks), funktionieren aber als nächstes
+  zu verifizieren.
+
+## Files
+
+- **`src/lib/signal-relevance-llm.ts`** (neu, ~250 Zeilen) — das
+  Pass-2-Modul mit JSDoc-Dokumentation der gesamten Architektur-Rationale
+- **`src/lib/signals.ts`** — `LiveSignal` Interface erweitert um
+  `llmRelevanceScore` + `llmRelevanceReason`
+- **`src/types/index.ts`** — `UsedSignal` analog erweitert
+- **`src/app/api/v1/query/route.ts`** — Pass 2a + Pass 2b Hooks plus
+  Telemetry-Logging
+- **`src/components/briefing/BriefingResult.tsx`** — `topicFit` priorisiert
+  llmRelevanceScore
+- **`src/app/canvas/OrbitDerivationView.tsx`** — `signalTopicalFit`
+  priorisiert llmRelevanceScore
+- **`docs/pilot-evaluations/interim-learnings.md`** — dieses Dokument

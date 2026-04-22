@@ -69,6 +69,28 @@ export interface LiveSignal {
    * anchor pass surfaces as `displayScore=0.50` and ranks correctly.
    */
   displayScore?: number;
+  /**
+   * 2026-04-23 Iteration-Loop Pass 2: LLM-judged relevance score 0-10.
+   * Set by `batchScoreSignalRelevance` in `signal-relevance-llm.ts`.
+   * Absent when the LLM-pass was skipped (no API key) or failed (HTTP
+   * error, malformed output) — caller falls back to mechanical filter.
+   *
+   * Score interpretation:
+   *   9-10: Core — directly addresses a primary aspect of the question
+   *   7-8:  Relevant — substantive engagement with one part
+   *   5-6:  Contextual — adjacent evidence useful for framing
+   *   3-4:  Tangential — touches a related concept but not the question
+   *   0-2:  Off-topic — would mislead a strategist if cited
+   *
+   * Default filter threshold (`MIN_RELEVANCE_SCORE`) is 5.
+   */
+  llmRelevanceScore?: number;
+  /**
+   * 2026-04-23 Iteration-Loop Pass 2: 1-line justification for the LLM
+   * relevance score. Useful for debugging and UI transparency (the user
+   * can see WHY the system kept/dropped a particular signal).
+   */
+  llmRelevanceReason?: string;
 }
 
 // ─── Source tiering ─────────────────────────────────────────────────────────

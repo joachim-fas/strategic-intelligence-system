@@ -136,13 +136,12 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   // Hürde, weil dort auch heute noch Personal-Posts durchrutschen können
   // (Bluesky/Mastodon haben kürzere Titel und keine redaktionelle
   // Pre-Filterung).
-  // 2026-04-23 Layered-Filter-Architecture-Fix: consume the canonical
-  // `displayScore` from the retrieval layer instead of re-deriving topic
-  // fit from raw `keywordOverlap` (which gives misleading 0.07 for short
-  // news titles that legitimately passed via long-domain-anchor or bigram
-  // bypass). Resolution: queryRelevance (LLM-set) > displayScore
-  // (retrieval-set, anchor-aware) > keywordOverlap (raw) > 0.3 (default).
+  // 2026-04-23 Iteration-Loop Pass 2: LLM-judged relevance is the most-
+  // trusted score (semantic, not lexical). Normalised from 0-10 to 0-1.
+  // Resolution: llmRelevanceScore/10 > queryRelevance > displayScore >
+  // keywordOverlap > 0.3 default.
   const topicFit = (s: any): number => {
+    if (typeof s.llmRelevanceScore === "number") return s.llmRelevanceScore / 10;
     if (typeof s.queryRelevance === "number") return s.queryRelevance;
     if (typeof s.displayScore === "number") return s.displayScore;
     if (typeof s.keywordOverlap === "number") return s.keywordOverlap;
