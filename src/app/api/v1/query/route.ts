@@ -477,7 +477,13 @@ export async function POST(req: Request) {
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
-            max_tokens: 12000,
+            // 2026-04-22 Pilot-Eval: 12000 → 16000 angehoben. Bei
+            // strategischen Queries mit reicher synthesis-Prosa konnte
+            // das alte Limit mitten im structured-JSON-Teil treffen,
+            // sodass scenarios/keyInsights/references abgeschnitten
+            // wurden (synthesis-only-Collapse-Pattern). 16000 gibt
+            // ~30% Headroom ohne nennenswerte Kosten-Eskalation.
+            max_tokens: 16000,
             system: systemPrompt,
             messages,
             stream: true,
@@ -548,6 +554,120 @@ export async function POST(req: Request) {
         const extracted = extractJSON(fullText);
         let result = extracted?.data ?? null;
         const wasRepaired = extracted?.repaired ?? false;
+
+        // ── Synthesis-only-Collapse: Post-Validator + Retry (2026-04-22) ──
+        // Pilot-Eval zeigte: Claude Sonnet 4.5 folgt dem Zero-Signal-
+        // Fallback-Guard nicht deterministisch. Wenn wir erkennen, dass
+        // die Response reich an synthesis-Prosa, aber leer in den
+        // strukturierten Feldern ist, triggern wir genau EINEN Retry mit
+        // einer verstärkten User-Message, die das Problem explizit
+        // benennt. Bei Erfolg: wir nutzen das Retry-Ergebnis. Bei
+        // Misserfolg: wir behalten das erste Ergebnis (kein Endlos-Loop).
+        if (result) {
+          const { detectSynthesisOnlyCollapse, buildCollapseRetryMessage } =
+            await import("@/lib/collapse-detection");
+          const detection = detectSynthesisOnlyCollapse(result);
+          if (detection.collapsed) {
+            console.warn(
+              `[query] synthesis-only-Collapse detected — missing: ${detection.missingFields.join(", ")}. Triggering retry…`,
+            );
+            emitActivity({
+              type: "query",
+              phase: "retry",
+              message: "Strukturelle Felder leer — automatischer Retry mit Verstärkung…",
+            });
+
+            const assistantResponse = fullText
+              .replace(/^```json\s*/i, "")
+              .replace(/```\s*$/, "")
+              .trim();
+            const retryMessage = buildCollapseRetryMessage(
+              detection.missingFields,
+              validLocale,
+            );
+            const retryMessages = [
+              ...messages,
+              { role: "assistant", content: assistantResponse },
+              { role: "user", content: retryMessage },
+            ];
+
+            try {
+              const retryRes = await fetch(
+                "https://api.anthropic.com/v1/messages",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": apiKey,
+                    "anthropic-version": "2023-06-01",
+                  },
+                  body: JSON.stringify({
+                    model: "claude-sonnet-4-6",
+                    max_tokens: 16000,
+                    system: systemPrompt,
+                    messages: retryMessages,
+                    stream: false,
+                  }),
+                },
+              );
+              if (retryRes.ok) {
+                const retryJson = (await retryRes.json()) as {
+                  content?: Array<{ type: string; text?: string }>;
+                };
+                const retryText =
+                  retryJson.content
+                    ?.filter((b) => b.type === "text" && b.text)
+                    .map((b) => b.text!)
+                    .join("") ?? "";
+                const retryExtracted = extractJSON(retryText);
+                if (retryExtracted?.data) {
+                  // Merge-Strategie: synthesis aus dem ersten Call
+                  // behalten (der War gut), alles andere aus dem Retry
+                  // übernehmen. So bleibt der narrative Faden stabil,
+                  // aber die strukturierten Felder sind gefüllt.
+                  const firstSynthesis =
+                    typeof (result as { synthesis?: unknown }).synthesis === "string"
+                      ? (result as { synthesis: string }).synthesis
+                      : "";
+                  const retrySynthesis =
+                    typeof (retryExtracted.data as { synthesis?: unknown }).synthesis === "string"
+                      ? (retryExtracted.data as { synthesis: string }).synthesis
+                      : "";
+                  result = {
+                    ...retryExtracted.data,
+                    synthesis:
+                      firstSynthesis.length > retrySynthesis.length
+                        ? firstSynthesis
+                        : retrySynthesis,
+                  };
+                  console.log(
+                    "[query] retry succeeded — structured fields now populated",
+                  );
+                  emitActivity({
+                    type: "query",
+                    phase: "retry-done",
+                    message: "Retry erfolgreich — strukturierte Felder gefüllt",
+                  });
+                } else {
+                  console.warn(
+                    "[query] retry returned unparseable JSON — keeping original",
+                  );
+                }
+              } else {
+                const errText = await retryRes.text();
+                console.warn(
+                  `[query] retry HTTP ${retryRes.status}: ${errText.slice(0, 200)}`,
+                );
+              }
+            } catch (retryErr) {
+              console.warn(
+                "[query] retry fetch failed — keeping original result:",
+                retryErr,
+              );
+            }
+          }
+        }
+
         if (!result) {
           // Fallback: the LLM responded with prose instead of JSON.
           // Use the full streamed text as synthesis so the user sees something.
