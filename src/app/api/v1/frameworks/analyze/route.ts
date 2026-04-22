@@ -1179,84 +1179,69 @@ Minimum 2 experiments + 3 rubric entries. Each experiment must have both a succe
   },
 
   // ═════════════════════════════════════════════════════════════════════
-  // 3.8 PRE-FRAGE — 4 steps (Question Architecture, no answers)
+  // 3.8 PRE-FRAGE — Question Atlas for Topics (NO answers)
   //
-  // 2026-04-23 (Konzept-Diskussion mit Founder, Abend):
-  // Während alle anderen Frameworks ANTWORTEN auf Fragen liefern,
-  // identifiziert "Pre-Frage" die richtigen FRAGEN — bevor irgendeine
-  // Antwort-Suche beginnt. Das adressiert den häufigsten Strategie-
-  // Fehler: die falsche Frage perfekt zu beantworten.
+  // 2026-04-23 v0.2 (Founder-Korrektur):
+  // v0.1 hatte Pre-Frage als "Question-Coaching" gebaut (User gibt vage
+  // Frage → System schärft sie). FALSCH. Der Founder hat klargestellt:
+  //
+  //   "Es sollen keine Fragen gestellt werden, sondern Fragen zu
+  //    komplexen Themen entwickelt werden."
+  //
+  // Korrekte Semantik:
+  //   - Input: ein THEMENFELD (3-15 Wörter, KEINE Frage)
+  //   - Prozess: für dieses Thema die richtigen Fragen ENTWICKELN
+  //   - Output: ein FRAGE-ATLAS — strukturiert, kuratiert, anschluss-fähig
+  //
+  // Use-Case: ein Berater/Stratege/Analyst am Start eines neuen Mandats
+  // — kennt das Themenfeld noch nicht, weiß nicht was zu fragen ist,
+  // braucht ein Briefing das auf einer Folie passt und eine 30-Min-
+  // Diskussion strukturiert.
+  //
+  // Drei Schritte:
+  //   1. Topic-Mapping — Facetten, Stakeholder, Grenzen, Welt-Modell-
+  //      Anknüpfung. Gibt die strukturelle Karte des Themas.
+  //   2. Question-Atlas — intern 30-50 Fragen generieren, KURATIEREN auf
+  //      7-9 Core-Fragen + 2-3 Provokante + 1-3 Open-Research-Items.
+  //      Curation IST der Wert. Lange Listen sind Listen-Tyrannei.
+  //   3. Starter-Sequenz — Top-3 mit Framework-Anschluss in der richtigen
+  //      Reihenfolge. Jede Antwort macht die nächste Frage beantwortbarer.
   //
   // Methodische Inspiration:
-  //   - Hal Gregersen (MIT, "Question Burst")
-  //   - Charlie Munger ("Invert, always invert")
-  //   - Phil Tetlock (Superforecaster — Decomposition als Schlüsselskill)
-  //   - Edgar Schein ("Humble Inquiry")
-  //   - Toyota 5 Whys
+  //   - Edgar Morin (Komplexitätstheorie — multiple Linsen)
+  //   - McKinsey Issue-Trees (Decomposition als Strukturwerkzeug)
+  //   - Hal Gregersen Question-Burst (intern viele, extern wenig)
+  //   - Cynefin (welche Klasse von Fragen lässt das Domäne überhaupt zu?)
+  //   - Foresight-Methode (welche Fragen werden in 10 Jahren wichtig?)
+  //   - Strategic Foresight Institute / RAND (Topic-Scanning als Methode)
   //
-  // Architektonische Symmetrie zur Iteration-Loop (e7f9699):
-  //   - Pass 2 (LLM-Relevance) ist Self-Critique auf der OUTPUT-Seite
-  //   - Pre-Frage ist Self-Critique auf der INPUT-Seite
-  //   - Beide zusammen = vollständiger Reflection-Loop
-  //
-  // Output: KEINE Antworten, sondern Hierarchie von Fragen mit
-  // Annahmen-Liste, Daten-Gaps und Framework-Anschluss-Empfehlungen.
+  // Architektonische Verortung: anders als die anderen Frameworks
+  // produziert Pre-Frage KEINE Antworten — der Output ist explizit das
+  // Framework-Roadmap, das den User in das richtige Antwort-Framework
+  // weiterleitet. Pre-Frage ist die Vor-Stufe.
   // ═════════════════════════════════════════════════════════════════════
   "pre-frage": (topic, step, context, locale, worldModel) => {
     const preamble = buildFrameworkPreamble(locale);
     const steps: Record<string, string> = {
 
-      // ── Step 1: Reframing ──────────────────────────────────────────
-      "reframing": `You are a strategic question coach in the tradition of Hal Gregersen (MIT "Question Burst") and Edgar Schein ("Humble Inquiry"). The user has formulated this initial topic / question:
+      // ── Step 1: Topic-Mapping ──────────────────────────────────────
+      "topic-mapping": `You are a strategic discovery analyst. The user has given you a TOPIC FIELD (not a question — a domain / subject area for which you will develop questions in subsequent steps):
 
 "${topic}"
 
 ${preamble}
 
-## Task — Step 1: Reframing
+## Task — Step 1: Topic-Mapping
 
-Your job is NOT to answer. Your job is to surface the QUESTION BEHIND THE QUESTION. Most strategic failures come from solving the wrong problem perfectly. Before any analysis, we need to validate that the user is asking the right thing.
+Your job: develop a structured map of what this topic actually CONTAINS, before any question generation. This is the foundation. A poor topic map produces generic questions.
 
-Pull live signals and world-model context — they often reveal that the user's question implicitly assumes a frame that the data doesn't support.
+Identify:
+- **Facets** — the distinct sub-areas of the topic that a strategist would address separately (a Klimawandel-Tourismus topic has facets like "physical destination impacts", "demand shifts", "regulatory responses", "economic structure", "cultural-demographic" — they overlap conceptually but require different analysis)
+- **Stakeholders** per facet — who has stakes, who decides, who is affected
+- **World-model anchors** — which existing trends, edges, regulations from SIS intersect with this facet (look at the world model below; specific names, not generic categories)
+- **Boundaries** — what is clearly IN this topic, what is adjacent and EASY TO CONFUSE but actually OUT
 
-<world_model>
-${worldModel}
-</world_model>
-
-Generate three classes of reframings:
-
-1. **Surface assumptions** — what does the original question implicitly take for granted?
-2. **Reframings** — how would different stakeholders / disciplines / time horizons phrase the question?
-3. **The deeper question** — if you stripped the original question to its core motivation, what is the user really trying to know?
-
-Output JSON:
-{
-  "originalQuestion": "Verbatim from user",
-  "implicitAssumptions": [
-    {"assumption": "X is the right unit of analysis", "whyMatters": "If X is wrong, every answer is wrong [SIGNAL/TREND: …]"}
-  ],
-  "reframings": [
-    {"frame": "Stakeholder lens (e.g. regulator, user, employee)", "reformulated": "Same topic phrased through this lens", "whyDifferent": "What this surfaces that the original misses"}
-  ],
-  "deeperQuestion": {
-    "candidate": "The question behind the question (one sentence)",
-    "reasoning": "Why this is more fundamental than what was asked"
-  },
-  "synthesis": "2-3 sentences on what the reframing exercise revealed"
-}
-
-Minimum: 4 implicit assumptions, 4 reframings (different lenses), 1 deeperQuestion candidate. Each entry must reference at least one [SIGNAL/TREND/EDGE] tag where applicable — show that reframings are grounded in observable reality, not vibe-based reformulation.`,
-
-      // ── Step 2: Decomposition + STEEP+V Lenses ─────────────────────
-      "decomposition": `${context}
-
-Topic: "${topic}"
-
-${preamble}
-
-## Task — Step 2: Decomposition + STEEP+V Lens Questions
-
-Following Phil Tetlock's superforecaster methodology: any complex question decomposes into MECE sub-questions (Mutually Exclusive, Collectively Exhaustive). Combine that with the SIS STEEP+V framework — for each dimension, generate the question that dimension forces you to ask.
+Be concrete. "Stakeholder: politicians" is generic and useless. "Stakeholder: alpine tourism boards in Tirol/Salzburg/Bayern with seasonal-employment dependency" is useful.
 
 <world_model>
 ${worldModel}
@@ -1264,89 +1249,53 @@ ${worldModel}
 
 Output JSON:
 {
-  "mainQuestion": "The primary question (refined from Step 1's deeperQuestion if applicable)",
-  "subQuestions": [
+  "topic": "Verbatim user input",
+  "topicReformulation": "The topic stated more precisely than the user did, in one sentence — surface the assumed scope",
+  "facets": [
     {
-      "question": "MECE sub-question 1",
-      "type": "definitional|factual|normative|prognostic|causal|hypothetical",
-      "whyEssential": "Why this sub-question must be answered before the main one",
-      "addressableBy": "framework-name | live-signals | external-research"
+      "name": "Concrete facet name (5-10 words)",
+      "scope": "What concretely belongs to this facet (10-25 words)",
+      "stakeholders": ["Specific actor 1 (with qualifier)", "Specific actor 2"],
+      "connectedTrends": ["Trend names verbatim from world model"],
+      "connectedRegulations": ["Regulation names verbatim from world model where applicable"]
     }
   ],
-  "lensQuestions": {
-    "social": [{"question": "What does the social lens force us to ask?", "rationale": "Why this matters here [TREND: …]"}],
-    "technological": [{"question": "…", "rationale": "…"}],
-    "economic": [{"question": "…", "rationale": "…"}],
-    "environmental": [{"question": "…", "rationale": "…"}],
-    "political": [{"question": "…", "rationale": "…"}],
-    "values": [{"question": "What unstated values / ethics are at play?", "rationale": "…"}]
+  "boundaries": {
+    "inScope": ["Aspect clearly part of this topic", "..."],
+    "outOfScope": ["Adjacent area NOT covered but easy to confuse with this topic", "..."],
+    "rationale": "Why these boundaries are meaningful (1 sentence)"
   },
-  "timeHorizonQuestions": [
-    {"horizon": "now (0-12 months)", "question": "What changes in the next year?"},
-    {"horizon": "mid (1-5 years)", "question": "…"},
-    {"horizon": "long (5-15 years)", "question": "…"},
-    {"horizon": "structural (15+ years)", "question": "…"}
-  ],
-  "synthesis": "2-3 sentences"
+  "synthesis": "2-3 sentences on what the topic-mapping reveals — does the topic decompose cleanly, or are there tensions in its framing?"
 }
 
-subQuestions: minimum 5, no overlap, must collectively cover the mainQuestion.
-lensQuestions: minimum 1 question per STEEP+V dimension.
-type field MUST be one of the listed values.
-addressableBy MUST name a concrete next step (specific framework name like "marktanalyse" / "trend-deep-dive", or "live-signals", or "external-research").`,
+Minimum: 5 facets (each with at least 2 stakeholders and at least 1 connectedTrend OR connectedRegulation where the world model permits it), 3 inScope items, 3 outOfScope items.
 
-      // ── Step 3: Inversion + Provocation ────────────────────────────
-      "inversion": `${context}
+CRITICAL: every facet must be specific to THIS topic. If a facet would apply to any topic with the topic word swapped, you have not done the work. Reject and reformulate.`,
+
+      // ── Step 2: Question-Atlas ─────────────────────────────────────
+      "question-atlas": `${context}
 
 Topic: "${topic}"
 
 ${preamble}
 
-## Task — Step 3: Inversion + Provocation
+## Task — Step 2: Question Atlas
 
-Charlie Munger: "Invert, always invert." Most strategic blindness comes from refusing to ask the uncomfortable, the taboo, the embarrassing question. Your job here is to find the questions the user does NOT want to ask but should.
+Generate the questions a strategist should ask about THIS topic. NOT generic questions ("what are the drivers"). Themen-spezifische questions that show you have actually thought about THIS subject matter, not subjects-in-general.
 
-<world_model>
-${worldModel}
-</world_model>
+Process (do this internally, do NOT show in output):
+- First, brainstorm 30-50 candidate questions across all 8 question classes (status / kausal / prognostisch / normativ / strategisch / definitorisch / strukturell / cross-domain) and across all facets from Step 1
+- Then CURATE ruthlessly down to the 7-9 best core questions — the ones that, if answered, would actually move the strategist forward
+- Curation is the value. Listen-Tyrannei (showing all 30) destroys the artifact.
 
-Three modes of provocation:
+For provocative questions: be UNCOMFORTABLE. Comfortable provocations are not provocations.
+- A "tabu" question must be one that is genuinely politically/socially difficult to voice
+- An "inversion" question must invert something the user actually believes
+- A "blind-spot" question must be invisible from the user's likely vantage point (e.g. an outsider's question, another generation's, another country's)
 
-1. **Inversion** — what would have to be TRUE for the original question to be irrelevant or wrong?
-2. **Taboo questions** — what question would the user's biggest critic ask? What would an outsider naively ask that an insider would never voice?
-3. **Pre-mortem question** — imagine 5 years from now, the strategy built on the original question has visibly failed. What was the question that should have been asked but wasn't?
+For open research items: only list what NO SIS framework can answer. If marktanalyse / trend-deep-dive / pre-mortem etc. could address it, it's a core question with framework handoff, NOT open research. Open research = needs human inquiry, qualitative interviews, philosophical analysis, ethnographic work, or domain expertise SIS doesn't have.
 
-Output JSON:
-{
-  "inversionQuestions": [
-    {"question": "What would have to be true for X to NOT matter?", "uncomfortableBecause": "Why people don't usually ask this"}
-  ],
-  "tabooQuestions": [
-    {"question": "The question nobody in the room wants to voice", "tabooReason": "Political, ethical, status-related, etc.", "whyImportant": "What it would surface"}
-  ],
-  "premortemQuestion": {
-    "scenario": "Brief sketch of how the strategy fails in 5 years (3-4 sentences) [SIGNAL/TREND: …]",
-    "missedQuestion": "The exact question that would have prevented this if asked now",
-    "earlyWarningSignals": ["Observable signal 1 we should monitor", "Signal 2", "Signal 3"]
-  },
-  "blindSpotQuestions": [
-    {"question": "Question about something that's invisible from the user's current vantage point", "vantagePointShift": "What perspective makes this visible (geographic, demographic, disciplinary)"}
-  ],
-  "synthesis": "2-3 sentences on what provocations revealed"
-}
-
-Minimum: 3 inversion questions, 3 taboo questions, 1 premortem scenario with missedQuestion + 3 earlyWarningSignals, 3 blindSpotQuestions. Be uncomfortable. Comfortable provocations are not provocations.`,
-
-      // ── Step 4: Critical Questions + Knowledge-Gap + Handoff ───────
-      "critical": `${context}
-
-Topic: "${topic}"
-
-${preamble}
-
-## Task — Step 4: Critical Questions + Knowledge-Gap + Framework Handoff
-
-Synthesize everything from Steps 1-3 into the user's actionable output. The user came expecting answers; they leave with a structured map of questions. Your job is to make that structure useful, not overwhelming.
+Each core question MUST cite world-model elements where applicable — show that the question is grounded in observable reality, not speculation.
 
 <world_model>
 ${worldModel}
@@ -1354,45 +1303,94 @@ ${worldModel}
 
 Output JSON:
 {
-  "criticalQuestions": [
+  "coreQuestions": [
     {
       "rank": 1,
-      "question": "The single most important question to answer first",
-      "whyCritical": "What hinges on the answer; why this question dominates the others",
-      "ifNotAnswered": "What goes wrong if we proceed without this answer",
+      "class": "status | kausal | prognostisch | normativ | strategisch | definitorisch | strukturell | cross-domain",
+      "question": "The themen-specific question, sharp, one sentence [SIGNAL/TREND/EDGE: ... where applicable]",
+      "whyMatters": "1-2 sentence justification — what hinges on the answer",
       "addressableBy": {
-        "framework": "marktanalyse | trend-deep-dive | pre-mortem | post-mortem | war-gaming | stakeholder | design-thinking | (none — needs external research)",
-        "rationale": "Why this framework is the right next tool"
-      }
+        "framework": "marktanalyse | trend-deep-dive | pre-mortem | post-mortem | war-gaming | stakeholder | design-thinking",
+        "rationale": "Why this framework is the right tool for this specific question"
+      },
+      "dataAvailability": "live-signals | partial | research-needed",
+      "facetReference": "Name of the facet from Step 1 this question primarily belongs to"
     }
   ],
-  "knowledgeGaps": [
+  "provocativeQuestions": [
     {
-      "gap": "What specific data / fact / signal we don't have",
-      "couldComeFrom": "SIS connector name OR external source category (e.g. expert interview, primary research)",
-      "currentlyAvailable": true,
-      "decisiveFor": "Which critical question would this resolve"
+      "type": "tabu | inversion | blind-spot",
+      "question": "The uncomfortable question (one sentence)",
+      "whyProvocative": "Why this is normally not asked / what it would surface (1-2 sentences)"
     }
   ],
-  "frameworkRoadmap": [
+  "openResearch": [
     {
-      "order": 1,
-      "framework": "Specific SIS framework",
-      "questionItAddresses": "Which sub-question / critical question this framework will answer",
-      "estimatedEffort": "low | medium | high",
-      "dependsOn": "What must be known before this step (or 'nothing — start here')"
+      "topic": "What this open research item is about (one sentence)",
+      "wouldNeed": "What kind of work would address it (e.g. 'qualitative interviews with N stakeholder group', 'philosophical analysis of normative claim X', 'historical case research on Y')",
+      "whyNoFramework": "Brief explanation why no SIS framework fits"
     }
   ],
-  "explicitAssumptionsToTest": [
-    {"assumption": "Assumption from Step 1 we are choosing to bracket for now", "testHow": "How we'd validate this later"}
-  ],
-  "honestStateOfKnowledge": "2-4 sentences: what we know, what we don't, what's most uncertain. NO false confidence.",
-  "synthesis": "Short executive summary: 'Before answering X, we need to first answer A, B, C — here's the order.'"
+  "synthesis": "2-3 sentences on what the question atlas reveals about the topic — what dominates, what is structurally hard, where the action is"
 }
 
-Minimum: 3 criticalQuestions (top-3, ranked, with framework handoff for each), 4 knowledgeGaps, 2-3 frameworkRoadmap entries showing the recommended sequence, 2 explicitAssumptionsToTest. Every criticalQuestion MUST reference a concrete next-step framework or external-research category — no dead ends.`,
+Constraints:
+- coreQuestions: EXACTLY 7-9 entries (ranked 1 to N), at least 4 different classes represented
+- provocativeQuestions: 2-3 entries (cover at least 2 of the 3 types if possible)
+- openResearch: 1-3 entries
+- Every coreQuestion must have a non-trivial framework handoff with rationale
+- Every coreQuestion must be themen-spezifisch — generic questions are rejected`,
+
+      // ── Step 3: Starter-Sequence ───────────────────────────────────
+      "starter-sequence": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 3: Starter Sequence
+
+Curate the question atlas into a recommended starting sequence. Most strategists CANNOT pursue 8-12 questions in parallel. Tell them which 3 to start with, in which order, and why.
+
+The order matters: each question's framework execution should make the NEXT question more answerable. Map the dependency. If question A's answer is needed to interpret question B's framework output, A must come first.
+
+Be HONEST about uncertainty. Where is the highest unknown? Where would different priorities change the recommended sequence?
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "starterSequence": [
+    {
+      "order": 1,
+      "questionRef": "Core #N (or Provocative Pn) — exact reference from Step 2",
+      "question": "Verbatim question repeated for clarity",
+      "framework": "marktanalyse | trend-deep-dive | pre-mortem | post-mortem | war-gaming | stakeholder | design-thinking",
+      "rationale": "Why this is the right first/second/third question (2-3 sentences)",
+      "expectedOutput": "What concrete artifact / answer the user gets from running this step (1 sentence)",
+      "enables": "What downstream questions become answerable once this is done (1 sentence)"
+    }
+  ],
+  "alternativeStarters": [
+    {
+      "scenario": "If the user's priority is X (e.g. 'rapid crisis-response' vs 'long-term strategic planning' vs 'investor-facing positioning')",
+      "alternativeFirstQuestion": "Core #N reference",
+      "rationale": "Why this would be the better starting point under that scenario"
+    }
+  ],
+  "honestStateOfKnowledge": "2-4 sentences: what we know about this topic with confidence, what we don't, where the highest uncertainty sits, what would shift our recommendation. NO false confidence — name the limits.",
+  "synthesis": "Executive summary, one paragraph: the topic in one phrase, the recommended path in one sentence, the honest caveats in one sentence."
+}
+
+Constraints:
+- starterSequence: EXACTLY 3 entries (the top-3 starting questions in execution order)
+- alternativeStarters: 1-2 entries showing how different priorities change the sequence
+- honestStateOfKnowledge MUST name at least one specific limitation, not a generic "we don't know everything"
+- The final synthesis is what the user remembers — make it count`,
     };
-    return steps[step] || steps["reframing"];
+    return steps[step] || steps["topic-mapping"];
   },
 };
 
@@ -1538,7 +1536,7 @@ export async function POST(req: Request) {
     "trend-deep-dive": ["definition", "evidence", "drivers", "impact", "actions"],
     "stakeholder": ["inventory", "power-matrix", "coalitions", "engagement"],
     "design-thinking": ["empathize", "define", "ideate", "validate"],
-    "pre-frage": ["reframing", "decomposition", "inversion", "critical"],
+    "pre-frage": ["topic-mapping", "question-atlas", "starter-sequence"],
   };
   const allowedSteps = VALID_STEPS[frameworkId];
   if (allowedSteps && !allowedSteps.includes(step)) {

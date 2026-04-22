@@ -497,28 +497,31 @@ Step 5 (actions): ring classification (adopt/trial/assess/hold), immediate + sho
 
   {
     id: "framework-pre-frage",
-    name: "Framework: Pre-Frage / Pre-Question (4 steps)",
+    name: "Framework: Pre-Frage / Pre-Question (3 steps, v0.2)",
     category: "framework",
     purpose:
-      "Four-step question architecture: reframing (what's the question behind the question?) + STEEP+V decomposition + inversion/provocation + critical-question synthesis with framework handoff. Outputs questions, not answers — the only SIS framework that does so.",
+      "Three-step question atlas for TOPICS (not for questions). Input is a topic field; output is a curated question atlas: 7-9 topic-specific core questions + 2-3 provocative questions + open research items, plus a top-3 starter sequence with framework handoff. The only SIS framework that produces questions, not answers — designed for the start of a new strategic engagement when the topic landscape is unknown and the right questions need to be DEVELOPED before any analysis can begin.",
     location: "src/app/api/v1/frameworks/analyze/route.ts → FRAMEWORK_PROMPTS['pre-frage']",
-    trigger: "User runs the Pre-Frage framework, typically BEFORE launching one of the answer-oriented frameworks. Designed as a problem-framing prelude.",
+    trigger: "User opens the Pre-Frage framework with a topic field (NOT a question — e.g. 'climate change and European tourism', 'public broadcasting in the AI era').",
     responseShape:
-      "Step 1 (reframing): originalQuestion + implicitAssumptions[] + reframings[] + deeperQuestion. Step 2 (decomposition): mainQuestion + subQuestions[] + lensQuestions{social,technological,economic,environmental,political,values} + timeHorizonQuestions[]. Step 3 (inversion): inversionQuestions[] + tabooQuestions[] + premortemQuestion + blindSpotQuestions[]. Step 4 (critical): criticalQuestions[3] (ranked, with framework handoff) + knowledgeGaps[] + frameworkRoadmap[] + explicitAssumptionsToTest[] + honestStateOfKnowledge.",
-    injectedContext: ["CURRENT_DATE", "World model block", "Previous-step context"],
+      "Step 1 (topic-mapping): topic + topicReformulation + facets[5+ with stakeholders + connectedTrends + connectedRegulations] + boundaries{inScope, outOfScope, rationale}. Step 2 (question-atlas): coreQuestions[7-9 ranked, with class + whyMatters + framework handoff + dataAvailability + facetReference] + provocativeQuestions[2-3 with type tabu/inversion/blind-spot] + openResearch[1-3 with wouldNeed + whyNoFramework]. Step 3 (starter-sequence): starterSequence[3 with order + framework + rationale + expectedOutput + enables] + alternativeStarters[1-2 different scenarios] + honestStateOfKnowledge.",
+    injectedContext: ["CURRENT_DATE", "World model block (trends + edges + regulations)", "Previous-step context"],
     modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
     status: "draft",
-    version: "v0.1",
+    version: "v0.2",
     wiring: "wired",
     apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=pre-frage)",
-    templateEn: `You are a strategic question coach (Hal Gregersen / Edgar Schein / Charlie Munger inversion). Topic: TOPIC
+    templateEn: `You are a strategic discovery analyst. Input is a TOPIC FIELD (not a question — a domain for which to develop questions).
 
-Step 1 (reframing): surface implicit assumptions, generate stakeholder/discipline/horizon reframings, identify the deeper question behind the user's stated question. NOT answers.
-Step 2 (decomposition): MECE sub-questions + STEEP+V lens questions + time-horizon questions. Each sub-question typed (definitional/factual/normative/prognostic/causal/hypothetical).
-Step 3 (inversion + provocation): Munger inversion questions, taboo questions (what nobody wants to ask), pre-mortem question (5-year-failure-scenario backsolved to today's missed question), blind-spot questions (what's invisible from current vantage point).
-Step 4 (critical synthesis): top-3 critical questions ranked, knowledge-gaps with sourcing recommendations, framework-roadmap (which SIS framework answers which sub-question, in what order), explicit assumptions to test, honest state-of-knowledge statement.
+Step 1 (topic-mapping): map facets, stakeholders per facet, world-model anchors (which trends/regulations from SIS intersect with each facet), boundaries (in-scope vs out-of-scope adjacent areas). Output a structural map of what the topic actually contains.
 
-Architectural symmetry to the Iteration-Loop Pass 2 (LLM-Relevance-Filter): Pass 2 is self-critique on the OUTPUT side; Pre-Frage is self-critique on the INPUT side. Together they form a complete reflection loop.`,
+Step 2 (question-atlas): generate 30-50 candidate questions internally, then CURATE to 7-9 core questions (ranked, themen-spezifisch, with class tag + framework handoff + data availability + facet reference). Add 2-3 provocative questions (tabu / inversion / blind-spot — must be UNCOMFORTABLE). Add 1-3 open research items (only what NO SIS framework can address). Curation is the value — Listen-Tyrannei is the failure mode.
+
+Step 3 (starter-sequence): pick top-3 in execution order with rationale, expected output, and what each step ENABLES downstream. Provide 1-2 alternative starter scenarios for different priorities. End with honestStateOfKnowledge — name specific limitations, no false confidence.
+
+CRITICAL: every output must be themen-spezifisch. Generic question templates that work for any topic with the topic word swapped are rejected.
+
+v0.2 architectural correction: v0.1 wrongly framed this as "question coaching" (sharpen a vague user question). Founder corrected — it should DEVELOP questions for a topic field, not refine an existing question. v0.1 prompts retired, see git history if reviving.`,
     templateDe: null,
   },
 

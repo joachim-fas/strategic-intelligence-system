@@ -1906,15 +1906,15 @@ export default function HomeClient() {
                   // Symmetrie zur Iteration-Loop Pass-2 (e7f9699): Self-
                   // Critique auf der INPUT-Seite statt OUTPUT-Seite.
                   icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
-                  type: locale === "de" ? "Frage-Architektur" : "Question Architecture",
+                  type: locale === "de" ? "Frage-Atlas" : "Question Atlas",
                   label: "Pre-Frage",
-                  desc: locale === "de" ? "Reframing · Linsen · Inversion · Kritische Fragen" : "Reframing · Lenses · Inversion · Critical Questions",
+                  desc: locale === "de" ? "Themen-Mapping · Frage-Atlas · Starter-Sequenz" : "Topic Mapping · Question Atlas · Starter Sequence",
                   tip: locale === "de"
-                    ? "Identifiziert die richtigen FRAGEN bevor irgendeine Antwort gesucht wird. 4 Schritte: Reframing (Frage hinter der Frage) → Decomposition + STEEP+V Linsen → Inversion + Provokation (Tabu-Fragen) → Top-3 kritische Fragen + Framework-Fahrplan."
-                    : "Identifies the right QUESTIONS before any answer search. 4 steps: Reframing (question behind the question) → Decomposition + STEEP+V lenses → Inversion + provocation (taboo questions) → Top-3 critical questions + framework roadmap.",
+                    ? "Input ist ein THEMENFELD (z.B. «Klimawandel und europäischer Tourismus»), nicht eine Frage. Output ist ein Frage-Atlas: 7-9 themen-spezifische Core-Fragen + 2-3 provokante Fragen + Open-Research, plus Top-3 Starter-Sequenz mit Framework-Anschluss. Use-Case: Berater am Start eines neuen Mandats — kennt das Themenfeld noch nicht, braucht ein Briefing das auf eine Folie passt."
+                    : "Input is a TOPIC FIELD (e.g. «Climate change and European tourism»), not a question. Output is a question atlas: 7-9 topic-specific core questions + 2-3 provocative questions + open research, plus a top-3 starter sequence with framework handoff. Use case: a consultant at the start of a new engagement — does not know the topic yet, needs a briefing that fits on one slide.",
                   flow: locale === "de"
-                    ? "Reframing → Linsen → Inversion → Kritische Fragen"
-                    : "Reframing → Lenses → Inversion → Critical Questions",
+                    ? "Themen-Mapping → Frage-Atlas → Starter-Sequenz"
+                    : "Topic-Mapping → Question-Atlas → Starter-Sequence",
                   templateId: "pre-frage",
                   p: { card: "#F4EEFF", icon: "#E0D0FF", border: "#C0A8F0", type: "#5A2A9E", typeBright: "#C8A6F8" },
                 },
