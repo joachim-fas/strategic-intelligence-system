@@ -31,6 +31,13 @@ import {
   VoltInsightChip,
 } from "@/components/verstehen/VoltPrimitives";
 import {
+  VoltEmpty,
+  VoltEmptyHeader,
+  VoltEmptyMedia,
+  VoltEmptyTitle,
+  VoltEmptyDescription,
+} from "@/components/volt/VoltEmpty";
+import {
   Target,
   Zap,
   BookOpen,
@@ -573,37 +580,56 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                     : "Number of live signals that topically fit the question. Signals are filtered by weighted keyword overlap and anchor-keyword match. Social-tier sources (Bluesky/Mastodon) need a higher topic threshold than authoritative ones (UN/ECFR/IPCC)."}
                 />
               )}
-              {b.references?.length > 0 && (
-                <VoltKpiCard
-                  variant="light"
-                  label={locale === "de" ? "Quellen" : "Sources"}
-                  value={b.references.length}
-                  subLabel={locale === "de" ? "Authoritative Referenzen" : "Authoritative references"}
-                  icon={<BookOpen size={16} />}
-                  helpText={locale === "de"
-                    ? "Externe Referenzen, die in der Synthese zitiert wurden. Quellen auf der Allowlist (EU/UN/Research-Domains) bekommen ein ✓; unverifizierte Domains ein ? — letzteres heißt nicht falsch, nur nicht editoriell geprüft."
-                    : "External references cited in the synthesis. Sources on the allowlist (EU/UN/research domains) get a ✓; unverified domains get a ? — the latter means not editorially vetted, not necessarily wrong."}
-                />
-              )}
-              {b.scenarios?.length > 0 && (
-                <VoltKpiCard
-                  variant="dark"
-                  label={locale === "de" ? "Szenarien" : "Scenarios"}
-                  value={b.scenarios.length}
-                  subLabel={locale === "de" ? "Optimistisch · Basis · Pessimistisch" : "Optimistic · Base · Pessimistic"}
-                  icon={<Compass size={16} />}
-                  helpText={locale === "de"
-                    ? "Drei primäre Zukunftsszenarien. Wahrscheinlichkeiten ergeben ~100% und werden aus der Analyse hergeleitet, nicht aus einem Default-Template. Eine optionale Wildcard kann als viertes Szenario auftauchen — ein Low-Probability-High-Impact-Ereignis."
-                    : "Three primary future scenarios. Probabilities sum to ~100% and are derived from the analysis, not from a default template. An optional wildcard may appear as a fourth scenario — a low-probability, high-impact event."}
-                />
-              )}
+              {/* Pilot-Eval-Fix 2026-04-22 P1-Empty-State: Quellen-KPI
+                   wird jetzt immer gezeigt, auch bei 0 — vorher versteckt
+                   der conditional-hide dem User die Tatsache, dass keine
+                   Refs geliefert wurden. Bei 0 zeigt das subLabel den
+                   transparenten Zustand. */}
+              <VoltKpiCard
+                variant="light"
+                label={locale === "de" ? "Quellen" : "Sources"}
+                value={b.references?.length ?? 0}
+                subLabel={
+                  (b.references?.length ?? 0) > 0
+                    ? (locale === "de" ? "Authoritative Referenzen" : "Authoritative references")
+                    : (locale === "de" ? "Keine Referenzen genannt" : "No references cited")
+                }
+                icon={<BookOpen size={16} />}
+                helpText={locale === "de"
+                  ? "Externe Referenzen, die in der Synthese zitiert wurden. Quellen auf der Allowlist (EU/UN/Research-Domains) bekommen ein ✓; unverifizierte Domains ein ? — letzteres heißt nicht falsch, nur nicht editoriell geprüft."
+                  : "External references cited in the synthesis. Sources on the allowlist (EU/UN/research domains) get a ✓; unverified domains get a ? — the latter means not editorially vetted, not necessarily wrong."}
+              />
+              {/* Szenarien-KPI: dito, immer zeigen. Bei 0 wird die
+                   ehrliche Lücke sichtbar. */}
+              <VoltKpiCard
+                variant="dark"
+                label={locale === "de" ? "Szenarien" : "Scenarios"}
+                value={b.scenarios?.length ?? 0}
+                subLabel={
+                  (b.scenarios?.length ?? 0) > 0
+                    ? (locale === "de" ? "Optimistisch · Basis · Pessimistisch" : "Optimistic · Base · Pessimistic")
+                    : (locale === "de" ? "Keine Szenarien modelliert" : "No scenarios modeled")
+                }
+                icon={<Compass size={16} />}
+                helpText={locale === "de"
+                  ? "Drei primäre Zukunftsszenarien. Wahrscheinlichkeiten ergeben ~100% und werden aus der Analyse hergeleitet, nicht aus einem Default-Template. Eine optionale Wildcard kann als viertes Szenario auftauchen — ein Low-Probability-High-Impact-Ereignis."
+                  : "Three primary future scenarios. Probabilities sum to ~100% and are derived from the analysis, not from a default template. An optional wildcard may appear as a fourth scenario — a low-probability, high-impact event."}
+              />
             </div>
           )}
 
           {/* ═══ LEVEL 2: MAIN SECTION CARDS ═══ */}
 
+          {/* Pilot-Eval-Fix 2026-04-22 P1-Empty-State: Heuristik
+               `isStrategicQuery` unten in jeder Section; Schwelle
+               `synthesis.length > 500` proxies „Strategische Frage mit
+               substantivem Output". Faktische Fragen („Wer ist X?")
+               liegen darunter und lösen keine Empty-States aus — dort
+               sind fehlende Szenarien/Erkenntnisse der erwartete
+               Zustand, nicht ein Defekt. */}
+
           {/* 2. Scenarios in Section Card */}
-          {b.scenarios?.length > 0 && (
+          {b.scenarios?.length > 0 ? (
             <VoltSectionCard
               icon={<Compass size={18} />}
               iconVariant="blue"
@@ -620,10 +646,33 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 hideHeader
               />
             </VoltSectionCard>
-          )}
+          ) : ((b.synthesis?.length ?? 0) > 500 && !isHelp) ? (
+            <VoltSectionCard
+              icon={<Compass size={18} />}
+              iconVariant="blue"
+              title={locale === "de" ? "Zukunftsszenarien" : "Future Scenarios"}
+              subtitle={locale === "de" ? "Nicht modelliert" : "Not modeled"}
+            >
+              <VoltEmpty className="border border-dashed">
+                <VoltEmptyHeader>
+                  <VoltEmptyMedia variant="icon">
+                    <Compass size={18} />
+                  </VoltEmptyMedia>
+                  <VoltEmptyTitle>
+                    {locale === "de" ? "Keine Szenarien modelliert" : "No scenarios modeled"}
+                  </VoltEmptyTitle>
+                  <VoltEmptyDescription>
+                    {locale === "de"
+                      ? "Die Analyse hat drei primäre Zukunftsszenarien nicht geliefert. Mögliche Ursachen: sehr dünne Signalbasis, extrem spezifische Frage, oder LLM-Format-Drift. Die Narrative oben fasst die Kernaussage trotzdem zusammen."
+                      : "The analysis did not deliver three primary future scenarios. Possible causes: very sparse signal basis, extremely specific question, or LLM format drift. The narrative above still captures the core takeaway."}
+                  </VoltEmptyDescription>
+                </VoltEmptyHeader>
+              </VoltEmpty>
+            </VoltSectionCard>
+          ) : null}
 
           {/* 3. Key Insights in Section Card */}
-          {briefing.keyInsights?.length > 0 && !isHelp && (
+          {(briefing.keyInsights?.length ?? 0) > 0 && !isHelp ? (
             <VoltSectionCard
               icon={<Lightbulb size={18} />}
               iconVariant="lime"
@@ -663,7 +712,30 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                 ))}
               </div>
             </VoltSectionCard>
-          )}
+          ) : ((b.synthesis?.length ?? 0) > 500 && !isHelp) ? (
+            <VoltSectionCard
+              icon={<Lightbulb size={18} />}
+              iconVariant="lime"
+              title={locale === "de" ? "Wichtigste Erkenntnisse" : "Key Insights"}
+              subtitle={locale === "de" ? "Nicht extrahiert" : "Not extracted"}
+            >
+              <VoltEmpty className="border border-dashed">
+                <VoltEmptyHeader>
+                  <VoltEmptyMedia variant="icon">
+                    <Lightbulb size={18} />
+                  </VoltEmptyMedia>
+                  <VoltEmptyTitle>
+                    {locale === "de" ? "Keine Erkenntnisse kondensiert" : "No insights condensed"}
+                  </VoltEmptyTitle>
+                  <VoltEmptyDescription>
+                    {locale === "de"
+                      ? "Die KI hat keine zitierbaren Kern-Erkenntnisse extrahiert. Die Kernaussagen sind in den Narrativ-Absätzen oben verteilt — für eine schärfere Key-Takeaway-Liste bitte die Frage spezifischer formulieren oder den Signal-Pool erweitern."
+                      : "The AI did not extract standalone key insights. The core statements are distributed across the narrative paragraphs above — for a sharper key-takeaway list, please rephrase the question or extend the signal pool."}
+                  </VoltEmptyDescription>
+                </VoltEmptyHeader>
+              </VoltEmpty>
+            </VoltSectionCard>
+          ) : null}
 
           {/* 4. Causal Orbit in Section Card */}
           {briefing.causalChain?.length > 0 && (
