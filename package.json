@@ -35,8 +35,9 @@
     "test:scenario-validation": "tsx scripts/scenario-validation-test.ts",
     "test:reference-verification": "tsx scripts/reference-verification-test.ts",
     "test:language-detection": "tsx scripts/language-detection-test.ts",
+    "test:prompt-guard": "tsx scripts/prompt-guard-test.ts",
     "pilot:eval": "tsx scripts/pilot-eval-run.ts",
-    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:forecasts && npm run test:sse-client && npm run test:pipeline-store && npm run test:pagination && npm run test:openapi-spec && npm run test:signals-relevance && npm run test:source-metadata && npm run test:scenario-validation && npm run test:reference-verification && npm run test:language-detection && npm run test:api",
+    "test": "npm run test:tenants && npm run test:stream && npm run test:briefing-url && npm run test:baseline && npm run test:cluster-snapshots && npm run test:ai-text && npm run test:foresight-parser && npm run test:forecasts && npm run test:sse-client && npm run test:pipeline-store && npm run test:pagination && npm run test:openapi-spec && npm run test:signals-relevance && npm run test:source-metadata && npm run test:scenario-validation && npm run test:reference-verification && npm run test:language-detection && npm run test:prompt-guard && npm run test:api",
     "trends:enrich": "tsx scripts/enrich-trends.ts",
     "edges:discover": "tsx scripts/discover-causal-edges.ts"
   },
