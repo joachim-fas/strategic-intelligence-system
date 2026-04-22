@@ -130,6 +130,20 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   // Soziologie liegt, nicht auf Makroökonomie). Macro-tier (Jahres-
   // horizont für die Mehrzahl der Publikationen).
   iab_rss:            { steepV: "social",        trendLevel: "macro" },
+  // ECIPE — European Centre for International Political Economy:
+  // Brüsseler Think-Tank für Handels- und Regulierungsrecht.
+  // Economic/macro — Papers sind jahres-scale, klarer Wirtschafts-
+  // Fokus (Industriepolitik, DMA/DSA-Wettbewerbsrecht, Tech-Handel).
+  ecipe_rss:          { steepV: "economic",      trendLevel: "macro" },
+  // OSW — Centre for Eastern Studies (Warschau): EU-Osteuropa-
+  // und Russland-Policy. Political/macro analog zu ecfr_rss, weil
+  // Policy-Briefs zum aktuellen Konflikt- und Sanktionsgeschehen.
+  osw_rss:            { steepV: "political",     trendLevel: "macro" },
+  // Clingendael — Netherlands Institute of International Relations:
+  // Political/signal, weil der Feed überwiegend Medien-Appearances
+  // der Forscher einfängt (News-Takes, nicht Papers). Trotzdem
+  // wertvoll für EU-Geopolitik-Diskurs-Breite.
+  clingendael_rss:    { steepV: "political",     trendLevel: "signal" },
 
   // ─── Macroeconomics (Economic, mega) ───────────────────────────────
   worldbank:          { steepV: "economic",      trendLevel: "mega"  },

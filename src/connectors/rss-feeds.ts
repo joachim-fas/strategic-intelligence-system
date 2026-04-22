@@ -375,6 +375,49 @@ const THINKTANK_FEEDS: RssFeedConfig[] = [
     tags: ["think-tank", "dach", "de", "labor-market", "research"],
   },
   {
+    // 2026-04-22 Pilot-Eval P0-A: ECIPE (European Centre for Inter-
+    // national Political Economy) — führendes EU-Handels- und
+    // Regulierungspolitik-Institut (Brüssel). Deckt DMA/DSA,
+    // Industriepolitik, Wettbewerbsrecht, Tech-Regulierung ab.
+    // Direkt relevant für A-Pilot (Supply-Chain-Fragmentierung) und
+    // für alle Fragen zu EU-Technologie/Handelsregulierung.
+    name: "ecipe_rss",
+    displayName: "ECIPE (European Centre for International Political Economy)",
+    feedUrl: "https://ecipe.org/feed/",
+    defaultTopic: "Economic Trends",
+    keywordMapping: THINKTANK_MAPPING,
+    tags: ["think-tank", "eu", "trade", "regulation", "brussels"],
+  },
+  {
+    // 2026-04-22 Pilot-Eval P0-A: OSW (Centre for Eastern Studies,
+    // Warschau) — EU-Osteuropa-/Russland-/Ukraine-Policy-Research.
+    // Englischsprachiger Feed mit aktuellen Policy-Briefs. Füllt die
+    // Lücke bei Russland-Sanktionen, Energiewende-Geopolitik,
+    // Osteuropa-Integration. Relevant für A-Pilot (Lieferketten-
+    // Fragmentierung wegen Ost-Konflikt-Dynamiken).
+    name: "osw_rss",
+    displayName: "OSW (Centre for Eastern Studies)",
+    feedUrl: "https://www.osw.waw.pl/en/rss.xml",
+    defaultTopic: "Geopolitical Fragmentation",
+    keywordMapping: THINKTANK_MAPPING,
+    tags: ["think-tank", "eu", "east-europe", "russia", "ukraine"],
+  },
+  {
+    // 2026-04-22 Pilot-Eval P0-A: Clingendael (Netherlands Institute
+    // of International Relations) — niederländisches EU-Think-Tank.
+    // Feed-Format ist überwiegend „Medien-Appearance" der Forscher
+    // in europäischen Medien (Multi-Sprache: EN/NL/DE/IT), nicht
+    // reine Policy-Papers. Trotzdem wertvoll als Breitensicht auf
+    // EU-Geopolitik-Diskurse, und die Mehrheit der Titel-Texte ist
+    // englisch (die Publikations-Titel, nicht die Medien-Titel).
+    name: "clingendael_rss",
+    displayName: "Clingendael (Netherlands International Affairs)",
+    feedUrl: "https://www.clingendael.org/rss.xml",
+    defaultTopic: "Geopolitical Fragmentation",
+    keywordMapping: THINKTANK_MAPPING,
+    tags: ["think-tank", "eu", "netherlands", "international-affairs"],
+  },
+  {
     name: "crisisgroup_rss",
     displayName: "International Crisis Group",
     feedUrl: "https://www.crisisgroup.org/rss.xml",

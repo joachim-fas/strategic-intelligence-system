@@ -81,7 +81,18 @@ function extractAtomLink(xml: string): string {
 function extractRssLink(xml: string): string {
   // First: plain `<link>text</link>`.
   const plain = xml.match(/<link>([\s\S]*?)<\/link>/i);
-  if (plain) return plain[1].trim();
+  if (plain && plain[1].trim()) return plain[1].trim();
+  // 2026-04-22 Pilot-Eval: some feeds (e.g. ECIPE) emit empty `<link/>`
+  // tags and only carry the canonical URL in `<guid isPermaLink="true">`
+  // or even in `<comments>`. Try those before giving up.
+  const guid = xml.match(/<guid(?:\s[^>]*)?>([\s\S]*?)<\/guid>/i);
+  if (guid && /^https?:\/\//i.test(guid[1].trim())) return guid[1].trim();
+  const comments = xml.match(/<comments>([\s\S]*?)<\/comments>/i);
+  if (comments) {
+    // Strip a trailing comment-anchor like `#respond` to get the paper URL.
+    const stripped = comments[1].trim().replace(/#[^#]*$/, "");
+    if (/^https?:\/\//i.test(stripped)) return stripped;
+  }
   return extractAtomLink(xml);
 }
 
