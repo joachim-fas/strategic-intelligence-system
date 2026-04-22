@@ -602,7 +602,6 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "gesellschaftlich": ["social", "society"],
     "wohlstand": ["prosperity", "wealth"],
     "sicherheit": ["security", "safety"],
-    "souveränität": ["sovereignty"],
     "resilienz": ["resilience", "resilient"],
     "verteidigung": ["defense", "defence"],
     "bildung": ["education", "educational"],
@@ -652,6 +651,49 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "weiterbildung": ["upskilling", "continuing education", "professional development"],
     "produktivität": ["productivity"],
     "wettbewerb": ["competition", "competitive"],
+    // 2026-04-22 Pilot-Eval P0-A-Follow-Up: Handels- und EU-Policy-
+    // Vokabular, das nach dem 6-Connector-Sprint (Bruegel/Politico/IAB/
+    // ECIPE/OSW/Clingendael) die Brücke zu den englischsprachigen
+    // Artikel-Titeln schlägt. Ohne diese Mappings finden deutsche
+    // Strategie-Queries die neuen EU-Policy-Signale nicht, weil
+    // „Industriepolitik" als Ein-Wort-Token eben nicht „industrial
+    // policy" matcht.
+    "industriepolitik": ["industrial policy", "industrial strategy", "industrial accelerator"],
+    "handelspolitik": ["trade policy", "trade relations", "trade agreement"],
+    "wettbewerbsfähigkeit": ["competitiveness", "competitive", "single market competitiveness"],
+    "wettbewerbsrecht": ["competition law", "antitrust", "dma", "dsa"],
+    "autonomie": ["autonomy", "sovereignty", "strategic autonomy"],
+    "souveränität": ["sovereignty", "strategic autonomy", "digital sovereignty"],
+    "abhängigkeit": ["dependency", "dependencies", "trade dependency"],
+    "abhängigkeiten": ["dependencies", "dependency", "trade dependencies"],
+    "sanktionen": ["sanctions", "restrictive measures", "export controls"],
+    "zölle": ["tariff", "tariffs", "customs duties", "duty"],
+    "zoll": ["tariff", "customs", "duty"],
+    "binnenmarkt": ["single market", "internal market", "eu single market"],
+    "dekarbonisierung": ["decarbonization", "decarbonisation", "net zero", "net-zero"],
+    "rohstoffe": ["raw materials", "critical raw materials", "critical minerals"],
+    "rohstoff": ["raw material", "critical raw material", "mineral"],
+    "halbleiter": ["semiconductor", "semiconductors", "chips", "chip act"],
+    "kritische": ["critical"],
+    "kritischen": ["critical"],
+    "kritischer": ["critical"],
+    "kritisch": ["critical"],
+    "resilient": ["resilient", "resilience"],
+    "strategisch": ["strategic"],
+    "strategische": ["strategic"],
+    "strategischer": ["strategic"],
+    "strategisches": ["strategic"],
+    // EU-Institutions
+    "kommission": ["european commission", "commission", "ec"],
+    "parlament": ["european parliament", "europarl"],
+    "rat": ["european council", "council of the eu"],
+    "zentralbank": ["central bank", "ecb", "european central bank"],
+    "ezb": ["ecb", "european central bank"],
+    // Geopolitik-Akteure + EU-Inhalte
+    "ukraine": ["ukraine", "ukrainian"],
+    "nato": ["nato"],
+    "verteidigungspolitik": ["defense policy", "defence policy", "security policy"],
+    "cybersicherheit_eu": ["eu cyber", "nis2", "cybersecurity act"],
   };
 
   const aliasLookup = new Map<string, string[]>();
