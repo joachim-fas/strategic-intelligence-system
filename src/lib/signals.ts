@@ -571,7 +571,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // zweisprachig bi-direktional alias-verknüpft, damit eine DE-Frage
   // EN-Content findet und umgekehrt.
   const CROSS_LANG_ALIASES: Record<string, string[]> = {
-    "ki": ["ai", "artificial intelligence", "künstliche intelligenz"],
+    "ki": ["ai", "artificial intelligence", "künstliche intelligenz", "llm", "large language model", "machine learning", "ml"],
     "klimawandel": ["climate change", "global warming"],
     "cybersicherheit": ["cybersecurity", "cyber security"],
     "energiewende": ["energy transition"],
@@ -608,7 +608,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "bildung": ["education", "educational"],
     "forschung": ["research", "r&d"],
     "innovation": ["innovation", "innovative"],
-    "automatisierung": ["automation", "automated"],
+    "automatisierung": ["automation", "automated", "autonomous"],
     "arbeit": ["work", "labor", "labour"],
     "wärmepumpe": ["heat pump"],
     "wärmepumpen": ["heat pumps", "heat pump"],
@@ -626,6 +626,32 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "slowakei": ["slovakia", "slovak"],
     "ungarn": ["hungary", "hungarian"],
     "rumänien": ["romania", "romanian"],
+    // 2026-04-22 Pilot-Eval P2-Erweiterung: KI-Agent-Terminologie.
+    // B-DE-Query „autonome KI-Agenten" fand 0 Treffer in 215 arxiv-
+    // Einträgen und 309 HN-Einträgen, weil nur „ki" als Alias gemappt
+    // war. Jetzt explizite Mappings für agent-basierte Konzepte.
+    "agent": ["autonomous agent", "ai agent", "llm agent", "agents"],
+    "agenten": ["autonomous agents", "llm agents", "agentic ai", "ai agents", "agents"],
+    "autonom": ["autonomous", "automated"],
+    "autonome": ["autonomous", "automated"],
+    "autonomer": ["autonomous", "automated"],
+    "autonomes": ["autonomous", "automated"],
+    "sprachmodell": ["language model", "llm", "foundation model"],
+    "sprachmodelle": ["language models", "llms", "foundation models"],
+    "generativ": ["generative", "generative ai", "genai"],
+    "generative": ["generative", "generative ai", "genai"],
+    "assistent": ["assistant", "copilot", "ai assistant"],
+    "assistenten": ["assistants", "copilots", "ai assistants"],
+    // Arbeitsmarkt-Ökosystem für B-Themen
+    "arbeitsplatz": ["job", "workplace", "employment"],
+    "arbeitsplätze": ["jobs", "employment", "workforce"],
+    "beschäftigung": ["employment", "employed", "workforce"],
+    "fachkräfte": ["skilled workers", "labor force", "workforce"],
+    "fachkräftemangel": ["skills shortage", "labor shortage", "skills gap"],
+    "umschulung": ["retraining", "reskilling"],
+    "weiterbildung": ["upskilling", "continuing education", "professional development"],
+    "produktivität": ["productivity"],
+    "wettbewerb": ["competition", "competitive"],
   };
 
   const aliasLookup = new Map<string, string[]>();
