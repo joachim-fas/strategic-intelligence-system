@@ -503,15 +503,37 @@ export function computeKeywordStats(
   // „region" oder „europa" im ECFR-EU-Hungary-Paper den Anchor, obwohl
   // „wintersport" (das eigentliche Kernwort) nirgends auftaucht.
   //
-  // Neue Regel: die TOP-3 längsten Base-Keywords sind Strict-Anchors.
-  // Mindestens einer davon (direkt ODER über seine Alias-Varianten)
-  // muss im Signal erscheinen — sonst gilt anchorMatched = false,
-  // selbst wenn andere, kürzere Keywords matchen. Das priorisiert die
-  // spezifischen Kernbegriffe der Frage über die generischen
-  // Struktur- und Funktionswörter.
+  // Regel: die TOP-3 längsten Base-Keywords sind Strict-Anchors plus
+  // die ERSTEN-5 Base-Keywords (User formuliert die Kernbegriffe
+  // typischerweise früh in der Query — vor Sub-Fragen).
+  //
+  // 2026-04-22 Abend-Fix (Nach B-DE-Pilot-Re-Run): reine Top-3-Länge
+  // ist zu restriktiv bei sub-fragen-reichen Queries. Bei
+  //   „Wie verändert sich der europäische Arbeitsmarkt durch autonome
+  //    KI-Agenten bis 2028? Welche Branchen sind am exponiertesten,
+  //    welche strukturellen Interventionen (Regulierung, Bildung,
+  //    Sozialsysteme) wirken — und wo droht die größte Kluft zwischen
+  //    politischem Willen und Realität?"
+  // picks das Top-3-Längste „sozialsysteme, interventionen,
+  // exponiertesten" — Wörter, die in echten RSS-Feed-Titeln praktisch
+  // nie auftauchen. Gleichzeitig bleibt „arbeitsmarkt" (12 Zeichen,
+  // 12 Titel-Treffer in der DB) aus dem Anchor-Set raus und IAB-
+  // Arbeitsmarkt-Artikel werden als „anchor-miss" verworfen.
+  //
+  // Union aus TOP-3-längste + ERSTEN-5 Base-Keywords korrigiert das:
+  // „arbeitsmarkt", „europäische", „autonome", „agenten", „ki" kommen
+  // ins Anchor-Set. Kernbegriffe der Frage bleiben strict geschützt,
+  // aber typische RSS-Titel-Begriffe können den Filter passieren.
   const sortedByLength = [...baseKeywords].sort((a, b) => b.length - a.length);
-  const strictAnchors = sortedByLength.slice(0, Math.min(3, sortedByLength.length));
-  const strictAnchorSet = new Set(strictAnchors);
+  const topByLength = sortedByLength.slice(0, Math.min(3, sortedByLength.length));
+  // Top-5-by-Position ergänzend, aber unter Beibehaltung der 5-Zeichen-
+  // Mindestlänge: „wien" (4) o.ä. short-term-Wörter bleiben vom Anchor-
+  // Schutz exkludiert, weil sie zu promiscuous matchen (verletzt sonst
+  // `signals-relevance-test.ts`-Assertion „short-match: no anchor").
+  const topByPosition = baseKeywords
+    .slice(0, Math.min(5, baseKeywords.length))
+    .filter((kw) => kw.length >= 5);
+  const strictAnchorSet = new Set<string>([...topByLength, ...topByPosition]);
   let anchorMatched = false;
 
   for (const kw of baseKeywords) {

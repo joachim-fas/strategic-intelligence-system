@@ -142,6 +142,66 @@ section("computeKeywordStats");
 }
 
 {
+  // 2026-04-22 Abend-Fix (Pilot-Eval B-DE-Re-Run):
+  //
+  // Sub-fragen-reiche Queries haben typisch sehr lange, aber seltene
+  // Keywords am Ende (z.B. „sozialsysteme", „interventionen",
+  // „exponiertesten") und die eigentlichen Kernbegriffe (z.B.
+  // „arbeitsmarkt") früh in der Query. Der Top-3-Längste-Only-Anchor
+  // würde nur die seltenen End-Wörter als Anchor setzen und die
+  // frühen Kern-Wörter aus dem Anchor-Set ausschließen — dann
+  // fallen IAB-Arbeitsmarkt-Artikel durch den Anchor-Miss-Filter.
+  //
+  // Fix: Anchor-Set = Top-3-längste + erste-5-Base-Keywords (mit ≥5-
+  // Zeichen-Filter, damit kurze Wörter wie „eu" nicht reinrutschen).
+  const subQuestionQuery = [
+    "arbeitsmarkt",       // Position 1, length 12 — wichtiger Kernbegriff
+    "europäische",        // Position 2, length 11
+    "autonome",           // Position 3, length 8
+    "agenten",            // Position 4, length 7
+    "branchen",           // Position 5, length 8
+    "exponiertesten",     // Position 6, length 14 — Top-3-längste
+    "strukturellen",      // Position 7, length 13 — Top-3-längste
+    "interventionen",     // Position 8, length 14 — Top-3-längste
+    "sozialsysteme",      // Position 9, length 13
+  ];
+  // Signal matcht das Kernwort „arbeitsmarkt" — sollte als Anchor
+  // zählen, auch wenn „arbeitsmarkt" nicht zu den 3 längsten Wörtern
+  // gehört.
+  const iabLikeTitle = computeKeywordStats(
+    subQuestionQuery,
+    "IAB: Regionale Arbeitsmarktprognosen 2026 — Konjunkturschwäche belastet die regionalen Arbeitsmärkte weiterhin",
+  );
+  assert(
+    iabLikeTitle.anchorMatched === true,
+    "sub-question query: arbeitsmarkt (Position 1) IS anchor via position-top-5",
+  );
+
+  // Gegenbeispiel: nur ein sehr langes, aber irrelevantes Wort matcht
+  // — das soll NICHT als Anchor zählen, wenn die eigentlichen
+  // Kernbegriffe (Position 1-5, Länge ≥5) fehlen. Nur dann wäre
+  // die Position-Erweiterung zu großzügig.
+  const shouldMiss = computeKeywordStats(
+    subQuestionQuery,
+    "Zufällige Nachricht über Interventionen in anderem Kontext",
+  );
+  assert(
+    shouldMiss.anchorMatched === true,
+    "interventionen ist in top-3-längste — matcht als Anchor (korrekt)",
+  );
+
+  // Echter Miss: weder Top-3-längste noch Top-5-Position matchen.
+  const trueMiss = computeKeywordStats(
+    subQuestionQuery,
+    "Wetter in Hamburg ist heute sehr sonnig und warm",
+  );
+  assert(
+    trueMiss.anchorMatched === false,
+    "kein Anchor-Keyword im Signal → anchorMatched=false",
+  );
+}
+
+{
   // Empty keywords
   const empty = computeKeywordStats([], "any text");
   assert(empty.matched === 0, "empty keywords: matched = 0");
