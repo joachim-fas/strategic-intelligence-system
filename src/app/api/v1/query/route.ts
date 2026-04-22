@@ -516,6 +516,16 @@ export async function POST(req: Request) {
         const decoder = new TextDecoder();
         let fullText = "";
         let lineBuffer = "";
+        // 2026-04-22 P2-Token-Audit: capture stop_reason + usage from the
+        // SSE stream so we can log per-request token telemetry. Without
+        // this we have no way to know whether max_tokens=16000 is being
+        // hit (truncation) or whether the LLM stops naturally far below it
+        // (headroom waste). Anthropic streams these in `message_start`
+        // (input usage) and `message_delta` (output usage + stop_reason).
+        const callStartedAt = Date.now();
+        let stopReason: string | null = null;
+        let inputTokens: number | null = null;
+        let outputTokens: number | null = null;
 
         const processAnthropicLine = (line: string) => {
           if (!line.startsWith("data: ")) return;
@@ -530,6 +540,11 @@ export async function POST(req: Request) {
             ) {
               fullText += event.delta.text;
               send({ type: "delta", text: event.delta.text });
+            } else if (event.type === "message_start" && event.message?.usage?.input_tokens) {
+              inputTokens = event.message.usage.input_tokens;
+            } else if (event.type === "message_delta") {
+              if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
+              if (event.usage?.output_tokens) outputTokens = event.usage.output_tokens;
             }
           } catch {
             // ignore malformed SSE lines
@@ -548,6 +563,16 @@ export async function POST(req: Request) {
 
         // Process any remaining buffered content (last line without trailing \n)
         if (lineBuffer.trim()) processAnthropicLine(lineBuffer.trim());
+
+        const callDurationMs = Date.now() - callStartedAt;
+        // Single-line audit log: greppable, parsable, never PII.
+        // stop_reason values to watch: "end_turn" (good — natural stop),
+        // "max_tokens" (BAD — output truncated, raise the cap), "stop_sequence"
+        // (rare — stop string fired). Token counts let us see whether 16000
+        // ceiling is wasteful headroom vs. tight fit for typical responses.
+        console.log(
+          `[query:llm-1] stop_reason=${stopReason} input_tokens=${inputTokens} output_tokens=${outputTokens} duration_ms=${callDurationMs}`,
+        );
 
         // Parse complete JSON and send structured result
         // API-03: extractJSON now returns { data, repaired } to flag repaired results.
@@ -592,6 +617,14 @@ export async function POST(req: Request) {
             ];
 
             try {
+              // 2026-04-22 P2-Token-Audit: retry max_tokens 16000 → 8000.
+              // The retry only needs to fill structured fields (scenarios,
+              // keyInsights, references, decisionFramework, causalChain) —
+              // the original synthesis prose is kept via the merge below.
+              // Typical structured-field JSON is ~2-4k tokens; 8000 leaves
+              // 2× headroom but cuts retry latency from up to ~200s to
+              // ~100s if the model uses the budget.
+              const retryStartedAt = Date.now();
               const retryRes = await fetch(
                 "https://api.anthropic.com/v1/messages",
                 {
@@ -603,7 +636,7 @@ export async function POST(req: Request) {
                   },
                   body: JSON.stringify({
                     model: "claude-sonnet-4-6",
-                    max_tokens: 16000,
+                    max_tokens: 8000,
                     system: systemPrompt,
                     messages: retryMessages,
                     stream: false,
@@ -613,7 +646,13 @@ export async function POST(req: Request) {
               if (retryRes.ok) {
                 const retryJson = (await retryRes.json()) as {
                   content?: Array<{ type: string; text?: string }>;
+                  stop_reason?: string;
+                  usage?: { input_tokens?: number; output_tokens?: number };
                 };
+                // P2-Token-Audit: log retry telemetry alongside first-call.
+                console.log(
+                  `[query:llm-2-retry] stop_reason=${retryJson.stop_reason ?? null} input_tokens=${retryJson.usage?.input_tokens ?? null} output_tokens=${retryJson.usage?.output_tokens ?? null} duration_ms=${Date.now() - retryStartedAt}`,
+                );
                 const retryText =
                   retryJson.content
                     ?.filter((b) => b.type === "text" && b.text)
