@@ -75,6 +75,14 @@ export default function SignalTicker() {
   const [signals, setSignals] = useState<TickerSignal[]>([]);
   const [isIframe, setIsIframe] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Click-to-expand popover (Backlog 2.2, 2026-04-22): ein angeklicktes
+  // Signal öffnet keine externe URL mehr direkt, sondern zeigt erst einen
+  // In-App-Detail-Popover mit den primären Aktionen „In SIS analysieren"
+  // (neue Query mit dem Signal-Titel) und „Quelle öffnen" (externer Link).
+  // Der alte reine-Link-Flow hat den User sofort aus SIS rausgeworfen;
+  // jetzt bleibt er mindestens einen Zwischenschritt in der App und kann
+  // entscheiden, ob er das Signal als Query-Keim aufgreifen möchte.
+  const [expandedSignal, setExpandedSignal] = useState<TickerSignal | null>(null);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const routeAllowsTicker = shouldShowTicker(pathname);
@@ -105,6 +113,21 @@ export default function SignalTicker() {
       if (refreshTimer.current) clearInterval(refreshTimer.current);
     };
   }, [routeAllowsTicker]);
+
+  // Esc schließt Popover; while offen stoppt die Marquee-Animation automatisch
+  // über den `paused`-Flag, damit der User nicht gegen bewegten Kontext klickt.
+  useEffect(() => {
+    if (!expandedSignal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpandedSignal(null);
+    };
+    window.addEventListener("keydown", onKey);
+    setPaused(true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      setPaused(false);
+    };
+  }, [expandedSignal]);
 
   if (!routeAllowsTicker || isIframe || signals.length === 0) return null;
 
@@ -282,44 +305,215 @@ export default function SignalTicker() {
               </>
             );
             const key = `${s.id}-${i}`;
-            if (s.url) {
-              return (
-                <a
-                  key={key}
-                  href={s.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    textDecoration: "none",
-                    flexShrink: 0,
-                    transition: "opacity 120ms ease",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.opacity = "1"; }}
-                >
-                  {content}
-                </a>
-              );
-            }
+            // Click-to-Expand: statt direktem Weg zur externen URL öffnet
+            // der Klick einen In-App-Popover mit Aktionen. Das ist jetzt
+            // Primär-Interaktion; externer Link lebt im Popover weiter.
             return (
-              <span
+              <button
                 key={key}
+                type="button"
+                onClick={() => setExpandedSignal(s)}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
                   flexShrink: 0,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  color: "inherit",
+                  font: "inherit",
+                  textAlign: "left",
+                  transition: "opacity 120ms ease",
                 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.7"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
               >
                 {content}
-              </span>
+              </button>
             );
           })}
         </div>
       </div>
+
+      {/* Click-to-Expand Popover — Backlog 2.2 (2026-04-22).
+          Halb-durchsichtiger Backdrop hinter dem Dialog, click-outside
+          schließt. Kein echter Modal (nicht `role=dialog` mit vollem
+          Fokus-Management), weil die Ticker-Interaktion leichtgewichtig
+          bleiben soll — User soll mit einem Klick schnell entscheiden:
+          analysieren, öffnen oder schließen. */}
+      {expandedSignal && (
+        <div
+          onClick={() => setExpandedSignal(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(10, 10, 10, 0.35)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            paddingBottom: bottomOffset + 44,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Signal details"
+            style={{
+              background: "var(--card, #fff)",
+              border: "1px solid var(--volt-border, #E8E8E8)",
+              borderRadius: 14,
+              padding: "18px 20px",
+              maxWidth: 540,
+              width: "calc(100% - 32px)",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+              fontFamily: "var(--font-ui)",
+            }}
+          >
+            {/* Meta-Zeile: Source-Dot + Source + Age + Topic */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <span
+                aria-hidden
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: sourceColor(expandedSignal.source),
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: sourceColor(expandedSignal.source),
+                }}
+              >
+                {expandedSignal.source}
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                  fontSize: 10,
+                  color: "var(--muted-foreground, #6B6B6B)",
+                }}
+              >
+                {ageLabel(expandedSignal.hoursAgo)}
+              </span>
+              {expandedSignal.topic && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--volt-font-mono, 'JetBrains Mono', monospace)",
+                    color: "var(--muted-foreground, #6B6B6B)",
+                    marginLeft: "auto",
+                    textAlign: "right",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: 220,
+                  }}
+                >
+                  {expandedSignal.topic}
+                </span>
+              )}
+            </div>
+
+            {/* Voller Titel — nicht truncated, bis 4 Zeilen */}
+            <p
+              style={{
+                fontSize: 15,
+                lineHeight: 1.45,
+                fontWeight: 500,
+                color: "var(--foreground, #0A0A0A)",
+                margin: "0 0 16px",
+                display: "-webkit-box",
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: "vertical" as const,
+                overflow: "hidden",
+              }}
+            >
+              {expandedSignal.title}
+            </p>
+
+            {/* Aktionen */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  // Navigiert zur Home-Seite mit dem Signal-Titel als
+                  // Query-Keim. `autostart=1` triggert handleSubmit in
+                  // HomeClient direkt — User landet also in der laufenden
+                  // Analyse, nicht nur in der vorbefüllten Eingabe.
+                  const q = encodeURIComponent(expandedSignal.title);
+                  window.location.href = `/?q=${q}&autostart=1`;
+                }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid var(--foreground, #0A0A0A)",
+                  background: "var(--foreground, #0A0A0A)",
+                  color: "var(--background, #fff)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-ui)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {/* Lokalisierung: DE/EN automatisch via usePathname möglich,
+                     aber der Ticker hat keine Locale-Prop. Default DE mit
+                     klarem EN-Nachlauf, damit beide Zielgruppen treffen. */}
+                In SIS analysieren
+              </button>
+              {expandedSignal.url && (
+                <a
+                  href={expandedSignal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border, #E8E8E8)",
+                    background: "transparent",
+                    color: "var(--foreground, #0A0A0A)",
+                    fontSize: 12,
+                    fontFamily: "var(--font-ui)",
+                    fontWeight: 500,
+                    textDecoration: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  Quelle öffnen ↗
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setExpandedSignal(null)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--muted-foreground, #6B6B6B)",
+                  fontSize: 12,
+                  fontFamily: "var(--font-ui)",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  marginLeft: "auto",
+                }}
+              >
+                Schließen (Esc)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes sis-ticker-scroll {

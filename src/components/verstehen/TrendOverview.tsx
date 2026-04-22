@@ -105,6 +105,13 @@ export default function TrendOverview({
                   selected={selectedId === t.id}
                   onClick={() => onTrendClick(t)}
                   de={de}
+                  // Progressive-Disclosure L2 (Backlog 2.3, 2026-04-22):
+                  // Beschreibung + 72h-Signal-Details + Top-Quellen als
+                  // In-Place-Expansion, ohne L3 zu öffnen.
+                  description={t.description}
+                  signalCount72h={t.signalCount72h}
+                  avgStrength={t.avgStrength}
+                  topSources={t.topSources}
                 />
               ))}
             </div>

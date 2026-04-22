@@ -17,7 +17,7 @@
  */
 
 import React from "react";
-import { Key as KeyIcon } from "lucide-react";
+import { Key as KeyIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { ConfidenceBadge } from "@/components/ui/ConfidenceBadge";
 import { HelpIcon } from "@/components/ui/HelpIcon";
 
@@ -380,6 +380,16 @@ export function VoltTrendDirection({
 //   - Title (truncated) + arrow-right icon top-right
 //   - MAKRO/META label (tiny mono uppercase) + status pill
 //   - Footer: "X sig." + "Y%"
+//
+// Progressive Disclosure (Backlog 2.3, 2026-04-22):
+//   L1 Compact Card (default). Click main body → L3 full panel via onClick.
+//   L2 Inline Expansion — Chevron-Toggle unten rechts; zeigt Beschreibung,
+//      72h-Signal-Details und Top-Quellen ohne die Seite zu wechseln.
+//   L3 Full Panel — via bestehendes onClick (öffnet TrendDetailPanel).
+//
+// HTML validity: Karte ist jetzt ein <div role="button"> (nicht <button>),
+// damit der Expand-Toggle-<button> sauber nested werden kann. Tastatur-
+// Bedienung via onKeyDown Enter/Space.
 export function VoltTrendCard({
   title,
   meta,
@@ -390,6 +400,10 @@ export function VoltTrendCard({
   onClick,
   selected = false,
   de,
+  description,
+  signalCount72h,
+  avgStrength,
+  topSources,
 }: {
   title: string;
   meta: string;
@@ -400,11 +414,37 @@ export function VoltTrendCard({
   onClick?: () => void;
   selected?: boolean;
   de?: boolean;
+  /** Optional L2 content — rendered only when the user expands the card. */
+  description?: string;
+  signalCount72h?: number;
+  avgStrength?: number;
+  topSources?: string[];
 }) {
+  const [expanded, setExpanded] = React.useState(false);
   const s = RING_STYLE[ring];
+
+  const hasL2Content = Boolean(
+    description ||
+    typeof signalCount72h === "number" ||
+    typeof avgStrength === "number" ||
+    (topSources && topSources.length > 0)
+  );
+
+  const handleCardActivate = () => {
+    onClick?.();
+  };
+
   return (
-    <button
-      onClick={onClick}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleCardActivate}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleCardActivate();
+        }
+      }}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -420,6 +460,7 @@ export function VoltTrendCard({
         transition: "all 0.15s",
         fontFamily: "var(--font-ui)",
         minHeight: 110,
+        outline: "none",
       }}
       onMouseEnter={(e) => {
         if (!selected) {
@@ -432,6 +473,13 @@ export function VoltTrendCard({
           e.currentTarget.style.borderColor = "var(--color-border, #E8E8E8)";
           e.currentTarget.style.transform = "translateY(0)";
         }
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.outline = "2px solid var(--volt-focus, #3B82F6)";
+        e.currentTarget.style.outlineOffset = "2px";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.outline = "none";
       }}
     >
       {/* Title row */}
@@ -471,7 +519,7 @@ export function VoltTrendCard({
         <VoltStatusPill ring={ring} size="sm" />
       </div>
 
-      {/* Footer: signal count + score.
+      {/* Footer: signal count + score + optional expand toggle.
           The score renders as a tiered ConfidenceBadge (Welle A Item 2)
           so low-confidence trends are immediately readable. `score` is
           a 0..1 value; ConfidenceBadge auto-detects the range. */}
@@ -492,9 +540,126 @@ export function VoltTrendCard({
              no-op and just noise. `de` prop kept so the caller
              API doesn't change. */}
         <span>{signalCount} sig.</span>
-        <ConfidenceBadge value={score} size="xs" showLabel={false} />
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <ConfidenceBadge value={score} size="xs" showLabel={false} />
+          {hasL2Content && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(v => !v);
+              }}
+              aria-label={expanded
+                ? (de ? "Details einklappen" : "Collapse details")
+                : (de ? "Details ausklappen" : "Expand details")}
+              aria-expanded={expanded}
+              style={{
+                border: "1px solid var(--color-border, #E8E8E8)",
+                background: "transparent",
+                borderRadius: 6,
+                padding: 2,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--muted-foreground, #6B6B6B)",
+                transition: "background 120ms ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--muted, #F5F5F5)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          )}
+        </div>
       </div>
-    </button>
+
+      {/* L2: Inline Expansion — Description + 72h Signal-Details + Top Sources.
+          Nur gerendert wenn expanded. Kein zweiter Fetch — alles aus
+          der bestehenden TrendDot-Datenstruktur. */}
+      {expanded && hasL2Content && (
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: "1px dashed var(--color-border, #E8E8E8)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            fontSize: 11,
+            color: "var(--muted-foreground, #6B6B6B)",
+            lineHeight: 1.45,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {description && (
+            <p
+              style={{
+                margin: 0,
+                color: "var(--foreground, #0A0A0A)",
+                display: "-webkit-box",
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: "vertical" as const,
+                overflow: "hidden",
+              }}
+            >
+              {description}
+            </p>
+          )}
+          {(typeof signalCount72h === "number" || typeof avgStrength === "number") && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontFamily: "var(--font-mono)" }}>
+              {typeof signalCount72h === "number" && (
+                <span>
+                  <strong style={{ color: "var(--foreground, #0A0A0A)", fontWeight: 600 }}>{signalCount72h}</strong>
+                  {" "}
+                  {de ? "Signale (72h)" : "signals (72h)"}
+                </span>
+              )}
+              {typeof avgStrength === "number" && (
+                <span>
+                  {de ? "Ø Stärke" : "avg strength"}{" "}
+                  <strong style={{ color: "var(--foreground, #0A0A0A)", fontWeight: 600 }}>
+                    {Math.round(avgStrength * 100)}%
+                  </strong>
+                </span>
+              )}
+            </div>
+          )}
+          {topSources && topSources.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {topSources.slice(0, 6).map((src, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 9,
+                    fontFamily: "var(--font-mono)",
+                    fontWeight: 600,
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    background: "var(--muted, #F5F5F5)",
+                    color: "var(--muted-foreground, #6B6B6B)",
+                  }}
+                >
+                  {src}
+                </span>
+              ))}
+            </div>
+          )}
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              fontStyle: "italic",
+              marginTop: 2,
+            }}
+          >
+            {de ? "→ Klicke auf die Karte für die Vollansicht" : "→ Click the card for the full view"}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

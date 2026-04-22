@@ -740,6 +740,95 @@ export default function TrendDetailPanel({ trend, onClose }: TrendDetailPanelPro
         </div>
       </div>
 
+      {/* ── What-If Prompts ────────────────────────────────────────────────
+           Backlog 2.1 (Bloomberg Learning 5, 2026-04-22): L3 Trend-Detail
+           bekommt kanonische „Was-wenn"-Prompts als Sprungpunkte in die
+           Analyse. Keine echte Simulation — ein Template-Baukasten, der
+           den Trend in vier strategisch nützliche Stressszenarien wirft
+           und per Klick die Pipeline mit einer fertigen Frage startet.
+           Baselines decken die häufigsten Foresight-Fragen ab:
+             - Beschleunigung (Upside-Szenario)
+             - Stagnation (Status-Quo-Beharrungskraft)
+             - Regulatorische Eskalation (Policy-Stressor)
+             - EU-vs-Global-Divergenz (Regional-Differentation)
+           Jeder Prompt ist ein `<a>` auf `/?q=…&autostart=1`. Die Home-
+           Route liest den Param und startet die Pipeline unmittelbar. */}
+      {(() => {
+        const whatIfs = locale === "de"
+          ? [
+              { label: "Beschleunigung", question: `Was passiert, wenn sich "${trend.name}" in den nächsten 24 Monaten deutlich beschleunigt? Welche Akteure, Regulierungen und Gegenbewegungen reagieren zuerst?` },
+              { label: "Stagnation", question: `Was passiert, wenn "${trend.name}" in den nächsten 24 Monaten an Momentum verliert? Welche Sub-Trends wären die verlässlichen Frühindikatoren für eine Stagnation?` },
+              { label: "Regulatorische Eskalation", question: `Was passiert, wenn "${trend.name}" durch strikte EU-Regulierung massiv eingeengt wird? Welche Ausweichpfade entstehen, welche Akteure gewinnen, welche verlieren?` },
+              { label: "EU-vs-Global-Divergenz", question: `Was passiert, wenn "${trend.name}" in der EU deutlich anders verläuft als global? Welche strukturellen Treiber erklären die Divergenz, welche strategischen Optionen ergeben sich für europäische Akteure?` },
+            ]
+          : [
+              { label: "Acceleration", question: `What happens if "${trend.name}" accelerates significantly over the next 24 months? Which actors, regulations, and counter-movements react first?` },
+              { label: "Stagnation", question: `What happens if "${trend.name}" loses momentum over the next 24 months? Which sub-trends would be the reliable early indicators of stagnation?` },
+              { label: "Regulatory escalation", question: `What happens if "${trend.name}" is heavily constrained by EU regulation? Which alternative pathways emerge, who wins, who loses?` },
+              { label: "EU-vs-global divergence", question: `What happens if "${trend.name}" follows a materially different trajectory in the EU vs globally? What structural drivers explain the divergence, and what strategic options does that create for European actors?` },
+            ];
+        return (
+          <div className="px-6 py-5 border-b" style={{ borderColor: "var(--volt-border, #E8E8E8)" }}>
+            <h3 className="text-[10px] font-semibold text-[var(--volt-text-faint,#9B9B9B)] uppercase tracking-wider mb-3">
+              {locale === "de" ? "What-If Prompts" : "What-If Prompts"}
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+              {whatIfs.map((wi, i) => (
+                <a
+                  key={i}
+                  href={`/?q=${encodeURIComponent(wi.question)}&autostart=1`}
+                  style={{
+                    display: "block",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid var(--volt-border, #E8E8E8)",
+                    background: "var(--card, #fff)",
+                    textDecoration: "none",
+                    color: "var(--foreground, #0A0A0A)",
+                    transition: "all 150ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--foreground, #0A0A0A)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--volt-border, #E8E8E8)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--muted-foreground, #6B6B6B)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {wi.label}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                      color: "var(--foreground, #0A0A0A)",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical" as const,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {wi.question}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── L3: Actions Bar ──────────────────────────────────────────────
            Zwei Aktionen, jede mit klarer semantischer Rolle:
 
