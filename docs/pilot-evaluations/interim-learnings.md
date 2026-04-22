@@ -1,8 +1,13 @@
-# Pilot-Eval — Konsolidierte Erkenntnisse (Stand 2026-04-22 Nachmittag)
+# Pilot-Eval — Konsolidierte Erkenntnisse (Stand 2026-04-22 Abend)
 
 Dieses Dokument aggregiert alle Erkenntnisse und Code-Änderungen aus den sechs
 Pilot-Evaluationen (A/B/C × DE/EN). Es dient als Input für die Notion-
 Priorisierung der nachfolgenden Fix-Arbeit.
+
+**Tages-Kurzfassung:** 12 Commits, 5 Findings-Wellen, 3 gefixte P0-Bugs,
+3 abgeschlossene P1-Bugs, 1 abgeschlossener P2, 6 neue strategische
+RSS-Connectors in Produktion, 40+ neue Cross-Language-Aliase, 116+ neue
+Test-Assertions — und eine publikationsreife A-DE-Bewertung (32/35).
 
 ## Kurz-Status der sechs Slots
 
@@ -20,7 +25,7 @@ mit klar benannter strukturierter Ursache. Pilot-Eval-Ziel „Defekte finden"
 ist maximal erfüllt — **drei P0-Defekte + drei P1-Defekte** aufgedeckt, davon
 zwei schon gefixt.
 
-## Drei Wellen von Findings
+## Fünf Wellen von Findings
 
 ### Welle 1 — nach A DE (Vormittag)
 
@@ -57,7 +62,7 @@ Ein P0-Bug, gefixt:
   Sprache den UI-Locale-Parameter überschreibt.
 - 15 Regression-Tests in `scripts/language-detection-test.ts`.
 
-### Welle 3 — nach B DE + C DE (Nachmittag) — NEU, ungefixt
+### Welle 3 — nach B DE + C DE (früher Nachmittag)
 
 Zwei schwerwiegende P0-Defekte plus zwei P1-Defekte:
 
@@ -173,77 +178,190 @@ B-Session-Query. Ein neuer Workspace wurde erwartet, tatsächlich wurde an
 den vorherigen Thread angekettet. Untersuchung pending — mögliche Ursache:
 Workspace-State-Leak im Client nach Canvas-Switch.
 
-## Aggregierte Fix-Action-Liste nach Priorität
+### Welle 4 — P0-B-Fix + P1-Sprint (später Nachmittag)
 
-### P0 (Produkt-blockierend, für publishable Output nötig)
+Drei ungefixte P0/P1 der Welle 3 wurden im Nachmittags-Sprint abgearbeitet:
 
-1. **Signal-Pool-Pipeline um 10 strategische DACH/EU-Connectors erweitern**
-   - ~15-30h Arbeit gesamt (je Connector 1-3h)
-   - Blockiert: alle deferred Pilot-Slots (B DE, B EN, C DE, C EN)
-   - Teilfix möglich: 3-5 Connectors (Bruegel, DIW, ifo, Agora, Politico)
-     würden A-B-Szenarien signifikant verbessern
+**P0-B gefixt** (Commit `13955e7`)
+- Zero-Signal-Fallback-Guard in den System-Prompt eingebaut: bei leerem
+  Signal-Pool MÜSSEN `scenarios`, `keyInsights`, `references`,
+  `decisionFramework` trotzdem gefüllt werden, mit `[LLM-KNOWLEDGE]`-Tags
+  als Anker. `scenarios: {}`-Escape-Hatch auf TRIVIALLY-FACTUAL-Fragen
+  eingeschränkt.
+- 18 Regression-Tests in `scripts/prompt-guard-test.ts`.
+- **End-to-End-Verifikation**: C-DE-Query (0 Signale) liefert jetzt
+  31 KB voll strukturiertes Briefing statt 3 KB synthesis-only.
+  3 Szenarien (28/47/25), 6 authoritative References, 4 keyInsights,
+  5 reasoningChains, 4 decisionFramework-Punkte.
 
-2. **Prompt-Guard gegen synthesis-only-Collapse**
-   - ~2h Arbeit (Prompt-Edit + 2-3 Regression-Test-Queries die mit wenig
-     Signalen laufen, Output muss strukturiert sein)
-   - Blockiert: Re-Run-Wert der deferred Slots
+**P1-Sprint Drei-in-Einem**
+- **P1 Error-UX** (Commit `eb23bd3`) — Server-Error-Text wird jetzt
+  durchgereicht statt vom Client-Fallback überschrieben. Neue
+  `src/lib/error-mapping.ts` mit pure function mapAnthropicError() →
+  {de, en}, differenziert Billing/Auth/Permission/RateLimit/Generic.
+  39 Regression-Tests.
+- **P1 Signal-Dedup** (Commit `4fb5d09`) — pure function
+  `dedupSignalsBySourceTitle()` entfernt (source, normalized-title)-
+  Duplikate nach Filter + vor Slice. Cross-Source-Coverage bleibt
+  erhalten. Live-Wirkung A-DE: 16 matches/3 unique → 10 matches/10 unique.
+  19 Regression-Tests.
+- **P1 UI-Empty-State** (Commit `a26139c`) — KPI-Karten für Quellen +
+  Szenarien werden immer gezeigt (mit muted subLabel bei 0 statt
+  conditional-hide). Scenarios- und KeyInsights-Sections bekommen
+  Empty-State-Card mit Heuristik `synthesis.length > 500` (strategische
+  Fragen vs. trivial-factual), damit faktische Queries empty-state-frei
+  bleiben.
 
-### P1 (UX-Regression, nach P0 fixbar)
+**P2 Alias-Map Runde 1** (Commit `d888517`)
+- CROSS_LANG_ALIASES um KI-Agent- und Arbeitsmarkt-Vokabular erweitert:
+  agent/agenten, autonom(e/er/es), sprachmodell(e), generativ(e),
+  assistent(en), arbeitsplatz/arbeitsplätze, fachkräfte(mangel),
+  umschulung, weiterbildung, produktivität, wettbewerb. Plus `ki`
+  erweitert um llm, large language model, machine learning, ml.
+- **Live-Wirkung**: B-DE-Query fand vorher 0 arxiv-Papers aus 215 in
+  der DB, nachher 6 arxiv-Papers (Machine Learning, AI, Computers &
+  Society) + Spiegel-EuGH-Arbeitsbezug.
 
-3. **UI-Empty-States** für fehlende scenarios/references/signals/
-   keyInsights/decisionFramework — je 1 `VoltEmptyStateCard`-Render
-   statt conditional-hide. ~2-3h.
+### Welle 5 — P0-A-Teilfix + Alias-Runde 2 (Abend)
 
-4. **Server-Error-Text durchreichen** statt generic Fallback.
-   `HomeClient.tsx:1299` + `route.ts:495-501`. ~1h.
+Der P0-A-Connector-Sprint brachte das Produkt strukturell dichter an
+sein Positionierungs-Versprechen.
 
-5. **Signal-Deduplizierung** auf Retrieval-Ebene — 16 matches für A DE
-   waren effektiv 1-2 unique titles. Add `DISTINCT` oder Dedup-Pass
-   basierend auf title-hash. ~2h.
+**P0-A Runde 1** (Commit `b68fb33`) — 3 strategische EU/DACH-Connectors
+- **Bruegel** (political/macro) — führendes EU-Economic-Policy-Research,
+  Brüssel-basiert. Hinweis: der aktuelle Feed führt zeitweise Event-
+  Agenda-Einträge („Lunch", „Coffee break"), die der Anchor-Match-Filter
+  zuverlässig aussortiert.
+- **POLITICO Europe** (political/signal) — EU-Tages-Newsfeed mit stünd-
+  lichen Updates, füllt die Lücke zwischen Think-Tank-Quartalsrhythmus
+  und echter Tagespolitik.
+- **IAB** (social/macro) — Institut für Arbeitsmarkt- und Berufs-
+  forschung, zentrales DACH-Arbeitsmarkt-Institut. Feed nach 2x 301-
+  Redirects unter `https://iab.de/feed/` erreichbar.
 
-### P2 (Nice-to-have, niedrige Dringlichkeit)
+**P0-A Runde 2** (Commit `93dd090`) — 3 weitere Connectors + Framework-Fix
+- **ECIPE** (economic/macro) — European Centre for International
+  Political Economy. Deckt EU-Handelspolitik, DMA/DSA, Industriepolitik,
+  Wettbewerbsrecht, Tech-Handel ab.
+- **OSW** (political/macro) — Centre for Eastern Studies (Warschau).
+  Englischer Feed zu EU-Osteuropa, Russland/Ukraine, Sanktionen.
+- **Clingendael** (political/signal) — Netherlands Institute of
+  International Relations. Multi-sprachiger Medien-Appearance-Feed
+  mit EU-Geopolitik-Diskurs-Breite.
+- **Framework-Fix** in `src/connectors/rss-feed.ts`: `extractRssLink()`
+  fällt bei leerem `<link>`-Tag jetzt auf `<guid>` und `<comments>`
+  zurück. Generisches Upgrade — ECIPE ging dadurch von 1→30 individual-
+  URL-Items, wird anderen Feeds in Zukunft auch helfen.
 
-6. **Folgefrage-Threading** untersuchen — warum C-Query an B-Thread
-   angekettet wurde. ~2-3h für Diagnose + Fix.
+**P2 Alias-Map Runde 2** (Commit `8f57c92`)
+- CROSS_LANG_ALIASES um 30+ EU-Policy-/Handels-Vokabular-Einträge
+  erweitert: industriepolitik, handelspolitik, wettbewerbsfähigkeit,
+  wettbewerbsrecht, autonomie, souveränität, abhängigkeit(en),
+  sanktionen, zölle, binnenmarkt, dekarbonisierung, rohstoffe,
+  halbleiter, kritisch(e/er/en), strategisch(e/er/es), plus
+  EU-Institutionen (kommission, parlament, zentralbank, ezb) und
+  geopolitische Akteure (ukraine, nato, verteidigungspolitik).
+- **Live-Wirkung**: der ECIPE-Artikel „Nostalgia is a Broken Compass
+  for Industrial Policy" ist für eine deutsche Industriepolitik-
+  Query jetzt Treffer #1 (28% Relevanz).
 
-7. **Alias-Map-Erweiterung für DE-KI-Terminologie** — „ki-agenten" soll
-   zu „autonomous agents", „llm agents", „agentic ai" aliasen.
-   In `src/lib/signals.ts` CROSS_LANG_ALIASES. ~30min.
+**Signal-Pump nach allem** (Abend-Run)
+- 49.7s Laufzeit, 1700 neue Signale, 105 aktive Sources, 0 Errors.
+- Total-Count im 14-Tage-Fenster: 5443 (nach Dedup-Pass der Pipeline,
+  die alte redundante Einträge bereinigt hat — zuvor 10 178).
+- Alle heute eingebauten Connectors haben frischen Content: ECIPE 31,
+  Politico 20, OSW/IAB/Clingendael je 12, Bruegel 10.
+- Post-Pump-Retrieval-Wirkung: A-DE 10→16, B-DE 13→16, Industrie-
+  politik 2→6 Treffer. C-DE (Wärmepumpen) bleibt bei 0 — braucht
+  echte Heizungsindustrie-Connectors (BDH/BWP), die Alias-Erweiterung
+  reicht hier nicht.
 
-8. **Token-Budget-Review**: C-DE-Run war 201 Sekunden für 3 KB Output.
-   Die Pipeline stopft viel Budget in nicht-persistierte Zwischenschritte
-   (Contradiction-Check, Assumption-Extraktion), bevor das dünne Ergebnis
-   gespeichert wird. Budget-Splitting auditieren. ~3-5h.
+## Aggregierte Fix-Action-Liste nach Priorität (Stand Abend)
 
-## Bilanz der Pilot-Evaluation
+### ✅ Gefixt heute
 
-**Ein einziger erfolgreicher Run (A DE 32/35) und fünf deferrals** ergaben
-in Summe:
+| Prio | Fix | Commit |
+|---|---|---|
+| P0 | Reference-Verifikation via Title-Patterns | `4da3710` |
+| P0 | Signal-Retrieval DE↔EN | `4da3710` |
+| P0 | Language-Detection (Query-Sprache > UI-Locale) | `e575478` |
+| P0-B | Zero-Signal-Fallback-Guard | `13955e7` |
+| P1 | Error-UX: Server-Error durchreichen | `eb23bd3` |
+| P1 | Signal-Deduplizierung auf Retrieval-Ebene | `4fb5d09` |
+| P1 | UI-Empty-States + immer-sichtbare KPI-Karten | `a26139c` |
+| P2 | Alias-Map DE-KI + Arbeitsmarkt | `d888517` |
+| P0-A (teilweise) | 6 von 10 strategischen Connectors | `b68fb33`, `93dd090` |
+| P0-A-Follow-Up | Alias-Map EU-Policy/Handel (Runde 2) | `8f57c92` |
 
-- **3 P0-Bugs gefixt** (Refs, Retrieval DE↔EN, Language-Detection) —
-  33 neue Regression-Tests, Code in Produktion
-- **2 P0-Bugs ungefixt identifiziert** (Signal-Pool-Drought,
-  synthesis-only-Collapse) — beide produkt-blockierend
-- **3 P1-Bugs identifiziert** (UI-Empty-State, Error-UX, Dedup)
-- **2 P2-Bugs identifiziert** (Folgefrage-Threading, Token-Budget)
+### 🟡 Noch offen
 
-Das ist **genau, was eine Pilot-Eval liefern soll**: nicht Noten sammeln,
-sondern strukturierte Defekte aufdecken, bevor echte Nutzer sie finden.
-Die Tatsache, dass fünf von sechs Slots deferred sind, ist **nicht** ein
-Evaluations-Versagen — es ist der harte, ehrliche Spiegel, dass das System
-für seine eigene Positionierung („EU-Strategic-Intelligence") einen
-fundamentalen Infrastruktur-Gap hat: der Signal-Pool matcht den Use-Case
-nicht, und die LLM-Pipeline reagiert auf diesen Gap mit struktureller
-Kapitulation statt expliziter Kommunikation.
+**P0-A Rest (4 von 10 Connectors)**
+- BDH (Bundesverband Deutsche Heizungsindustrie) — blockiert C-Pilot,
+  RSS-Endpoint noch nicht gefunden
+- BWP (Bundesverband Wärmepumpe) — dito
+- Agora Energiewende — alle getesteten URLs 404, RSS vermutlich abgeschafft
+- BMWK Presse — alle getesteten URLs 404
+- Chatham House + Euractiv — Cloudflare-Bot-Protection, braucht
+  alternative Zugriffs-Strategie (Google News, Archivdienste)
+- Institut Jacques Delors — Content auf Französisch, braucht
+  DE-FR-Alias-Erweiterung
+
+Impact: C-DE/C-EN bleiben im Retrieval blockiert, bis BDH/BWP oder
+äquivalente Heizungsindustrie-Quelle integriert ist.
+
+**P2 offen**
+- Folgefrage-Threading untersuchen (~2-3h, investigativ)
+- Token-Budget-Review (~3-5h, größerer Task)
+
+**Pipeline-Dedup (Fix B aus Signal-Dedup-Karte)**
+- Content-Hash beim Insert + UNIQUE INDEX + Migration für bestehende
+  Duplikate. Nachhaltiger als der Retrieval-Pass (Fix A, erledigt).
+  ~2-3h.
+
+## Bilanz der Pilot-Evaluation (Tagesabschluss)
+
+**Ein voller Score (A DE 32/35), fünf deferrals**, ergänzt um einen
+achtstündigen Sprint gegen die aufgedeckten Defekte:
+
+- **4 P0-Bugs gefixt** (Refs, DE↔EN-Retrieval, Language-Detection,
+  Zero-Signal-Fallback-Guard) + 1 P0 teilweise gefixt (6 von 10
+  strategischen Connectors)
+- **3 P1-Bugs gefixt** (Error-UX, Signal-Dedup, UI-Empty-States)
+- **1 P2-Bug gefixt** (Alias-Map DE-KI + EU-Policy/Handel)
+- **2 P2-Bugs bleiben offen** (Folgefrage-Threading, Token-Budget)
+
+**12 Commits**, **116+ neue Test-Assertions** (prompt-guard 18,
+error-mapping 39, signal-dedup 19, prompt-structure-Tests 40), null
+Regression in bestehenden Test-Suites.
+
+**Signal-Pool** nach Abend-Pump: 105 aktive Sources (darunter 6 neue
+strategische EU/DACH-Feeds), 5 443 Signale im 14-Tage-Fenster nach
+Dedup-Bereinigung. Retrieval-Qualität für die Pilot-Queries stieg
+messbar: A-DE 10→16, B-DE 13→16, neue Testquery Industriepolitik 0→6.
+
+**Der strukturelle Mismatch zwischen Produkt-Positionierung und
+Signal-Pool ist damit nicht vollständig geschlossen** — C-DE
+(Wärmepumpen) bleibt im Retrieval blockiert, bis BDH/BWP oder
+äquivalente Heizungsindustrie-Quellen integriert sind. Aber der
+generelle EU-Policy-/Handels-/Arbeitsmarkt-Fokus ist jetzt
+signal-seitig belegbar.
 
 ## Nächste Schritte
 
-1. Dieses Dokument als Notion-Backlog-Aggregat veröffentlichen
-2. P0-A + P0-B als Sprint-Kandidaten für den kommenden Sprint setzen
-3. Nach P0-Fixes: die fünf deferred Slots in einem gemeinsamen Re-Run-
-   Batch nachholen — wenn alle strukturell ähnlich scoren, wissen wir,
-   dass die Fixes greifen. Wenn individuelle Slots weiterhin schwach
-   sind, zeigt das die query-spezifischen Reste.
-4. Die Pilot-Eval-Infrastruktur (`pilot:eval`, `signal-retrieval-debug`,
-   Rubrik-Files) für die kommenden Themen wiederverwenden — sie hat sich
-   als leistungsfähiges Debug-Werkzeug bewährt.
+1. **Re-Run-Batch der 5 deferred Pilot-Slots** (A EN, B DE+EN, C DE+EN)
+   mit dem heutigen Stack (Guard + Dedup + UI-Empty-States + erweitere
+   Alias-Map + breiterer Signal-Pool). Erwartung: A EN und B DE in
+   publikationsreifem Bereich (30+/35), B EN + C DE/EN abhängig von
+   verbliebenen Signal-Pool-Lücken.
+2. **BDH/BWP oder Heizungsindustrie-Fachpresse** integrieren, um
+   C-Pilot zu entsperren. Wenn kein RSS verfügbar, GDELT-Feld-Filter
+   oder Google News aggregieren.
+3. **P2 Folgefrage-Threading** als nächster kleinerer investigativer
+   Task vor dem nächsten Sprint.
+4. **Pipeline-Dedup** (Fix B aus der Dedup-Karte) in der nächsten
+   Infrastruktur-Iteration — heute ist Fix A auf Retrieval-Ebene drin,
+   aber die DB selbst sollte über content-hash + UNIQUE INDEX keine
+   Duplikate mehr zulassen.
+5. **interim-learnings.md in Notion als Projekt-Page spiegeln**
+   (nicht nur im Repo) — für Stakeholder-Gespräche und cross-session
+   Kontinuität.
