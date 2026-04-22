@@ -447,14 +447,29 @@ export function validateLLMResponse(
     const requiredTypes: Array<"optimistic" | "baseline" | "pessimistic"> = [
       "optimistic", "baseline", "pessimistic",
     ];
+    // Type-Aliase: die v0.2-Notion-Spec nennt den Basisfall "likely", der
+    // Legacy-Array-Pfad erwartet "baseline". Wenn der LLM direkt ein Array
+    // mit `type: "likely"` zurückgibt (statt das v0.2-Object-Shape, wo
+    // normalizeScenarios das schon mappt), müssen wir die Äquivalenz hier
+    // auch respektieren — sonst dropt die Enforcement-Logik „likely" und
+    // füllt den Baseline-Slot mit einem Platzhalter.
+    const TYPE_ALIASES: Record<"optimistic" | "baseline" | "pessimistic", readonly string[]> = {
+      optimistic:  ["optimistic"],
+      baseline:    ["baseline", "likely"],
+      pessimistic: ["pessimistic"],
+    };
     const primary: Array<z.infer<typeof ScenarioSchema>> = [];
 
-    // Erster Durchgang: Typen exakt matchen
+    // Erster Durchgang: Typen exakt (oder via Alias) matchen und den
+    // Canonical-Typ am Output-Scenario setzen.
     const taken = new Set<number>();
     for (const requested of requiredTypes) {
-      const idx = primaryCandidates.findIndex((s, i) => !taken.has(i) && s.type === requested);
+      const aliases = TYPE_ALIASES[requested];
+      const idx = primaryCandidates.findIndex(
+        (s, i) => !taken.has(i) && typeof s.type === "string" && aliases.includes(s.type),
+      );
       if (idx !== -1) {
-        primary.push(primaryCandidates[idx]);
+        primary.push({ ...primaryCandidates[idx], type: requested });
         taken.add(idx);
       }
     }

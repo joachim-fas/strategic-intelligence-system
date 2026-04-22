@@ -69,16 +69,16 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   hackernews:         { steepV: "technological", trendLevel: "signal" },
   github:             { steepV: "technological", trendLevel: "micro" },
   stackoverflow:      { steepV: "technological", trendLevel: "micro" },
-  "npm-pypi":         { steepV: "technological", trendLevel: "micro" },
+  npm_pypi:           { steepV: "technological", trendLevel: "micro" },
   producthunt:        { steepV: "technological", trendLevel: "signal" },
-  "docker-hub":       { steepV: "technological", trendLevel: "micro" },
-  "google-trends":    { steepV: "technological", trendLevel: "signal" },
+  docker_hub:         { steepV: "technological", trendLevel: "micro" },
+  google_trends:      { steepV: "technological", trendLevel: "signal" },
 
   // ─── Science / Research (Technology, micro→macro) ──────────────────
   arxiv:              { steepV: "technological", trendLevel: "micro" },
   openalex:           { steepV: "technological", trendLevel: "macro" },
   crossref:           { steepV: "technological", trendLevel: "macro" },
-  "semantic-scholar": { steepV: "technological", trendLevel: "macro" },
+  semantic_scholar:   { steepV: "technological", trendLevel: "macro" },
   patentsview:        { steepV: "technological", trendLevel: "macro" },
   wikipedia:          { steepV: "technological", trendLevel: "macro" },
   clinicaltrials:     { steepV: "social",        trendLevel: "macro" },
@@ -87,10 +87,12 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   // ─── Social (Society, signal) ──────────────────────────────────────
   reddit:             { steepV: "social",        trendLevel: "signal" },
   bluesky:            { steepV: "social",        trendLevel: "signal" },
-  "mastodon-api":     { steepV: "social",        trendLevel: "signal" },
-  "mastodon-sentiment": { steepV: "social",      trendLevel: "signal" },
-  "youtube-sentiment":  { steepV: "social",      trendLevel: "signal" },
-  "news-sentiment":     { steepV: "social",      trendLevel: "signal" },
+  // Connector names use underscores (see src/connectors/mastodon-api.ts:
+  // `name: "mastodon_api"`). Keep both keys in sync for safety.
+  mastodon_api:       { steepV: "social",        trendLevel: "signal" },
+  mastodon_sentiment: { steepV: "social",        trendLevel: "signal" },
+  youtube_sentiment:  { steepV: "social",        trendLevel: "signal" },
+  news_sentiment:     { steepV: "social",        trendLevel: "signal" },
   sentiment:          { steepV: "social",        trendLevel: "signal" },
 
   // ─── News / Media (Political, macro) ───────────────────────────────
@@ -98,7 +100,7 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   nyt:                { steepV: "political",     trendLevel: "macro" },
   newsdata:           { steepV: "political",     trendLevel: "macro" },
   guardian:           { steepV: "political",     trendLevel: "macro" },
-  "media-cloud":      { steepV: "political",     trendLevel: "macro" },
+  media_cloud:        { steepV: "political",     trendLevel: "macro" },
   spiegel_rss:        { steepV: "political",     trendLevel: "macro" },
   aljazeera_rss:      { steepV: "political",     trendLevel: "macro" },
 
@@ -108,7 +110,7 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   ucdp:               { steepV: "political",     trendLevel: "mega"  },
   vdem:               { steepV: "political",     trendLevel: "mega"  },
   worldmonitor:       { steepV: "political",     trendLevel: "signal" },
-  "ecfr_rss":         { steepV: "political",     trendLevel: "macro" },
+  ecfr_rss:           { steepV: "political",     trendLevel: "macro" },
 
   // ─── Macroeconomics (Economic, mega) ───────────────────────────────
   worldbank:          { steepV: "economic",      trendLevel: "mega"  },
@@ -119,15 +121,15 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   destatis:           { steepV: "economic",      trendLevel: "macro" },
   bls:                { steepV: "economic",      trendLevel: "macro" },
   imf:                { steepV: "economic",      trendLevel: "mega"  },
-  "un-data":          { steepV: "economic",      trendLevel: "mega"  },
-  "un-sdg":           { steepV: "values",        trendLevel: "mega"  },
+  un_data:            { steepV: "economic",      trendLevel: "mega"  },
+  un_sdg:             { steepV: "values",        trendLevel: "mega"  },
   un_news_rss:        { steepV: "political",     trendLevel: "macro" },
 
   // ─── Finance / Markets (Economic, signal) ──────────────────────────
   finnhub:            { steepV: "economic",      trendLevel: "signal" },
-  "open-exchange":    { steepV: "economic",      trendLevel: "signal" },
+  open_exchange:      { steepV: "economic",      trendLevel: "signal" },
   coingecko:          { steepV: "economic",      trendLevel: "signal" },
-  "defi-llama":       { steepV: "economic",      trendLevel: "micro" },
+  defi_llama:         { steepV: "economic",      trendLevel: "micro" },
 
   // ─── Prediction markets (Economic, signal) ─────────────────────────
   polymarket:         { steepV: "economic",      trendLevel: "signal" },
@@ -136,18 +138,21 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   kalshi:             { steepV: "economic",      trendLevel: "signal" },
 
   // ─── Climate / Environment (Environmental, macro→mega) ─────────────
-  "nasa-eonet":       { steepV: "environmental", trendLevel: "signal" },
-  "open-meteo":       { steepV: "environmental", trendLevel: "signal" },
-  "usgs-earthquake":  { steepV: "environmental", trendLevel: "signal" },
+  nasa_eonet:         { steepV: "environmental", trendLevel: "signal" },
+  open_meteo:         { steepV: "environmental", trendLevel: "signal" },
+  usgs_earthquake:    { steepV: "environmental", trendLevel: "signal" },
 
   // ─── Health (Social, macro) ────────────────────────────────────────
-  "who-gho":          { steepV: "social",        trendLevel: "mega"  },
+  who_gho:            { steepV: "social",        trendLevel: "mega"  },
   ilo:                { steepV: "social",        trendLevel: "mega"  },
   openfda:            { steepV: "social",        trendLevel: "macro" },
   unhcr:              { steepV: "social",        trendLevel: "macro" },
 
   // ─── Culture / Foresight (Values) ──────────────────────────────────
+  // Google Ngram's actual connector name is "google-ngram" (dash);
+  // keep both spellings mapped so that either variant resolves.
   "google-ngram":     { steepV: "values",        trendLevel: "macro" },
+  google_ngram:       { steepV: "values",        trendLevel: "macro" },
   steamspy:           { steepV: "social",        trendLevel: "signal" },
 
   // ─── arxiv-qbio RSS (Technology, micro) ────────────────────────────
@@ -160,15 +165,26 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
  * fall back to `{ steepV: "values", trendLevel: "signal" }` — loud
  * enough to show up in filter views, vague enough to not misclassify.
  *
- * Accepts both `connector.name` and lower-cased variants — some data
- * paths uppercase the source (`UN_SDG`) while others don't.
+ * Accepts all common source-name spellings:
+ *   - canonical: "mastodon_api", "un_sdg"
+ *   - case-variant: "MASTODON_API"
+ *   - dash-vs-underscore: "mastodon-api" ↔ "mastodon_api"
+ *
+ * This matters because different call paths normalise source names
+ * inconsistently (connector.name vs RSS source tag vs UI display
+ * strings) — the helper absorbs that drift so upstream code doesn't
+ * have to know which spelling it's holding.
  */
 export function getSourceMetadata(source: string): SourceMetadata {
   if (!source) return DEFAULT_METADATA;
-  const key = source;
-  if (SOURCE_METADATA[key]) return SOURCE_METADATA[key];
-  const lower = key.toLowerCase();
+  if (SOURCE_METADATA[source]) return SOURCE_METADATA[source];
+  const lower = source.toLowerCase();
   if (SOURCE_METADATA[lower]) return SOURCE_METADATA[lower];
+  // Dash ↔ underscore normalisation — tries both spellings of the key.
+  const dashed = lower.replace(/_/g, "-");
+  if (SOURCE_METADATA[dashed]) return SOURCE_METADATA[dashed];
+  const underscored = lower.replace(/-/g, "_");
+  if (SOURCE_METADATA[underscored]) return SOURCE_METADATA[underscored];
   return DEFAULT_METADATA;
 }
 
