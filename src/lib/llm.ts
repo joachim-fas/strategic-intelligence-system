@@ -182,14 +182,66 @@ interface LLMBriefingResponse {
 }
 
 /**
+ * Heuristisches Sprach-Detect für eine Query. Entscheidet zwischen „de"
+ * und „en" anhand der Häufigkeit typischer Stopwords in beiden Sprachen
+ * plus DE-spezifischer Zeichen (ß/ä/ö/ü). Keine externe Library, kein
+ * ML-Call — reine Pattern-Auszählung, robust für 99% der Fälle mit <5
+ * Zeichen Laufzeit.
+ *
+ * Hintergrund (Pilot-Eval 2026-04-22): A EN-Run lieferte deutsche
+ * Antwort, weil der UI-Locale-Switch auf DE stand und der System-Prompt
+ * den `locale`-Parameter benutzte, nicht die tatsächliche Query-Sprache.
+ * Dieses Helper ermittelt die Sprache aus der Query direkt, sodass der
+ * Response-Language-Hint unabhängig vom UI-Context sauber bleibt.
+ */
+export function detectQueryLanguage(query: string): Locale {
+  if (!query || query.length < 4) return "de";
+  const text = query.toLowerCase();
+
+  // DE-spezifische Zeichen sind der stärkste Indikator — englische
+  // Queries enthalten sie praktisch nie.
+  if (/[äöüß]/.test(text)) return "de";
+
+  // Stopword-Zählung: die robustesten 1-vs-1-Marker
+  const deStopwords = [
+    " der ", " die ", " das ", " und ", " ist ", " sind ", " von ", " mit ",
+    " bei ", " auf ", " für ", " sich ", " nicht ", " wird ", " werden ",
+    " welche ", " welcher ", " wie ", " was ", " wer ", " wann ",
+  ];
+  const enStopwords = [
+    " the ", " is ", " are ", " and ", " of ", " to ", " in ", " for ",
+    " with ", " by ", " on ", " at ", " from ", " will ", " would ",
+    " which ", " what ", " how ", " why ", " does ", " do ",
+  ];
+
+  // Pad mit Leerzeichen, damit die Stopword-Matches an Wortgrenzen greifen
+  const padded = ` ${text} `;
+  let deHits = 0;
+  let enHits = 0;
+  for (const sw of deStopwords) if (padded.includes(sw)) deHits += 1;
+  for (const sw of enStopwords) if (padded.includes(sw)) enHits += 1;
+
+  if (deHits === 0 && enHits === 0) return "de"; // default
+  return enHits > deHits ? "en" : "de";
+}
+
+/**
  * Build the system prompt with full data context.
  *
  * Structure mirrors the Notion spec (see module JSDoc above). The
  * language-of-response hint is included so German queries still get
  * German answers — the prompt wording itself stays English because
  * that's what the model was tuned on.
+ *
+ * 2026-04-22: Neuer optionaler `queryText`-Parameter. Wenn gesetzt,
+ * detectQueryLanguage(queryText) überschreibt den `locale`-Parameter
+ * für den Response-Language-Hint. Grund: Pilot-Eval A EN zeigte, dass
+ * der UI-Locale-Switch die tatsächliche Query-Sprache überschreibt —
+ * eine EN-Query mit DE-UI-Switch kommt dann deutsch zurück. Die
+ * Query-Sprache dominiert nun immer den Output, UI-Locale ist nur
+ * noch Fallback wenn `queryText` fehlt.
  */
-export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignalsContext?: string): string {
+export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignalsContext?: string, queryText?: string): string {
   // Sort and slice trends for the prompt. We keep the full list available
   // via `trends.length` for the "You have access to N trends" line but
   // only inject the top 40 by relevance to keep the prompt manageable.
@@ -218,8 +270,12 @@ export function buildSystemPrompt(trends: TrendDot[], locale: Locale, liveSignal
     .map((e) => `${e.from} --${e.type}(${(e.strength*100).toFixed(0)}%)--> ${e.to}`)
     .join("\n");
 
-  const dateContext = buildDateContext(locale);
-  const responseLangHint = locale === "de"
+  // Query-Sprache dominiert den Output. UI-Locale ist nur Fallback
+  // für den Fall, dass kein queryText übergeben wurde (seltene
+  // Aufrufpfade wie Framework-Templates).
+  const effectiveLocale: Locale = queryText ? detectQueryLanguage(queryText) : locale;
+  const dateContext = buildDateContext(effectiveLocale);
+  const responseLangHint = effectiveLocale === "de"
     ? "The user's question is in German — respond in German."
     : "The user's question is in English — respond in English.";
 
@@ -534,7 +590,7 @@ export async function queryLLM(request: LLMBriefingRequest): Promise<LLMBriefing
   const apiKey = resolveEnv("ANTHROPIC_API_KEY");
   if (!apiKey) return null;
 
-  const systemPrompt = buildSystemPrompt(request.trends, request.locale, request.liveSignalsContext);
+  const systemPrompt = buildSystemPrompt(request.trends, request.locale, request.liveSignalsContext, request.query);
 
   // SEC-08: Sanitize contextProfile fields to prevent prompt injection
   let userMessage = request.query;

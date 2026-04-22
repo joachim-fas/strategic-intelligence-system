@@ -324,7 +324,11 @@ export async function POST(req: Request) {
 
   emitActivity({ type: "query", phase: "signals", message: `${relevantSignals.length} Signale aus ${uniqueSources} Quellen geladen`, meta: { signals: relevantSignals.length, sources: uniqueSources } });
 
-  let systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined);
+  // Pilot-Eval-Fix 2026-04-22 (A EN lieferte DE-Antwort):
+  // `query` als 4. Argument durchreichen. Der Prompt-Builder
+  // detected damit die tatsächliche Sprache der Frage und
+  // überschreibt den UI-locale für den Response-Language-Hint.
+  let systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined, query);
 
   // SEC-08: Sanitize contextProfile fields — prevent prompt injection via role/industry/region
   const sanitizeField = (v: unknown): string => {
