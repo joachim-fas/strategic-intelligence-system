@@ -113,25 +113,41 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
   // ── Topisch relevante Signale herausfiltern (Fix 2026-04-21) ──────────────
   //
   // `b.usedSignals` kommt als gemergter Pool aus Retrieval (1. Pass) + Trend-
-  // Namen-basierter Anreicherung (2. Pass). Ohne Filter landen Bluesky-
-  // Personal-Posts und Al-Jazeera-Geopolitik-Stories in der „Live-Signale"-
-  // Sektion, obwohl sie mit der Frage nichts zu tun haben. Der Filter zieht
-  // pro Signal den besten verfügbaren Topic-Score (LLM queryRelevance →
-  // keyword overlap → konservativer Default) und gated auf 0.25. Social-
-  // Tier-Signale müssen 0.5 schaffen.
+  // Namen-basierter Anreicherung (2. Pass).
   //
-  // Die Kachel „Live-Signale N" zählt jetzt die GEFILTERTE Menge, damit
-  // UI-Zahl und inhaltliche Aussage konsistent sind (LLM sagt „keine
-  // direkten Signale" ⇒ Kachel zeigt 0 statt 13).
+  // 2026-04-22 P3-Display-Sync: Der historische UI-Threshold von ≥0.25
+  // weighted overlap stammt aus einer Zeit, als das Retrieval-Layer
+  // unspezifisch war und 13 marginal-related Signale lieferte, die der
+  // LLM dann ignorierte (UI zeigte 13, Synthesis sagte „keine direkten
+  // Signale" — Inkonsistenz). Heute ist das Retrieval-Layer smart
+  // (alias-aware Anchor-Match + Long-Domain-Bypass + Bigram-Bypass +
+  // tier-spezifische Overlap-Schwellen). Wenn ein Signal es bis in
+  // `usedSignals` schafft, ist es bereits gefiltert.
+  //
+  // Der zweite UI-Filter ≥0.25 wirft jetzt fälschlich Signale raus, die
+  // der LLM in der Synthesis zitiert (z.B. C-DE-Wärmepumpen-Run: News-
+  // Titel mit nur 1-2 Keyword-Treffern aus 19 erweiterten Keywords haben
+  // weighted overlap 0.07-0.13, fallen unter 0.25, werden aber im Text
+  // namentlich zitiert). Resultat: „0 Live-Signale" in der Kachel,
+  // obwohl der LLM 2-3 explizit referenziert.
+  //
+  // Fix: für non-social Quellen kein zusätzlicher Threshold mehr — wir
+  // vertrauen dem Retrieval-Layer. Social-Tier behält die strenge 0.5-
+  // Hürde, weil dort auch heute noch Personal-Posts durchrutschen können
+  // (Bluesky/Mastodon haben kürzere Titel und keine redaktionelle
+  // Pre-Filterung).
   const rawSignals: any[] = Array.isArray(b.usedSignals) ? b.usedSignals : [];
   const relevantSignals = rawSignals.filter((s: any) => {
-    const topic = typeof s.queryRelevance === "number"
-      ? s.queryRelevance
-      : typeof s.keywordOverlap === "number"
-        ? s.keywordOverlap
-        : 0.3;
-    if (s.sourceTier === "social") return topic >= 0.5;
-    return topic >= 0.25;
+    if (s.sourceTier === "social") {
+      const topic = typeof s.queryRelevance === "number"
+        ? s.queryRelevance
+        : typeof s.keywordOverlap === "number"
+          ? s.keywordOverlap
+          : 0.3;
+      return topic >= 0.5;
+    }
+    // Non-social: trust retrieval. If it made it into usedSignals, show it.
+    return true;
   }).sort((a: any, b2: any) => {
     const ta = typeof a.queryRelevance === "number" ? a.queryRelevance : (a.keywordOverlap ?? 0);
     const tb = typeof b2.queryRelevance === "number" ? b2.queryRelevance : (b2.keywordOverlap ?? 0);
