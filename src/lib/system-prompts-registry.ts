@@ -496,6 +496,33 @@ Step 5 (actions): ring classification (adopt/trial/assess/hold), immediate + sho
   },
 
   {
+    id: "framework-pre-frage",
+    name: "Framework: Pre-Frage / Pre-Question (4 steps)",
+    category: "framework",
+    purpose:
+      "Four-step question architecture: reframing (what's the question behind the question?) + STEEP+V decomposition + inversion/provocation + critical-question synthesis with framework handoff. Outputs questions, not answers — the only SIS framework that does so.",
+    location: "src/app/api/v1/frameworks/analyze/route.ts → FRAMEWORK_PROMPTS['pre-frage']",
+    trigger: "User runs the Pre-Frage framework, typically BEFORE launching one of the answer-oriented frameworks. Designed as a problem-framing prelude.",
+    responseShape:
+      "Step 1 (reframing): originalQuestion + implicitAssumptions[] + reframings[] + deeperQuestion. Step 2 (decomposition): mainQuestion + subQuestions[] + lensQuestions{social,technological,economic,environmental,political,values} + timeHorizonQuestions[]. Step 3 (inversion): inversionQuestions[] + tabooQuestions[] + premortemQuestion + blindSpotQuestions[]. Step 4 (critical): criticalQuestions[3] (ranked, with framework handoff) + knowledgeGaps[] + frameworkRoadmap[] + explicitAssumptionsToTest[] + honestStateOfKnowledge.",
+    injectedContext: ["CURRENT_DATE", "World model block", "Previous-step context"],
+    modelConfig: { model: "claude-sonnet-4-5", maxTokens: 8000 },
+    status: "draft",
+    version: "v0.1",
+    wiring: "wired",
+    apiRoute: "POST /api/v1/frameworks/analyze (frameworkId=pre-frage)",
+    templateEn: `You are a strategic question coach (Hal Gregersen / Edgar Schein / Charlie Munger inversion). Topic: TOPIC
+
+Step 1 (reframing): surface implicit assumptions, generate stakeholder/discipline/horizon reframings, identify the deeper question behind the user's stated question. NOT answers.
+Step 2 (decomposition): MECE sub-questions + STEEP+V lens questions + time-horizon questions. Each sub-question typed (definitional/factual/normative/prognostic/causal/hypothetical).
+Step 3 (inversion + provocation): Munger inversion questions, taboo questions (what nobody wants to ask), pre-mortem question (5-year-failure-scenario backsolved to today's missed question), blind-spot questions (what's invisible from current vantage point).
+Step 4 (critical synthesis): top-3 critical questions ranked, knowledge-gaps with sourcing recommendations, framework-roadmap (which SIS framework answers which sub-question, in what order), explicit assumptions to test, honest state-of-knowledge statement.
+
+Architectural symmetry to the Iteration-Loop Pass 2 (LLM-Relevance-Filter): Pass 2 is self-critique on the OUTPUT side; Pre-Frage is self-critique on the INPUT side. Together they form a complete reflection loop.`,
+    templateDe: null,
+  },
+
+  {
     id: "framework-stakeholder",
     name: "Framework: Stakeholder Analysis (4 steps)",
     category: "framework",

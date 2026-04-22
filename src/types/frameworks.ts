@@ -9,7 +9,8 @@ export type FrameworkId =
   | "post-mortem"
   | "trend-deep-dive"
   | "stakeholder"
-  | "design-thinking";
+  | "design-thinking"
+  | "pre-frage";
 
 export interface FrameworkMeta {
   id: FrameworkId;
@@ -86,6 +87,34 @@ export const FRAMEWORK_META: FrameworkMeta[] = [
     subtitle: { de: "Empathie · Reframing · Lösungsraum · Validierung", en: "Empathy · Reframing · Solution Space · Validation" },
     color: { card: "#FFF4E6", icon: "#FFE1C1", border: "#F0C088", accent: "#B45309" },
     llmIntensity: "high", timeHorizon: { de: "Gegenwart + 6–18 Monate", en: "Present + 6–18 months" },
+  },
+  {
+    // 2026-04-23 (Konzept-Diskussion mit Founder, Abend):
+    // Während alle anderen Frameworks ANTWORTEN auf Fragen liefern,
+    // identifiziert "Pre-Frage" die richtigen FRAGEN — bevor irgendeine
+    // Antwort-Suche beginnt. Inspiration: Hal Gregersen (MIT, Question
+    // Burst), Charlie Munger (Inversion), Phil Tetlock (Decomposition),
+    // Edgar Schein (Humble Inquiry), Toyota 5 Whys.
+    //
+    // Vier Schritte:
+    //  1. Reframing — welche Frage steckt hinter der Frage?
+    //  2. Decomposition + STEEP+V Lenses — strukturierte Sub-Fragen
+    //  3. Inversion + Provokation — was wäre unbequem zu fragen?
+    //  4. Kritische Fragen + Daten-Gap + Framework-Anschluss
+    //
+    // Output: KEINE Antworten, sondern eine Hierarchie von Fragen mit
+    // Annahmen-Liste, Daten-Gaps und Framework-Empfehlungen.
+    //
+    // Symmetrie zur Iteration-Loop-Architektur (e7f9699): Pass 2 ist
+    // Self-Critique auf der OUTPUT-Seite, Pre-Frage ist Self-Critique
+    // auf der INPUT-Seite. Beide zusammen ergeben einen vollständigen
+    // Reflection-Loop.
+    id: "pre-frage", slug: "pre-frage",
+    icon: "❓", iconSvg: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+    name: { de: "Pre-Frage", en: "Pre-Question" },
+    subtitle: { de: "Reframing · Lenses · Inversion · Critical Questions", en: "Reframing · Lenses · Inversion · Critical Questions" },
+    color: { card: "#F4EEFF", icon: "#E0D0FF", border: "#C0A8F0", accent: "#5A2A9E" },
+    llmIntensity: "medium", timeHorizon: { de: "Vor jeder Analyse", en: "Before any analysis" },
   },
 ];
 

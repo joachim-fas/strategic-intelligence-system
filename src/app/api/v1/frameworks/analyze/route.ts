@@ -1177,6 +1177,223 @@ Minimum 2 experiments + 3 rubric entries. Each experiment must have both a succe
     };
     return steps[step] || steps["empathize"];
   },
+
+  // ═════════════════════════════════════════════════════════════════════
+  // 3.8 PRE-FRAGE — 4 steps (Question Architecture, no answers)
+  //
+  // 2026-04-23 (Konzept-Diskussion mit Founder, Abend):
+  // Während alle anderen Frameworks ANTWORTEN auf Fragen liefern,
+  // identifiziert "Pre-Frage" die richtigen FRAGEN — bevor irgendeine
+  // Antwort-Suche beginnt. Das adressiert den häufigsten Strategie-
+  // Fehler: die falsche Frage perfekt zu beantworten.
+  //
+  // Methodische Inspiration:
+  //   - Hal Gregersen (MIT, "Question Burst")
+  //   - Charlie Munger ("Invert, always invert")
+  //   - Phil Tetlock (Superforecaster — Decomposition als Schlüsselskill)
+  //   - Edgar Schein ("Humble Inquiry")
+  //   - Toyota 5 Whys
+  //
+  // Architektonische Symmetrie zur Iteration-Loop (e7f9699):
+  //   - Pass 2 (LLM-Relevance) ist Self-Critique auf der OUTPUT-Seite
+  //   - Pre-Frage ist Self-Critique auf der INPUT-Seite
+  //   - Beide zusammen = vollständiger Reflection-Loop
+  //
+  // Output: KEINE Antworten, sondern Hierarchie von Fragen mit
+  // Annahmen-Liste, Daten-Gaps und Framework-Anschluss-Empfehlungen.
+  // ═════════════════════════════════════════════════════════════════════
+  "pre-frage": (topic, step, context, locale, worldModel) => {
+    const preamble = buildFrameworkPreamble(locale);
+    const steps: Record<string, string> = {
+
+      // ── Step 1: Reframing ──────────────────────────────────────────
+      "reframing": `You are a strategic question coach in the tradition of Hal Gregersen (MIT "Question Burst") and Edgar Schein ("Humble Inquiry"). The user has formulated this initial topic / question:
+
+"${topic}"
+
+${preamble}
+
+## Task — Step 1: Reframing
+
+Your job is NOT to answer. Your job is to surface the QUESTION BEHIND THE QUESTION. Most strategic failures come from solving the wrong problem perfectly. Before any analysis, we need to validate that the user is asking the right thing.
+
+Pull live signals and world-model context — they often reveal that the user's question implicitly assumes a frame that the data doesn't support.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Generate three classes of reframings:
+
+1. **Surface assumptions** — what does the original question implicitly take for granted?
+2. **Reframings** — how would different stakeholders / disciplines / time horizons phrase the question?
+3. **The deeper question** — if you stripped the original question to its core motivation, what is the user really trying to know?
+
+Output JSON:
+{
+  "originalQuestion": "Verbatim from user",
+  "implicitAssumptions": [
+    {"assumption": "X is the right unit of analysis", "whyMatters": "If X is wrong, every answer is wrong [SIGNAL/TREND: …]"}
+  ],
+  "reframings": [
+    {"frame": "Stakeholder lens (e.g. regulator, user, employee)", "reformulated": "Same topic phrased through this lens", "whyDifferent": "What this surfaces that the original misses"}
+  ],
+  "deeperQuestion": {
+    "candidate": "The question behind the question (one sentence)",
+    "reasoning": "Why this is more fundamental than what was asked"
+  },
+  "synthesis": "2-3 sentences on what the reframing exercise revealed"
+}
+
+Minimum: 4 implicit assumptions, 4 reframings (different lenses), 1 deeperQuestion candidate. Each entry must reference at least one [SIGNAL/TREND/EDGE] tag where applicable — show that reframings are grounded in observable reality, not vibe-based reformulation.`,
+
+      // ── Step 2: Decomposition + STEEP+V Lenses ─────────────────────
+      "decomposition": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 2: Decomposition + STEEP+V Lens Questions
+
+Following Phil Tetlock's superforecaster methodology: any complex question decomposes into MECE sub-questions (Mutually Exclusive, Collectively Exhaustive). Combine that with the SIS STEEP+V framework — for each dimension, generate the question that dimension forces you to ask.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "mainQuestion": "The primary question (refined from Step 1's deeperQuestion if applicable)",
+  "subQuestions": [
+    {
+      "question": "MECE sub-question 1",
+      "type": "definitional|factual|normative|prognostic|causal|hypothetical",
+      "whyEssential": "Why this sub-question must be answered before the main one",
+      "addressableBy": "framework-name | live-signals | external-research"
+    }
+  ],
+  "lensQuestions": {
+    "social": [{"question": "What does the social lens force us to ask?", "rationale": "Why this matters here [TREND: …]"}],
+    "technological": [{"question": "…", "rationale": "…"}],
+    "economic": [{"question": "…", "rationale": "…"}],
+    "environmental": [{"question": "…", "rationale": "…"}],
+    "political": [{"question": "…", "rationale": "…"}],
+    "values": [{"question": "What unstated values / ethics are at play?", "rationale": "…"}]
+  },
+  "timeHorizonQuestions": [
+    {"horizon": "now (0-12 months)", "question": "What changes in the next year?"},
+    {"horizon": "mid (1-5 years)", "question": "…"},
+    {"horizon": "long (5-15 years)", "question": "…"},
+    {"horizon": "structural (15+ years)", "question": "…"}
+  ],
+  "synthesis": "2-3 sentences"
+}
+
+subQuestions: minimum 5, no overlap, must collectively cover the mainQuestion.
+lensQuestions: minimum 1 question per STEEP+V dimension.
+type field MUST be one of the listed values.
+addressableBy MUST name a concrete next step (specific framework name like "marktanalyse" / "trend-deep-dive", or "live-signals", or "external-research").`,
+
+      // ── Step 3: Inversion + Provocation ────────────────────────────
+      "inversion": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 3: Inversion + Provocation
+
+Charlie Munger: "Invert, always invert." Most strategic blindness comes from refusing to ask the uncomfortable, the taboo, the embarrassing question. Your job here is to find the questions the user does NOT want to ask but should.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Three modes of provocation:
+
+1. **Inversion** — what would have to be TRUE for the original question to be irrelevant or wrong?
+2. **Taboo questions** — what question would the user's biggest critic ask? What would an outsider naively ask that an insider would never voice?
+3. **Pre-mortem question** — imagine 5 years from now, the strategy built on the original question has visibly failed. What was the question that should have been asked but wasn't?
+
+Output JSON:
+{
+  "inversionQuestions": [
+    {"question": "What would have to be true for X to NOT matter?", "uncomfortableBecause": "Why people don't usually ask this"}
+  ],
+  "tabooQuestions": [
+    {"question": "The question nobody in the room wants to voice", "tabooReason": "Political, ethical, status-related, etc.", "whyImportant": "What it would surface"}
+  ],
+  "premortemQuestion": {
+    "scenario": "Brief sketch of how the strategy fails in 5 years (3-4 sentences) [SIGNAL/TREND: …]",
+    "missedQuestion": "The exact question that would have prevented this if asked now",
+    "earlyWarningSignals": ["Observable signal 1 we should monitor", "Signal 2", "Signal 3"]
+  },
+  "blindSpotQuestions": [
+    {"question": "Question about something that's invisible from the user's current vantage point", "vantagePointShift": "What perspective makes this visible (geographic, demographic, disciplinary)"}
+  ],
+  "synthesis": "2-3 sentences on what provocations revealed"
+}
+
+Minimum: 3 inversion questions, 3 taboo questions, 1 premortem scenario with missedQuestion + 3 earlyWarningSignals, 3 blindSpotQuestions. Be uncomfortable. Comfortable provocations are not provocations.`,
+
+      // ── Step 4: Critical Questions + Knowledge-Gap + Handoff ───────
+      "critical": `${context}
+
+Topic: "${topic}"
+
+${preamble}
+
+## Task — Step 4: Critical Questions + Knowledge-Gap + Framework Handoff
+
+Synthesize everything from Steps 1-3 into the user's actionable output. The user came expecting answers; they leave with a structured map of questions. Your job is to make that structure useful, not overwhelming.
+
+<world_model>
+${worldModel}
+</world_model>
+
+Output JSON:
+{
+  "criticalQuestions": [
+    {
+      "rank": 1,
+      "question": "The single most important question to answer first",
+      "whyCritical": "What hinges on the answer; why this question dominates the others",
+      "ifNotAnswered": "What goes wrong if we proceed without this answer",
+      "addressableBy": {
+        "framework": "marktanalyse | trend-deep-dive | pre-mortem | post-mortem | war-gaming | stakeholder | design-thinking | (none — needs external research)",
+        "rationale": "Why this framework is the right next tool"
+      }
+    }
+  ],
+  "knowledgeGaps": [
+    {
+      "gap": "What specific data / fact / signal we don't have",
+      "couldComeFrom": "SIS connector name OR external source category (e.g. expert interview, primary research)",
+      "currentlyAvailable": true,
+      "decisiveFor": "Which critical question would this resolve"
+    }
+  ],
+  "frameworkRoadmap": [
+    {
+      "order": 1,
+      "framework": "Specific SIS framework",
+      "questionItAddresses": "Which sub-question / critical question this framework will answer",
+      "estimatedEffort": "low | medium | high",
+      "dependsOn": "What must be known before this step (or 'nothing — start here')"
+    }
+  ],
+  "explicitAssumptionsToTest": [
+    {"assumption": "Assumption from Step 1 we are choosing to bracket for now", "testHow": "How we'd validate this later"}
+  ],
+  "honestStateOfKnowledge": "2-4 sentences: what we know, what we don't, what's most uncertain. NO false confidence.",
+  "synthesis": "Short executive summary: 'Before answering X, we need to first answer A, B, C — here's the order.'"
+}
+
+Minimum: 3 criticalQuestions (top-3, ranked, with framework handoff for each), 4 knowledgeGaps, 2-3 frameworkRoadmap entries showing the recommended sequence, 2 explicitAssumptionsToTest. Every criticalQuestion MUST reference a concrete next-step framework or external-research category — no dead ends.`,
+    };
+    return steps[step] || steps["reframing"];
+  },
 };
 
 // ── Model fallback chain ─────────────────────────────────────────────────────
@@ -1321,6 +1538,7 @@ export async function POST(req: Request) {
     "trend-deep-dive": ["definition", "evidence", "drivers", "impact", "actions"],
     "stakeholder": ["inventory", "power-matrix", "coalitions", "engagement"],
     "design-thinking": ["empathize", "define", "ideate", "validate"],
+    "pre-frage": ["reframing", "decomposition", "inversion", "critical"],
   };
   const allowedSteps = VALID_STEPS[frameworkId];
   if (allowedSteps && !allowedSteps.includes(step)) {

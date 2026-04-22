@@ -1898,6 +1898,26 @@ export default function HomeClient() {
                   templateId: "design-thinking",
                   p: { card: "#FFF4E6", icon: "#FFE1C1", border: "#F0C088", type: "#B45309", typeBright: "#FFB87A" },
                 },
+                {
+                  // 2026-04-23 (Konzept-Diskussion mit Founder): Pre-Frage —
+                  // das einzige SIS-Framework, das KEINE Antworten liefert,
+                  // sondern die richtigen FRAGEN identifiziert. Inspiration
+                  // Hal Gregersen / Munger / Tetlock. Architektonische
+                  // Symmetrie zur Iteration-Loop Pass-2 (e7f9699): Self-
+                  // Critique auf der INPUT-Seite statt OUTPUT-Seite.
+                  icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+                  type: locale === "de" ? "Frage-Architektur" : "Question Architecture",
+                  label: "Pre-Frage",
+                  desc: locale === "de" ? "Reframing · Linsen · Inversion · Kritische Fragen" : "Reframing · Lenses · Inversion · Critical Questions",
+                  tip: locale === "de"
+                    ? "Identifiziert die richtigen FRAGEN bevor irgendeine Antwort gesucht wird. 4 Schritte: Reframing (Frage hinter der Frage) → Decomposition + STEEP+V Linsen → Inversion + Provokation (Tabu-Fragen) → Top-3 kritische Fragen + Framework-Fahrplan."
+                    : "Identifies the right QUESTIONS before any answer search. 4 steps: Reframing (question behind the question) → Decomposition + STEEP+V lenses → Inversion + provocation (taboo questions) → Top-3 critical questions + framework roadmap.",
+                  flow: locale === "de"
+                    ? "Reframing → Linsen → Inversion → Kritische Fragen"
+                    : "Reframing → Lenses → Inversion → Critical Questions",
+                  templateId: "pre-frage",
+                  p: { card: "#F4EEFF", icon: "#E0D0FF", border: "#C0A8F0", type: "#5A2A9E", typeBright: "#C8A6F8" },
+                },
               ] as { icon: string; type: string; label: string; desc: string; tip: string; flow: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } }[]).map(t => (
                 <Tooltip
                   key={t.templateId}
