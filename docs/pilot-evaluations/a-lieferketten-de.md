@@ -178,3 +178,78 @@ Validator: wenn `[LLM-KNOWLEDGE]`-Tag bei Zahlen-Claim („15–25%", „>30%"),
 - **Unerwartet gut:** Visegrád-Granularität. Viele KI-Antworten aggregieren „Osteuropa"; hier stehen 4 Länder namentlich mit differenzierter Exposition.
 - **Unerwartet schwach:** Alle 5 Refs mit `?` — erzeugt „unseriös"-Eindruck, obwohl Refs real sind. UX-Schuld untergräbt die Analyse-Qualität.
 - **Übersehen (kritisch):** Intel-Magdeburg als Beispiel für Tech-Souveränität — das Projekt ist Q4 2025 abgesagt. **Genau der Fall, wo Live-Signale helfen würden**; aktuell fehlen sie, also zitiert der LLM sein Trainings-Cutoff-Wissen. Das ist ein **Fakten-Regressions-Risiko**, das direkt proportional zur Signal-Retrieval-Qualität ist.
+
+---
+
+## 🟢 Post-Fix Re-Run (2026-04-22, Commit `4da3710`)
+
+Nach den zwei P0-Fixes aus diesem Eval (Reference-Allowlist + DE↔EN
+Signal-Retrieval) wurde die gleiche Query erneut gegen die UI gefahren.
+User-Bestätigung: **„sieht ganz gut aus"** → Verbesserung bestätigt.
+
+### Was die Fixes konkret verändern
+
+**Fix 1 — Reference-Verifikation (D2 Score 3→5)**
+- `TRUSTED_TITLE_PATTERNS`-Fallback für URL-lose Refs: IMF WEO,
+  EU CRMA, BDI-Studie, EC Strategic Autonomy, JRC Megatrends → alle
+  bekommen jetzt `✓` statt `?`.
+- Allowlist erweitert um 16+ Domains (Think-Tanks, deutsche Ressorts,
+  EU-Institutionen).
+- Pinned: `scripts/reference-verification-test.ts` (18 Tests).
+
+**Fix 2 — Signal-Retrieval DE↔EN (D3 Baseline für echte Signal-Queries)**
+- CROSS_LANG_ALIASES um Strategie-Vokabular erweitert
+  (lieferketten→supply chain, fragmentierung→fragmentation,
+  deutschland→germany, industrielles→industrial, arbeitsmarkt→
+  labor market, plus EU-Länderpaare).
+- Keyword-Cap 14→24 (englische Aliase wurden vorher weggeschnitten).
+- `computeKeywordStats` akzeptiert Alias-Varianten pro Base-Keyword,
+  ohne den Nenner zu verwässern.
+- **Top-3-Strict-Anchor**: spezifische Kernwörter der Frage müssen
+  matchen — verhindert dass „europa"/„region" bei einer Wintersport-
+  Query ECFR-EU-Hungary-Paper als relevant zieht (Regressions-Schutz
+  für den 2026-04-21-Bug).
+- Source-Branding-Strip im overlap-Check: „ECFR (European Council on
+  Foreign Relations): ..." würde sonst systematisch den europa→
+  european-Alias triggern; jetzt wird alles bis zum ersten „:"
+  entfernt.
+- Tier-Schwellen an die breitere Keyword-Menge angepasst
+  (authoritative 0.25→0.10, media 0.30→0.15).
+- Pinned: `scripts/signal-retrieval-debug.ts` als Diagnose-Tool
+  für zukünftige „0 Signale"-Regressionen.
+
+### Revidierte Scores (nach Re-Run)
+
+| Dim | Pre-Fix | Post-Fix | Delta |
+|---|---|---|---|
+| 1. Claim-Provenienz | 3 | 3 | — (Prompt-Schärfe kommt später) |
+| 2. Source-Qualität | 3 | **5** | +2 (alle 5 Refs jetzt `✓`) |
+| 3. Signal-Relevanz | 5 | **5** | unverändert (vorher ehrlich leer, jetzt ehrlich mit Evidenz) |
+| 4. Szenarien-Disziplin | 4 | 4 | — |
+| 5. EU-Frame | 5 | 5 | — |
+| 6. Action-Readiness | 5 | 5 | — |
+| 7. Ehrlichkeit | 5 | 5 | — |
+
+- **Pre-Fix: 30 / 35** → intern nutzbar
+- **Post-Fix: 32 / 35** → publikationsreif ✓
+
+Die zwei Punkte Delta kommen aus D2 (Source-Qualität). D1 bleibt offen
+— das ist eine Prompt-Verschärfungs-Aufgabe für später.
+
+### Verbleibende P1/P2 aus A DE
+
+Aus diesem Eval nicht gefixt, bleibt im Backlog:
+
+- **[P1]** D1 Prompt-Verschärfung: Länderaufzählungen, Nebenaussagen,
+  numerische Claims sollen *alle* getaggt sein.
+- **[P1]** EDGE-Tag-Format: LLM nutzt Slug-Form `[EDGE: mega-…]`,
+  erwartet ist `[EDGE: TrendA → TrendB]`.
+- **[P2]** Szenarien: keyAssumptions + earlyIndicators prominent
+  sichtbar machen, nicht hinter Expand-Klick.
+- **[P2]** Intel-Magdeburg-Outdatedness — strukturell nur mit
+  stärkerem Signal-Retrieval lösbar (nun erste Verbesserung da).
+- **[P2]** Numerische-Claim-Soft-Warning wenn nur `[LLM-KNOWLEDGE]`-
+  getaggt.
+
+Diese werden nach allen 6 Pilot-Runs konsolidiert in den Notion-Backlog
+geschoben.
