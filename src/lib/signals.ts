@@ -787,7 +787,47 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     enriched.push({ ...row, keywordOverlap: stats.weightedOverlap, sourceTier: tier });
   }
 
-  return enriched.slice(0, limit);
+  // 2026-04-22 Pilot-Eval-Fix P1-Dedup: Signal-Deduplizierung gegen
+  // (source, title)-Duplikate aus Multi-Tenant-Pipeline-Polls. Ohne
+  // diesen Pass liefert ein Connector wie ecfr_rss leicht 5 Kopien
+  // desselben Artikels (weil die RSS-Poll-Logik idempotenz-frei pro
+  // Tenant einträgt), die dann 5 Slots der Top-N verbrauchen und den
+  // LLM mit 1-2 unique Titles abspeisen. Post-Filter, Pre-Slice —
+  // damit die `limit`-Zahl echte unique Signale liefert.
+  const deduped = dedupSignalsBySourceTitle(enriched);
+
+  return deduped.slice(0, limit);
+}
+
+/**
+ * Deduplicates signals by the `(source, normalized-title)` tuple.
+ *
+ * Two rows with the same source + title are treated as the same signal
+ * (the second occurrence is dropped, the first is kept — so combine this
+ * with a pre-sort by relevance if you want the highest-scoring variant
+ * to survive). Different sources carrying the same title are KEPT as
+ * distinct entries — co-reported stories have independent value.
+ *
+ * Normalisation: whitespace-collapsed + lowercased, so minor formatting
+ * variations (trailing newline, double space) still collapse to one.
+ *
+ * Exported so `scripts/signal-dedup-test.ts` can assert on the logic
+ * without going through the full SQL pipeline.
+ */
+export function dedupSignalsBySourceTitle<T extends { source: string; title: string }>(
+  signals: T[],
+): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of signals) {
+    const title = typeof row.title === "string" ? row.title : "";
+    const normTitle = title.trim().toLowerCase().replace(/\s+/g, " ");
+    const key = `${row.source}::${normTitle}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }
 
 // ─── Format signals for LLM prompt injection ─────────────────────────────────
