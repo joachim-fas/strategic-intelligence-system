@@ -327,6 +327,47 @@ export const FRAMEWORKS: FrameworkDefinition[] = [
       ],
     },
   },
+
+  // ═══ 7. DESIGN THINKING (Human-Centered Strategic Design) ═══
+  // 2026-04-22 (Backlog: neues Template). 4-Schritt-Variante statt
+  // klassischer 5-Phasen-Form (Empathize/Define/Ideate/Prototype/Test):
+  // „Prototype" und „Test" werden zu einer Validate-Phase verdichtet,
+  // weil strategische Fragen meist kein Produkt-MVP brauchen, sondern
+  // ein überprüfbares Entscheidungsartefakt (Policy, Roadmap, Offer).
+  // Der Prompt-Handler liegt in src/app/api/v1/frameworks/analyze/route.ts.
+  {
+    id: "design-thinking", icon: "🧭",
+    name: "Design Thinking", nameEn: "Design Thinking",
+    methodology: "Human-centered strategic design (IDEO / Stanford d.school, 1991→). 4-Schritt-Adaption für strategische Intelligence-Fragen: Empathize → Define → Ideate → Validate. Jede Phase liefert ein überprüfbares Artefakt; Validate-Phase verlangt Success- UND Kill-Metrik.",
+    methodologyEn: "Human-centered strategic design (IDEO / Stanford d.school, 1991→). 4-step adaptation for strategic intelligence questions: Empathize → Define → Ideate → Validate. Each phase produces a testable artifact; Validate requires both success AND kill metrics.",
+    description: "Empathie → Problem reframen → Lösungsraum divergieren → Validieren",
+    descriptionEn: "Empathize → Reframe problem → Diverge solution space → Validate",
+    steps: [
+      { title: "Empathize", description: "Stakeholder-Jobs-to-be-done & Emotionale Landkarte", queryTemplate: "Stakeholder-Empathie für '{topic}': benenne 4+ konkrete Stakeholder-Gruppen (nicht nur 'User'), deren Job-to-be-done, Kontext/Constraints, 2-3 Pain-Points und Early-Signals für Veränderung. Baue zusätzlich eine Emotional-Map über Awareness/Consideration/Decision mit Feeling + Trigger pro Phase.", dependsOn: [] },
+      { title: "Define", description: "3-5 How-might-we-Reframings mit Hidden-Assumption", queryTemplate: "{context}\n\nReframe das Kernspannungsfeld bei '{topic}' in 3-5 Varianten der Form 'How might we [verb] [spezifischer Akteur] to [Bedürfnis] despite [Constraint]'. Bewerte jede auf Hebel (0-5), Machbarkeit (0-5), Blast-Radius (0-5). Benenne die Hidden-Assumption jedes Framings + eine knappe Warum-wichtig-Zeile. Plus: 2 verworfene Reframings mit Begründung.", dependsOn: [0] },
+      { title: "Ideate", description: "6-10 Lösungen, mindestens eine pro Typ", queryTemplate: "{context}\n\nFür das stärkste Reframing aus Step 2: generiere 6-10 Lösungen mit mindestens einer pro Typ (incremental / disruptive / analog / structural / reframe-challenge). Pro Lösung: Name, Mechanismus (1 Satz), kleinster Prototyp (4-8 Wochen testbar), 1-3 Early-Signals die Traction bestätigen, 1+ Kill-Signal. Zusätzlich: benannte Trends/Edges aus dem Weltmodell, auf die die Lösung aufsetzt.", dependsOn: [1] },
+      { title: "Validate", description: "2-3 Experimente mit Success- UND Kill-Metrik", queryTemplate: "{context}\n\nValidierungs-Plan für 2-3 der Lösungen aus Step 3. Pro Experiment: Hypothese (wenn X dann Y weil Z), kleinster Test (4-12 Wochen), benannte Stakeholder-Teilnehmer aus Step 1, Success-Metrik mit Schwellwert, Kill-Metrik mit Schwellwert, 1-2 Early-Warning-Signale, Kostenrahmen, Timeline. Plus: 3-Zeilen-Entscheidungs-Rubrik (Success/Kill/Ambiguous).", dependsOn: [2] },
+    ],
+    guidance: {
+      questionShape: {
+        de: "Formuliere eine strategische Frage mit einem konkreten menschlichen Stakeholder-Kreis und einem überprüfbaren Entscheidungs-Artefakt am Ende. Nicht 'Wie entwickelt sich X?', sondern 'Wie gestalten wir X für wen damit Y messbar wird?'.",
+        en: "Ask a strategic question with a concrete human stakeholder set and a testable decision artifact at the end. Not just 'How does X evolve?' — rather 'How do we design X for whom so Y becomes measurable?'.",
+      },
+      examples: [
+        { de: "Wie bauen wir ein Onboarding-Programm für Quereinsteiger:innen in die Elektromobilitäts-Industrie, das Fachkräftemangel spürbar dämpft?", en: "How do we design an onboarding program for career-changers entering the electromobility industry that measurably alleviates the skills shortage?" },
+        { de: "Welche Bürger-Interaktions-Schnittstelle lässt klassische Kommunen Open-Data-Plattformen wirklich nutzen statt nur betreiben?", en: "Which citizen-interaction surface would make classic municipalities actually use open-data platforms rather than just operate them?" },
+        { de: "Wie muss ein EU-Förderprogramm für grünen Wasserstoff aussehen, damit KMUs tatsächlich Anträge stellen können — und wie messen wir Erfolg?", en: "What shape must an EU green-hydrogen funding programme take so SMEs can actually apply — and how do we measure success?" },
+      ],
+      antiExample: {
+        de: "Reine Trend- oder Prognosefragen passen besser in Trend Deep-Dive. Reine Risiko-Fragen passen besser in Pre-Mortem.",
+        en: "Pure trend or forecast questions fit Trend Deep-Dive better. Pure risk questions fit Pre-Mortem better.",
+      },
+      fields: [
+        { key: "targetUser", labelDe: "Zielgruppe (optional)", labelEn: "Target user group (optional)", placeholderDe: "z.B. kommunale Energie-Beauftragte in DACH-Städten < 100k EW", placeholderEn: "e.g. municipal energy officers in DACH cities < 100k inhabitants", type: "text" },
+        { key: "horizon", labelDe: "Zeithorizont für Validierung (optional)", labelEn: "Validation horizon (optional)", placeholderDe: "z.B. 8 Wochen bis 6 Monate", placeholderEn: "e.g. 8 weeks to 6 months", type: "text" },
+      ],
+    },
+  },
 ];
 
 // ─── Legacy Template Registry (backward compat with TemplatePicker) ──────────

@@ -1868,6 +1868,26 @@ export default function HomeClient() {
                   templateId: "stakeholder-mapping",
                   p: { card: "#FFFDE8", icon: "#FFF5BA", border: "#E8D870", type: "#7A5C00", typeBright: "#F5DC5C" },
                 },
+                {
+                  // 2026-04-22 (Backlog: neues 7. Framework „Design Thinking").
+                  // Die Home-Liste war bisher hardcoded auf 6 Einträge; Design
+                  // Thinking existiert zwar in FRAMEWORK_META + /frameworks-
+                  // Grid, blieb aber auf der Startseite unsichtbar. Hier als
+                  // siebte Kachel nachgetragen, Farbe an orange-Akzent
+                  // angelehnt (konsistent mit types/frameworks.ts).
+                  icon: "/icons/methoden/stakeholder/stakeholder-users-round.svg",
+                  type: locale === "de" ? "Human-Centered" : "Human-Centered",
+                  label: "Design Thinking",
+                  desc: locale === "de" ? "Empathie · Reframing · Lösungsraum" : "Empathy · Reframing · Solution space",
+                  tip: locale === "de"
+                    ? "Human-centered Strategic Design in 4 Schritten: Empathize → Define → Ideate → Validate. Jede Phase liefert ein überprüfbares Artefakt, Validate-Phase verlangt Success- UND Kill-Metrik."
+                    : "Human-centered strategic design in 4 steps: Empathize → Define → Ideate → Validate. Each phase produces a testable artifact; Validate requires both a success AND a kill metric.",
+                  flow: locale === "de"
+                    ? "Empathie → Problem reframen → Divergent ideieren → Validieren"
+                    : "Empathize → Reframe problem → Diverge → Validate",
+                  templateId: "design-thinking",
+                  p: { card: "#FFF4E6", icon: "#FFE1C1", border: "#F0C088", type: "#B45309", typeBright: "#FFB87A" },
+                },
               ] as { icon: string; type: string; label: string; desc: string; tip: string; flow: string; templateId: string; p: { card: string; icon: string; border: string; type: string; typeBright: string } }[]).map(t => (
                 <Tooltip
                   key={t.templateId}
