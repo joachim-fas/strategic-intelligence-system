@@ -196,6 +196,10 @@ export const SOURCE_METADATA: Record<string, SourceMetadata> = {
   // ─── arxiv-qbio RSS (Technology, micro) ────────────────────────────
   arxiv_qbio_rss:     { steepV: "technological", trendLevel: "micro" },
   nature_rss:         { steepV: "technological", trendLevel: "macro" },
+
+  // ─── Google News RSS Heat Pump Europe (EN) (Environmental, signal) ──
+  // C-Pilot EN counterpart to google_news_wp_de. Same tier/level.
+  google_news_hp_en:  { steepV: "environmental", trendLevel: "signal" },
 };
 
 /**

@@ -550,6 +550,21 @@ const DOMAIN_FEEDS: RssFeedConfig[] = [
     ],
     tags: ["energy", "heating", "market", "de"],
   },
+  {
+    // English-language counterpart for C EN pilot (heat pump market DACH/Europe).
+    // Google News aggregates international press coverage in EN — covers IEA
+    // market reports, EU EPBD coverage, German GEG commentary, policy analysis.
+    name: "google_news_hp_en",
+    displayName: "Google News — Heat Pump Europe (EN)",
+    feedUrl: "https://news.google.com/rss/search?q=heat+pump+Europe+Germany&hl=en&gl=US&ceid=US:en",
+    defaultTopic: "Climate Change & Sustainability",
+    keywordMapping: [
+      [["market", "sales", "industry", "manufacturer", "installation", "adoption"], "Economic Trends"],
+      [["building", "renovation", "retrofit", "efficiency", "insulation", "directive"], "Climate Change & Sustainability"],
+      [["policy", "regulation", "subsidy", "incentive", "geg", "epbd", "act"], "Climate Change & Sustainability"],
+    ],
+    tags: ["energy", "heat pump", "market", "en"],
+  },
 ];
 
 // ── Merged export ─────────────────────────────────────────────────────────

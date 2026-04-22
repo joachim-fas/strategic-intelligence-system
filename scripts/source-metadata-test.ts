@@ -134,12 +134,16 @@ section("Regression — Signal-Kettenbezug-Bug specifically");
 // ═══════════════════════════════════════════════════════════════════════
 //  Google News Wärmepumpe (C-Pilot Connector)
 // ═══════════════════════════════════════════════════════════════════════
-section("google_news_wp_de — C-Pilot Wärmepumpen Connector");
+section("google_news_wp_de + google_news_hp_en — C-Pilot Wärmepumpen Connectors");
 
 {
   const wp = getSourceMetadata("google_news_wp_de");
   assert(wp.steepV === "environmental", "google_news_wp_de → environmental (Wärmepumpen = Energie/Klima)");
   assert(wp.trendLevel === "signal", "google_news_wp_de → signal-level (tagesaktuelle Presseartikel)");
+
+  const en = getSourceMetadata("google_news_hp_en");
+  assert(en.steepV === "environmental", "google_news_hp_en → environmental (Heat Pump = Energie/Klima)");
+  assert(en.trendLevel === "signal", "google_news_hp_en → signal-level (tagesaktuelle Presseartikel EN)");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

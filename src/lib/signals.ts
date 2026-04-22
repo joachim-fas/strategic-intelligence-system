@@ -79,6 +79,7 @@ const SOURCE_TIER_MAP: Record<string, SourceTier> = {
   aljazeera_rss: "media",
   gdelt: "media",
   google_news_wp_de: "media",   // Google News RSS — Wärmepumpe (DE)
+  google_news_hp_en: "media",   // Google News RSS — Heat Pump Europe (EN)
 
   // Social — personal/unedited, needs high topic-match to count
   bluesky: "social",
@@ -632,7 +633,7 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "innovation": ["innovation", "innovative"],
     "automatisierung": ["automation", "automated", "autonomous"],
     "arbeit": ["work", "labor", "labour"],
-    // Wärmepumpen / Gebäudeenergie (C-Pilot)
+    // Wärmepumpen / Gebäudeenergie (C-Pilot) — DE→EN
     "wärmepumpe": ["heat pump", "heat pump system", "hp"],
     "wärmepumpen": ["heat pumps", "heat pump"],
     "heizung": ["heating", "heating system", "boiler"],
@@ -647,6 +648,15 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     "gebäudeenergiegesetz": ["building energy act", "geg", "energy standards"],
     "wärmepumpenmarkt": ["heat pump market", "heat pump industry"],
     "gebäude": ["building", "buildings"],
+    // Reverse EN→DE aliases so English queries find German Wärmepumpe signals
+    "heat": ["wärme", "heizung", "wärmepumpe"],
+    "pump": ["pumpe", "wärmepumpe"],
+    "renovation": ["sanierung", "gebäudesanierung"],
+    "retrofit": ["sanierung"],
+    "insulation": ["dämmung"],
+    "heating": ["heizung", "wärmepumpe"],
+    "decarbonization": ["dekarbonisierung", "klimaneutral", "energiewende"],
+    "decarbonisation": ["dekarbonisierung", "klimaneutral", "energiewende"],
     "dach": ["dach region", "germany austria switzerland"],
     "china": ["china", "chinese", "prc"],
     "russland": ["russia", "russian"],
@@ -884,16 +894,31 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
     }
 
     // (B) Weighted overlap against per-tier threshold.
-    // Exception: for academic and authoritative sources, anchor-match
-    // alone is a sufficient quality gate. Peer-reviewed papers and
-    // institutional reports don't produce off-topic content — if an
-    // anchor keyword (≥5 chars) appears in the title, the paper is
-    // on-topic regardless of the overlap fraction. This prevents complex
-    // multi-part queries (many keywords → diluted overlap) from
-    // suppressing relevant arxiv / Eurostat / ECFR papers.
+    //
+    // The overlap fraction dilutes for complex multi-part queries: a query
+    // with 20 keywords gives only 5% overlap for a single match, far below
+    // any static threshold. We bypass the gate in two safe cases:
+    //
+    //   1. academic / authoritative tier: anchor-match alone is a sufficient
+    //      quality gate. Peer-reviewed papers don't produce off-topic content.
+    //
+    //   2. Any tier + long domain-specific anchor (≥9 chars): compound terms
+    //      like "wärmepumpen" (11), "autonomous" (9), "arbeitsmarkt" (12),
+    //      "interventions" (13), "penetration" (11) are not false-positive
+    //      prone. If such a term appears in a signal title the signal IS on
+    //      topic, regardless of the overlap fraction or the source tier.
+    //      Generic 4-8-char anchors (european, market, labor) still require
+    //      the overlap gate so noise from broad media feeds is suppressed.
     const minOverlap = TIER_MIN_OVERLAP[tier];
+    const hasLongDomainAnchor =
+      stats.anchorMatched &&
+      baseKeywords.some(kw => kw.length >= 9 && signalText.toLowerCase().includes(kw));
     const anchorIsSufficient =
-      stats.anchorMatched && (tier === "academic" || tier === "authoritative");
+      stats.anchorMatched && (
+        tier === "academic" ||
+        tier === "authoritative" ||
+        hasLongDomainAnchor
+      );
     if (!anchorIsSufficient && stats.weightedOverlap < minOverlap) continue;
 
     enriched.push({ ...row, keywordOverlap: stats.weightedOverlap, sourceTier: tier });
