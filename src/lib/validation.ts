@@ -188,13 +188,22 @@ const UsedSignalRefSchema = z.object({
 const KNOWN_DOMAINS: string[] = [
   // EU + nationale Behörden
   "europa.eu", "ec.europa.eu", "eurostat.ec.europa.eu",
-  "bundestag.de", "bundesregierung.de", "parlament.gv.at",
+  "commission.europa.eu", "eur-lex.europa.eu", "data.europa.eu",
+  "knowledge4policy.ec.europa.eu",
+  "bundestag.de", "bundesregierung.de", "bmwk.de", "bmk.gv.at",
+  "parlament.gv.at", "destatis.de", "bundesbank.de",
+  "ecb.europa.eu", "eib.org",
   // Internationale Organisationen
   "un.org", "who.int", "imf.org", "worldbank.org", "oecd.org",
   "wto.org", "iea.org", "unfccc.int", "weforum.org",
-  // Research + Academic
+  "ipcc.ch", "un-foundation.org", "undp.org", "unhcr.org",
+  // Research + Academic + Think-Tanks
   "arxiv.org", "nature.com", "science.org", "ssrn.com",
   "jrc.ec.europa.eu", "nber.org",
+  "bdi.eu", "iwkoeln.de", "diw.de", "ifo.de", "zew.de", "wifo.ac.at",
+  "chathamhouse.org", "rand.org", "brookings.edu", "ecfr.eu",
+  "swp-berlin.org", "stiftung-wissenschaft-politik.de",
+  "bertelsmann-stiftung.de", "merics.org",
   // Connectors
   "polymarket.com", "kalshi.com", "manifold.markets",
   "github.com", "news.ycombinator.com", "reddit.com",
@@ -206,10 +215,101 @@ const KNOWN_DOMAINS: string[] = [
   "wsj.com", "nytimes.com", "spiegel.de", "zeit.de", "faz.net",
   "handelsblatt.com", "diepresse.com", "derstandard.at",
   "politico.eu", "bruegel.org", "carnegieendowment.org",
+  "euractiv.com", "euobserver.com",
   // Tech + Industry Research
   "gartner.com", "forrester.com", "mckinsey.com", "bcg.com",
   "bain.com", "deloitte.com", "pwc.com", "ey.com", "kpmg.com",
 ];
+
+/**
+ * Title-based verification patterns — hits when the LLM cites an
+ * authoritative publication by name *without* a URL (the system prompt
+ * explicitly forbids inventing URLs: line 265 of llm.ts says "NEVER
+ * invent URLs"). In that case KNOWN_DOMAINS can't help — the URL is
+ * empty — and the reference falsely shows as `?`-unverified even
+ * though the title identifies a well-known source.
+ *
+ * Each pattern matches a publication family from an authoritative
+ * institution. The verifier checks title against these patterns AFTER
+ * failing the URL match, so URL-based verification remains the primary
+ * path. Patterns are case-insensitive.
+ *
+ * Added 2026-04-22 after Pilot-Eval A DE showed 5/5 real-but-unverified
+ * references (EU CRMA, IMF WEO, BDI Study, EC Strategic Autonomy, JRC
+ * Megatrends) — all legitimate but all flagged as `?`.
+ */
+const TRUSTED_TITLE_PATTERNS: RegExp[] = [
+  // EU institutional publications
+  /\bEU(\s+|-)?(Critical\s+Raw\s+Materials|AI\s+Act|Green\s+Deal|Taxonomy|CSRD|CBAM|DMA|DSA|NIS2|GDPR|MiCA|AML)/i,
+  /\bEuropean\s+Commission\b/i,
+  /\bEC\s+(Strategic|Recommendation|Communication|Regulation|Directive)/i,
+  /\bJRC\s+(Megatrends|Foresight|Technical\s+Report|Science\s+for\s+Policy)/i,
+  /\bEUR-Lex\b/i,
+  /\bEurostat\b/i,
+  /\bECB\s+(Economic\s+Bulletin|Financial\s+Stability|Annual\s+Report)/i,
+  // International organisations
+  /\bIMF\s+(World\s+Economic\s+Outlook|Fiscal\s+Monitor|Global\s+Financial\s+Stability)/i,
+  /\bWorld\s+Bank\s+(Development|Economic\s+Prospects|Poverty|Doing\s+Business)/i,
+  /\bOECD\s+(Economic\s+Outlook|Science.*Technology|Going\s+Digital|Employment\s+Outlook)/i,
+  /\bUN\s+(Population|SDG|DESA|Trade|Conference)/i,
+  /\bUNCTAD\b|\bUNDP\b|\bUNHCR\b/i,
+  /\bWHO\s+(Global\s+Health|World\s+Health\s+Report|Pandemic|Disease)/i,
+  /\bILO\s+(World\s+Employment|Global\s+Wage|Labour\s+Market)/i,
+  /\bWTO\s+(World\s+Trade\s+Report|Trade\s+Statistics)/i,
+  /\bIEA\s+(World\s+Energy\s+Outlook|Renewables|Coal|Gas|Oil)/i,
+  /\bIRENA\b/i,
+  /\bIPCC\s+(Assessment|AR\d|Special\s+Report|Working\s+Group)/i,
+  // German / DACH research bodies
+  /\bBDI\s+(Studie|Study|Positionspapier|Report)/i,
+  /\bDIW\s+(Berlin|Wochenbericht)/i,
+  /\bifo\s+(Konjunktur|Geschäftsklima|Institut)/i,
+  /\bZEW\s+(Konjunktur|Innovation)/i,
+  /\bWIFO\s+(Monatsbericht|Prognose)/i,
+  /\bDestatis\b|\bStatistisches\s+Bundesamt\b/i,
+  /\bBundesbank\s+(Monatsbericht|Finanzstabilität)/i,
+  // Think tanks
+  /\bBruegel\s+(Policy\s+Brief|Working\s+Paper|Analysis)/i,
+  /\bECFR\s+(Policy\s+Brief|Commentary)/i,
+  /\bMERICS\s+(China\s+Monitor|Report)/i,
+  /\bChatham\s+House\b/i,
+  /\bRAND\s+(Corporation|Report)/i,
+  /\bBrookings\s+(Institution|Paper)/i,
+  /\bCarnegie\s+(Endowment|Paper)/i,
+  /\bSWP\s+(Studie|Comment)/i,
+  /\bBertelsmann\s+(Stiftung|Transformation\s+Index)/i,
+  // Consultancies (research publications, not marketing)
+  /\b(McKinsey\s+Global\s+Institute|MGI)\b/i,
+  /\bBCG\s+(Henderson|Global\s+Wealth|Annual\s+Report)/i,
+  /\bDeloitte\s+(Insights|Tech\s+Trends|State\s+of)/i,
+  /\bPwC\s+(Global\s+CEO\s+Survey|Strategy\+\s+|World\s+in\s+2050)/i,
+  /\bEY\s+(Global\s+Capital|Megatrends)/i,
+  /\bKPMG\s+(Global|Outlook|CEO)/i,
+  // Tech/Industry research
+  /\bGartner\s+(Hype\s+Cycle|Magic\s+Quadrant|Top\s+Strategic)/i,
+  /\bIDC\s+(FutureScape|Spending\s+Guide|Worldwide)/i,
+  /\bForrester\s+(Wave|Predictions|Report)/i,
+  /\bCB\s+Insights\b/i,
+  /\bStatista\b/i,
+  /\bStanford\s+(HAI|AI\s+Index)/i,
+  // Climate / sustainability
+  /\bClimate\s+Action\s+Tracker\b/i,
+  /\bGlobal\s+Carbon\s+Project\b/i,
+  /\bBloombergNEF\b|\bBNEF\b/i,
+  /\bCarbon\s+Brief\b/i,
+  /\bOurWorldInData\b|\bOur\s+World\s+in\s+Data\b/i,
+];
+
+/**
+ * Check whether a reference title identifies a trusted institutional
+ * publication even when URL is missing. Returns true on any match.
+ */
+function isTrustedByTitle(title: string): boolean {
+  if (!title || title.length < 4) return false;
+  for (const pattern of TRUSTED_TITLE_PATTERNS) {
+    if (pattern.test(title)) return true;
+  }
+  return false;
+}
 
 const ReferenceSchema = z.object({
   title: z.string().max(500).default(""),
@@ -570,17 +670,32 @@ export function validateLLMResponse(
       }
     })
     .map((ref) => {
-      if (!ref.url) return ref;
+      // Pilot-Eval-Fix 2026-04-22: Verifikation geht jetzt zweistufig —
+      // (1) URL-Domain-Match gegen KNOWN_DOMAINS (primär, wie bisher),
+      // (2) Titel-Match gegen TRUSTED_TITLE_PATTERNS (Fallback für
+      // URL-lose Refs). Der System-Prompt verbietet explizit URL-
+      // Erfindungen („NEVER invent URLs"), deshalb kommen Refs zu
+      // authoritativen Quellen wie IMF WEO, EU CRMA, BDI-Studien regel-
+      // mäßig ohne URL — ohne Titel-Fallback zeigte die UI alle fünf
+      // Pilot-A-Refs als `?` an, obwohl sie real und seriös waren.
+      const titleVerified = isTrustedByTitle(ref.title);
+      if (!ref.url) {
+        return titleVerified
+          ? ({ ...ref, verified: true } as typeof ref & { verified: boolean })
+          : ref;
+      }
       try {
         const host = new URL(ref.url).hostname.toLowerCase();
-        const verified = KNOWN_DOMAINS.some(
+        const domainVerified = KNOWN_DOMAINS.some(
           (d) => host === d || host.endsWith("." + d),
         );
         // Legacy references don't have the verified-field. z.infer still works
         // because the schema's shape is open-ended via `.default`.
-        return { ...ref, verified } as typeof ref & { verified: boolean };
+        return { ...ref, verified: domainVerified || titleVerified } as typeof ref & { verified: boolean };
       } catch {
-        return ref;
+        return titleVerified
+          ? ({ ...ref, verified: true } as typeof ref & { verified: boolean })
+          : ref;
       }
     });
 

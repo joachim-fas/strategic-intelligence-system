@@ -118,20 +118,29 @@ export function classifySource(source: string): SourceTier {
 }
 
 /**
- * Minimum keyword-overlap per tier. The more authoritative the source,
- * the looser the topical-match requirement: UN/IPCC content is editorial
- * and focused, so even a single matching keyword signals engagement with
- * the topic. Social content is noisy — we demand substantial keyword
+ * Minimum weighted-keyword-overlap per tier. The more authoritative the
+ * source, the looser the topical-match requirement: UN/IPCC content is
+ * editorial and focused, so even a moderate overlap signals engagement
+ * with the topic. Social content is noisy — we demand high keyword
  * density before we let it through.
  *
- * These override the global 30% overlap floor in getRelevantSignals.
+ * 2026-04-22 Pilot-Eval-A Re-Kalibrierung: Schwellen halbiert. Grund:
+ * seit der Alias-Expansion (CROSS_LANG_ALIASES, DE↔EN) hat eine
+ * typische Query ~20 expanded Keywords statt ~10. Weighted-Overlap
+ * skaliert umgekehrt proportional zur Keyword-Menge — ein Signal, das
+ * 3 von 10 ursprünglichen Begriffen trifft, lag bei ~40% Overlap; mit
+ * 20 expanded Keywords liegt derselbe tatsächliche Match bei ~15-20%.
+ * Die ALTEN Schwellen (30-40%) waren daher effektiv zu streng und
+ * schlossen thematisch passende Signale aus. Der Anchor-Match-Gate
+ * (≥5-Zeichen-Keyword muss erscheinen) bleibt als Schutz gegen
+ * inhaltlichen Off-Topic-Müll bestehen.
  */
 const TIER_MIN_OVERLAP: Record<SourceTier, number> = {
-  authoritative: 0.25,
-  academic: 0.30,
-  media: 0.30,
-  proxy: 0.40,
-  social: 0.60,  // Bluesky etc. — needs to really be on-topic
+  authoritative: 0.10,
+  academic: 0.15,
+  media: 0.15,
+  proxy: 0.20,
+  social: 0.35,  // Bluesky etc. — needs to really be on-topic
 };
 
 function db() {
@@ -463,12 +472,20 @@ export function extractQueryKeywords(query: string): string[] {
  *    matched a short generic word (e.g. only "eu" from "eu mobility
  *    policy") from being treated as topical evidence.
  *
- * Generic enough to work for any query in any domain — no per-topic
- * customisation required.
+ * 2026-04-22 Pilot-Eval-Fix: `aliasGroups` ist ein optionales zweites
+ * Argument. Jede Gruppe ist eine Menge synonymer Varianten eines
+ * Base-Keywords (z.B. `["wintersport", "winter sports"]` oder
+ * `["lieferketten", "supply chain", "supply chains"]`). Wenn irgendeine
+ * Variante einer Gruppe im Signal vorkommt, gilt das Base-Keyword als
+ * matched. Nenner bleibt aber die Base-Keyword-Menge — der Overlap
+ * zeigt also immer, wie viele Konzepte der Original-Frage adressiert
+ * sind, nicht wie viele Alias-Varianten im Text auftauchen. Ohne
+ * aliasGroups (Legacy-Aufruf) verhält sich die Funktion wie vorher.
  */
 export function computeKeywordStats(
   baseKeywords: string[],
   signalText: string,
+  aliasGroups?: Record<string, string[]>,
 ): { matched: number; overlap: number; weightedOverlap: number; anchorMatched: boolean } {
   if (baseKeywords.length === 0) {
     return { matched: 0, overlap: 0, weightedOverlap: 0, anchorMatched: false };
@@ -478,17 +495,33 @@ export function computeKeywordStats(
   let matched = 0;
   let matchedWeight = 0;
   let totalWeight = 0;
-  let anchorMatched = false;
 
-  const anchors = baseKeywords.filter((k) => k.length >= 5);
-  const anchorSet = new Set(anchors.length > 0 ? anchors : baseKeywords);
+  // 2026-04-22 Pilot-Eval-Fix: Anchor-Mechanik strenger.
+  //
+  // Frühere Regel „irgendein Keyword ≥5 Zeichen matcht" war unter Alias-
+  // Expansion zu großzügig: bei einer Wintersport-Query triggerte schon
+  // „region" oder „europa" im ECFR-EU-Hungary-Paper den Anchor, obwohl
+  // „wintersport" (das eigentliche Kernwort) nirgends auftaucht.
+  //
+  // Neue Regel: die TOP-3 längsten Base-Keywords sind Strict-Anchors.
+  // Mindestens einer davon (direkt ODER über seine Alias-Varianten)
+  // muss im Signal erscheinen — sonst gilt anchorMatched = false,
+  // selbst wenn andere, kürzere Keywords matchen. Das priorisiert die
+  // spezifischen Kernbegriffe der Frage über die generischen
+  // Struktur- und Funktionswörter.
+  const sortedByLength = [...baseKeywords].sort((a, b) => b.length - a.length);
+  const strictAnchors = sortedByLength.slice(0, Math.min(3, sortedByLength.length));
+  const strictAnchorSet = new Set(strictAnchors);
+  let anchorMatched = false;
 
   for (const kw of baseKeywords) {
     totalWeight += kw.length;
-    if (text.includes(kw)) {
+    const variants = aliasGroups && aliasGroups[kw] ? [kw, ...aliasGroups[kw]] : [kw];
+    const hit = variants.some((v) => text.includes(v));
+    if (hit) {
       matched += 1;
       matchedWeight += kw.length;
-      if (anchorSet.has(kw)) anchorMatched = true;
+      if (strictAnchorSet.has(kw)) anchorMatched = true;
     }
   }
 
@@ -529,19 +562,70 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   const d = db();
 
   // ALG-21: Cross-language alias map for common DE<>EN term pairs.
+  //
+  // 2026-04-22 Pilot-Eval-Erweiterung: DE-Strategie-Queries liefen
+  // häufig gegen 0 Live-Signale, weil die News-Connectors überwiegend
+  // englischsprachig sind (Guardian/NYT/NewsData/Al Jazeera) und die
+  // Original-DE-Keywords nicht matchen. Die Lücken-Familie „Supply
+  // Chain / Fragmentation / Standort / EU-Ländernamen" ist jetzt
+  // zweisprachig bi-direktional alias-verknüpft, damit eine DE-Frage
+  // EN-Content findet und umgekehrt.
   const CROSS_LANG_ALIASES: Record<string, string[]> = {
     "ki": ["ai", "artificial intelligence", "künstliche intelligenz"],
     "klimawandel": ["climate change", "global warming"],
     "cybersicherheit": ["cybersecurity", "cyber security"],
     "energiewende": ["energy transition"],
-    "lieferkette": ["supply chain"],
+    "lieferkette": ["supply chain", "lieferketten"],
+    "lieferketten": ["supply chain", "supply chains", "lieferkette"],
     "gesundheit": ["health", "public health"],
     "migration": ["immigration", "refugees"],
-    "geopolitik": ["geopolitics"],
+    "geopolitik": ["geopolitics", "geopolitical"],
     "kryptowährung": ["cryptocurrency", "crypto"],
     "mobilität": ["mobility", "transport", "transportation", "verkehr"],
     "nachhaltigkeit": ["sustainability", "sustainable"],
     "digitalisierung": ["digitalization", "digital transformation"],
+    // 2026-04-22: Strategie-Vokabular
+    "fragmentierung": ["fragmentation"],
+    "wirtschaft": ["economy", "economic"],
+    "wirtschaftlich": ["economic", "economy"],
+    "industrie": ["industry", "industrial"],
+    "industriell": ["industrial", "industry"],
+    "industrielles": ["industrial", "industry"],
+    "deutschland": ["germany", "german"],
+    "deutsche": ["german", "germany"],
+    "europa": ["europe", "european", "eu"],
+    "europäisch": ["european", "europe", "eu"],
+    "europäische": ["european", "europe", "eu"],
+    "regulierung": ["regulation", "regulatory"],
+    "arbeitsmarkt": ["labor market", "labour market", "employment"],
+    "gesellschaft": ["society", "social"],
+    "gesellschaftlich": ["social", "society"],
+    "wohlstand": ["prosperity", "wealth"],
+    "sicherheit": ["security", "safety"],
+    "souveränität": ["sovereignty"],
+    "resilienz": ["resilience", "resilient"],
+    "verteidigung": ["defense", "defence"],
+    "bildung": ["education", "educational"],
+    "forschung": ["research", "r&d"],
+    "innovation": ["innovation", "innovative"],
+    "automatisierung": ["automation", "automated"],
+    "arbeit": ["work", "labor", "labour"],
+    "wärmepumpe": ["heat pump"],
+    "wärmepumpen": ["heat pumps", "heat pump"],
+    "gebäude": ["building", "buildings"],
+    "dach": ["dach region", "germany austria switzerland"],
+    "china": ["china", "chinese", "prc"],
+    "russland": ["russia", "russian"],
+    "österreich": ["austria", "austrian"],
+    "schweiz": ["switzerland", "swiss"],
+    "frankreich": ["france", "french"],
+    "italien": ["italy", "italian"],
+    "spanien": ["spain", "spanish"],
+    "polen": ["poland", "polish"],
+    "tschechien": ["czech", "czechia", "czech republic"],
+    "slowakei": ["slovakia", "slovak"],
+    "ungarn": ["hungary", "hungarian"],
+    "rumänien": ["romania", "romanian"],
   };
 
   const aliasLookup = new Map<string, string[]>();
@@ -570,7 +654,13 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
       }
     }
   }
-  const keywords = Array.from(expandedSet).slice(0, 14);
+  // 2026-04-22: Cap auf 24 erhöht (war 14). DE-Queries mit erweitertem
+  // Alias-Set produzieren leicht 20+ Terms — mit der alten Cap wurden
+  // englische Varianten weggeschnitten, was DE-Queries trotz korrekter
+  // Aliase 0 Treffer gegen den englischsprachig-dominierten Content-
+  // Pool lieferte (Pilot-Eval-A Root-Cause). 24 ist konservativ genug,
+  // um den SQL-Score-Compute nicht explodieren zu lassen.
+  const keywords = Array.from(expandedSet).slice(0, 24);
 
   if (keywords.length === 0) {
     d.close();
@@ -643,11 +733,41 @@ export function getRelevantSignals(query: string, limit = 12): LiveSignal[] {
   // against the query) and `sourceTier` forward, so downstream UI +
   // Orbit scoring can use them as deterministic fallbacks when the LLM
   // has not supplied per-signal queryRelevance.
+  // Alias-Gruppen pro Base-Keyword für die Overlap-Berechnung. Jedes
+  // Base-Keyword bekommt nur seine eigenen Aliase zugeordnet, damit die
+  // Overlap-Metrik base-relativ bleibt (nicht durch alias-Expansion
+  // verwässert). Der zweimal aufgerufene Lookup oben hat nur als
+  // Source-zu-Alias-Gruppe gedient, hier bauen wir die exakte Map.
+  const aliasMap: Record<string, string[]> = {};
+  for (const bk of baseKeywords) {
+    const group = aliasLookup.get(bk);
+    if (group) aliasMap[bk] = group.filter(x => x !== bk);
+  }
+
   const enriched: (LiveSignal & { relevance_score: number; keywordOverlap: number; sourceTier: SourceTier })[] = [];
   for (const row of filtered) {
-    const signalText = [row.title, row.topic, row.content?.slice(0, 1000), row.tags]
+    // 2026-04-22 Pilot-Eval-Regressions-Fix: Source-Branding-Präfix
+    // aus signalText strippen, bevor overlap berechnet wird. Sonst
+    // triggert z.B. „ECFR (European Council on Foreign Relations):"
+    // den europa→european-Alias unabhängig vom tatsächlichen Paper-
+    // Inhalt, und Feeds wie „EU Observer" / „Bloomberg Europe" werden
+    // systematisch überbewertet. Die Convention der RSS-Feeds ist
+    // `<Quelle-Branding>: <echter Titel>` (Konvention aus rss-feeds.ts).
+    const strippedTitle = typeof row.title === "string"
+      ? row.title.replace(/^[^:]{1,120}:\s*/, "")
+      : row.title;
+    const signalText = [strippedTitle, row.topic, row.content?.slice(0, 1000), row.tags]
       .filter(Boolean).join(" ");
-    const stats = computeKeywordStats(baseKeywords, signalText);
+    // 2026-04-22 Pilot-Eval-Fix: Overlap gegen BASE-Keywords rechnen,
+    // aber Aliase als gültige Match-Varianten pro Base-Keyword
+    // zulassen (dritter Parameter). Dadurch bleibt der Nenner stabil
+    // bei der Original-Fragenkomplexität — ein „supply chain"-Match
+    // zählt als „lieferketten matched", nicht als zusätzlicher Treffer
+    // neben „lieferketten". So werden Wintersport-Queries NICHT mehr
+    // durch ECFR-EU-Papers noise-gematcht (weil „wintersport" dort
+    // fehlt), während Lieferketten-Queries sehr wohl englisch-
+    // sprachige Signale finden.
+    const stats = computeKeywordStats(baseKeywords, signalText, aliasMap);
     const tier = classifySource(row.source);
 
     // (A) Anchor-match — skipped when the user explicitly asked about a
