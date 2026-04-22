@@ -17,7 +17,9 @@ import { ORBIT_STAGE_COLORS, ORBIT_STATE_COLORS, stageColor } from "./orbit-colo
    causal edges → insights → scenarios → decisions out as columns. Every node
    inherits a chain-relevance computed as the product of upstream strengths
    from the focused terminal node. Low-relevance debris (e.g. off-topic
-   signals) is filtered by a user-controlled threshold (default 0.20).
+   signals) is filtered by a user-controlled threshold (default 0.05 since
+   2026-04-22 — was 0.20, but post-retrieval-reform that hid signals which
+   were correctly retrieved via the long-domain-anchor / bigram bypass).
 
    Scoring (post 2026-04-21 Signal-Kettenbezug fix):
    - Trends:  queryRelevance (LLM) → fallback relevance × confidence
@@ -543,7 +545,17 @@ export function OrbitDerivationView({
   const [focusId, setFocusId] = useState<string | null>(initialFocus);
   const [detailSpineId, setDetailSpineId] = useState<string | null>(null); // spine-node id for right-hand context panel
   const [panelPinned, setPanelPinned] = useState(true);                     // show panel by default once focused
-  const [threshold, setThreshold] = useState(0.20);
+  // 2026-04-22 P3-Display-Sync: default threshold lowered from 0.20 → 0.05.
+  // Same root cause as the BriefingResult Live-Signale fix (80288e2): the
+  // smart retrieval layer (alias-aware anchor + long-domain-anchor + bigram
+  // bypass) admits domain-relevant signals even when their raw weighted-
+  // overlap is low (short news titles match 1-2 of 19+ expanded keywords).
+  // For C-DE Wärmepumpen signals, chainRel = strength(0.5) × topic(0.07)
+  // × avgTrendRel(~0.5) ≈ 0.018 — far below the old 0.20 cutoff. They were
+  // cited by the LLM in the synthesis but invisible in the Orbit derivation
+  // chain. The user-facing slider still works for tightening the view; the
+  // default just no longer hides correctly-retrieved signals.
+  const [threshold, setThreshold] = useState(0.05);
   const [expandedBuckets, setExpandedBuckets] = useState<Set<string>>(new Set());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
