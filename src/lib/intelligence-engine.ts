@@ -128,6 +128,44 @@ export interface IntelligenceBriefing {
     overallReadiness: number;
     criticalTension?: string;
   };
+  // 2026-04-23 Server-Meta-Felder (`_*` prefix). Werden in
+  // `src/app/api/v1/query/route.ts` an `finalResult` gehängt und durch
+  // `intelligence-engine.ts` (queryIntelligenceAsync return) explizit
+  // weitergereicht. Vor dem 2026-04-23-Fix wurden sie gestrippt — was
+  // dazu führte dass die Coverage-Health-Box nie rendern konnte. Diese
+  // Felder sind alle optional (Pass-3 / Contradiction-Check / Assumption-
+  // Extraction können failen → null) und alle non-PII (gaps + scores +
+  // metadata für UI-Transparenz).
+  _coverageReport?: {
+    coverageGaps: Array<{
+      aspect: string;
+      severity: "low" | "medium" | "high";
+      whyMissing?: string;
+      refinementQuery?: string;
+    }>;
+    representationBiases: Array<{
+      type: "source" | "perspective" | "geography" | "time-period";
+      description: string;
+      howSkews?: string;
+    }>;
+    confidenceCeiling: number;
+    refinementQueries: string[];
+    synthesis: string;
+  };
+  _coverageCeilingClamp?: { original: number; ceiling: number };
+  _confidenceCalibration?: {
+    score: number;
+    band: string;
+    limitingFactors?: string[];
+    inputs?: Record<string, number>;
+  };
+  _contradictionReport?: unknown;
+  _assumptionReport?: unknown;
+  _scenarioDivergence?: unknown;
+  _mode?: string;
+  _repaired?: boolean;
+  _dataQualityWarnings?: string[];
+  _validationWarnings?: string[];
 }
 
 interface TrendMatch {
@@ -492,7 +530,31 @@ export async function queryIntelligenceAsync(
     // Ergaenzungen auf maximal 15 aufgefuellt — deduped.
     const mergedTags = Array.from(new Set([...llmTags, ...localTags])).slice(0, 15);
 
+    // 2026-04-23 Bug-Fix: forward all `_*` meta-fields from llmResult.
+    // Vor diesem Fix wurden _coverageReport, _coverageCeilingClamp,
+    // _confidenceCalibration, _contradictionReport, _assumptionReport,
+    // _scenarioDivergence, _mode, _repaired, _dataQualityWarnings,
+    // _validationWarnings stillschweigend gestrippt — sie gingen vom
+    // Server-finalResult zum gespeicherten Briefing nicht durch. Effekt:
+    // die Coverage-Health-Box (UI-Komponente in BriefingResult) konnte
+    // nie rendern, weil die Daten in der DB fehlten, obwohl Pass 3 sie
+    // produziert hatte. Spread llmResult zuerst, dann explizite Felder
+    // (für die typed-shape), dann meta-fields explizit nochmal um sie
+    // bei TypeScript-Awareness aufzulisten.
+    const llm = llmResult as any;
     return {
+      // Forward all meta-fields (_coverageReport etc.) from server
+      _coverageReport: llm._coverageReport,
+      _coverageCeilingClamp: llm._coverageCeilingClamp,
+      _confidenceCalibration: llm._confidenceCalibration,
+      _contradictionReport: llm._contradictionReport,
+      _assumptionReport: llm._assumptionReport,
+      _scenarioDivergence: llm._scenarioDivergence,
+      _mode: llm._mode,
+      _repaired: llm._repaired,
+      _dataQualityWarnings: llm._dataQualityWarnings,
+      _validationWarnings: llm._validationWarnings,
+      // Explicit typed fields
       query,
       matchedTrends,
       synthesis: llmResult.synthesis || "",
