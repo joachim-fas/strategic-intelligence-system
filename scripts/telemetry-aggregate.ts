@@ -82,11 +82,41 @@ function parseLog(text: string): PerQueryRecord[] {
   const records: PerQueryRecord[] = [];
   let current: PerQueryRecord | null = null;
 
+  // 2026-04-23 Bug-Fix: previously the session-start marker was
+  // [query:llm-1], but Pass 2a (relevance-pass-1) and Pass 3
+  // (coverage-critique) actually appear BEFORE llm-1 in the log
+  // sequence. So those lines were either dropped (first query) or
+  // attached to the PREVIOUS query (subsequent queries). Now:
+  // [query:relevance-pass-1] is the canonical session-start; if a
+  // log doesn't have it (legacy/pre-Pass-2 logs), [query:llm-1] is
+  // the fallback start.
   for (const line of lines) {
-    if (line.includes("[query:llm-1]")) {
-      // Push previous, start new
+    // Primary session-start: relevance-pass-1 (modern pipeline)
+    if (line.includes("[query:relevance-pass-1]")) {
       if (current) records.push(current);
       current = {};
+      const kv = parseKv(line);
+      current.pass1 = {
+        in: asNumber(kv.in),
+        out: asNumber(kv.out),
+        dropped: asNumber(kv.dropped),
+        mean: asNumber(kv.mean),
+        tokensIn: asNumber(kv.tokens_in),
+        tokensOut: asNumber(kv.tokens_out),
+        durationMs: asNumber(kv.duration_ms),
+      };
+      continue;
+    }
+    // Fallback session-start: llm-1 (legacy, pre-Pass-2 logs)
+    if (line.includes("[query:llm-1]")) {
+      // If current session already has an llm-1, this is a new session.
+      // If not, attach to current (the relevance-pass-1 already opened it).
+      if (current && current.llm1) {
+        records.push(current);
+        current = {};
+      } else if (!current) {
+        current = {};
+      }
       const kv = parseKv(line);
       current.llm1 = {
         stopReason: kv.stop_reason,
@@ -103,17 +133,6 @@ function parseLog(text: string): PerQueryRecord[] {
         stopReason: kv.stop_reason,
         inputTokens: asNumber(kv.input_tokens),
         outputTokens: asNumber(kv.output_tokens),
-        durationMs: asNumber(kv.duration_ms),
-      };
-    } else if (line.includes("[query:relevance-pass-1]")) {
-      const kv = parseKv(line);
-      current.pass1 = {
-        in: asNumber(kv.in),
-        out: asNumber(kv.out),
-        dropped: asNumber(kv.dropped),
-        mean: asNumber(kv.mean),
-        tokensIn: asNumber(kv.tokens_in),
-        tokensOut: asNumber(kv.tokens_out),
         durationMs: asNumber(kv.duration_ms),
       };
     } else if (line.includes("[query:relevance-pass-2]")) {

@@ -52,6 +52,8 @@ import {
   ArrowRight,
   Newspaper,
   Compass,
+  ShieldAlert,
+  Search as SearchIcon,
   FileText as DocIcon,
   MessageSquare,
   LayoutGrid,
@@ -666,6 +668,25 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
                liegen darunter und lösen keine Empty-States aus — dort
                sind fehlende Szenarien/Erkenntnisse der erwartete
                Zustand, nicht ein Defekt. */}
+
+          {/* 1.5 Coverage-Health (Pass 3 — sichtbar wenn vorhanden)
+               2026-04-23: macht die heute gebaute Iteration-Loop-
+               Architektur sichtbar. Pass 3 produziert _coverageReport
+               (gaps + biases + ceiling + refinement-queries) und
+               _coverageCeilingClamp (wenn Sonnet die Ceiling-Instruction
+               überschritten hat und der Hard-Clamp gefeuert hat).
+               Diese Box zeigt: warum ist die Konfidenz so/so, welche
+               strukturellen Datenlücken gibt es, was sollte zusätzlich
+               gesucht werden. Differenzierung: andere Tools verstecken
+               solche Limitierungen, SIS macht sie sichtbar. */}
+          {(b as any)._coverageReport && (
+            <CoverageHealthBox
+              report={(b as any)._coverageReport}
+              clamp={(b as any)._coverageCeilingClamp}
+              locale={locale}
+              de={locale === "de"}
+            />
+          )}
 
           {/* 2. Scenarios in Section Card */}
           {b.scenarios?.length > 0 ? (
@@ -1532,5 +1553,328 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
         </div>
       )}
     </article>
+  );
+}
+
+// ─── Coverage-Health-Box (2026-04-23) ────────────────────────────────────
+//
+// Renders the Iteration-Loop Pass 3 output (signal-coverage-critique.ts)
+// as a structured user-facing block. Surfaces:
+//   - Confidence ceiling that Pass 3 set, with visual indicator if the
+//     Confidence-Clamp had to fire (= Sonnet wanted higher confidence
+//     than the evidence justified)
+//   - Coverage gaps grouped by severity (HIGH/MEDIUM/LOW) — what aspects
+//     of the question the signal set DOES NOT support
+//   - Representation biases — overrepresented sources/perspectives
+//   - Refinement queries — search terms that might fill the gaps
+//     (future v0.3: clickable to launch a follow-up retrieval)
+//
+// Differentiation: most retrieval/synthesis tools hide their limits.
+// SIS makes them explicit. The strategist sees not just the answer but
+// also the structural shape of the evidence base — which builds trust
+// because the system is honest about what it doesn't know.
+//
+// Defensive rendering: if any field is missing, renders gracefully
+// (the report shape is well-defined but field-by-field fallback is
+// good practice for any LLM-derived data).
+
+interface CoverageGap {
+  aspect: string;
+  severity: "low" | "medium" | "high";
+  whyMissing?: string;
+  refinementQuery?: string;
+}
+
+interface CoverageBias {
+  type: "source" | "perspective" | "geography" | "time-period";
+  description: string;
+  howSkews?: string;
+}
+
+interface CoverageReportShape {
+  coverageGaps?: CoverageGap[];
+  representationBiases?: CoverageBias[];
+  confidenceCeiling?: number;
+  refinementQueries?: string[];
+  synthesis?: string;
+}
+
+interface CoverageClampShape {
+  original: number; // 0-1 raw, or 0-100 percent — we handle both
+  ceiling: number;
+}
+
+function CoverageHealthBox({
+  report,
+  clamp,
+  locale,
+  de,
+}: {
+  report: CoverageReportShape;
+  clamp: CoverageClampShape | null | undefined;
+  locale: string;
+  de: boolean;
+}) {
+  const gaps = Array.isArray(report.coverageGaps) ? report.coverageGaps : [];
+  const biases = Array.isArray(report.representationBiases) ? report.representationBiases : [];
+  const refinements = Array.isArray(report.refinementQueries) ? report.refinementQueries : [];
+  const ceilingPct = typeof report.confidenceCeiling === "number"
+    ? Math.round(report.confidenceCeiling * 100)
+    : null;
+
+  // Normalise clamp values — could be 0-1 or 0-100 depending on caller
+  const normaliseToPct = (v: number) => v <= 1 ? Math.round(v * 100) : Math.round(v);
+  const clampOriginalPct = clamp ? normaliseToPct(clamp.original) : null;
+  const clampCeilingPct = clamp ? normaliseToPct(clamp.ceiling) : null;
+
+  // Sort gaps by severity (high first)
+  const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const sortedGaps = [...gaps].sort(
+    (a, b) => (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99),
+  );
+
+  const severityColor = (s: string): { bg: string; fg: string; label: string } => {
+    if (s === "high") return { bg: "#FEE2E2", fg: "#991B1B", label: "HIGH" };
+    if (s === "medium") return { bg: "#FEF3C7", fg: "#92400E", label: "MED" };
+    return { bg: "#E0F2FE", fg: "#075985", label: "LOW" };
+  };
+
+  const tl = (deStr: string, enStr: string) => de ? deStr : enStr;
+
+  return (
+    <VoltSectionCard
+      icon={<ShieldAlert size={18} />}
+      iconVariant="butter"
+      title={tl("Coverage-Health (Pass 3)", "Coverage Health (Pass 3)")}
+      subtitle={
+        ceilingPct !== null
+          ? tl(
+              `Pass-3 Confidence-Ceiling: ${ceilingPct}% — LLM-judged evidence assessment`,
+              `Pass-3 confidence ceiling: ${ceilingPct}% — LLM-judged evidence assessment`,
+            )
+          : tl("Pass-3-Bewertung der Datenlage", "Pass-3 evidence assessment")
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Clamp-Indikator: nur wenn Sonnet die Ceiling überschritten hat
+            und der Hard-Clamp gefeuert hat. Sonst still — Sonnet war ehrlich. */}
+        {clamp && clampOriginalPct !== null && clampCeilingPct !== null && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 12px",
+              background: "#FEF3C7",
+              border: "1px solid #F59E0B",
+              borderRadius: 6,
+              fontSize: 13,
+              color: "#92400E",
+            }}
+          >
+            <AlertTriangle size={14} />
+            <span>
+              <strong>{tl("Confidence-Clamp aktiv:", "Confidence-Clamp active:")}</strong>{" "}
+              {tl(
+                `LLM wollte ${clampOriginalPct}%, durch Coverage-Ceiling auf ${clampCeilingPct}% gehärtet.`,
+                `LLM claimed ${clampOriginalPct}%, hardened to ${clampCeilingPct}% by coverage ceiling.`,
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* Synthesis (1-2 Sätze, was die Coverage-Analyse sagt) */}
+        {report.synthesis && (
+          <div
+            style={{
+              padding: "10px 12px",
+              background: "#FAF7FF",
+              border: "1px solid #C0A8F0",
+              borderRadius: 6,
+              fontSize: 13,
+              fontStyle: "italic",
+              color: "#3F2A5C",
+              lineHeight: 1.5,
+            }}
+          >
+            {report.synthesis}
+          </div>
+        )}
+
+        {/* Coverage-Lücken (gruppiert nach Severity) */}
+        {sortedGaps.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#6B5B95",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 8,
+              }}
+            >
+              {tl("Coverage-Lücken", "Coverage Gaps")} ({sortedGaps.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sortedGaps.map((g, i) => {
+                const sc = severityColor(g.severity);
+                return (
+                  <div
+                    key={`gap-${i}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 8,
+                      padding: "8px 10px",
+                      background: "#fff",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 5,
+                    }}
+                  >
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: sc.fg,
+                        background: sc.bg,
+                        borderRadius: 3,
+                        padding: "2px 6px",
+                        marginTop: 1,
+                      }}
+                    >
+                      {sc.label}
+                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                      <div style={{ fontSize: 13, color: "#1F2937", lineHeight: 1.45 }}>
+                        {g.aspect}
+                      </div>
+                      {g.whyMissing && (
+                        <div style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.5 }}>
+                          {tl("Grund", "Reason")}: {g.whyMissing}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Repräsentations-Biases */}
+        {biases.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#6B5B95",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 8,
+              }}
+            >
+              {tl("Verzerrungen im Signal-Set", "Representation Biases")} ({biases.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {biases.map((b, i) => (
+                <div
+                  key={`bias-${i}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: "8px 10px",
+                    background: "#fff",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 5,
+                  }}
+                >
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: "#5A2A9E",
+                      background: "#F4EEFF",
+                      borderRadius: 3,
+                      padding: "2px 6px",
+                      marginTop: 1,
+                    }}
+                  >
+                    {b.type}
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                    <div style={{ fontSize: 13, color: "#1F2937", lineHeight: 1.45 }}>
+                      {b.description}
+                    </div>
+                    {b.howSkews && (
+                      <div style={{ fontSize: 11, color: "#6B7280", lineHeight: 1.5 }}>
+                        {tl("Verzerrt", "Skews")}: {b.howSkews}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Refinement-Queries (read-only in v0.1; v0.3 könnte sie klickbar
+            machen für direktes Re-Retrieval = Pass 4 mini) */}
+        {refinements.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#6B5B95",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <SearchIcon size={12} />
+              {tl("Refinement-Vorschläge", "Refinement Suggestions")} ({refinements.length})
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {refinements.map((q, i) => (
+                <span
+                  key={`ref-${i}`}
+                  style={{
+                    fontSize: 12,
+                    color: "#075985",
+                    background: "#E0F2FE",
+                    border: "1px solid #7DD3FC",
+                    borderRadius: 4,
+                    padding: "4px 10px",
+                    fontFamily: "var(--volt-font-mono, monospace)",
+                  }}
+                  title={tl(
+                    "Suchvorschlag von Pass-3 — könnte fehlende Signale finden, falls als Folge-Query genutzt",
+                    "Search suggestion from Pass 3 — might find missing signals if used as a follow-up query",
+                  )}
+                >
+                  {q}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer-Attribution */}
+        <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4, textAlign: "right" }}>
+          {tl(
+            "Quelle: Pass-3 Coverage-Critique (claude-haiku-4-5)",
+            "Source: Pass-3 Coverage-Critique (claude-haiku-4-5)",
+          )}
+        </div>
+      </div>
+    </VoltSectionCard>
   );
 }
