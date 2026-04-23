@@ -61,7 +61,9 @@ export default function ReadView({ projectId }: ReadViewProps) {
         fetchWithTimeout(`/api/v1/canvas/${projectId}`, {}, 15_000).then(r => r.ok ? r.json() : null),
         fetchWithTimeout(`/api/v1/projects/${projectId}/queries`, {}, 15_000).then(r => r.ok ? r.json() : null),
       ]);
-      if (pj?.canvas?.name) setProjectName(pj.canvas.name);
+      // API returns { ok, data: { canvas: {...} } } — handle both wrapped + unwrapped
+      const canvasName = pj?.data?.canvas?.name ?? pj?.canvas?.name;
+      if (canvasName) setProjectName(canvasName);
       const list: QueryRow[] = (qs?.data?.queries ?? qs?.queries ?? []) as QueryRow[];
       // Filter: ignore framework-step rows like "marktanalyse/risks" — they
       // have query strings of the form "<frameworkId>/<stepId>" which
@@ -111,27 +113,67 @@ export default function ReadView({ projectId }: ReadViewProps) {
     }
   };
 
-  // Build HistoryEntry per query — BriefingResult expects this shape.
+  // Build HistoryEntry per query — BriefingResult expects IntelligenceBriefing
+  // shape, but the stored result_json has matchedTrends in FLAT form
+  // ({id, name, ...}). BriefingResult expects TrendMatch[] (with .trend
+  // wrapper). Same shape-adapter that intelligence-engine.ts:queryIntelligenceAsync
+  // applies for live queries needs to run here too. Without it, BriefingResult
+  // throws when accessing m.trend.id etc. — that's the "Etwas ist
+  // schiefgelaufen"-Crash we saw on first load.
   const entries: HistoryEntry[] = useMemo(() => {
-    return queries.map((q) => ({
-      id: q.id,
-      query: q.query,
-      briefing: q.result ?? {
-        // Defensive fallback: empty briefing if result is null/missing
+    return queries.map((q) => {
+      const result = q.result || {};
+      // Wrap flat matchedTrends → TrendMatch[]. Detect by shape: if first
+      // item has a .trend property already, it's already wrapped (some
+      // briefings might be stored differently across history). Otherwise
+      // wrap each {id, name, ...} into {trend: {...}, relevanceToQuery, matchReason}.
+      const rawMatchedTrends: any[] = Array.isArray(result.matchedTrends) ? result.matchedTrends : [];
+      const looksWrapped = rawMatchedTrends.length > 0 && typeof rawMatchedTrends[0] === "object" && rawMatchedTrends[0] !== null && "trend" in rawMatchedTrends[0];
+      const matchedTrends = looksWrapped
+        ? rawMatchedTrends
+        : rawMatchedTrends.map((t: any) => ({
+            trend: {
+              id: t.id, name: t.name, description: t.description ?? "",
+              category: t.category ?? "other", tags: Array.isArray(t.tags) ? t.tags : [],
+              relevance: typeof t.relevance === "number" ? t.relevance : 0.5,
+              confidence: typeof t.confidence === "number" ? t.confidence : 0.5,
+              impact: typeof t.impact === "number" ? t.impact : 0.5,
+              timeHorizon: t.timeHorizon ?? "mid", ring: t.ring ?? "assess",
+              quadrant: t.quadrant ?? 0,
+              signalCount: typeof t.signalCount === "number" ? t.signalCount : 0,
+              topSources: Array.isArray(t.topSources) ? t.topSources : [],
+              velocity: t.velocity ?? "stable", userOverride: false,
+            },
+            relevanceToQuery: typeof t.queryRelevance === "number" ? t.queryRelevance : (typeof t.relevance === "number" ? t.relevance : 0.5),
+            matchReason: "LLM analysis",
+          }));
+
+      const briefing = {
+        // Forward the raw result as-is (preserves _coverageReport, _coverageCeilingClamp,
+        // and all other meta-fields needed for Coverage-Health-Box)
+        ...result,
+        // Override with shape-adapted matchedTrends + ensure required fields exist
         query: q.query,
-        matchedTrends: [],
-        synthesis: "",
-        reasoningChains: [],
-        keyInsights: [],
-        regulatoryContext: [],
-        causalChain: [],
-        signalSummary: "",
-        confidence: 0,
-        dataPoints: 0,
-      },
-      timestamp: new Date(q.created_at),
-      isLoading: false,
-    }));
+        matchedTrends,
+        matchedTrendsRaw: rawMatchedTrends, // canvas/orbit consumers might want raw
+        synthesis: result.synthesis ?? "",
+        reasoningChains: result.reasoningChains ?? [],
+        keyInsights: result.keyInsights ?? [],
+        regulatoryContext: result.regulatoryContext ?? [],
+        causalChain: result.causalChain ?? result.causalAnalysis ?? [],
+        signalSummary: typeof result.signalSummary === "string" ? result.signalSummary : "",
+        confidence: typeof result.confidence === "number" ? result.confidence : 0,
+        dataPoints: typeof result.dataPoints === "number" ? result.dataPoints : 0,
+      };
+
+      return {
+        id: q.id,
+        query: q.query,
+        briefing,
+        timestamp: new Date(q.created_at),
+        isLoading: false,
+      };
+    });
   }, [queries]);
 
   const formatRelative = (date: Date): string => {
