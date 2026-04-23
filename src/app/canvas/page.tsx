@@ -69,7 +69,7 @@ import { expandSlashCommand } from "@/lib/slash-prompts";
 import {
   GitBranch, LayoutGrid, Columns3, Clock, Hexagon,
   TreePine, Tag, Layers, X, Group, MoreHorizontal, Trash2, RefreshCw, MessageSquarePlus, TagIcon, Pin, CheckCircle2, Circle, CircleDot, Plus, Zap,
-  ArrowDown, ArrowRight, ChevronDown, ChevronUp, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw,
+  ArrowDown, ArrowRight, ChevronDown, ChevronUp, ShieldAlert, Compass, ExternalLink, Copy, Check, Search, RotateCcw, BookOpen,
 } from "lucide-react";
 // Sparkles laeuft ueber den Volt-Adapter. Die uebrigen Icons in dieser
 // Datei bleiben bis zum Icon-Set-Swap vorerst auf lucide — eine
@@ -2443,6 +2443,51 @@ export default function CanvasPage() {
             >
               <VIconSparkles size={12} />
               <span>{t("canvasPage.summaryButton")}</span>
+            </button>
+          </Tooltip>
+
+          {/* 2026-04-23 User-Wunsch: zur Linear-Read-View des Projekts.
+               Anders als „Zusammenfassung" (kompakt, Plain-Text-Stack)
+               zeigt /lesen jeden Briefing als volle BriefingResult mit
+               KPI-Tiles, Coverage-Health-Box, Live-Signale, etc. — die
+               Ansicht die man von Home kennt. Plus TOC-Sidebar zum
+               Springen zwischen Briefings (Dokumente werden lang).
+               Inactive (greyed) wenn kein Projekt geladen ist. */}
+          <Tooltip
+            content={
+              projectId
+                ? (locale === "de"
+                    ? "Projekt linear lesen — alle Briefings im vollen Layout (TOC-Navigation links)"
+                    : "Read project linearly — all briefings in full layout (TOC navigation on the left)")
+                : (locale === "de"
+                    ? "Linear-Lese-Ansicht — kein Projekt geladen"
+                    : "Linear read view — no project loaded")
+            }
+            placement="bottom"
+          >
+            <button
+              onClick={() => {
+                flushPendingSave();
+                isDirtyRef.current = false;
+                router.push(projectId
+                  ? `/canvas/${projectId}/lesen`
+                  : "/projects");
+              }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                fontSize: 11, fontWeight: 600, padding: "5px 11px",
+                borderRadius: 8, border: "1px solid var(--color-border)",
+                background: "transparent",
+                color: projectId ? "var(--color-text-secondary)" : "var(--color-text-muted)",
+                cursor: "pointer", transition: "all 0.12s",
+                fontFamily: "var(--font-ui)",
+                opacity: projectId ? 1 : 0.75,
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "#E4FF97"; el.style.color = "#0A0A0A"; el.style.borderColor = "rgba(0,0,0,0.1)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "transparent"; el.style.color = projectId ? "var(--color-text-secondary)" : "var(--color-text-muted)"; el.style.borderColor = "var(--color-border)"; }}
+            >
+              <BookOpen className="w-3 h-3" />
+              <span>{locale === "de" ? "Lesen" : "Read"}</span>
             </button>
           </Tooltip>
         </div>
