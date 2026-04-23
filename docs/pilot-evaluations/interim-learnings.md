@@ -784,3 +784,230 @@ semantisch relevant.
 - **`src/app/canvas/OrbitDerivationView.tsx`** — `signalTopicalFit`
   priorisiert llmRelevanceScore
 - **`docs/pilot-evaluations/interim-learnings.md`** — dieses Dokument
+
+---
+
+# Iteration-Loop Pass 3 — Coverage-Critique (gleicher Tag, Abend-Erweiterung)
+
+## Was Pass 3 macht (vs. Pass 2)
+
+Pass 2 evaluiert jedes Signal **einzeln**: ist DIESES Signal relevant
+zur Frage? Pass 3 evaluiert die Menge **kollektiv**: ist die Set
+zusammen ein ausreichendes Evidence-Fundament?
+
+Konkret bekommt Pass 3 die Pass-2-gefilterten Signale (5-15 Signale
+mit ihren LLM-Scores + Begründungen) und wird gefragt:
+
+- Welche Aspekte der Frage haben KEIN oder schwaches Signal-Support?
+- Ist eine Quelle / Perspektive / Geographie / Zeit-Periode
+  überrepräsentiert in einer Weise, die die Synthesis verzerren würde?
+- Welches Confidence-Ceiling ist angesichts der Set noch ehrlich?
+- Welche Refinement-Search-Queries würden die Lücken füllen (input
+  für ein zukünftiges Pass 4)?
+
+## Beispiel-Wirkung — Rundfunk-Query
+
+Ohne Pass 3:
+- Pass 2 liefert 2 Signale (ECFR + OSW)
+- Synthesis bekommt diese 2 Signale, generiert eine ausführliche
+  Antwort über Rundfunk-Vertrauen mit ~60% Konfidenz
+- LLM verwendet vermutlich `[LLM-KNOWLEDGE]`-Tags für die
+  Behauptungen — aber unsystematisch und ohne den User explizit zu
+  warnen welche strukturellen Lücken bestehen
+
+Mit Pass 3:
+- Pass 3 erkennt: keine Daten zu konkreten Rundfunk-Anstalten (ARD/
+  ZDF/ORF), keine Demoskopie zu Vertrauen, beide Quellen framen
+  Geopolitik nicht Medienpolitik
+- Generiert `<coverage_analysis>`-Block, der in den Synthesis-System-
+  Prompt injiziert wird:
+
+```
+<coverage_analysis>
+Coverage Analysis (Iteration-Loop Pass 3):
+
+Confidence ceiling for this query: 0.30
+
+Coverage gaps (aspects with no/weak signal support):
+  - [HIGH] Specific public broadcasting institutions (ARD, ZDF, ORF)
+        why: no broadcasting connectors in DB
+  - [MEDIUM] Public trust survey data
+        why: no demoscopy connectors
+
+Representation biases (skews in the signal set):
+  - [source] ECFR + OSW dominate, both geopolitics framing
+        skews: synthesis might frame Rundfunk as geopolitical institution
+        rather than as media-public-sphere institution
+
+Summary: Coverage is geopolitics-tilted. Broadcasting-specific data
+missing. Synthesis should rely heavily on [LLM-KNOWLEDGE] for the
+broadcasting-substance claims and cap confidence at 0.30.
+
+INSTRUCTION: Respect the confidence ceiling. Use [LLM-KNOWLEDGE] tags
+for any claim that addresses a gap above. Do NOT claim more than the
+signals support.
+</coverage_analysis>
+```
+
+- Synthesis liest das, kalibriert sich, schreibt eine ehrlichere
+  Antwort mit explizit benannten Lücken und Confidence ≤ 30%
+
+## Was Pass 3 NICHT macht
+
+Pass 3 generiert auch `refinementQueries` — Search-Terms die fehlende
+Signale finden könnten ("ARD ZDF ORF Vertrauensbarometer", "Public
+Service Media Index"). **Pass 3 führt diese Queries NICHT aus.** Das
+wäre Pass 4 (Refined-Retrieval), separat zu bauen wenn wir sehen dass
+die Refinement-Queries tatsächlich nützliche Signale finden.
+
+Pass 3 alleine = **Diagnose ohne Aktion**. Schon ein großer Schritt:
+ehrliche Synthesis statt korrigierte Retrieval.
+
+## Failure-Mode-Garantie
+
+Wie bei Pass 2: bei jedem Pass-3-Fehler returnt das Modul `null`.
+Caller (route.ts) prüft das und injiziert dann KEINEN
+`<coverage_analysis>`-Block in den Prompt. Synthesis läuft normal ohne
+explizite Coverage-Awareness — pre-Pass-3-Baseline. Keine
+Pass-3-bedingte Regression möglich.
+
+## Telemetrie
+
+Greppable Server-Log-Zeile pro Pass:
+
+```
+[query:coverage-critique] signals=8 gaps=2 biases=1 ceiling=0.40 model=claude-haiku-4-5 duration_ms=2840 tokens_in=1250 tokens_out=620
+```
+
+Activity-Stream-Event enthält `gaps`, `biases`, `ceiling`,
+`refinementQueries` — Loop-Aktivität ist auch im UI-Aktivitäts-Panel
+sichtbar.
+
+## Kosten
+
+Pro Query:
+- Input: ~1500 Tokens (Query + 5-15 gefilterte Signale + LLM-Judgments)
+- Output: ~500-800 Tokens (gaps + biases + queries + ceiling)
+- Haiku 4.5: ~$0.001-0.005 pro Query
+
+Total pro Query (jetzt mit Pass 2a + 2b + 3):
+- Pass 2a: ~$0.008
+- Pass 2b: ~$0.008
+- Pass 3:  ~$0.005
+- Sonnet-Synthesis: ~$0.02
+- **Total: ~$0.04 pro Query**
+
+Bei einer Pilot-Eval-Session mit 6 Queries: ~$0.25. Bei einer
+Stakeholder-Demo mit 20 Queries: ~$0.80. Marginal verglichen mit dem
+Wert „Synthesis ist ehrlich über Coverage statt zu raten".
+
+## Implementation
+
+**Neues Modul:** `src/lib/signal-coverage-critique.ts` (~280 Zeilen)
+- `analyzeCoverage(query, signals): Promise<CoverageReport | null>`
+- `extractCoverageReport(text): Partial<CoverageReport> | null` (exportiert für Tests)
+- `formatCoverageBlock(report, locale): string` (exportiert für Tests + route.ts)
+
+**Integration in route.ts** (zwischen Pass 2a und Synthesis-Call):
+
+```typescript
+const { analyzeCoverage, formatCoverageBlock } =
+  await import("@/lib/signal-coverage-critique");
+const coverageReport = await analyzeCoverage(query, relevantSignals);
+const coverageBlock = formatCoverageBlock(coverageReport, validLocale);
+const enrichedSignalsContext = coverageBlock
+  ? `${coverageBlock}\n\n${liveSignalsContext || ""}`.trim()
+  : liveSignalsContext;
+let systemPrompt = buildSystemPrompt(trends, validLocale, enrichedSignalsContext, query);
+```
+
+Wenn coverageReport null ist (Pass 3 failed) → coverageBlock ist
+empty string → Synthesis sieht den ursprünglichen liveSignalsContext
+ohne zusätzliche Zeilen. Kein Behavior-Change. Failure-safe.
+
+## Was Pass 3 vom Loop-Schluss trennt
+
+```
+[INPUT-SIDE Self-Critique]    Pre-Frage (das Question-Atlas-Framework)
+[RETRIEVAL]                   Pass 1 (multi-evidence-gate, ff19ba5)
+[OUTPUT-SIDE per-Signal]      Pass 2a + Pass 2b (e7f9699)
+[OUTPUT-SIDE per-Set]         Pass 3 (Coverage-Critique, NEU)
+[SYNTHESIS]                   Sonnet (mit injiziertem coverage_analysis)
+[NICHT GEBAUT]                Pass 4 (Refined-Retrieval — würde
+                              refinementQueries aus Pass 3 nehmen
+                              und damit getRelevantSignals erneut
+                              aufrufen, dann Pass 2b auf der erweiterten
+                              Set wiederholen, dann Pass 3 erneut, …
+                              max 2-3 Refinement-Iterationen.
+                              Erst bauen wenn wir sehen dass die
+                              Pass-3-Refinement-Queries genug Wert haben.)
+```
+
+Pass 3 schließt den Output-Self-Critique-Layer auf zwei Ebenen ab:
+per-Signal (Pass 2) und per-Set (Pass 3). Mit Pre-Frage als Input-
+Self-Critique haben wir **drei von vier Reflektions-Schichten gebaut**.
+
+## Tests
+
+`scripts/signal-coverage-critique-test.ts` (39 Assertions):
+
+- **extractCoverageReport** (12 Assertions): clean JSON, code-fence-
+  wrapped, defensive normalisation (severity-enum-fallback, type-enum-
+  fallback, ceiling-clamp, missing-ceiling-fallback, invalid-entries-
+  filtered, empty-strings-filtered), edge cases (empty/non-JSON/array/
+  null)
+- **formatCoverageBlock** (27 Assertions): null/trivial cases skip
+  block (no clutter), non-trivial reports inject block with correct
+  tags + INSTRUCTION line, locale switch DE/EN, low-severity gaps
+  trigger block (any gap = relevant)
+
+Live-LLM-Aufruf (`analyzeCoverage`) wird NICHT in unit-tests
+abgedeckt — gehört in eine opt-in Integration-Suite, weil es echte
+Haiku-Calls braucht.
+
+## Files
+
+- **`src/lib/signal-coverage-critique.ts`** (neu, ~280 Zeilen) — das
+  Pass-3-Modul mit JSDoc der vollen Architektur-Rationale
+- **`src/app/api/v1/query/route.ts`** — Pass-3-Hook zwischen Pass 2a
+  und Synthesis-Call, plus Telemetry-Logging
+- **`scripts/signal-coverage-critique-test.ts`** (neu, ~200 Zeilen) —
+  39 Test-Assertions für die Pure Functions
+
+## Bekannte Limitationen (v0.1 von Pass 3)
+
+1. **Pass 3 sieht NICHT die Pass-2b-augmented Signale** — nur die
+   Pass-2a-Set (16 first-pass Signale). Hintergrund: Pass 3 läuft VOR
+   der Synthesis (damit der Coverage-Block in den Prompt kann), aber
+   Pass 2b läuft NACH Synthesis (für UI-Display). Falls Pass-2b-
+   augmented Signale signifikant abweichen, könnte das die Coverage-
+   Analyse minder akkurat machen. Empirie steht aus.
+
+2. **Refinement-Queries werden noch nicht ausgeführt** — Pass 4 ist
+   das fehlende Stück. Die Queries sind im Output sichtbar (für
+   Telemetrie + spätere manuelle Inspection), aber kein Auto-Re-
+   Retrieval.
+
+3. **Confidence-Ceiling-Verbindung zur LLM-Self-Confidence** — wir
+   injizieren den Ceiling in den Prompt, aber das `confidence`-Feld
+   in der LLM-Response wird nicht hart gegen den Ceiling validiert.
+   Das LLM kann theoretisch trotzdem 70% Konfidenz reklamieren obwohl
+   Ceiling 0.4 sagt. Geplanter Folge-Schritt: post-validation
+   confidence-clamp.
+
+4. **Kein explizites UI-Surfacing der Coverage-Lücken** — die Lücken
+   sind im Briefing-Result-Payload, werden aber noch nicht in der
+   UI gerendert. Geplant: ein „Coverage-Health"-Box neben der
+   Live-Signale-Kachel mit Ampel-Anzeige.
+
+## Wann Pass 4 (Refined-Retrieval) bauen?
+
+Trigger-Bedingung: wenn empirisch (über mehrere Live-Runs) sichtbar
+wird, dass die `refinementQueries` aus Pass 3 plausible search-terms
+sind, die mit hoher Wahrscheinlichkeit echte Signale finden würden,
+die der erste Retrieval-Pass übersehen hat.
+
+Aktuell wissen wir das noch nicht — die ersten paar Live-Runs werden
+zeigen ob die LLM gute Refinement-Queries generiert oder nur
+generisches "more research needed". Bei guten Queries → Pass 4 bauen.
+Bei schwachen → Pass-3-Prompt verschärfen, Pass 4 zurückstellen.

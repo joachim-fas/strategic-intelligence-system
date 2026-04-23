@@ -377,11 +377,66 @@ export async function POST(req: Request) {
     },
   });
 
+  // 2026-04-23 Iteration-Loop Pass 3: Coverage-Critique on the
+  // Pass-2-filtered signal set. Asks Haiku to evaluate the SET
+  // COLLECTIVELY (Pass 2 evaluated each signal individually) — what
+  // aspects of the query have no signal support? what's overrepresented?
+  // what's the appropriate confidence ceiling for the synthesis?
+  //
+  // The output is injected as a structured <coverage_analysis> block
+  // into the synthesis system prompt, forcing Sonnet to honor the
+  // ceiling and explicitly flag gaps with [LLM-KNOWLEDGE] tags.
+  //
+  // Failure-safe: if Haiku returns null (no API key, HTTP error,
+  // malformed JSON), the coverage block is empty and synthesis runs
+  // normally without explicit coverage awareness — pre-Pass-3 baseline.
+  // No regression possible from a Pass-3 failure.
+  //
+  // See `src/lib/signal-coverage-critique.ts` for the full design.
+  const { analyzeCoverage, formatCoverageBlock } =
+    await import("@/lib/signal-coverage-critique");
+  const coverageReport = await analyzeCoverage(query, relevantSignals);
+  if (coverageReport) {
+    console.log(
+      `[query:coverage-critique] ` +
+      `signals=${relevantSignals.length} ` +
+      `gaps=${coverageReport.coverageGaps.length} ` +
+      `biases=${coverageReport.representationBiases.length} ` +
+      `ceiling=${coverageReport.confidenceCeiling.toFixed(2)} ` +
+      `model=${coverageReport.modelUsed} ` +
+      `duration_ms=${coverageReport.callDurationMs} ` +
+      `tokens_in=${coverageReport.inputTokens} ` +
+      `tokens_out=${coverageReport.outputTokens}`,
+    );
+    emitActivity({
+      type: "query",
+      phase: "coverage",
+      message: coverageReport.coverageGaps.length > 0
+        ? `Coverage-Critique: ${coverageReport.coverageGaps.length} Lücken erkannt, Confidence-Ceiling ${(coverageReport.confidenceCeiling * 100).toFixed(0)}%`
+        : `Coverage-Critique: keine signifikanten Lücken, Ceiling ${(coverageReport.confidenceCeiling * 100).toFixed(0)}%`,
+      meta: {
+        gaps: coverageReport.coverageGaps.length,
+        biases: coverageReport.representationBiases.length,
+        ceiling: coverageReport.confidenceCeiling,
+        refinementQueries: coverageReport.refinementQueries,
+      },
+    });
+  } else {
+    console.warn(`[query:coverage-critique] skipped — LLM unavailable or failed`);
+  }
+  const coverageBlock = formatCoverageBlock(coverageReport, validLocale);
+
   // Pilot-Eval-Fix 2026-04-22 (A EN lieferte DE-Antwort):
   // `query` als 4. Argument durchreichen. Der Prompt-Builder
   // detected damit die tatsächliche Sprache der Frage und
   // überschreibt den UI-locale für den Response-Language-Hint.
-  let systemPrompt = buildSystemPrompt(trends, validLocale, liveSignalsContext || undefined, query);
+  // 2026-04-23 Pass 3: optional coverage block prepended to liveSignalsContext.
+  // The block is empty string when coverage is fine OR when Pass 3 failed —
+  // either way, no prompt change in those cases.
+  const enrichedSignalsContext = coverageBlock
+    ? `${coverageBlock}\n\n${liveSignalsContext || ""}`.trim()
+    : liveSignalsContext;
+  let systemPrompt = buildSystemPrompt(trends, validLocale, enrichedSignalsContext || undefined, query);
 
   // SEC-08: Sanitize contextProfile fields — prevent prompt injection via role/industry/region
   const sanitizeField = (v: unknown): string => {
