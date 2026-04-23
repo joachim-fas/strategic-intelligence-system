@@ -210,6 +210,27 @@ function pUSD(n: number): string {
   return `$${n.toFixed(4)}`;
 }
 
+// 2026-04-23 Min-sample-size guard für Warnings.
+// Vor diesem Fix feuerten Warnungen wie "⚠️ >50% Sonnet ignoriert ceiling"
+// schon bei N=1 (1 von 1 = 100% > 50%), was statistisch sinnlos ist —
+// ein einzelner Datenpunkt sagt nichts über systematisches Verhalten.
+// MIN_WARN_SAMPLES = 3 ist ein konservativer Floor: Warnungen erscheinen
+// erst wenn wir mindestens 3 Datenpunkte haben. Bei N<3 wird stattdessen
+// eine sample-size-Notiz angezeigt damit der User weiß dass mehr Runs
+// für aussagekräftige Diagnose nötig sind.
+const MIN_WARN_SAMPLES = 3;
+function maybeWarn(condition: boolean, sampleSize: number, message: string): void {
+  if (sampleSize < MIN_WARN_SAMPLES) {
+    if (condition) {
+      console.log(`  (Hinweis: N=${sampleSize}, mindestens ${MIN_WARN_SAMPLES} Samples für aussagekräftige Warnung)`);
+    }
+    return;
+  }
+  if (condition) {
+    console.log(message);
+  }
+}
+
 function report(records: PerQueryRecord[]) {
   if (records.length === 0) {
     console.log("No [query:*] records found in input.");
@@ -252,9 +273,11 @@ function report(records: PerQueryRecord[]) {
     const pct = (count / llm1Records.length * 100).toFixed(0);
     console.log(`  ${reason.padEnd(20)} ${count.toString().padStart(4)}  (${pct}%)`);
   }
-  if (synthesisStopReasons.get("max_tokens")) {
-    console.log(`  ⚠️  max_tokens stop_reason indicates synthesis was truncated. Consider raising max_tokens.`);
-  }
+  maybeWarn(
+    Boolean(synthesisStopReasons.get("max_tokens")),
+    llm1Records.length,
+    `  ⚠️  max_tokens stop_reason indicates synthesis was truncated. Consider raising max_tokens.`,
+  );
   console.log();
 
   // Retry rate
@@ -275,9 +298,11 @@ function report(records: PerQueryRecord[]) {
     console.log(`  Queries: ${pass1Records.length}`);
     console.log(`  Mean drop rate: ${meanDropPct.toFixed(0)}%`);
     console.log(`  Mean LLM score: ${meanScore.toFixed(1)} / 10`);
-    if (meanScore < 4) {
-      console.log(`  ⚠️  Mean score < 4 suggests Pass 1 admits too much noise OR queries don't match the DB well.`);
-    }
+    maybeWarn(
+      meanScore < 4,
+      pass1Records.length,
+      `  ⚠️  Mean score < 4 suggests Pass 1 admits too much noise OR queries don't match the DB well.`,
+    );
     console.log();
   }
 
@@ -307,9 +332,11 @@ function report(records: PerQueryRecord[]) {
     console.log(`  Low ceilings (< 50%):    ${lowCeiling} (${(lowCeiling / pass3Records.length * 100).toFixed(0)}%)`);
     console.log(`  High ceilings (≥ 70%):   ${highCeiling} (${(highCeiling / pass3Records.length * 100).toFixed(0)}%)`);
     console.log(`  Total coverage-gaps detected: ${totalGaps}`);
-    if (lowCeiling / pass3Records.length > 0.4) {
-      console.log(`  ⚠️  >40% of queries get low ceiling — DB likely too sparse for the question domain.`);
-    }
+    maybeWarn(
+      lowCeiling / pass3Records.length > 0.4,
+      pass3Records.length,
+      `  ⚠️  >40% of queries get low ceiling — DB likely too sparse for the question domain.`,
+    );
     console.log();
   }
 
@@ -321,9 +348,11 @@ function report(records: PerQueryRecord[]) {
     console.log(`PASS 3 — Confidence-Clamp activations`);
     console.log(`  Queries: ${clampRecords.length} of ${records.length}  (${(clampRecords.length / records.length * 100).toFixed(0)}%)`);
     console.log(`  Mean drop: ${meanDrop.toFixed(0)}pp (synthesis was over-confident vs Pass 3 ceiling)`);
-    if (clampRecords.length / records.length > 0.5) {
-      console.log(`  ⚠️  Sonnet ignores the ceiling instruction in >50% of cases. Consider strengthening the prompt.`);
-    }
+    maybeWarn(
+      clampRecords.length / records.length > 0.5,
+      records.length,
+      `  ⚠️  Sonnet ignores the ceiling instruction in >50% of cases. Consider strengthening the prompt.`,
+    );
     console.log();
   }
 

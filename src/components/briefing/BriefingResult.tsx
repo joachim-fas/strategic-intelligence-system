@@ -685,6 +685,7 @@ export function BriefingResult({ entry, locale, trendCount, onTrendClick, active
               clamp={(b as any)._coverageCeilingClamp}
               locale={locale}
               de={locale === "de"}
+              onFollowUp={onFollowUp}
             />
           )}
 
@@ -1609,11 +1610,13 @@ function CoverageHealthBox({
   clamp,
   locale,
   de,
+  onFollowUp,
 }: {
   report: CoverageReportShape;
   clamp: CoverageClampShape | null | undefined;
   locale: string;
   de: boolean;
+  onFollowUp?: (query: string) => void;
 }) {
   const gaps = Array.isArray(report.coverageGaps) ? report.coverageGaps : [];
   const biases = Array.isArray(report.representationBiases) ? report.representationBiases : [];
@@ -1822,8 +1825,13 @@ function CoverageHealthBox({
           </div>
         )}
 
-        {/* Refinement-Queries (read-only in v0.1; v0.3 könnte sie klickbar
-            machen für direktes Re-Retrieval = Pass 4 mini) */}
+        {/* Refinement-Queries — klickbar wenn onFollowUp callback vorhanden,
+            sonst readonly. Klick triggert eine NEUE Query mit der
+            vorgeschlagenen Such-Phrase als Topic. Der parent (Home/Canvas)
+            empfängt das via onFollowUp und behandelt es wie jede andere
+            User-Query. Das ist effektiv „Pass 4 mini" — refined-retrieval
+            durch User-Klick statt Auto-Loop. Der User behält die Kontrolle
+            ob er die Suggestion verfolgen will. */}
         {refinements.length > 0 && (
           <div>
             <div
@@ -1841,28 +1849,75 @@ function CoverageHealthBox({
             >
               <SearchIcon size={12} />
               {tl("Refinement-Vorschläge", "Refinement Suggestions")} ({refinements.length})
+              {onFollowUp && (
+                <span style={{ fontSize: 10, fontWeight: 400, color: "#9CA3AF", textTransform: "none", letterSpacing: 0 }}>
+                  · {tl("klicken um Folge-Query zu starten", "click to start follow-up query")}
+                </span>
+              )}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {refinements.map((q, i) => (
-                <span
-                  key={`ref-${i}`}
-                  style={{
-                    fontSize: 12,
-                    color: "#075985",
-                    background: "#E0F2FE",
-                    border: "1px solid #7DD3FC",
-                    borderRadius: 4,
-                    padding: "4px 10px",
-                    fontFamily: "var(--volt-font-mono, monospace)",
-                  }}
-                  title={tl(
-                    "Suchvorschlag von Pass-3 — könnte fehlende Signale finden, falls als Folge-Query genutzt",
-                    "Search suggestion from Pass 3 — might find missing signals if used as a follow-up query",
-                  )}
-                >
-                  {q}
-                </span>
-              ))}
+              {refinements.map((q, i) => {
+                const tooltipText = onFollowUp
+                  ? tl(
+                      `Klick startet eine neue Query mit "${q}" als Topic. Sucht gezielt nach Signalen die in dieser Lücke fehlen.`,
+                      `Click to start a new query with "${q}" as topic. Targets signals that fill this gap.`,
+                    )
+                  : tl(
+                      "Suchvorschlag von Pass-3 — könnte fehlende Signale finden, falls als Folge-Query genutzt",
+                      "Search suggestion from Pass 3 — might find missing signals if used as a follow-up query",
+                    );
+                if (onFollowUp) {
+                  return (
+                    <button
+                      key={`ref-${i}`}
+                      onClick={() => onFollowUp(q)}
+                      title={tooltipText}
+                      style={{
+                        fontSize: 12,
+                        color: "#075985",
+                        background: "#E0F2FE",
+                        border: "1px solid #7DD3FC",
+                        borderRadius: 4,
+                        padding: "4px 10px",
+                        fontFamily: "var(--volt-font-mono, monospace)",
+                        cursor: "pointer",
+                        transition: "background 120ms ease, border-color 120ms ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#BAE6FD";
+                        e.currentTarget.style.borderColor = "#0EA5E9";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#E0F2FE";
+                        e.currentTarget.style.borderColor = "#7DD3FC";
+                      }}
+                    >
+                      <SearchIcon size={11} />
+                      {q}
+                    </button>
+                  );
+                }
+                return (
+                  <span
+                    key={`ref-${i}`}
+                    style={{
+                      fontSize: 12,
+                      color: "#075985",
+                      background: "#E0F2FE",
+                      border: "1px solid #7DD3FC",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontFamily: "var(--volt-font-mono, monospace)",
+                    }}
+                    title={tooltipText}
+                  >
+                    {q}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

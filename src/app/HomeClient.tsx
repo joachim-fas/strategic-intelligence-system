@@ -1230,6 +1230,24 @@ export default function HomeClient() {
       parentQuery: prevCtx?.query, // link to parent if this is a follow-up
       pipelineStages: defaultPipelineStages(),
     }, ...prev]);
+
+    // 2026-04-23 Folgefrage-Threading-P2 Investigation:
+    // Day-1-Backlog-Item meldete: "C-Frage als Folgefrage zu B-Session-Query
+    // gethreaded, obwohl neuer Workspace erwartet". Code-Review (alle
+    // parentQuery-Schreibstellen, alle prevCtx-Caller) zeigte: nur
+    // onFollowUp-Klick passes prevCtx. Command-Line + Retry passes
+    // immer undefined. Der Retry-Self-Reference-Bug wurde durch 80ff12a
+    // behoben. Wenn das Day-1-Pattern noch reproduzierbar ist, liegt es
+    // wahrscheinlich an User-Intent-Confusion (z.B. SuggestedTag-Chip
+    // versehentlich angeklickt) oder einer Race-Condition mit stale
+    // activeEntry-closures. Diese defensive Log-Zeile gibt forensische
+    // Daten falls der Bug nochmal auftritt: was wurde als Parent
+    // gesetzt, was als Child, war es bewusst ein follow-up.
+    if (prevCtx) {
+      console.log(
+        `[handleSubmit:follow-up] parent="${prevCtx.query.slice(0, 60)}…" child="${q.slice(0, 60)}…" (prevCtx-driven)`,
+      );
+    }
     // New query always becomes the active node in the session
     setActiveNodeId(entryId);
     setQuery("");
