@@ -17,6 +17,7 @@
 import {
   extractCoverageReport,
   formatCoverageBlock,
+  clampConfidenceToCeiling,
   type CoverageReport,
 } from "../src/lib/signal-coverage-critique";
 
@@ -236,6 +237,82 @@ section("formatCoverageBlock — gaps with low severity also shown");
   const block = formatCoverageBlock(lowGaps);
   assert(block.length > 0, "low-severity gap still triggers block (any gap = relevant)");
   assert(block.includes("[LOW]"), "low severity shown");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  clampConfidenceToCeiling — Pass-3-Ceiling-Enforcement
+// ═══════════════════════════════════════════════════════════════════════
+section("clampConfidenceToCeiling — basic clamping");
+
+{
+  // Over-ceiling → clamped down
+  const r = clampConfidenceToCeiling(0.85, 0.4);
+  assert(r.confidence === 0.4, "0.85 confidence over 0.4 ceiling → clamped to 0.4");
+  assert(r.clamped !== null, "clamp metadata returned");
+  assert(r.clamped?.original === 0.85, "original recorded");
+  assert(r.clamped?.ceiling === 0.4, "ceiling recorded");
+}
+
+{
+  // Under-ceiling → untouched
+  const r = clampConfidenceToCeiling(0.3, 0.4);
+  assert(r.confidence === 0.3, "0.3 confidence under 0.4 ceiling → not clamped");
+  assert(r.clamped === null, "no clamp metadata when under ceiling");
+}
+
+{
+  // Equal to ceiling → not clamped (boundary)
+  const r = clampConfidenceToCeiling(0.4, 0.4);
+  assert(r.confidence === 0.4, "exactly at ceiling → not clamped");
+  assert(r.clamped === null, "no clamp metadata when exactly at ceiling");
+}
+
+section("clampConfidenceToCeiling — defensive null/invalid handling");
+
+{
+  // No ceiling → no clamp
+  const r = clampConfidenceToCeiling(0.85, null);
+  assert(r.confidence === 0.85, "null ceiling → no clamp");
+  assert(r.clamped === null, "null ceiling → no metadata");
+}
+
+{
+  const r = clampConfidenceToCeiling(0.85, undefined);
+  assert(r.confidence === 0.85, "undefined ceiling → no clamp");
+}
+
+{
+  // Out-of-range ceiling → no clamp (defensive)
+  const r = clampConfidenceToCeiling(0.85, 1.5);
+  assert(r.confidence === 0.85, "ceiling > 1 → no clamp");
+}
+
+{
+  const r = clampConfidenceToCeiling(0.85, -0.2);
+  assert(r.confidence === 0.85, "ceiling < 0 → no clamp");
+}
+
+{
+  // NaN confidence → no clamp (don't propagate NaN)
+  const r = clampConfidenceToCeiling(NaN, 0.5);
+  assert(isNaN(r.confidence), "NaN confidence → returned unchanged");
+  assert(r.clamped === null, "no clamp metadata for NaN");
+}
+
+section("clampConfidenceToCeiling — edge ceilings");
+
+{
+  // Ceiling 0 → all confidence clamped to 0
+  const r = clampConfidenceToCeiling(0.5, 0);
+  assert(r.confidence === 0, "ceiling 0 → confidence 0");
+  assert(r.clamped !== null, "clamp metadata recorded");
+}
+
+{
+  // Ceiling 1 → never clamps (any valid confidence is ≤ 1)
+  const r = clampConfidenceToCeiling(0.85, 1);
+  assert(r.confidence === 0.85, "ceiling 1 → never clamps");
+  assert(r.clamped === null, "no clamp at ceiling 1");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

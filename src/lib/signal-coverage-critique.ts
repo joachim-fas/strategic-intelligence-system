@@ -347,6 +347,47 @@ export async function analyzeCoverage(
 }
 
 /**
+ * Hard-clamp the synthesis-LLM's self-reported confidence against the
+ * Pass-3 confidence ceiling. Sonnet can ignore the injected
+ * <coverage_analysis> instruction and still claim higher confidence
+ * than the ceiling allows — this function enforces the ceiling as a
+ * UPPER BOUND. Conservative LLM confidence (below ceiling) is left
+ * untouched; only over-confidence gets capped.
+ *
+ * Returns:
+ *   - confidence: the (possibly clamped) value the route should use
+ *   - clamped: metadata for logging + UI surfacing, or null if no clamp happened
+ *
+ * Defensive null-handling: if ceiling is missing or out of [0, 1],
+ * no clamp is applied. Pass-3 might not have produced a ceiling
+ * (Pass-3 failed entirely → null report), in which case we trust the
+ * LLM's self-confidence as-is.
+ *
+ * Exported for testing.
+ */
+export function clampConfidenceToCeiling(
+  llmConfidence: number,
+  ceiling: number | null | undefined,
+): {
+  confidence: number;
+  clamped: { original: number; ceiling: number } | null;
+} {
+  if (typeof ceiling !== "number" || ceiling < 0 || ceiling > 1) {
+    return { confidence: llmConfidence, clamped: null };
+  }
+  if (typeof llmConfidence !== "number" || isNaN(llmConfidence)) {
+    return { confidence: llmConfidence, clamped: null };
+  }
+  if (llmConfidence <= ceiling) {
+    return { confidence: llmConfidence, clamped: null };
+  }
+  return {
+    confidence: ceiling,
+    clamped: { original: llmConfidence, ceiling },
+  };
+}
+
+/**
  * Format the coverage report as a structured text block for injection
  * into the synthesis system prompt. Returns empty string if report is
  * null or trivially empty (no gaps, no biases) — in that case there's

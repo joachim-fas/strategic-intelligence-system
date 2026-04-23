@@ -1011,3 +1011,150 @@ Aktuell wissen wir das noch nicht — die ersten paar Live-Runs werden
 zeigen ob die LLM gute Refinement-Queries generiert oder nur
 generisches "more research needed". Bei guten Queries → Pass 4 bauen.
 Bei schwachen → Pass-3-Prompt verschärfen, Pass 4 zurückstellen.
+
+---
+
+# Pass-3 Hardening + Telemetry-Tooling (Abend-Folge-Sweep)
+
+Nach dem Pass-3-Build noch drei Hygiene-Schritte:
+
+## 1. Confidence-Clamp Post-Validator
+
+Pass 3 injiziert ein Confidence-Ceiling in den Synthesis-Prompt mit
+`INSTRUCTION: Respect the confidence ceiling`. Sonnet kann diese
+Anweisung aber **theoretisch ignorieren** und trotzdem 70% Konfidenz
+reklamieren obwohl Pass-3 0.4 als Maximum sagt — das war als
+explizite Limitation in der v0.1-Doku notiert.
+
+**Fix:** `clampConfidenceToCeiling(llmConfidence, ceiling)` Pure-
+Function in `src/lib/signal-coverage-critique.ts`. Logik:
+
+- Wenn `ceiling` null/missing/out-of-range → kein Clamp, return as-is
+- Wenn `llmConfidence ≤ ceiling` → kein Clamp (LLM ist konservativ, OK)
+- Wenn `llmConfidence > ceiling` → clamp auf `ceiling`, Metadaten zur
+  Telemetrie zurückgeben (`{ original, ceiling }`)
+
+Hard-Clamp im Synthesis-Post-Processing-Pfad (route.ts), zwischen
+Contradiction-Confidence-Adjustment und finalResult-Build:
+
+```typescript
+const { clampConfidenceToCeiling } = await import("@/lib/signal-coverage-critique");
+const clampResult = clampConfidenceToCeiling(validated.confidence, coverageReport.confidenceCeiling);
+if (clampResult.clamped) {
+  console.warn(`[query:coverage-clamp] LLM confidence ${...}% > ceiling ${...}%, clamping`);
+  validated.confidence = clampResult.confidence;
+  // emit activity event + add _coverageCeilingClamp to finalResult
+}
+```
+
+Telemetrie:
+```
+[query:coverage-clamp] LLM confidence 65% > ceiling 40%, clamping
+```
+
+Activity-Stream-Event:
+```
+"Confidence-Clamp: 65% → 40% (Coverage-Ceiling)"
+```
+
+`finalResult` wird um `_coverageReport` (gaps + biases + ceiling +
+refinementQueries) und `_coverageCeilingClamp` (`{original, ceiling}`)
+erweitert. Future-UI-Work kann das als „Coverage-Health"-Box rendern.
+
+**Tests:** 19 Assertions in `signal-coverage-critique-test.ts`:
+- Über-Ceiling clamping
+- Unter-Ceiling pass-through
+- Boundary-Case (gleich Ceiling) → kein Clamp
+- Defensive null/undefined/out-of-range/NaN Handling
+- Edge-Ceilings (0 → alles auf 0 clamped, 1 → nie clamped)
+
+## 2. Telemetry-Aggregator Tool
+
+Die Pipeline loggt jetzt mehrere `[query:*]`-Zeilen pro Query
+(Pass-2a/2b, Coverage-Critique, Clamp, llm-1, llm-2-retry). Ohne
+Aggregations-Tool sind diese Logs inert.
+
+**Neu:** `scripts/telemetry-aggregate.ts` parst Server-Logs und produziert
+eine Cost-/Latency-/Quality-Übersicht:
+
+```
+═══════════════════════════════════════════════════════════════
+  SIS Telemetry Aggregate — N queries
+═══════════════════════════════════════════════════════════════
+
+COST
+  Total:      $0.7115
+  Mean/query: $0.2372
+  Max/query:  $0.3804
+
+LATENCY (sum of all LLM calls per query)
+  Mean: 134.8s
+  P95:  232.5s
+
+SYNTHESIS (Sonnet) STOP REASONS
+  end_turn          2  (67%)
+  max_tokens        1  (33%)
+  ⚠️  max_tokens stop_reason indicates synthesis was truncated.
+
+COLLAPSE-RETRY RATE
+  1 of 3 queries triggered the synthesis-only-collapse retry  (33%)
+
+PASS 2A — LLM-Relevance-Filter (pre-synthesis)
+  Mean drop rate: 49%
+  Mean LLM score: 5.3 / 10
+
+PASS 3 — Coverage-Critique
+  Mean confidence-ceiling: 50%
+  Low ceilings (< 50%):    2 (67%)
+  Total coverage-gaps detected: 6
+  ⚠️  >40% of queries get low ceiling — DB likely too sparse for the
+     question domain.
+
+PASS 3 — Confidence-Clamp activations
+  Queries: 2 of 3  (67%)
+  Mean drop: 35pp
+  ⚠️  Sonnet ignores the ceiling instruction in >50% of cases.
+     Consider strengthening the prompt.
+```
+
+**Use-Cases:**
+- **Cost-Monitoring:** wieviel verbrennt SIS pro Query / Session?
+- **Quality-Diagnose:** wenn Pass-3-Mean-Ceiling kontinuierlich niedrig
+  ist, brauchen wir mehr Connectors (DB-Sparse-Hint)
+- **Prompt-Tuning-Signal:** wenn Confidence-Clamp in >50% feuert,
+  ignoriert Sonnet die Ceiling-Instruction systematisch — Pass-3-
+  Prompt schärfen
+- **Synthesis-Truncation-Detection:** wenn `max_tokens` stop_reason
+  häufig auftaucht, Synthesis wird abgeschnitten — `max_tokens`-Cap
+  raufdrehen
+
+**Usage:**
+```bash
+cat server.log | npx tsx scripts/telemetry-aggregate.ts
+# oder
+npx tsx scripts/telemetry-aggregate.ts /path/to/server.log
+```
+
+## 3. Pre-Frage v0.1 → v0.2 Backwards-Compat
+
+Geprüft: in `project_queries` keine v0.1-Step-Daten gespeichert
+(`SELECT query FROM project_queries WHERE query LIKE 'pre-frage/%'`
+→ leer). Framework wurde am gleichen Tag deployed wie korrigiert,
+kein User-Run dazwischen. **Kein Migrations-Skript nötig.**
+
+Edge-Case (browser-cached v0.1-UI gegen v0.2-Backend) → 422 „Unknown
+step" — sauberer Error, kein Crash. Acceptable.
+
+## Files
+
+- **`src/lib/signal-coverage-critique.ts`** — `clampConfidenceToCeiling`
+  ergänzt (~30 Zeilen)
+- **`src/app/api/v1/query/route.ts`** — Confidence-Clamp im Post-
+  Processing-Pfad + `_coverageReport` + `_coverageCeilingClamp` im
+  finalResult
+- **`scripts/signal-coverage-critique-test.ts`** — +19 Clamp-Tests
+  (Total: 58/58)
+- **`scripts/telemetry-aggregate.ts`** (neu, ~280 Zeilen) — Cost/
+  Latency/Quality-Aggregator über `[query:*]`-Logs
+- **`docs/frameworks/pre-frage-spec.md`** — Backwards-Compat-Section
+  ergänzt

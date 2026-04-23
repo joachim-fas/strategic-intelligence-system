@@ -1411,6 +1411,42 @@ export async function POST(req: Request) {
             }
           }
 
+          // 2026-04-23 Iteration-Loop Pass 3 — Confidence-Clamp:
+          // Sonnet CAN ignore the injected <coverage_analysis> ceiling
+          // instruction and still claim higher confidence than the
+          // Pass-3 evidence justifies. Hard-clamp here enforces the
+          // ceiling as an upper bound. Conservative LLM confidence
+          // (below ceiling) is untouched; only over-confidence gets
+          // capped. See `clampConfidenceToCeiling` in
+          // src/lib/signal-coverage-critique.ts for the pure-function
+          // logic + tests.
+          let coverageCeilingClamp: { original: number; ceiling: number } | null = null;
+          if (coverageReport) {
+            const { clampConfidenceToCeiling } =
+              await import("@/lib/signal-coverage-critique");
+            const clampResult = clampConfidenceToCeiling(
+              validated.confidence,
+              coverageReport.confidenceCeiling,
+            );
+            if (clampResult.clamped) {
+              console.warn(
+                `[query:coverage-clamp] LLM confidence ${(clampResult.clamped.original * 100).toFixed(0)}% > ceiling ${(clampResult.clamped.ceiling * 100).toFixed(0)}%, clamping`,
+              );
+              validated.confidence = clampResult.confidence;
+              coverageCeilingClamp = clampResult.clamped;
+              emitActivity({
+                type: "query",
+                phase: "coverage-clamp",
+                message: `Confidence-Clamp: ${(coverageCeilingClamp.original * 100).toFixed(0)}% → ${(coverageCeilingClamp.ceiling * 100).toFixed(0)}% (Coverage-Ceiling)`,
+                meta: {
+                  original: coverageCeilingClamp.original,
+                  ceiling: coverageCeilingClamp.ceiling,
+                  clamped: clampResult.confidence,
+                },
+              });
+            }
+          }
+
           // API-03 + VAL-01 + v0.2: Final result with full meta metadata
           const finalResult = {
             ...validated,
@@ -1432,6 +1468,19 @@ export async function POST(req: Request) {
             ...(wasRepaired ? { _repaired: true } : {}),
             ...(qualityWarnings.length > 0 ? { _dataQualityWarnings: qualityWarnings } : {}),
             ...(warnings.length > 0 ? { _validationWarnings: warnings } : {}),
+            // 2026-04-23 Pass 3: surface coverage report + clamp metadata
+            // in the response payload so future UI work can render a
+            // "Coverage-Health" indicator. The report is non-PII (just
+            // gaps + biases + ceiling) and useful for stakeholder
+            // transparency about how the system arrived at its confidence.
+            ...(coverageReport ? { _coverageReport: {
+              coverageGaps: coverageReport.coverageGaps,
+              representationBiases: coverageReport.representationBiases,
+              confidenceCeiling: coverageReport.confidenceCeiling,
+              refinementQueries: coverageReport.refinementQueries,
+              synthesis: coverageReport.synthesis,
+            } } : {}),
+            ...(coverageCeilingClamp ? { _coverageCeilingClamp: coverageCeilingClamp } : {}),
           };
           send({ type: "complete", result: finalResult });
           emitActivity({

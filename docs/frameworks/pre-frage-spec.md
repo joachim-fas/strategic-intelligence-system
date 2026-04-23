@@ -298,3 +298,11 @@ Erwartetes Verhalten:
 Die v0.1-Iteration hat ~1200 Zeilen Code produziert auf Basis eines fundamental falsch verstandenen Use-Cases. Founder-Korrektur kam schnell (innerhalb von Stunden), aber zeigt: bei konzeptionellen Frameworks ist der **konkrete Use-Case-Sketch VOR dem Build** unbezahlbar wertvoll.
 
 Die v0.2-Iteration begann mit einem **manuellen Concept-Sketch im Chat** für ein Beispiel-Thema („Klimawandel und europäischer Tourismus"). Dieser Sketch hat in 10 Minuten Klarheit geschaffen, die der v0.1-Build in 45 Minuten nicht erreichen konnte. **Sketches vor Code, immer.**
+
+## Backwards-Compat-Status (v0.1 → v0.2)
+
+Geprüft: keine v0.1-Step-Daten in `project_queries` (`SELECT query FROM project_queries WHERE query LIKE 'pre-frage/%'` → leer). Das Framework wurde am 2026-04-23 first-deployed mit v0.1 und am gleichen Tag durch v0.2 ersetzt — kein User-Run dazwischen.
+
+Edge-Case: User hat browser-cached v0.1-UI und triggert step `reframing`. Route returnt 422 mit „Unknown step 'reframing' for framework 'pre-frage'. Valid steps: topic-mapping, question-atlas, starter-sequence." Sauberer Error, kein Crash. Acceptable.
+
+Kein Migration-Skript nötig.
